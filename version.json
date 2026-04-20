@@ -1,15 +1,11 @@
 {
-    "version": "1.0.2",
+    "version": "1.0.4",
     "archivos": [
-        "lisps/BV.lsp",
-        "lisps/DL2.lsp",
-        "lisps/MC.lsp",
-        "lisps/MPEND.lsp",
-        "lisps/NOMBRAR.lsp",
-        "lisps/P0.lsp",
-        "lisps/PND.lsp",
-        "lisps/RMLAY.lsp",
-        "lisps/ST0.lsp",
-        "lisps/ZE.lsp"
+        "lisps/BV.lsp", "lisps/DL2.lsp", "lisps/MC.lsp", "lisps/MPEND.lsp",
+        "lisps/NOMBRAR.lsp", "lisps/P0.lsp", "lisps/PND.lsp", "lisps/RMLAY.lsp",
+        "lisps/ST0.lsp", "lisps/ZE.lsp", "lisps/W08.lsp", "lisps/ESTRUCTURA.lsp",
+        "lisps/RC-CAPAS.lsp",
+        "startup/MisColores.lsp", "startup/AutoCrearPropiedad.lsp", "startup/AUTO-DYNMODE.lsp",
+        "masters/FORMATOS ANOTATIVOS ACAD_2025.dwg"
     ]
 }
