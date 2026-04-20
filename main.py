@@ -164,8 +164,11 @@ class ActualizadorCAD(ctk.CTk):
         ruta_acaddoc = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
         with open(ruta_acaddoc, 'w', encoding='utf-8') as f:
             f.write(';; CARGADOR ESTANDAR SINCAL\n(princ "\\nCargando Estándar SINCAL...")\n')
-            # Forzamos la carga de SINCAL.lsp primero
-            f.write(f'(load "{ruta_sincal_lsp.replace("\\", "\\\\")}")\n')
+            
+            # SOLUCIÓN DEL ERROR DE SINTAXIS (Variable intermedia)
+            ruta_sincal_escapada = ruta_sincal_lsp.replace('\\', '\\\\')
+            f.write(f'(load "{ruta_sincal_escapada}")\n')
+            
             # Cargar el resto de archivos
             for a in archivos:
                 if a.endswith('.lsp') and "SINCAL.lsp" not in a:
