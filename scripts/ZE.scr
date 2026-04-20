@@ -1,0 +1,5 @@
+_.ZOOM
+_E
+(setvar "DYNMODE" 3)
+(setvar "WIPEOUTFRAME" 0)
+_.QSAVE

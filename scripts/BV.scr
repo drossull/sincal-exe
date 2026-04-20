@@ -1,0 +1,7 @@
+(setq lays nil)
+(foreach x (dictsearch (namedobjdict) "ACAD_LAYOUT") (if (and (= (car x) 3) (/= (strcase (cdr x)) "MODEL")) (setq lays (cons (cdr x) lays))))
+(foreach lay lays (setvar "CTAB" lay) (if (setq ss (ssget "X" (list '(0 . "VIEWPORT") (cons 410 lay)))) (command "_.MVIEW" "_Lock" "_ON" ss "")))
+(setvar "DYNMODE" 3)
+(setvar "WIPEOUTFRAME" 0)
+_.QSAVE
+_.CLOSE

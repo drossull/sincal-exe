@@ -1,0 +1,9 @@
+(command "_-PSETUPIN" "C:/Users/Usuario/Documents/SINCAL/000 - ESTANDAR 2025/FORMATOS ANOTATIVOS ACAD_2025.dwg" "SINCAL-A1")
+(if (= (logand (getvar "CMDACTIVE") 1) 1) (command "_Y"))
+(setq laylist nil)
+(foreach item (dictsearch (namedobjdict) "ACAD_LAYOUT") (if (and (= (car item) 3) (/= (strcase (cdr item)) "MODEL")) (setq laylist (cons (cdr item) laylist))))
+(foreach lay laylist (setvar "CTAB" lay) (command "_.-PLOT" "_N" "" "SINCAL-A1" "" "" "_Y" "_N"))
+(setvar "DYNMODE" 3)
+(setvar "WIPEOUTFRAME" 0)
+_.QSAVE
+_.CLOSE

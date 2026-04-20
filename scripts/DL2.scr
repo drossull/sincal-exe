@@ -1,0 +1,31 @@
+(setvar "CTAB" "Model")
+(setq layFound nil)
+(foreach x (dictsearch (namedobjdict) "ACAD_LAYOUT") (if (and (= (car x) 3) (= (strcase (cdr x)) "LAYOUT2")) (setq layFound T)))
+(if layFound (command "_.-LAYOUT" "_D" "Layout2"))
+
+(setq dict (dictsearch (namedobjdict) "ACAD_LAYOUT"))
+(setq minOrd 9999 firstLay nil)
+(foreach item dict
+  (if (= (car item) 3)
+    (progn
+      (setq layName (cdr item))
+      (if (/= (strcase layName) "MODEL")
+        (progn
+          (setq layEnt (cdr (assoc 350 (member item dict))))
+          (setq tabOrd (cdr (assoc 71 (entget layEnt))))
+          (if (and tabOrd (< tabOrd minOrd))
+            (progn
+              (setq minOrd tabOrd)
+              (setq firstLay layName)
+            )
+          )
+        )
+      )
+    )
+  )
+)
+(if firstLay (setvar "CTAB" firstLay))
+(setvar "DYNMODE" 3)
+(setvar "WIPEOUTFRAME" 0)
+_.QSAVE
+_.CLOSE

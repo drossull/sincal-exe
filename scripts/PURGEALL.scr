@@ -1,0 +1,15 @@
+_.-PURGE
+_R
+*
+_N
+_.-PURGE
+_A
+*
+_N
+_.-PURGE
+_A
+*
+_N
+(setvar "WIPEOUTFRAME" 0)
+_.QSAVE
+_.CLOSE

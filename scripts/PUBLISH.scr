@@ -1,0 +1,9 @@
+(setvar "EXPERT" 5)
+(setq lays nil)
+(foreach x (dictsearch (namedobjdict) "ACAD_LAYOUT") (if (and (= (car x) 3) (/= (strcase (cdr x)) "MODEL")) (setq lays (cons (cdr x) lays))))
+(foreach lay lays (setq outPath (strcat (getvar "DWGPREFIX") (vl-filename-base (getvar "DWGNAME")) ".pdf")) (command "_.-PLOT" "_N" lay "" "" outPath "_N" "_Y"))
+(setvar "EXPERT" 0)
+(setvar "DYNMODE" 3)
+(setvar "WIPEOUTFRAME" 0)
+_.QSAVE
+_.CLOSE
