@@ -4,7 +4,7 @@ Desarrollado por G. Mardones, dibujante proyectista Sincal Ltda.
 
 Bienvenido al repositorio central de herramientas, scripts y rutinas LISP para AutoCAD y ZWCAD. 
 
-Este repositorio actúa como el **servidor maestro** para el instalador y actualizador automático. A través de este sistema, los usuarios finales pueden mantener sus herramientas de diseño siempre actualizadas sin necesidad de descargar o configurar archivos manualmente.
+Este repositorio actúa como el **servidor maestro** para el instalador y actualizador automático. A través de este sistema, los trabajadores de Sincal pueden mantener sus herramientas de diseño siempre actualizadas sin necesidad de descargar o configurar archivos manualmente.
 
 ---
 
