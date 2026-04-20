@@ -4,6 +4,7 @@ import json
 import requests
 import winreg
 import threading
+import ctypes
 import customtkinter as ctk
 
 # --- CONFIGURACIÓN ---
@@ -12,7 +13,6 @@ REPO_GITHUB = "sincal-exe"
 RAMA = "main" 
 
 URL_BASE_RAW = f"https://raw.githubusercontent.com/{USUARIO_GITHUB}/{REPO_GITHUB}/{RAMA}/"
-# Nombre de carpeta actualizado a Estándar SINCAL
 RUTA_LOCAL_APP = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL") 
 
 ctk.set_appearance_mode("System")  
@@ -84,6 +84,53 @@ class ActualizadorCAD(ctk.CTk):
         self.consola.configure(state="disabled")
         threading.Thread(target=self.motor_actualizacion).start()
 
+    def buscar_y_configurar_consolas(self):
+        """Busca accoreconsole o ZWCADConsole y crea un archivo .bat de referencia"""
+        self.log("[-] Localizando ejecutables de consola CAD...")
+        ruta_config_bat = os.path.join(RUTA_LOCAL_APP, "scripts", "cad_env.bat")
+        exe_encontrado = None
+
+        # 1. Intentar encontrar AutoCAD
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Autodesk\AutoCAD") as key:
+                for i in range(winreg.QueryInfoKey(key)[0]):
+                    v_name = winreg.EnumKey(key, i)
+                    v_path = f"SOFTWARE\\Autodesk\\AutoCAD\\{v_name}"
+                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, v_path) as vk:
+                        for j in range(winreg.QueryInfoKey(vk)[0]):
+                            p_name = winreg.EnumKey(vk, j)
+                            p_path = f"{v_path}\\{p_name}"
+                            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, p_path) as pk:
+                                install_path, _ = winreg.QueryValueEx(pk, "InstallPath")
+                                full_exe = os.path.join(install_path, "accoreconsole.exe")
+                                if os.path.exists(full_exe):
+                                    exe_encontrado = full_exe
+                                    break
+                    if exe_encontrado: break
+        except: pass
+
+        # 2. Si no hay AutoCAD, intentar ZWCAD
+        if not exe_encontrado:
+            try:
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\ZWSOFT\ZWCAD") as key:
+                    for i in range(winreg.QueryInfoKey(key)[0]):
+                        v_name = winreg.EnumKey(key, i)
+                        v_path = f"SOFTWARE\\ZWSOFT\\ZWCAD\\{v_name}"
+                        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, v_path) as vk:
+                            install_path, _ = winreg.QueryValueEx(vk, "InstallPath")
+                            full_exe = os.path.join(install_path, "ZWCADConsole.exe")
+                            if os.path.exists(full_exe):
+                                exe_encontrado = full_exe
+                                break
+            except: pass
+
+        if exe_encontrado:
+            with open(ruta_config_bat, 'w') as f:
+                f.write(f'@set "CAD_CONSOLE={exe_encontrado}"')
+            self.log(f" [+] Consola detectada: {os.path.basename(exe_encontrado)}")
+        else:
+            self.log(" [!] No se detectó ninguna consola CAD compatible.")
+
     def actualizar_rutas_registro(self):
         self.log("[-] Configurando rutas de soporte en CAD...")
         targets = [
@@ -118,95 +165,59 @@ class ActualizadorCAD(ctk.CTk):
                                 except: pass
             except: pass
 
+    def actualizar_variable_entorno(self):
+        self.log("[-] Configurando Variables de Entorno (PATH)...")
+        ruta_scripts = os.path.join(RUTA_LOCAL_APP, "scripts")
+        os.makedirs(ruta_scripts, exist_ok=True)
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS) as key:
+                try:
+                    path_actual, _ = winreg.QueryValueEx(key, "Path")
+                except: path_actual = ""
+                if ruta_scripts.lower() not in path_actual.lower():
+                    nuevo_path = f"{path_actual};{ruta_scripts}" if path_actual else ruta_scripts
+                    winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, nuevo_path)
+                    HWND_BROADCAST, WM_SETTINGCHANGE, SMTO_ABORTIFHUNG = 0xFFFF, 0x001A, 0x0002
+                    ctypes.windll.user32.SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, 0, "Environment", SMTO_ABORTIFHUNG, 5000, None)
+                    self.log(" [+] Scripts agregados al PATH.")
+        except: pass
+
     def generar_archivos_lisp(self, archivos):
-        """Genera el cargador y el comando SINCAL con rutas dinámicas"""
         self.log("[-] Generando cargadores dinámicos...")
-        
-        # 1. Generar SINCAL.lsp dinámico
         ruta_dwg_maestro = os.path.join(RUTA_LOCAL_APP, "masters", "FORMATOS ANOTATIVOS ACAD_2025.dwg").replace('\\', '\\\\')
         ruta_sincal_lsp = os.path.join(RUTA_LOCAL_APP, "lisps", "SINCAL.lsp")
-        
-        codigo_sincal = f'''
-(defun c:SINCAL (/ RutaArchivoMaestro nombreBloque cmdecho_ini attreq_ini entUltima)
-  (vl-load-com) 
-  (setq RutaArchivoMaestro "{ruta_dwg_maestro}")
-  (setq cmdecho_ini (getvar "CMDECHO"))
-  (setq attreq_ini (getvar "ATTREQ"))
-  (setvar "CMDECHO" 0)
-  (setvar "ATTREQ" 0) 
-  (princ "\\n[SINCAL] Buscando archivo de normas...")
-  (if (findfile RutaArchivoMaestro)
-    (progn
-      (setq nombreBloque (vl-filename-base RutaArchivoMaestro))
-      (if (tblsearch "BLOCK" nombreBloque)
-        (command "._-INSERT" (strcat nombreBloque "=" RutaArchivoMaestro) "_Y" "0,0,0" "1" "1" "0")
-        (command "._-INSERT" RutaArchivoMaestro "0,0,0" "1" "1" "0")
-      )
-      (setq entUltima (entlast))
-      (if entUltima (entdel entUltima))
-      (vl-cmdf "._-PURGE" "_B" nombreBloque "_N")
-      (if (tblsearch "STYLE" "RomanD") (setvar "TEXTSTYLE" "RomanD"))
-      (if (tblsearch "DIMSTYLE" "GSG_COTAS") (command "._-DIMSTYLE" "_R" "GSG_COTAS"))
-      (princ (strcat "\\n[EXITO] Estándares importados desde: " RutaArchivoMaestro))
-    )
-    (alert (strcat "ERROR: No se encuentra el maestro en:\\n" RutaArchivoMaestro))
-  )
-  (setvar "ATTREQ" attreq_ini)
-  (setvar "CMDECHO" cmdecho_ini)
-  (princ)
-)
-(princ "\\nComando SINCAL cargado correctamente.") (princ)
-'''
-        with open(ruta_sincal_lsp, 'w', encoding='utf-8') as f:
-            f.write(codigo_sincal)
-
-        # 2. Generar acaddoc.lsp (Cargador de todo)
+        codigo_sincal = f'''(defun c:SINCAL (/ R nombreB c i a e) (vl-load-com) (setq R "{ruta_dwg_maestro}") (setq c (getvar "CMDECHO") a (getvar "ATTREQ")) (setvar "CMDECHO" 0) (setvar "ATTREQ" 0) (if (findfile R) (progn (setq nombreB (vl-filename-base R)) (if (tblsearch "BLOCK" nombreB) (command "._-INSERT" (strcat nombreB "=" R) "_Y" "0,0,0" "1" "1" "0") (command "._-INSERT" R "0,0,0" "1" "1" "0")) (setq e (entlast)) (if e (entdel e)) (vl-cmdf "._-PURGE" "_B" nombreB "_N") (if (tblsearch "STYLE" "RomanD") (setvar "TEXTSTYLE" "RomanD")) (if (tblsearch "DIMSTYLE" "GSG_COTAS") (command "._-DIMSTYLE" "_R" "GSG_COTAS")) (princ (strcat "\\n[EXITO] Importado: " R))) (alert "Error: Maestro no hallado")) (setvar "ATTREQ" a) (setvar "CMDECHO" c) (princ))'''
+        with open(ruta_sincal_lsp, 'w', encoding='utf-8') as f: f.write(codigo_sincal)
         ruta_acaddoc = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
         with open(ruta_acaddoc, 'w', encoding='utf-8') as f:
-            f.write(';; CARGADOR ESTANDAR SINCAL\n(princ "\\nCargando Estándar SINCAL...")\n')
-            
-            # SOLUCIÓN DEL ERROR DE SINTAXIS (Variable intermedia)
-            ruta_sincal_escapada = ruta_sincal_lsp.replace('\\', '\\\\')
-            f.write(f'(load "{ruta_sincal_escapada}")\n')
-            
-            # Cargar el resto de archivos
+            f.write(';; SINCAL\n(princ "\\nCargando SINCAL...")\n')
+            r_s = ruta_sincal_lsp.replace('\\', '\\\\')
+            f.write(f'(load "{r_s}")\n')
             for a in archivos:
                 if a.endswith('.lsp') and "SINCAL.lsp" not in a:
                     r = os.path.join(RUTA_LOCAL_APP, a).replace('\\', '\\\\')
                     f.write(f'(if (findfile "{r}") (load "{r}"))\n')
-            f.write('(princ "\\n[OK] Todos los Lisps de SINCAL cargados.")(princ)\n')
+            f.write('(princ "\\n[OK] Lisps cargados.")(princ)\n')
 
     def motor_actualizacion(self):
         self.log("--- INICIANDO ACTUALIZACIÓN ---")
         os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
-        
         try:
             r = requests.get(URL_BASE_RAW + "version.json")
-            r.raise_for_status()
             data = r.json()
-            v_nube = data.get("version")
             archivos = data.get("archivos", [])
-        except Exception as e:
-            self.log(f"[!] Error de red: {e}")
-            self.btn_actualizar.configure(state="normal", text="Reintentar")
-            return
-
-        # Sincronizar archivos
-        self.log(f"[-] Versión nube: {v_nube}. Descargando...")
-        for a in archivos:
-            r_save = os.path.join(RUTA_LOCAL_APP, a)
-            os.makedirs(os.path.dirname(r_save), exist_ok=True)
-            res = requests.get(URL_BASE_RAW + a)
-            if res.status_code == 200:
+            for a in archivos:
+                r_save = os.path.join(RUTA_LOCAL_APP, a)
+                os.makedirs(os.path.dirname(r_save), exist_ok=True)
+                res = requests.get(URL_BASE_RAW + a)
                 with open(r_save, 'wb') as f: f.write(res.content)
-                self.log(f"  > {os.path.basename(a)}")
-
-        # Configuración final
-        self.generar_archivos_lisp(archivos)
-        self.actualizar_rutas_registro()
-        
-        self.log("\n[!] PROCESO FINALIZADO.")
-        self.log("Reinicia AutoCAD para aplicar cambios.")
+                self.log(f"  > Descargado: {os.path.basename(a)}")
+            self.generar_archivos_lisp(archivos)
+            self.actualizar_rutas_registro()
+            self.actualizar_variable_entorno()
+            self.buscar_y_configurar_consolas() # <--- NUEVA FUNCIÓN
+            self.log("\n[!] PROCESO FINALIZADO.")
+        except Exception as e: self.log(f"[!] Error: {e}")
         self.btn_actualizar.configure(state="normal", text="Sincronizado")
 
 if __name__ == "__main__":

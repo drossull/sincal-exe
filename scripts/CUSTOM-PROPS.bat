@@ -1,4 +1,7 @@
 @echo off
+:: Cargar la ruta de la consola detectada por Python
+call "%AppData%\Estándar SINCAL\scripts\cad_env.bat"
+
 echo ===================================================
 echo     ACTUALIZADOR MASIVO DE DWGPROPS (MULTIPLE)
 echo ===================================================
@@ -14,8 +17,8 @@ set /p fecha_rev="3. Fecha_Rev: "
 set /p fecha_inf="4. Fecha_Inf: "
 set /p no_total_planos="5. No_total_planos: "
 
-:: 2. Ruta del script temporal
-set "ruta_script=C:\Users\Usuario\Documents\SINCAL\SCRIPTS\TEMP_PROPS.scr"
+:: 2. Ruta del script temporal (Se guarda en la misma carpeta oculta universal)
+set "ruta_script=%~dp0TEMP_PROPS.scr"
 
 :: 3. Generación del Script (.scr) con las 5 propiedades restantes
 echo (vl-load-com) > "%ruta_script%"
@@ -37,12 +40,13 @@ echo. >> "%ruta_script%"
 echo.
 echo ---------------------------------------------------
 echo Datos capturados. Iniciando procesamiento masivo...
+echo Usando consola rapida: %CAD_CONSOLE%
 echo ---------------------------------------------------
 
-:: 4. Ejecución en AutoCAD 2025
+:: 4. Ejecución Universal y Silenciosa
 for %%f in (*.dwg) do (
     echo Procesando: %%f
-    start /wait "" "C:\Program Files\Autodesk\AutoCAD 2025\acad.exe" /nologo "%%~ff" /b "%ruta_script%"
+    "%CAD_CONSOLE%" /i "%%f" /s "%ruta_script%"
 )
 
 :: 5. Eliminación del script temporal
