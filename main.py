@@ -6,6 +6,7 @@ import winreg
 import threading
 import ctypes
 import shutil
+from PIL import Image # Requiere: pip install Pillow (solo para el logo estático)
 import customtkinter as ctk
 
 # --- CONFIGURACIÓN ---
@@ -14,6 +15,12 @@ REPO_GITHUB = "sincal-exe"
 RAMA = "main" 
 URL_BASE_RAW = f"https://raw.githubusercontent.com/{USUARIO_GITHUB}/{REPO_GITHUB}/{RAMA}/"
 RUTA_LOCAL_APP = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL") 
+
+# Configuración global de fuentes
+FUENTE_TITULO = ("Consolas", 24, "bold")
+FUENTE_SUBTITULO = ("Consolas", 18, "bold")
+FUENTE_NORMAL = ("Consolas", 14)
+FUENTE_CONSOLA = ("Consolas", 12)
 
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
@@ -29,9 +36,10 @@ class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("SINCAL - Suite de Herramientas v1.0.9")
-        self.geometry("850x550")
+        self.geometry("850x580")
         self.resizable(False, False)
 
+        # Icono de la ventana (Barra superior)
         try:
             self.iconbitmap(obtener_ruta_recurso("logo.ico"))
         except:
@@ -40,8 +48,11 @@ class ActualizadorCAD(ctk.CTk):
         self.tutoriales = {}
 
         # --- SISTEMA DE PESTAÑAS ---
-        self.tabview = ctk.CTkTabview(self, width=810, height=510)
+        self.tabview = ctk.CTkTabview(self, width=810, height=530)
         self.tabview.pack(padx=20, pady=10)
+        
+        # Cambiar fuente de las pestañas
+        self.tabview._segmented_button.configure(font=FUENTE_NORMAL)
         
         self.tab_main = self.tabview.add("Sincronizador")
         self.tab_help = self.tabview.add("Instructivo")
@@ -50,34 +61,49 @@ class ActualizadorCAD(ctk.CTk):
         self.setup_tab_instructivo()
 
     def setup_tab_sincronizador(self):
-        lbl = ctk.CTkLabel(self.tab_main, text="Estándar SINCAL", font=("Consolas", 24, "bold"))
-        lbl.pack(pady=10)
+        # Frame de Cabecera (Logo + Título)
+        header_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
+        header_frame.pack(pady=10, fill="x", padx=20)
 
-        self.btn_actualizar = ctk.CTkButton(self.tab_main, text="Instalar / Actualizar Todo", font=("Consolas", 14, "bold"),
+        # Logo interno (Esquina izquierda)
+        try:
+            logo_path = obtener_ruta_recurso("logo.ico")
+            img_logo = Image.open(logo_path)
+            self.logo_image = ctk.CTkImage(light_image=img_logo, dark_image=img_logo, size=(40, 40))
+            lbl_logo = ctk.CTkLabel(header_frame, image=self.logo_image, text="")
+            lbl_logo.pack(side="left", padx=(0, 10))
+        except:
+            pass
+
+        lbl_titulo = ctk.CTkLabel(header_frame, text="Estándar SINCAL", font=FUENTE_TITULO)
+        lbl_titulo.pack(side="left")
+
+        self.btn_actualizar = ctk.CTkButton(self.tab_main, text="Instalar / Actualizar Todo", font=FUENTE_NORMAL,
                                            fg_color="transparent", border_width=2, command=self.iniciar_actualizacion_hilo)
         self.btn_actualizar.pack(pady=10)
 
-        self.btn_folder = ctk.CTkButton(self.tab_main, text="Abrir carpeta local", command=self.abrir_carpeta_local)
+        self.btn_folder = ctk.CTkButton(self.tab_main, text="Abrir carpeta local", font=FUENTE_NORMAL, command=self.abrir_carpeta_local)
         self.btn_folder.pack(pady=5)
 
-        self.consola = ctk.CTkTextbox(self.tab_main, width=750, height=280, font=("Consolas", 12), state="disabled")
+        self.consola = ctk.CTkTextbox(self.tab_main, width=750, height=250, font=FUENTE_CONSOLA, state="disabled")
         self.consola.pack(pady=10)
 
     def setup_tab_instructivo(self):
         self.help_frame = ctk.CTkFrame(self.tab_help, fg_color="transparent")
         self.help_frame.pack(fill="both", expand=True)
 
-        self.list_frame = ctk.CTkScrollableFrame(self.help_frame, width=200, label_text="Comandos Disponibles")
+        self.list_frame = ctk.CTkScrollableFrame(self.help_frame, width=220, label_text="Comandos Disponibles")
+        self.list_frame._label.configure(font=FUENTE_NORMAL) # Fuente del label del scroll
         self.list_frame.pack(side="left", fill="y", padx=(0, 10), pady=10)
 
         self.content_frame = ctk.CTkFrame(self.help_frame)
         self.content_frame.pack(side="right", fill="both", expand=True, pady=10)
 
-        self.help_title = ctk.CTkLabel(self.content_frame, text="Bienvenido al Instructivo", font=("Consolas", 18, "bold"))
+        self.help_title = ctk.CTkLabel(self.content_frame, text="Bienvenido al Instructivo", font=FUENTE_SUBTITULO)
         self.help_title.pack(pady=20)
 
         self.help_desc = ctk.CTkLabel(self.content_frame, text="Selecciona un comando en la lista de la izquierda para ver su descripción y modo de uso.", 
-                                      wraplength=450, justify="left", font=("Consolas", 14))
+                                      wraplength=450, justify="left", font=FUENTE_NORMAL)
         self.help_desc.pack(padx=30, pady=20)
 
         self.cargar_lista_tutoriales()
@@ -99,7 +125,8 @@ class ActualizadorCAD(ctk.CTk):
                 with open(ruta_json, 'r', encoding='utf-8') as f:
                     self.tutoriales = json.load(f)
                 for cmd in self.tutoriales.keys():
-                    btn = ctk.CTkButton(self.list_frame, text=cmd, fg_color="transparent", border_width=1,
+                    btn = ctk.CTkButton(self.list_frame, text=cmd, font=FUENTE_NORMAL, 
+                                        fg_color="transparent", border_width=1,
                                         command=lambda c=cmd: self.mostrar_tutorial(c))
                     btn.pack(fill="x", pady=2, padx=5)
             except: pass
@@ -225,7 +252,6 @@ class ActualizadorCAD(ctk.CTk):
         
         r_acc = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
         with open(r_acc, 'w', encoding='utf-8') as f:
-            # AQUÍ ESTÁ LA CORRECCIÓN APLICADA DE NUEVO
             r_sincal_escaped = r_sincal.replace("\\", "\\\\")
             f.write(f'(load "{r_sincal_escaped}")\n')
             for a in archivos:
