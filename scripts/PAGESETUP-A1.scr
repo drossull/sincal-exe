@@ -1,4 +1,7 @@
-(command "_-PSETUPIN" "C:/Users/Usuario/Documents/SINCAL/000 - ESTANDAR 2025/FORMATOS ANOTATIVOS ACAD_2025.dwg" "SINCAL-A1")
+(vl-load-com)
+(setq appPath (vl-string-translate "\\" "/" (getenv "APPDATA")))
+(setq masterPath (strcat appPath "/Estándar SINCAL/masters/FORMATOS ANOTATIVOS ACAD_2025.dwg"))
+(command "_-PSETUPIN" masterPath "SINCAL-A1")
 (if (= (logand (getvar "CMDACTIVE") 1) 1) (command "_Y"))
 (setq laylist nil)
 (foreach item (dictsearch (namedobjdict) "ACAD_LAYOUT") (if (and (= (car item) 3) (/= (strcase (cdr item)) "MODEL")) (setq laylist (cons (cdr item) laylist))))
