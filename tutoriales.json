@@ -1,58 +1,58 @@
 {
     "SINCAL": {
-        "titulo": "Comando: SINCAL (Importar Estándares)",
-        "descripcion": "El comando maestro. Importa automáticamente todas las capas, estilos de texto (RomanD), estilos de cota y bloques desde el archivo maestro DWG.\n\nUso: Escribe SINCAL y presiona Enter."
+        "titulo": "Comando: SINCAL (Importar Estándar)",
+        "descripcion": "El comando maestro de estandarización. Importa automáticamente todas las capas, estilos de texto (RomanD), estilos de cota y bloques necesarios desde el archivo maestro DWG.\n\nUso: Escribe SINCAL y presiona Enter.\n\nTodos los estilos, capas y bloques de 'FORMATOS ANOTATIVOS ACAD_2025.dwg' se importarán al archivo actual donde se ejecute el comando. Dicho archivo maestro fue convenido en la reunión de estándar de la oficina de SINCAL."
     },
     "BV": {
         "titulo": "Comando: BV (Bloquear Viewports)",
-        "descripcion": "Bloquea automáticamente todas las ventanas gráficas (Viewports) de la presentación (Layout) actual para evitar cambios accidentales de escala o encuadre.\n\nNota: Solo funciona en hojas de presentación."
+        "descripcion": "Bloquea automáticamente todas las ventanas gráficas (Viewports) de la presentación (Layout) actual para asegurar la integridad de la vista.\n\nEs fundamental bloquear los viewports para evitar que, al trabajar en el layout y hacer doble clic dentro de una ventana, la escala y el encuadre se pierdan accidentalmente con el uso de la rueda del mouse."
     },
     "DL2": {
-        "titulo": "Comando: DL2 (Delete Layout 2)",
-        "descripcion": "Elimina instantáneamente la pestaña 'Layout2' de tu dibujo, ayudando a mantener el archivo limpio. No se puede ejecutar si estás trabajando dentro de esa misma pestaña."
+        "titulo": "Comando: DL2 (Eliminar Layout2)",
+        "descripcion": "Elimina instantáneamente la pestaña 'Layout2' de tu dibujo para optimizar el archivo.\n\nSoftware como Tekla Structures produce planos con layouts llamados 'Layout1' y 'Layout2' de forma predeterminada. 'Layout2' es una hoja que no se utiliza y su presencia entorpece los procesos de ploteo por lote (Publish). Nota: Con el nuevo método de generación de formas mediante FreeCAD, esta pestaña excedente ya no se produce."
     },
     "ESTRUCTURA": {
-        "titulo": "Comandos: ESTRUCTURA / NOTOTAL",
-        "descripcion": "Edita rápidamente las propiedades personalizadas 'Nombre_Estructura' y 'No_total_planos' del archivo. Al finalizar, regenera automáticamente el dibujo para que las carátulas se actualicen en pantalla."
+        "titulo": "Comando: ESTRUCTURA (Gestión Paramétrica)",
+        "descripcion": "Como parte de las configuraciones de este software, se ha instalado la función de adición de CUSTOM PROPERTIES (DWGPROPS). Estas propiedades personalizadas se comunican con el formato de viñeta parametrizada del nuevo estándar. Mediante este comando, se define la propiedad 'Nombre_Estructura', la cual actualiza automáticamente el campo de texto correspondiente en la carátula. Esto permite que el cambio de datos sea paramétrico, centralizado y no manual."
     },
     "MC": {
         "titulo": "Comando: MC (Middle Center)",
-        "descripcion": "Cambia la justificación de textos simples y múltiples a 'Medio Centro' (Middle Center) SIN que se muevan visualmente de su posición original en el plano."
+        "descripcion": "Cambia la justificación de textos simples (DText) y múltiples (MText) a 'Medio Centro' (Middle Center) sin alterar su posición visual en el plano."
     },
     "MPEND": {
         "titulo": "Comando: MPEND (Pendiente Multileader)",
-        "descripcion": "Alinea e inclina las directrices múltiples basándose en un porcentaje de pendiente.\n\nUso: Selecciona el Multileader, escribe la pendiente (ej. 2 o -2) y la flecha se ajustará con el ángulo matemático exacto."
+        "descripcion": "Alinea e inclina Multileaders basándose en un porcentaje de pendiente ingresado (ej. 2 o -2), calculando el ángulo matemático exacto de la directriz."
     },
     "NOMBRAR": {
-        "titulo": "Comando: NOMBRAR",
-        "descripcion": "Permite editar rápidamente la propiedad personalizada 'Nombre_Plano'. Ideal para el uso de campos (Fields) en carátulas, ya que regenera el archivo al instante para reflejar el cambio."
+        "titulo": "Comando: NOMBRAR (Propiedad de Plano)",
+        "descripcion": "Permite editar rápidamente la propiedad personalizada 'Nombre_Plano'. Al actualizarse, el comando regenera los campos (Fields) de la viñeta para reflejar el nuevo nombre automáticamente."
     },
     "P0": {
         "titulo": "Comando: P0 (Pegar en Origen)",
-        "descripcion": "Pega el contenido del portapapeles exactamente en las coordenadas absolutas (0,0,0) del espacio en el que te encuentres, ya sea en el Modelo o en un Layout."
+        "descripcion": "Pega el contenido del portapapeles como bloque exactamente en las coordenadas 0,0,0 del espacio actual, ya sea en el Espacio Modelo o Layout."
     },
     "PND": {
         "titulo": "Comando: PND (Calculadora de Pendiente)",
-        "descripcion": "Calcula de forma automática la pendiente en porcentaje de cualquier línea o polilínea seleccionada y muestra el resultado en una ventana emergente."
+        "descripcion": "Calcula y muestra en una ventana emergente la pendiente porcentual de cualquier línea o polilínea seleccionada en el dibujo."
     },
     "RC-CAPAS": {
-        "titulo": "Comando: RC-CAPAS (Restaurar Color)",
-        "descripcion": "Escanea y corrige los colores de todas las capas del dibujo, convirtiendo colores True Color (RGB) y variaciones sutiles a sus equivalentes exactos clásicos de AutoCAD (Index Color 1 al 8)."
+        "titulo": "Comando: RC-CAPAS (Restaurar Colores)",
+        "descripcion": "Escanea todas las capas y corrige sus colores convirtiendo valores True Color (RGB) a los colores base del estándar SINCAL (Index Color 1 al 8)."
     },
     "RMLAY": {
         "titulo": "Comando: RMLAY (Renombrar Layout)",
-        "descripcion": "Cambia rápidamente el nombre de la pestaña de presentación (Layout) actual desde la línea de comandos sin tener que usar el ratón. Soporta nombres con espacios."
+        "descripcion": "Permite renombrar la pestaña de presentación actual de forma ágil.\n\nRecordar que, según el estándar, el layout debe nombrarse con el número del plano actual. Por ejemplo, si el plano de disposición general es el 01, el layout debe llamarse '01'. Ejecutar RMLAY y escribir '01' asegura esta consistencia."
     },
     "ST0": {
-        "titulo": "Comando: ST0 (Style Text 0)",
-        "descripcion": "Establece la altura (Height) de absolutamente todos los estilos de texto del dibujo a 0.0 de forma masiva para estandarizar el archivo."
+        "titulo": "Comando: ST0 (Altura de Texto 0.0)",
+        "descripcion": "Establece masivamente la altura de todos los estilos de texto a 0.0.\n\nEs necesario ejecutar este comando cuando los estilos tienen tamaños fijos (como 2.5) que limitan la edición. El estándar promueve el uso de textos anotativos, donde el tamaño final se gestiona mediante las propiedades del objeto y la escala anotativa de la vista."
     },
     "W08": {
-        "titulo": "Comando: W08 (Width Factor 0.8)",
-        "descripcion": "Establece el factor de ancho (Width Factor) de todos los estilos de texto del dibujo a 0.8 de manera instantánea y masiva."
+        "titulo": "Comando: W08 (Factor de Ancho 0.8)",
+        "descripcion": "Aplica de forma global un factor de ancho (Width Factor) de 0.8 a todos los estilos de texto para estandarizar la estética de los planos."
     },
     "ZE": {
         "titulo": "Comando: ZE (Zoom Extents)",
-        "descripcion": "Realiza un Zoom Extents (acercamiento general a todos los elementos del dibujo) rápido mediante un atajo corto de teclado."
+        "descripcion": "Ejecuta un Zoom Extents instantáneo mediante un atajo corto de teclado para visualizar todos los elementos del dibujo."
     }
 }
