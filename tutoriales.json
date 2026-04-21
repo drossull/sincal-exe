@@ -1,0 +1,58 @@
+{
+    "SINCAL": {
+        "titulo": "Comando: SINCAL (Importar Estándares)",
+        "descripcion": "El comando maestro. Importa automáticamente todas las capas, estilos de texto (RomanD), estilos de cota y bloques desde el archivo maestro DWG.\n\nUso: Escribe SINCAL y presiona Enter."
+    },
+    "BV": {
+        "titulo": "Comando: BV (Bloquear Viewports)",
+        "descripcion": "Bloquea automáticamente todas las ventanas gráficas (Viewports) de la presentación (Layout) actual para evitar cambios accidentales de escala o encuadre.\n\nNota: Solo funciona en hojas de presentación."
+    },
+    "DL2": {
+        "titulo": "Comando: DL2 (Delete Layout 2)",
+        "descripcion": "Elimina instantáneamente la pestaña 'Layout2' de tu dibujo, ayudando a mantener el archivo limpio. No se puede ejecutar si estás trabajando dentro de esa misma pestaña."
+    },
+    "ESTRUCTURA": {
+        "titulo": "Comandos: ESTRUCTURA / NOTOTAL",
+        "descripcion": "Edita rápidamente las propiedades personalizadas 'Nombre_Estructura' y 'No_total_planos' del archivo. Al finalizar, regenera automáticamente el dibujo para que las carátulas se actualicen en pantalla."
+    },
+    "MC": {
+        "titulo": "Comando: MC (Middle Center)",
+        "descripcion": "Cambia la justificación de textos simples y múltiples a 'Medio Centro' (Middle Center) SIN que se muevan visualmente de su posición original en el plano."
+    },
+    "MPEND": {
+        "titulo": "Comando: MPEND (Pendiente Multileader)",
+        "descripcion": "Alinea e inclina las directrices múltiples basándose en un porcentaje de pendiente.\n\nUso: Selecciona el Multileader, escribe la pendiente (ej. 2 o -2) y la flecha se ajustará con el ángulo matemático exacto."
+    },
+    "NOMBRAR": {
+        "titulo": "Comando: NOMBRAR",
+        "descripcion": "Permite editar rápidamente la propiedad personalizada 'Nombre_Plano'. Ideal para el uso de campos (Fields) en carátulas, ya que regenera el archivo al instante para reflejar el cambio."
+    },
+    "P0": {
+        "titulo": "Comando: P0 (Pegar en Origen)",
+        "descripcion": "Pega el contenido del portapapeles exactamente en las coordenadas absolutas (0,0,0) del espacio en el que te encuentres, ya sea en el Modelo o en un Layout."
+    },
+    "PND": {
+        "titulo": "Comando: PND (Calculadora de Pendiente)",
+        "descripcion": "Calcula de forma automática la pendiente en porcentaje de cualquier línea o polilínea seleccionada y muestra el resultado en una ventana emergente."
+    },
+    "RC-CAPAS": {
+        "titulo": "Comando: RC-CAPAS (Restaurar Color)",
+        "descripcion": "Escanea y corrige los colores de todas las capas del dibujo, convirtiendo colores True Color (RGB) y variaciones sutiles a sus equivalentes exactos clásicos de AutoCAD (Index Color 1 al 8)."
+    },
+    "RMLAY": {
+        "titulo": "Comando: RMLAY (Renombrar Layout)",
+        "descripcion": "Cambia rápidamente el nombre de la pestaña de presentación (Layout) actual desde la línea de comandos sin tener que usar el ratón. Soporta nombres con espacios."
+    },
+    "ST0": {
+        "titulo": "Comando: ST0 (Style Text 0)",
+        "descripcion": "Establece la altura (Height) de absolutamente todos los estilos de texto del dibujo a 0.0 de forma masiva para estandarizar el archivo."
+    },
+    "W08": {
+        "titulo": "Comando: W08 (Width Factor 0.8)",
+        "descripcion": "Establece el factor de ancho (Width Factor) de todos los estilos de texto del dibujo a 0.8 de manera instantánea y masiva."
+    },
+    "ZE": {
+        "titulo": "Comando: ZE (Zoom Extents)",
+        "descripcion": "Realiza un Zoom Extents (acercamiento general a todos los elementos del dibujo) rápido mediante un atajo corto de teclado."
+    }
+}

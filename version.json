@@ -1,5 +1,5 @@
 {
-    "version": "1.0.6",
+    "version": "1.0.9",
     "archivos": [
         "lisps/BV.lsp",
         "lisps/DL2.lsp",
@@ -36,6 +36,8 @@
         "scripts/PUBLISH.scr",
         "scripts/PURGEALL.scr",
         "scripts/RC-CAPAS.scr",
-        "scripts/ZE.scr"
+        "scripts/ZE.scr",
+        "plotstyles/SINCAL_A1 (2025).ctb",
+        "tutoriales.json"
     ]
 }
