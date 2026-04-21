@@ -30,17 +30,23 @@ Para que el gestor funcione correctamente, el repositorio debe mantener esta est
 ├── 📄 main.py          # Código fuente de la aplicación en Python
 └── 🖼️ logo.ico         # Icono para la compilación del ejecutable
 
-## 💻 Guía de Uso (Para el Usuario Final)
+💻 Guía de Uso (Para el Usuario Final)
 
-1. **Descarga el ejecutable:** Descarga el archivo `SINCAL.exe` proporcionado por el administrador.
-2. **Ejecuta el programa:** Ábrelo (no requiere permisos de administrador).
-3. **Actualiza:** Ve a la pestaña "Sincronizador" y haz clic en **"Instalar / Actualizar Todo"**.
-4. **Aprende:** Ve a la pestaña "Instructivo" para leer qué hace cada comando y cómo utilizarlo.
-5. **Abre tu CAD:** Al iniciar AutoCAD o ZWCAD, los comandos (ej. `SINCAL`, `BV`, `ZE`) ya estarán listos para usarse y las plumillas aparecerán en tu ventana de impresión.
+* **Descarga el ejecutable:** Descarga el archivo SINCAL.exe proporcionado por el administrador.
 
-### Uso de Comandos Masivos (Scripts)
+* **Ejecuta el programa:** Ábrelo (no requiere permisos de administrador).
+
+* **Actualiza:** Ve a la pestaña "Sincronizador" y haz clic en "Instalar / Actualizar Todo".
+
+* **Aprende:** Ve a la pestaña "Instructivo" para leer qué hace cada comando y cómo utilizarlo.
+
+* **Abre tu CAD:** Al iniciar AutoCAD o ZWCAD, los comandos (ej. SINCAL, BV, ZE) ya estarán listos para usarse y las plumillas aparecerán en tu ventana de impresión.
+
+**Uso de Comandos Masivos (Scripts)**
 Para procesar múltiples planos de golpe:
 
-1. Ve a la carpeta de Windows donde tienes tus planos `.dwg`.
-2. Haz clic en la barra de direcciones superior del Explorador de Archivos, escribe `cmd` y presiona **Enter**.
-3. En la ventana negra, escribe el nombre del proceso (ej. `AUDIT`, `PUBLISH`, `PURGEALL`) y presiona **Enter**.
+* Ve a la carpeta de Windows donde tienes tus planos .dwg.
+
+* Haz clic en la barra de direcciones superior del Explorador de Archivos, escribe cmd y presiona Enter.
+
+* En la ventana negra, escribe el nombre del proceso (ej. AUDIT, PUBLISH, PURGEALL) y presiona Enter.
