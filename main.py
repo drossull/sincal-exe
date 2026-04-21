@@ -219,10 +219,15 @@ class ActualizadorCAD(ctk.CTk):
         r_dwg = os.path.join(RUTA_LOCAL_APP, "masters", "FORMATOS ANOTATIVOS ACAD_2025.dwg").replace('\\', '\\\\')
         r_sincal = os.path.join(RUTA_LOCAL_APP, "lisps", "SINCAL.lsp")
         lisp_code = f'''(defun c:SINCAL (/ R n c a e) (vl-load-com) (setq R "{r_dwg}") (setq c (getvar "CMDECHO") a (getvar "ATTREQ")) (setvar "CMDECHO" 0) (setvar "ATTREQ" 0) (if (findfile R) (progn (setq n (vl-filename-base R)) (if (tblsearch "BLOCK" n) (command "._-INSERT" (strcat n "=" R) "_Y" "0,0,0" "1" "1" "0") (command "._-INSERT" R "0,0,0" "1" "1" "0")) (setq e (entlast)) (if e (entdel e)) (vl-cmdf "._-PURGE" "_B" n "_N") (if (tblsearch "STYLE" "RomanD") (setvar "TEXTSTYLE" "RomanD")) (if (tblsearch "DIMSTYLE" "GSG_COTAS") (command "._-DIMSTYLE" "_R" "GSG_COTAS")) (princ (strcat "\\n[OK] " R))) (alert "Error Maestro")) (setvar "ATTREQ" a) (setvar "CMDECHO" c) (princ))'''
+        
+        os.makedirs(os.path.dirname(r_sincal), exist_ok=True)
         with open(r_sincal, 'w', encoding='utf-8') as f: f.write(lisp_code)
+        
         r_acc = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
         with open(r_acc, 'w', encoding='utf-8') as f:
-            f.write(f'(load "{r_sincal.replace("\\", "\\\\")}")\n')
+            # AQUÍ ESTÁ LA CORRECCIÓN APLICADA DE NUEVO
+            r_sincal_escaped = r_sincal.replace("\\", "\\\\")
+            f.write(f'(load "{r_sincal_escaped}")\n')
             for a in archivos:
                 if a.endswith('.lsp') and "SINCAL.lsp" not in a:
                     r = os.path.join(RUTA_LOCAL_APP, a).replace('\\', '\\\\')
