@@ -24,11 +24,13 @@ COLOR_TITULO = "#FFBF00"
 COLOR_TEXTO = "#CCCCCC"      
 COLOR_ACENTO = "#007FFF"     
 
+# Fuentes
 FUENTE_TITULO = ("Consolas", 24, "bold")
 FUENTE_SUBTITULO = ("Consolas", 18, "bold")
 FUENTE_NORMAL = ("Consolas", 14)
 FUENTE_CONSOLA = ("Consolas", 12)
 
+# Forzar modo oscuro
 ctk.set_appearance_mode("dark") 
 
 def obtener_ruta_recurso(ruta_relativa):
@@ -41,11 +43,12 @@ def obtener_ruta_recurso(ruta_relativa):
 class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("SINCAL - Suite de Herramientas v1.1.3")
+        self.title("SINCAL - Suite de Herramientas v1.1.4")
         self.geometry("850x660")
         self.resizable(False, False)
         self.configure(fg_color=COLOR_FONDO)
 
+        # Icono de la ventana
         try:
             self.iconbitmap(obtener_ruta_recurso("logo.ico"))
         except:
@@ -53,6 +56,7 @@ class ActualizadorCAD(ctk.CTk):
 
         self.tutoriales = {}
 
+        # --- SISTEMA DE PESTAÑAS ---
         self.tabview = ctk.CTkTabview(self, width=810, height=610, fg_color=COLOR_FONDO,
                                       segmented_button_selected_color=COLOR_ACENTO,
                                       segmented_button_selected_hover_color=COLOR_ACENTO,
@@ -110,14 +114,48 @@ class ActualizadorCAD(ctk.CTk):
         self.content_frame.pack(side="right", fill="both", expand=True, pady=10)
         self.help_title = ctk.CTkLabel(self.content_frame, text="LISP: Selecciona un comando", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO)
         self.help_title.pack(pady=20)
-        self.help_desc = ctk.CTkLabel(self.content_frame, text="Selecciona una rutina...", wraplength=450, justify="left", font=FUENTE_NORMAL, text_color=COLOR_TEXTO)
+        self.help_desc = ctk.CTkLabel(self.content_frame, text="Selecciona una rutina en la lista para ver su descripción técnica.", wraplength=450, justify="left", font=FUENTE_NORMAL, text_color=COLOR_TEXTO)
         self.help_desc.pack(padx=30, pady=20)
         self.cargar_lista_tutoriales()
 
     def setup_tab_cmd(self):
         lbl_cmd_title = ctk.CTkLabel(self.tab_cmd, text="Guía de Procesamiento por Lotes (CMD)", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO)
         lbl_cmd_title.pack(pady=(10, 5))
-        readme_text = "💻 PROCESAMIENTO MASIVO...\n[CONTENIDO DEL README]"
+        readme_text = (
+            "💻 PROCESAMIENTO MASIVO DE ARCHIVOS DWG\n"
+            "--------------------------------------------------\n\n"
+            "Esta función permite ejecutar procesos automáticos sobre múltiples\n"
+            "archivos DWG sin necesidad de abrirlos uno por uno, utilizando\n"
+            "el motor de fondo de AutoCAD o ZWCAD.\n\n"
+            "🛠️ COMANDOS DISPONIBLES:\n"
+            "- AUDIT:        Repara y audita errores en todos los DWG.\n"
+            "- PURGEALL:     Limpieza profunda de capas, bloques y estilos.\n"
+            "- PUBLISH:      Genera PDFs automáticos de cada plano.\n"
+            "- ZE:           Aplica 'Zoom Extents' y guarda cada archivo.\n"
+            "- RC-CAPAS:     Normaliza los colores al estándar SINCAL.\n"
+            "- CUSTOM-PROPS: Inyección masiva de propiedades de viñeta.\n"
+            "                (Ver detalles más abajo).\n\n"
+            "📖 INSTRUCCIONES DE USO GENERAL:\n"
+            "1. Abra la carpeta de Windows que contiene sus archivos .dwg.\n"
+            "2. Haga clic en la barra de direcciones superior.\n"
+            "3. Escriba 'cmd' y presione ENTER.\n"
+            "4. En la ventana negra, escriba el comando (ej: AUDIT) y ENTER.\n"
+            "5. El sistema procesará cada archivo automáticamente.\n\n"
+            "📝 DETALLE ESPECIAL: USO DE 'CUSTOM-PROPS'\n"
+            "Este comando es interactivo. Al escribir 'CUSTOM-PROPS' y dar\n"
+            "ENTER, la consola hará una pausa y le pedirá escribir los\n"
+            "datos para 5 campos paramétricos de su proyecto:\n"
+            "  1. Nombre_Estructura\n"
+            "  2. Revision\n"
+            "  3. Fecha_Rev\n"
+            "  4. Fecha_Inf\n"
+            "  5. No_total_planos\n\n"
+            "Escriba el valor de cada uno y presione ENTER. Al terminar el\n"
+            "último, el sistema inyectará esa información en TODOS los planos\n"
+            "de la carpeta a la vez, actualizando las carátulas al instante.\n\n"
+            "--------------------------------------------------\n"
+            "Nota: El tiempo dependerá de la cantidad y peso de los planos."
+        )
         self.cmd_readme = ctk.CTkTextbox(self.tab_cmd, width=750, height=430, font=FUENTE_CONSOLA, fg_color="#222222", text_color=COLOR_TEXTO)
         self.cmd_readme.insert("0.0", readme_text)
         self.cmd_readme.configure(state="disabled")
@@ -189,7 +227,7 @@ class ActualizadorCAD(ctk.CTk):
         try:
             r = requests.get(URL_BASE_RAW + "version.json")
             data = r.json()
-            version_nube = data.get("version", "v1.1.3")
+            version_nube = data.get("version", "v1.1.4")
             archivos = data.get("archivos", [])
             for a in archivos:
                 r_save = os.path.join(RUTA_LOCAL_APP, a)
@@ -313,16 +351,69 @@ class ActualizadorCAD(ctk.CTk):
         r_dwg = os.path.join(RUTA_LOCAL_APP, "masters", "FORMATOS ANOTATIVOS ACAD_2025.dwg").replace('\\', '\\\\')
         r_sincal = os.path.join(RUTA_LOCAL_APP, "lisps", "SINCAL.lsp")
         lisp_code = f'''(defun c:SINCAL (/ R n c a e) (vl-load-com) (setq R "{r_dwg}") (setq c (getvar "CMDECHO") a (getvar "ATTREQ")) (setvar "CMDECHO" 0) (setvar "ATTREQ" 0) (if (findfile R) (progn (setq n (vl-filename-base R)) (if (tblsearch "BLOCK" n) (command "._-INSERT" (strcat n "=" R) "_Y" "0,0,0" "1" "1" "0") (command "._-INSERT" R "0,0,0" "1" "1" "0")) (setq e (entlast)) (if e (entdel e)) (vl-cmdf "._-PURGE" "_B" n "_N") (if (tblsearch "STYLE" "RomanD") (setvar "TEXTSTYLE" "RomanD")) (if (tblsearch "DIMSTYLE" "GSG_COTAS") (command "._-DIMSTYLE" "_R" "GSG_COTAS")) (princ (strcat "\\n[OK] " R))) (alert "Error Maestro")) (setvar "ATTREQ" a) (setvar "CMDECHO" c) (princ))'''
+        
         os.makedirs(os.path.dirname(r_sincal), exist_ok=True)
         with open(r_sincal, 'w', encoding='utf-8') as f: f.write(lisp_code)
+        
+        # --- EL CABALLO DE TROYA: LISP PARA AUTO-INYECTAR LA RUTA ---
+        ruta_escapada = RUTA_LOCAL_APP.replace("\\", "\\\\")
+        lisp_hack_rutas = f'''
+;; Hack de Rutas Nativas
+(vl-load-com)
+(vl-catch-all-apply
+  '(lambda ( / pref paths newpath )
+    (setq pref (vla-get-Files (vla-get-Preferences (vlax-get-acad-object))))
+    (setq paths (vla-get-SupportPath pref))
+    (setq newpath "{ruta_escapada}")
+    (if (not (vl-string-search "SINCAL" paths))
+      (vla-put-SupportPath pref (strcat paths ";" newpath))
+    )
+  )
+)
+'''
+        # Generar acaddoc maestro
         r_acc = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
         with open(r_acc, 'w', encoding='utf-8') as f:
+            f.write(lisp_hack_rutas)
             f.write(f'(load "{r_sincal.replace("\\", "\\\\")}")\n')
             for a in archivos:
                 if a.endswith('.lsp') and "SINCAL.lsp" not in a:
-                    f.write(f'(if (findfile "{os.path.join(RUTA_LOCAL_APP, a).replace("\\", "\\\\")}") (load "{os.path.join(RUTA_LOCAL_APP, a).replace("\\", "\\\\")}"))\n')
-        shutil.copy2(r_acc, os.path.join(RUTA_LOCAL_APP, "zwcaddoc.lsp"))
-        shutil.copy2(r_acc, os.path.join(RUTA_LOCAL_APP, "zwcad.lsp"))
+                    ruta_lisp = os.path.join(RUTA_LOCAL_APP, a).replace("\\", "\\\\")
+                    f.write(f'(if (findfile "{ruta_lisp}") (load "{ruta_lisp}"))\n')
+        
+        # Generar clones para ZWCAD
+        r_zwcdoc = os.path.join(RUTA_LOCAL_APP, "zwcaddoc.lsp")
+        r_zwc = os.path.join(RUTA_LOCAL_APP, "zwcad.lsp")
+        shutil.copy2(r_acc, r_zwcdoc)
+        shutil.copy2(r_acc, r_zwc)
+        
+        # Disparar la inyección nativa
+        self.inyectar_arranque_nativo(r_acc, r_zwcdoc, r_zwc)
+
+    def inyectar_arranque_nativo(self, r_acc, r_zwcdoc, r_zwc):
+        """Busca las carpetas de Support reales del usuario y pega los LISP de arranque ahí"""
+        appdata = os.getenv('APPDATA')
+        
+        # Inyección en ZWCAD
+        zwsoft_dir = os.path.join(appdata, "ZWSOFT")
+        if os.path.exists(zwsoft_dir):
+            for root, dirs, files in os.walk(zwsoft_dir):
+                if os.path.basename(root).lower() == "support":
+                    try:
+                        shutil.copy2(r_zwcdoc, os.path.join(root, "zwcaddoc.lsp"))
+                        shutil.copy2(r_zwc, os.path.join(root, "zwcad.lsp"))
+                        self.log(f" [+] Arranque inyectado en carpeta nativa de ZWCAD.")
+                    except: pass
+
+        # Inyección en AutoCAD
+        autodesk_dir = os.path.join(appdata, "Autodesk")
+        if os.path.exists(autodesk_dir):
+            for root, dirs, files in os.walk(autodesk_dir):
+                if os.path.basename(root).lower() == "support":
+                    try:
+                        shutil.copy2(r_acc, os.path.join(root, "acaddoc.lsp"))
+                        self.log(f" [+] Arranque inyectado en carpeta nativa de AutoCAD.")
+                    except: pass
 
 if __name__ == "__main__":
     app = ActualizadorCAD()
