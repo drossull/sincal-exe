@@ -1,16 +1,22 @@
 @echo off
-:: Cargar la ruta de la consola detectada por Python
-call "%AppData%\Estándar SINCAL\scripts\cad_env.bat"
+chcp 65001 > nul
+call "%~dp0cad_env.bat"
 
-echo Purgando elementos no usados (capas, bloques, estilos) en todos los planos...
-echo Usando consola: %CAD_CONSOLE%
+echo ---------------------------------------------------
+echo Consola detectada: %CAD_CONSOLE%
+echo ---------------------------------------------------
+
+if "%CAD_CONSOLE%"=="" (
+    echo [ERROR] No se pudo cargar la ruta de la consola.
+    pause
+    exit /b
+)
 
 for %%f in (*.dwg) do (
-    echo ---------------------------------------------------
-    echo Purgando el plano: %%f
+    echo Limpiando (Purge) el plano: %%f
     "%CAD_CONSOLE%" /i "%%f" /s "%~dp0PURGEALL.scr"
 )
 
 echo.
-echo ¡Limpieza profunda finalizada en todos los archivos!
+echo ¡Proceso finalizado!
 pause

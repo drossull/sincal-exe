@@ -1,9 +1,12 @@
 @echo off
-:: Cargar la ruta de la consola detectada por Python
-call "%AppData%\Estándar SINCAL\scripts\cad_env.bat"
+:: Forzar consola a leer caracteres especiales (tildes) correctamente
+chcp 65001 > nul
+
+:: Cargar la ruta de la consola buscando en la MISMA carpeta del script
+call "%~dp0cad_env.bat"
 
 echo ===================================================
-echo     ACTUALIZADOR MASIVO DE DWGPROPS (MULTIPLE)
+echo    ACTUALIZADOR MASIVO DE DWGPROPS (MULTIPLE)
 echo ===================================================
 echo.
 echo Por favor, ingresa los datos para actualizar las viñetas.
@@ -40,8 +43,17 @@ echo. >> "%ruta_script%"
 echo.
 echo ---------------------------------------------------
 echo Datos capturados. Iniciando procesamiento masivo...
-echo Usando consola rapida: %CAD_CONSOLE%
+echo Consola detectada: %CAD_CONSOLE%
 echo ---------------------------------------------------
+
+:: Verificación de seguridad por si no se detectó el CAD
+if "%CAD_CONSOLE%"=="" (
+    echo [ERROR] No se pudo cargar la ruta de la consola de AutoCAD/ZWCAD.
+    echo Asegurate de haber presionado "Actualizar" en el SINCAL.exe
+    del "%ruta_script%" 2>nul
+    pause
+    exit /b
+)
 
 :: 4. Ejecución Universal y Silenciosa
 for %%f in (*.dwg) do (

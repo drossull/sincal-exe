@@ -1,15 +1,21 @@
 @echo off
-:: 1. Cargar la ruta de la consola detectada por Python
-call "%AppData%\Estándar SINCAL\scripts\cad_env.bat"
+chcp 65001 > nul
+call "%~dp0cad_env.bat"
 
-echo Ejecutando AUDIT con: %CAD_CONSOLE%
+echo ---------------------------------------------------
+echo Consola detectada: %CAD_CONSOLE%
+echo ---------------------------------------------------
 
-for %%F in (*.dwg) do (
-    echo ---------------------------------------------------
-    echo Auditando el plano: %%F
-    
-    :: 2. Usar la variable detectada dinámicamente
-    "%CAD_CONSOLE%" /i "%%F" /s "%~dp0AUDIT.scr"
+if "%CAD_CONSOLE%"=="" (
+    echo [ERROR] No se pudo cargar la ruta de la consola de AutoCAD/ZWCAD.
+    echo Asegurate de haber presionado "Actualizar" en el SINCAL.exe
+    pause
+    exit /b
+)
+
+for %%f in (*.dwg) do (
+    echo Auditando el plano: %%f
+    "%CAD_CONSOLE%" /i "%%f" /s "%~dp0AUDIT.scr"
 )
 
 echo.

@@ -1,16 +1,22 @@
 @echo off
-:: Cargar la ruta de la consola detectada por Python
-call "%AppData%\Estándar SINCAL\scripts\cad_env.bat"
+chcp 65001 > nul
+call "%~dp0cad_env.bat"
 
-echo Eliminando Layout2 en todos los planos...
-echo Usando consola: %CAD_CONSOLE%
+echo ---------------------------------------------------
+echo Consola detectada: %CAD_CONSOLE%
 echo ---------------------------------------------------
 
+if "%CAD_CONSOLE%"=="" (
+    echo [ERROR] No se pudo cargar la ruta de la consola.
+    pause
+    exit /b
+)
+
 for %%f in (*.dwg) do (
-    echo Procesando: %%f
+    echo Eliminando Layout2 en: %%f
     "%CAD_CONSOLE%" /i "%%f" /s "%~dp0DL2.scr"
 )
 
 echo.
-echo ¡Proceso finalizado! Los Layout2 han sido eliminados.
+echo ¡Proceso finalizado!
 pause

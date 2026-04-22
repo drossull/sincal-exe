@@ -1,16 +1,22 @@
 @echo off
-:: Cargar la ruta de la consola detectada por Python
-call "%AppData%\Estándar SINCAL\scripts\cad_env.bat"
+chcp 65001 > nul
+call "%~dp0cad_env.bat"
 
-echo Configurando la hoja de impresion en todos los planos...
-echo Usando consola detectada: %CAD_CONSOLE%
+echo ---------------------------------------------------
+echo Consola detectada: %CAD_CONSOLE%
 echo ---------------------------------------------------
 
+if "%CAD_CONSOLE%"=="" (
+    echo [ERROR] No se pudo cargar la ruta de la consola.
+    pause
+    exit /b
+)
+
 for %%f in (*.dwg) do (
-    echo Procesando: %%f
+    echo Configurando pagina A1 en: %%f
     "%CAD_CONSOLE%" /i "%%f" /s "%~dp0PAGESETUP-A1.scr"
 )
 
 echo.
-echo ¡Todas las hojas de impresion fueron configuradas y guardadas!
+echo ¡Proceso finalizado!
 pause

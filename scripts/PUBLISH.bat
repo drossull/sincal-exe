@@ -1,18 +1,22 @@
 @echo off
-:: Cargar la ruta de la consola detectada por Python
-call "%AppData%\Estándar SINCAL\scripts\cad_env.bat"
+chcp 65001 > nul
+call "%~dp0cad_env.bat"
 
-echo Generando PDFs con el nombre exacto del DWG...
-echo Usando consola: %CAD_CONSOLE%
+echo ---------------------------------------------------
+echo Consola detectada: %CAD_CONSOLE%
+echo ---------------------------------------------------
 
-for %%F in (*.dwg) do (
-    echo ---------------------------------------------------
-    echo Imprimiendo el plano: %%F
-    
-    :: Ejecutamos la consola CAD de forma silenciosa para imprimir
-    "%CAD_CONSOLE%" /i "%%F" /s "%~dp0PUBLISH.scr"
+if "%CAD_CONSOLE%"=="" (
+    echo [ERROR] No se pudo cargar la ruta de la consola.
+    pause
+    exit /b
+)
+
+for %%f in (*.dwg) do (
+    echo Publicando PDF de: %%f
+    "%CAD_CONSOLE%" /i "%%f" /s "%~dp0PUBLISH.scr"
 )
 
 echo.
-echo ¡Proceso finalizado! PDFs generados y a salvo.
+echo ¡Proceso finalizado!
 pause
