@@ -311,7 +311,8 @@ class ActualizadorCAD(ctk.CTk):
     def buscar_y_configurar_consolas(self):
         ruta_env = os.path.join(RUTA_LOCAL_APP, "scripts", "cad_env.bat")
         exe = None
-        # Búsqueda AutoCAD
+        
+        # 1. Búsqueda AutoCAD
         try:
             with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Autodesk\AutoCAD") as k:
                 for i in range(winreg.QueryInfoKey(k)[0]):
@@ -325,28 +326,58 @@ class ActualizadorCAD(ctk.CTk):
                                     exe = os.path.join(path, "accoreconsole.exe")
                                     break
         except: pass
-        # Búsqueda ZWCAD
+
+        # 2. Búsqueda ZWCAD (Agresiva para versión 2025+)
         if not exe:
             try:
                 with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\ZWSOFT\ZWCAD") as k:
                     for i in range(winreg.QueryInfoKey(k)[0]):
-                        v = winreg.EnumKey(k, i)
-                        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"SOFTWARE\\ZWSOFT\\ZWCAD\\{v}") as vk:
-                            path, _ = winreg.QueryValueEx(vk, "InstallPath")
-                            if os.path.exists(os.path.join(path, "ZWCADConsole.exe")):
-                                exe = os.path.join(path, "ZWCADConsole.exe")
-                                break
+                        v = winreg.EnumKey(k, i) # ej: "2025" o "2025es-ES"
+                        
+                        # Intento A: Directo en la versión (ZWCAD antiguo)
+                        try:
+                            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"SOFTWARE\\ZWSOFT\\ZWCAD\\{v}") as vk:
+                                path, _ = winreg.QueryValueEx(vk, "InstallPath")
+                                exe = self.validar_exe_zwcad(path)
+                                if exe: break
+                        except: pass
+                        
+                        # Intento B: Subcarpeta de idioma (ZWCAD nuevo/2025)
+                        if not exe:
+                            try:
+                                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"SOFTWARE\\ZWSOFT\\ZWCAD\\{v}") as vk:
+                                    for j in range(winreg.QueryInfoKey(vk)[0]):
+                                        lang = winreg.EnumKey(vk, j)
+                                        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"SOFTWARE\\ZWSOFT\\ZWCAD\\{v}\\{lang}") as lk:
+                                            path, _ = winreg.QueryValueEx(lk, "InstallPath")
+                                            exe = self.validar_exe_zwcad(path)
+                                            if exe: break
+                            except: pass
+                        if exe: break
             except: pass
+            
         if exe:
             with open(ruta_env, 'w') as f: f.write(f'@set "CAD_CONSOLE={exe}"')
             self.log(f" [+] Consola vinculada: {os.path.basename(exe)}")
+        else:
+            self.log(" [X] Advertencia: No se detectó consola de AutoCAD ni ZWCAD de fondo.")
+
+    def validar_exe_zwcad(self, path):
+        # Busca los posibles nombres de consola introducidos en versiones recientes
+        candidatos = ["ZwCoreConsole.exe", "ZWCADConsole.exe", "zwcad.exe"]
+        for c in candidatos:
+            if os.path.exists(os.path.join(path, c)):
+                return os.path.join(path, c)
+        return None
 
     def actualizar_rutas_registro(self):
         carpeta_ctb = os.path.join(RUTA_LOCAL_APP, "plotstyles")
+        # Se agregaron múltiples posibles nombres de variables para cubrir ZWCAD 2025
         targets = [
             {"r": r"Software\Autodesk\AutoCAD", "v": "ACAD"}, 
             {"r": r"Software\ZWSOFT\ZWCAD", "v": "ZWCAD"},
-            {"r": r"Software\ZWSOFT\ZWCAD", "v": "ACAD"}
+            {"r": r"Software\ZWSOFT\ZWCAD", "v": "ACAD"},
+            {"r": r"Software\ZWSOFT\ZWCAD", "v": "SearchPath"} 
         ]
         for t in targets:
             try:
