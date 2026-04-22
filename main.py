@@ -403,40 +403,64 @@ class ActualizadorCAD(ctk.CTk):
 
     def actualizar_rutas_registro(self):
         carpeta_ctb = os.path.join(RUTA_LOCAL_APP, "plotstyles")
-        # Se agregaron múltiples posibles nombres de variables para cubrir ZWCAD 2025
-        targets = [
-            {"r": r"Software\Autodesk\AutoCAD", "v": "ACAD"}, 
-            {"r": r"Software\ZWSOFT\ZWCAD", "v": "ZWCAD"},
-            {"r": r"Software\ZWSOFT\ZWCAD", "v": "ACAD"},
-            {"r": r"Software\ZWSOFT\ZWCAD", "v": "SearchPath"} 
-        ]
-        for t in targets:
+        
+        # Bases del registro para AutoCAD y ZWCAD
+        bases = [r"Software\Autodesk\AutoCAD", r"Software\ZWSOFT\ZWCAD"]
+        
+        for base in bases:
             try:
-                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, t["r"]) as key:
-                    for i in range(winreg.QueryInfoKey(key)[0]):
-                        v_n = winreg.EnumKey(key, i)
-                        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, f"{t['r']}\\{v_n}") as vk:
-                            for j in range(winreg.QueryInfoKey(vk)[0]):
-                                p_n = winreg.EnumKey(vk, j)
-                                profs = f"{t['r']}\\{v_n}\\{p_n}\\Profiles"
+                # 1er Nivel: Ej -> Software\ZWSOFT\ZWCAD
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, base) as k1:
+                    for i in range(winreg.QueryInfoKey(k1)[0]):
+                        v1 = winreg.EnumKey(k1, i) # Ej -> "2025"
+                        
+                        # 2do Nivel: Ej -> Software\ZWSOFT\ZWCAD\2025
+                        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, f"{base}\\{v1}") as k2:
+                            for j in range(winreg.QueryInfoKey(k2)[0]):
+                                v2 = winreg.EnumKey(k2, j) # Ej -> "en-US"
+                                profs_path = f"{base}\\{v1}\\{v2}\\Profiles"
+                                
+                                # 3er Nivel: Buscar perfiles (Ej -> "Default")
                                 try:
-                                    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, profs) as pk:
-                                        for k in range(winreg.QueryInfoKey(pk)[0]):
-                                            p = winreg.EnumKey(pk, k)
-                                            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, f"{profs}\\{p}\\General", 0, winreg.KEY_ALL_ACCESS) as gk:
-                                                try: paths, _ = winreg.QueryValueEx(gk, t["v"])
-                                                except: 
-                                                    paths, _ = winreg.QueryValueEx(gk, "SEARCHPATH")
-                                                    t["v"] = "SEARCHPATH"
-                                                if RUTA_LOCAL_APP.lower() not in paths.lower():
-                                                    winreg.SetValueEx(gk, t["v"], 0, winreg.REG_SZ, f"{paths};{RUTA_LOCAL_APP}")
-                                                if os.path.exists(carpeta_ctb):
-                                                    try: r_ctb, _ = winreg.QueryValueEx(gk, "PrinterStyleSheetDir")
-                                                    except: r_ctb = ""
-                                                    if r_ctb:
-                                                        r_ctb = os.path.expandvars(r_ctb)
-                                                        for c in os.listdir(carpeta_ctb):
-                                                            if c.lower().endswith('.ctb'): shutil.copy2(os.path.join(carpeta_ctb, c), os.path.join(r_ctb, c))
+                                    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, profs_path) as k3:
+                                        for k in range(winreg.QueryInfoKey(k3)[0]):
+                                            prof_name = winreg.EnumKey(k3, k) 
+                                            gen_path = f"{profs_path}\\{prof_name}\\General"
+                                            
+                                            # INYECCIÓN FINAL EN EL PERFIL
+                                            try:
+                                                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, gen_path, 0, winreg.KEY_ALL_ACCESS) as gk:
+                                                    
+                                                    # A. Inyectar Rutas de Soporte (Prueba todas las variantes)
+                                                    nombres_posibles = ["ACAD", "ZWCAD", "SearchPath", "SEARCHPATH"]
+                                                    for nombre in nombres_posibles:
+                                                        try:
+                                                            paths, _ = winreg.QueryValueEx(gk, nombre)
+                                                            if paths and RUTA_LOCAL_APP.lower() not in paths.lower():
+                                                                winreg.SetValueEx(gk, nombre, 0, winreg.REG_SZ, f"{paths};{RUTA_LOCAL_APP}")
+                                                        except:
+                                                            pass # Si no existe esa variable, prueba con la siguiente
+                                                    
+                                                    # B. Inyectar TrustedPaths (Rutas de confianza para CAD 2025+)
+                                                    try:
+                                                        tp, _ = winreg.QueryValueEx(gk, "TrustedPaths")
+                                                        if RUTA_LOCAL_APP.lower() not in tp.lower():
+                                                            winreg.SetValueEx(gk, "TrustedPaths", 0, winreg.REG_SZ, f"{tp};{RUTA_LOCAL_APP}")
+                                                    except:
+                                                        winreg.SetValueEx(gk, "TrustedPaths", 0, winreg.REG_SZ, RUTA_LOCAL_APP)
+                                                        
+                                                    # C. Copiar CTBs (Plotstyles)
+                                                    if os.path.exists(carpeta_ctb):
+                                                        try:
+                                                            r_ctb, _ = winreg.QueryValueEx(gk, "PrinterStyleSheetDir")
+                                                            if r_ctb:
+                                                                r_ctb = os.path.expandvars(r_ctb)
+                                                                for c in os.listdir(carpeta_ctb):
+                                                                    if c.lower().endswith('.ctb'): 
+                                                                        shutil.copy2(os.path.join(carpeta_ctb, c), os.path.join(r_ctb, c))
+                                                        except:
+                                                            pass
+                                            except: pass
                                 except: pass
             except: pass
 
