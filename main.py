@@ -6,7 +6,6 @@ import winreg
 import threading
 import ctypes
 import shutil
-from PIL import Image
 import customtkinter as ctk
 
 # --- CONFIGURACIÓN ---
@@ -44,10 +43,11 @@ class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("SINCAL - Suite de Herramientas v1.1.1")
-        self.geometry("850x680") # Un poco más alto para que el pie de página respire
+        self.geometry("850x620") # Altura ajustada al no tener footer
         self.resizable(False, False)
         self.configure(fg_color=COLOR_FONDO)
 
+        # Icono de la ventana (Barra de título y barra de tareas)
         try:
             self.iconbitmap(obtener_ruta_recurso("logo.ico"))
         except:
@@ -58,7 +58,7 @@ class ActualizadorCAD(ctk.CTk):
         # --- SISTEMA DE PESTAÑAS ---
         self.tabview = ctk.CTkTabview(self, 
                                       width=810, 
-                                      height=630, 
+                                      height=570, 
                                       fg_color=COLOR_FONDO,
                                       segmented_button_selected_color=COLOR_ACENTO,
                                       segmented_button_selected_hover_color=COLOR_ACENTO,
@@ -94,7 +94,7 @@ class ActualizadorCAD(ctk.CTk):
                                            hover_color="#005BBF",
                                            text_color="white",
                                            command=self.iniciar_actualizacion_hilo)
-        self.btn_actualizar.pack(pady=10)
+        self.btn_actualizar.pack(pady=15)
 
         botones_sec_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         botones_sec_frame.pack(pady=5)
@@ -123,48 +123,12 @@ class ActualizadorCAD(ctk.CTk):
 
         self.consola = ctk.CTkTextbox(self.tab_main, 
                                      width=750, 
-                                     height=260, 
+                                     height=280, 
                                      font=FUENTE_CONSOLA, 
                                      fg_color="#222222", 
                                      text_color=COLOR_TEXTO,
                                      state="disabled")
-        self.consola.pack(pady=10)
-
-        # --- PIE DE PÁGINA (LOGOS) ---
-        footer_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
-        footer_frame.pack(side="bottom", fill="x", padx=20, pady=(0, 10))
-
-        # Logo SINCAL a la izquierda (con marco sólido gris)
-        marco_logo_sincal = ctk.CTkFrame(footer_frame, fg_color="transparent", border_width=2, border_color=COLOR_TEXTO, corner_radius=5)
-        marco_logo_sincal.pack(side="left")
-
-        try:
-            img_logo = Image.open(obtener_ruta_recurso("logo.ico"))
-            self.img_sincal = ctk.CTkImage(light_image=img_logo, dark_image=img_logo, size=(30, 30))
-            lbl_logo_sincal = ctk.CTkLabel(marco_logo_sincal, image=self.img_sincal, text="")
-            lbl_logo_sincal.pack(padx=5, pady=5)
-        except:
-            pass
-
-        # Frame para logos derechos (AutoCAD y ZWCAD)
-        logos_derechos_frame = ctk.CTkFrame(footer_frame, fg_color="transparent")
-        logos_derechos_frame.pack(side="right")
-
-        try:
-            img_acad = Image.open(obtener_ruta_recurso("autocad.png"))
-            self.img_autocad = ctk.CTkImage(light_image=img_acad, dark_image=img_acad, size=(30, 30))
-            lbl_acad = ctk.CTkLabel(logos_derechos_frame, image=self.img_autocad, text="")
-            lbl_acad.pack(side="left", padx=10)
-        except:
-            pass
-
-        try:
-            img_zwcad = Image.open(obtener_ruta_recurso("zwcad.png"))
-            self.img_zwcad = ctk.CTkImage(light_image=img_zwcad, dark_image=img_zwcad, size=(30, 30))
-            lbl_zwcad = ctk.CTkLabel(logos_derechos_frame, image=self.img_zwcad, text="")
-            lbl_zwcad.pack(side="left", padx=10)
-        except:
-            pass
+        self.consola.pack(pady=15)
 
     def setup_tab_lisp(self):
         self.help_frame = ctk.CTkFrame(self.tab_lisp, fg_color="transparent")
