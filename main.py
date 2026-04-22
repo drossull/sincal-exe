@@ -16,11 +16,14 @@ RAMA = "main"
 URL_BASE_RAW = f"https://raw.githubusercontent.com/{USUARIO_GITHUB}/{REPO_GITHUB}/{RAMA}/"
 RUTA_LOCAL_APP = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL") 
 
+# 👇 PEGA AQUÍ TU URL DE GOOGLE APPS SCRIPT 👇
+URL_WEBHOOK_SHEETS = "https://script.google.com/macros/s/AKfycbywJwskXQrAhNYHV559ngE5WAPa-bhvrfgcYg0ej_WDfxQMP5vmT31b66mEPqeFCchaPQ/exec"
+
 # Definición de Colores SINCAL
-COLOR_FONDO = "#333333"      # Gris oscuro (51,51,51)
-COLOR_TITULO = "#FFBF00"     # Ámbar (255,191,0)
-COLOR_TEXTO = "#CCCCCC"      # Gris claro (204,204,204)
-COLOR_ACENTO = "#007FFF"     # Azul SINCAL (0,127,255)
+COLOR_FONDO = "#333333"      
+COLOR_TITULO = "#FFBF00"     
+COLOR_TEXTO = "#CCCCCC"      
+COLOR_ACENTO = "#007FFF"     
 
 # Fuentes
 FUENTE_TITULO = ("Consolas", 24, "bold")
@@ -28,7 +31,6 @@ FUENTE_SUBTITULO = ("Consolas", 18, "bold")
 FUENTE_NORMAL = ("Consolas", 14)
 FUENTE_CONSOLA = ("Consolas", 12)
 
-# FORZAR MODO OSCURO (Evita que cambie con el sistema)
 ctk.set_appearance_mode("dark") 
 
 def obtener_ruta_recurso(ruta_relativa):
@@ -41,10 +43,10 @@ def obtener_ruta_recurso(ruta_relativa):
 class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("SINCAL - Suite de Herramientas v1.1.0")
-        self.geometry("850x620")
+        self.title("SINCAL - Suite de Herramientas v1.1.1")
+        self.geometry("850x660")
         self.resizable(False, False)
-        self.configure(fg_color=COLOR_FONDO) # Fondo ventana principal
+        self.configure(fg_color=COLOR_FONDO)
 
         try:
             self.iconbitmap(obtener_ruta_recurso("logo.ico"))
@@ -56,21 +58,19 @@ class ActualizadorCAD(ctk.CTk):
         # --- SISTEMA DE PESTAÑAS ---
         self.tabview = ctk.CTkTabview(self, 
                                       width=810, 
-                                      height=570, 
+                                      height=610, 
                                       fg_color=COLOR_FONDO,
                                       segmented_button_selected_color=COLOR_ACENTO,
                                       segmented_button_selected_hover_color=COLOR_ACENTO,
                                       segmented_button_unselected_hover_color="#444444")
         self.tabview.pack(padx=20, pady=10)
         
-        # Estilo de las pestañas
         self.tabview._segmented_button.configure(font=FUENTE_NORMAL, text_color=COLOR_TEXTO)
         
         self.tab_main = self.tabview.add("Sincronizador")
         self.tab_lisp = self.tabview.add("Instructivo LISP")
         self.tab_cmd = self.tabview.add("Instructivo CMD")
 
-        # Configurar fondo de cada pestaña individualmente
         for tab in [self.tab_main, self.tab_lisp, self.tab_cmd]:
             tab.configure(fg_color=COLOR_FONDO)
 
@@ -80,19 +80,19 @@ class ActualizadorCAD(ctk.CTk):
 
     def setup_tab_sincronizador(self):
         header_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
-        header_frame.pack(pady=10, fill="x", padx=20)
+        header_frame.pack(pady=10, fill="x", padx=10)
 
         try:
             logo_path = obtener_ruta_recurso("logo.ico")
             img_logo = Image.open(logo_path)
             self.logo_image = ctk.CTkImage(light_image=img_logo, dark_image=img_logo, size=(40, 40))
             lbl_logo = ctk.CTkLabel(header_frame, image=self.logo_image, text="")
-            lbl_logo.pack(side="left", padx=(0, 10))
+            lbl_logo.pack(side="left")
         except:
             pass
 
-        lbl_titulo = ctk.CTkLabel(header_frame, text="Estándar SINCAL", font=FUENTE_TITULO, text_color=COLOR_TITULO)
-        lbl_titulo.pack(side="left")
+        lbl_titulo = ctk.CTkLabel(header_frame, text="ESTÁNDAR SINCAL", font=FUENTE_TITULO, text_color=COLOR_TITULO)
+        lbl_titulo.pack(expand=True)
 
         self.btn_actualizar = ctk.CTkButton(self.tab_main, 
                                            text="Instalar / Actualizar Todo", 
@@ -101,9 +101,12 @@ class ActualizadorCAD(ctk.CTk):
                                            hover_color="#005BBF",
                                            text_color="white",
                                            command=self.iniciar_actualizacion_hilo)
-        self.btn_actualizar.pack(pady=10)
+        self.btn_actualizar.pack(pady=15)
 
-        self.btn_folder = ctk.CTkButton(self.tab_main, 
+        botones_sec_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
+        botones_sec_frame.pack(pady=5)
+
+        self.btn_folder = ctk.CTkButton(botones_sec_frame, 
                                        text="Abrir carpeta local", 
                                        font=FUENTE_NORMAL, 
                                        fg_color="transparent",
@@ -112,16 +115,27 @@ class ActualizadorCAD(ctk.CTk):
                                        text_color=COLOR_TEXTO,
                                        hover_color="#444444",
                                        command=self.abrir_carpeta_local)
-        self.btn_folder.pack(pady=5)
+        self.btn_folder.pack(side="left", padx=10)
+
+        self.btn_forzar_path = ctk.CTkButton(botones_sec_frame, 
+                                       text="Reparar / Forzar PATH", 
+                                       font=FUENTE_NORMAL, 
+                                       fg_color="transparent",
+                                       border_width=1,
+                                       border_color=COLOR_TITULO,
+                                       text_color=COLOR_TITULO,
+                                       hover_color="#444444",
+                                       command=self.forzar_path_manual)
+        self.btn_forzar_path.pack(side="left", padx=10)
 
         self.consola = ctk.CTkTextbox(self.tab_main, 
                                      width=750, 
-                                     height=290, 
+                                     height=280, 
                                      font=FUENTE_CONSOLA, 
                                      fg_color="#222222", 
                                      text_color=COLOR_TEXTO,
                                      state="disabled")
-        self.consola.pack(pady=10)
+        self.consola.pack(pady=15)
 
     def setup_tab_lisp(self):
         self.help_frame = ctk.CTkFrame(self.tab_lisp, fg_color="transparent")
@@ -201,8 +215,6 @@ class ActualizadorCAD(ctk.CTk):
         self.cmd_readme.configure(state="disabled")
         self.cmd_readme.pack(pady=10)
 
-    # ... [Resto de las funciones de lógica: motor_actualizacion, generar_archivos_lisp, etc., permanecen iguales] ...
-
     def log(self, mensaje):
         self.consola.configure(state="normal")
         self.consola.insert("end", mensaje + "\n")
@@ -212,6 +224,24 @@ class ActualizadorCAD(ctk.CTk):
     def abrir_carpeta_local(self):
         if os.path.exists(RUTA_LOCAL_APP): os.startfile(RUTA_LOCAL_APP)
 
+    def forzar_path_manual(self):
+        self.log("\n--- REPARACIÓN DE VARIABLES DE ENTORNO (PATH) ---")
+        r_scripts = os.path.join(RUTA_LOCAL_APP, "scripts")
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS) as key:
+                try: p, _ = winreg.QueryValueEx(key, "Path")
+                except: p = ""
+                if r_scripts.lower() not in p.lower():
+                    nuevo_path = f"{p};{r_scripts}" if p else r_scripts
+                    winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, nuevo_path)
+                    self.log(f" [+] ÉXITO: Ruta inyectada en el registro.")
+                else:
+                    self.log(f" [OK] La ruta ya existe en el registro.")
+                ctypes.windll.user32.SendMessageTimeoutW(0xFFFF, 0x001A, 0, "Environment", 0x0002, 5000, None)
+                self.log(" [!] Cierra cualquier CMD abierto para aplicar los cambios.\n")
+        except PermissionError:
+            self.log(" [X] ERROR: Ejecuta SINCAL como administrador.\n")
+
     def cargar_lista_tutoriales(self):
         for widget in self.list_frame.winfo_children(): widget.destroy()
         ruta_json = os.path.join(RUTA_LOCAL_APP, "tutoriales.json")
@@ -220,13 +250,9 @@ class ActualizadorCAD(ctk.CTk):
                 with open(ruta_json, 'r', encoding='utf-8') as f:
                     self.tutoriales = json.load(f)
                 for cmd in self.tutoriales.keys():
-                    btn = ctk.CTkButton(self.list_frame, 
-                                        text=cmd, 
-                                        font=FUENTE_NORMAL, 
-                                        fg_color="transparent", 
-                                        text_color=COLOR_TEXTO,
-                                        border_width=1,
-                                        border_color="#444444",
+                    btn = ctk.CTkButton(self.list_frame, text=cmd, font=FUENTE_NORMAL, 
+                                        fg_color="transparent", text_color=COLOR_TEXTO,
+                                        border_width=1, border_color="#444444",
                                         hover_color=COLOR_ACENTO,
                                         command=lambda c=cmd: self.mostrar_tutorial(c))
                     btn.pack(fill="x", pady=2, padx=5)
@@ -244,12 +270,30 @@ class ActualizadorCAD(ctk.CTk):
         self.consola.configure(state="disabled")
         threading.Thread(target=self.motor_actualizacion).start()
 
+    # --- NUEVA FUNCIÓN DE TELEMETRÍA ---
+    def enviar_telemetria(self, version_instalada):
+        if "TU_CODIGO_AQUI" in URL_WEBHOOK_SHEETS:
+            return # Evita enviar si no has configurado la URL aún
+        try:
+            usuario_windows = os.environ.get('USERNAME', 'Desconocido')
+            payload = {
+                "usuario": usuario_windows,
+                "version": version_instalada,
+                "accion": "Actualización Completada"
+            }
+            # Se envía de forma silenciosa, timeout corto para no colgar la app
+            requests.post(URL_WEBHOOK_SHEETS, json=payload, timeout=3)
+        except:
+            pass # Si no hay internet o falla, falla silenciosamente
+
     def motor_actualizacion(self):
         self.log("--- INICIANDO ACTUALIZACIÓN ---")
         os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
+        version_nube = "Desconocida"
         try:
             r = requests.get(URL_BASE_RAW + "version.json")
             data = r.json()
+            version_nube = data.get("version", "Desconocida")
             archivos = data.get("archivos", [])
             for a in archivos:
                 r_save = os.path.join(RUTA_LOCAL_APP, a)
@@ -263,8 +307,12 @@ class ActualizadorCAD(ctk.CTk):
             self.actualizar_variable_entorno()
             self.buscar_y_configurar_consolas()
             
-            self.log("\n[!] PROCESO FINALIZADO.")
+            self.log(f"\n[!] PROCESO FINALIZADO. VERSIÓN INSTALADA: {version_nube}")
             self.after(0, self.cargar_lista_tutoriales)
+            
+            # --- ENVÍO DE DATOS A GOOGLE SHEETS ---
+            self.enviar_telemetria(version_nube)
+            
         except Exception as e: self.log(f"[!] Error: {e}")
         self.btn_actualizar.configure(state="normal", text="Actualizar Todo")
 
