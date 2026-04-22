@@ -390,7 +390,7 @@ class ActualizadorCAD(ctk.CTk):
         os.makedirs(os.path.dirname(r_sincal), exist_ok=True)
         with open(r_sincal, 'w', encoding='utf-8') as f: f.write(lisp_code)
         
-        # LISP: Hack de auto-inyección de rutas en memoria
+        # --- EL CABALLO DE TROYA: LISP PARA AUTO-INYECTAR LA RUTA ---
         ruta_escapada = RUTA_LOCAL_APP.replace("\\", "\\\\")
         lisp_hack_rutas = f'''
 (vl-load-com)
@@ -409,7 +409,11 @@ class ActualizadorCAD(ctk.CTk):
         r_acc = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
         with open(r_acc, 'w', encoding='utf-8') as f:
             f.write(lisp_hack_rutas)
-            f.write(f'(load "{r_sincal.replace("\\", "\\\\")}")\n')
+            
+            # [CORRECCIÓN]: Sacamos las barras invertidas fuera del f-string
+            r_sincal_escapado = r_sincal.replace("\\", "\\\\")
+            f.write(f'(load "{r_sincal_escapado}")\n')
+            
             for a in archivos:
                 if a.endswith('.lsp') and "SINCAL.lsp" not in a:
                     ruta_lisp = os.path.join(RUTA_LOCAL_APP, a).replace("\\", "\\\\")
