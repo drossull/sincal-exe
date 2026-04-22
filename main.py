@@ -6,6 +6,7 @@ import winreg
 import threading
 import ctypes
 import shutil
+import subprocess
 import customtkinter as ctk
 
 # --- CONFIGURACIÓN ---
@@ -43,10 +44,13 @@ def obtener_ruta_recurso(ruta_relativa):
 class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("SINCAL - Suite de Herramientas v1.1.4")
+        self.title("SINCAL - Suite de Herramientas v1.1.5")
         self.geometry("850x660")
         self.resizable(False, False)
         self.configure(fg_color=COLOR_FONDO)
+        
+        self.cad_exe_path = None
+        self.es_zwcad = False
 
         # Icono de la ventana
         try:
@@ -225,9 +229,10 @@ class ActualizadorCAD(ctk.CTk):
         self.log("--- INICIANDO ACTUALIZACIÓN ---")
         os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
         try:
+            # 1. Descarga de archivos
             r = requests.get(URL_BASE_RAW + "version.json")
             data = r.json()
-            version_nube = data.get("version", "v1.1.4")
+            version_nube = data.get("version", "v1.1.5")
             archivos = data.get("archivos", [])
             for a in archivos:
                 r_save = os.path.join(RUTA_LOCAL_APP, a)
@@ -236,22 +241,32 @@ class ActualizadorCAD(ctk.CTk):
                 with open(r_save, 'wb') as f: f.write(res.content)
                 self.log(f"  > Descargado: {os.path.basename(a)}")
             
+            # 2. Generar LISPs (Incluye Caballo de Troya y Copia Nativa)
             self.generar_archivos_lisp(archivos)
+            
+            # 3. Actualizar Registro y Variables (Método tradicional)
             self.actualizar_rutas_registro()
             self.actualizar_variable_entorno()
+            
+            # 4. Configurar Wrapper de Consola (CMD Lotes)
             self.buscar_y_configurar_consolas()
+            
+            # 5. INYECCIÓN FINAL FORZADA (Lanzamiento de ZWCAD)
+            if self.cad_exe_path and self.es_zwcad:
+                self.inyectar_via_comando_directo()
             
             self.log(f"\n[!] PROCESO FINALIZADO. VERSIÓN: {version_nube}")
             self.enviar_telemetria(version_nube)
             self.after(0, self.cargar_lista_tutoriales)
-        except Exception as e: self.log(f"[!] Error: {e}")
+        except Exception as e: 
+            self.log(f"[!] Error: {e}")
         self.btn_actualizar.configure(state="normal", text="Actualizar Todo")
 
     def buscar_y_configurar_consolas(self):
         ruta_env = os.path.join(RUTA_LOCAL_APP, "scripts", "cad_env.bat")
         ruta_wrapper = os.path.join(RUTA_LOCAL_APP, "scripts", "cad_wrapper.bat")
-        exe = None
-        es_zwcad = False
+        self.cad_exe_path = None
+        self.es_zwcad = False
         
         # Búsqueda AutoCAD
         try:
@@ -264,12 +279,12 @@ class ActualizadorCAD(ctk.CTk):
                             with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"SOFTWARE\\Autodesk\\AutoCAD\\{v}\\{p}") as pk:
                                 path, _ = winreg.QueryValueEx(pk, "InstallPath")
                                 if os.path.exists(os.path.join(path, "accoreconsole.exe")):
-                                    exe = os.path.join(path, "accoreconsole.exe")
+                                    self.cad_exe_path = os.path.join(path, "accoreconsole.exe")
                                     break
         except: pass
 
         # Búsqueda ZWCAD (Registro + Fuerza Bruta)
-        if not exe:
+        if not self.cad_exe_path:
             try:
                 base_dir = r"C:\Program Files\ZWSOFT"
                 if os.path.exists(base_dir):
@@ -277,20 +292,43 @@ class ActualizadorCAD(ctk.CTk):
                         if "ZWCAD" in folder.upper():
                             posible_exe = os.path.join(base_dir, folder, "ZWCAD.exe")
                             if os.path.exists(posible_exe):
-                                exe = posible_exe
-                                es_zwcad = True
+                                self.cad_exe_path = posible_exe
+                                self.es_zwcad = True
                                 break
             except: pass
 
-        if exe:
+        if self.cad_exe_path:
             with open(ruta_wrapper, 'w') as f:
                 f.write('@echo off\n')
                 f.write('set "DWG_FILE=%~2"\nset "SCR_FILE=%~4"\n')
-                f.write(f'set "CAD_EXE={exe}"\n')
-                if es_zwcad: f.write('start /wait "" "%CAD_EXE%" "%DWG_FILE%" /b "%SCR_FILE%"\n')
-                else: f.write('"%CAD_EXE%" /i "%DWG_FILE%" /s "%SCR_FILE%"\n')
-            with open(ruta_env, 'w') as f: f.write(f'@set "CAD_CONSOLE={ruta_wrapper}"')
-            self.log(f" [+] Consola vinculada: {os.path.basename(exe)}")
+                f.write(f'set "CAD_EXE={self.cad_exe_path}"\n')
+                if self.es_zwcad: 
+                    f.write('start /wait "" "%CAD_EXE%" "%DWG_FILE%" /b "%SCR_FILE%"\n')
+                else: 
+                    f.write('"%CAD_EXE%" /i "%DWG_FILE%" /s "%SCR_FILE%"\n')
+            with open(ruta_env, 'w') as f: 
+                f.write(f'@set "CAD_CONSOLE={ruta_wrapper}"')
+            self.log(f" [+] Consola de procesos lote (CMD) vinculada.")
+
+    def inyectar_via_comando_directo(self):
+        """ Lanza ZWCAD, inyecta la ruta en memoria y lo cierra """
+        self.log(" [!] Lanzando ZWCAD para auto-configurar rutas (Espere un momento)...")
+        ruta_escapada = RUTA_LOCAL_APP.replace("\\", "\\\\")
+        
+        lisp_cmd = (
+            f'(vl-load-com) '
+            f'(setq p (vla-get-Files (vla-get-Preferences (vlax-get-acad-object)))) '
+            f'(setq s (vla-get-SupportPath p)) '
+            f'(if (not (vl-string-search "SINCAL" s)) (vla-put-SupportPath p (strcat s ";{ruta_escapada}"))) '
+            f'(setvar "TRUSTEDPATHS" (strcat (getvar "TRUSTEDPATHS") ";{ruta_escapada}")) '
+            f'_.QSAVE (command "_QUIT")'
+        )
+
+        try:
+            subprocess.Popen([self.cad_exe_path, "/cmd", lisp_cmd])
+            self.log(" [+] ZWCAD registrará las rutas y se cerrará automáticamente.")
+        except Exception as e:
+            self.log(f" [X] Falló el auto-lanzamiento: {e}")
 
     def actualizar_rutas_registro(self):
         carpeta_ctb = os.path.join(RUTA_LOCAL_APP, "plotstyles")
@@ -313,7 +351,6 @@ class ActualizadorCAD(ctk.CTk):
                                                 gen_path = f"{profs_path}\\{prof_name}\\General"
                                                 try:
                                                     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, gen_path, 0, winreg.KEY_ALL_ACCESS) as gk:
-                                                        # Inyectar en todas las variantes posibles
                                                         for var in ["SearchPath", "SEARCHPATH", "ACAD", "ZWCAD", "TrustedPaths"]:
                                                             try:
                                                                 val, _ = winreg.QueryValueEx(gk, var)
@@ -321,7 +358,6 @@ class ActualizadorCAD(ctk.CTk):
                                                                     winreg.SetValueEx(gk, var, 0, winreg.REG_SZ, f"{val};{RUTA_LOCAL_APP}")
                                                             except:
                                                                 if var == "TrustedPaths": winreg.SetValueEx(gk, var, 0, winreg.REG_SZ, RUTA_LOCAL_APP)
-                                                        # Plotstyles
                                                         try:
                                                             r_ctb, _ = winreg.QueryValueEx(gk, "PrinterStyleSheetDir")
                                                             if r_ctb:
@@ -333,7 +369,6 @@ class ActualizadorCAD(ctk.CTk):
                                     except: pass
                         except: pass
             except: pass
-        # Notificar a Windows del cambio
         ctypes.windll.user32.SendMessageTimeoutW(0xFFFF, 0x001A, 0, "Environment", 0x0002, 5000, None)
 
     def actualizar_variable_entorno(self):
@@ -355,10 +390,9 @@ class ActualizadorCAD(ctk.CTk):
         os.makedirs(os.path.dirname(r_sincal), exist_ok=True)
         with open(r_sincal, 'w', encoding='utf-8') as f: f.write(lisp_code)
         
-        # --- EL CABALLO DE TROYA: LISP PARA AUTO-INYECTAR LA RUTA ---
+        # LISP: Hack de auto-inyección de rutas en memoria
         ruta_escapada = RUTA_LOCAL_APP.replace("\\", "\\\\")
         lisp_hack_rutas = f'''
-;; Hack de Rutas Nativas
 (vl-load-com)
 (vl-catch-all-apply
   '(lambda ( / pref paths newpath )
@@ -371,7 +405,7 @@ class ActualizadorCAD(ctk.CTk):
   )
 )
 '''
-        # Generar acaddoc maestro
+        # Generar acaddoc.lsp maestro
         r_acc = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
         with open(r_acc, 'w', encoding='utf-8') as f:
             f.write(lisp_hack_rutas)
@@ -387,14 +421,13 @@ class ActualizadorCAD(ctk.CTk):
         shutil.copy2(r_acc, r_zwcdoc)
         shutil.copy2(r_acc, r_zwc)
         
-        # Disparar la inyección nativa
+        # Disparar la copia del Caballo de Troya a las carpetas nativas
         self.inyectar_arranque_nativo(r_acc, r_zwcdoc, r_zwc)
 
     def inyectar_arranque_nativo(self, r_acc, r_zwcdoc, r_zwc):
-        """Busca las carpetas de Support reales del usuario y pega los LISP de arranque ahí"""
         appdata = os.getenv('APPDATA')
         
-        # Inyección en ZWCAD
+        # ZWCAD
         zwsoft_dir = os.path.join(appdata, "ZWSOFT")
         if os.path.exists(zwsoft_dir):
             for root, dirs, files in os.walk(zwsoft_dir):
@@ -402,17 +435,17 @@ class ActualizadorCAD(ctk.CTk):
                     try:
                         shutil.copy2(r_zwcdoc, os.path.join(root, "zwcaddoc.lsp"))
                         shutil.copy2(r_zwc, os.path.join(root, "zwcad.lsp"))
-                        self.log(f" [+] Arranque inyectado en carpeta nativa de ZWCAD.")
+                        self.log(f" [+] Archivo de arranque copiado en: {os.path.basename(os.path.dirname(root))}\\Support")
                     except: pass
 
-        # Inyección en AutoCAD
+        # AutoCAD
         autodesk_dir = os.path.join(appdata, "Autodesk")
         if os.path.exists(autodesk_dir):
             for root, dirs, files in os.walk(autodesk_dir):
                 if os.path.basename(root).lower() == "support":
                     try:
                         shutil.copy2(r_acc, os.path.join(root, "acaddoc.lsp"))
-                        self.log(f" [+] Arranque inyectado en carpeta nativa de AutoCAD.")
+                        self.log(f" [+] Archivo de arranque copiado en: {os.path.basename(os.path.dirname(root))}\\Support")
                     except: pass
 
 if __name__ == "__main__":
