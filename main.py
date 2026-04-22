@@ -17,7 +17,7 @@ URL_BASE_RAW = f"https://raw.githubusercontent.com/{USUARIO_GITHUB}/{REPO_GITHUB
 RUTA_LOCAL_APP = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL") 
 
 # 👇 PEGA AQUÍ TU URL DE GOOGLE APPS SCRIPT 👇
-URL_WEBHOOK_SHEETS = "https://script.google.com/macros/s/AKfycbywJwskXQrAhNYHV559ngE5WAPa-bhvrfgcYg0ej_WDfxQMP5vmT31b66mEPqeFCchaPQ/exec"
+URL_WEBHOOK_SHEETS = "https://script.google.com/macros/s/TU_CODIGO_AQUI/exec"
 
 # Definición de Colores SINCAL
 COLOR_FONDO = "#333333"      
@@ -44,7 +44,7 @@ class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("SINCAL - Suite de Herramientas v1.1.1")
-        self.geometry("850x660")
+        self.geometry("850x680") # Un poco más alto para que el pie de página respire
         self.resizable(False, False)
         self.configure(fg_color=COLOR_FONDO)
 
@@ -58,7 +58,7 @@ class ActualizadorCAD(ctk.CTk):
         # --- SISTEMA DE PESTAÑAS ---
         self.tabview = ctk.CTkTabview(self, 
                                       width=810, 
-                                      height=610, 
+                                      height=630, 
                                       fg_color=COLOR_FONDO,
                                       segmented_button_selected_color=COLOR_ACENTO,
                                       segmented_button_selected_hover_color=COLOR_ACENTO,
@@ -79,18 +79,11 @@ class ActualizadorCAD(ctk.CTk):
         self.setup_tab_cmd()
 
     def setup_tab_sincronizador(self):
+        # --- CABECERA ---
         header_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         header_frame.pack(pady=10, fill="x", padx=10)
 
-        try:
-            logo_path = obtener_ruta_recurso("logo.ico")
-            img_logo = Image.open(logo_path)
-            self.logo_image = ctk.CTkImage(light_image=img_logo, dark_image=img_logo, size=(40, 40))
-            lbl_logo = ctk.CTkLabel(header_frame, image=self.logo_image, text="")
-            lbl_logo.pack(side="left")
-        except:
-            pass
-
+        # Título en Mayúsculas y Centrado
         lbl_titulo = ctk.CTkLabel(header_frame, text="ESTÁNDAR SINCAL", font=FUENTE_TITULO, text_color=COLOR_TITULO)
         lbl_titulo.pack(expand=True)
 
@@ -101,7 +94,7 @@ class ActualizadorCAD(ctk.CTk):
                                            hover_color="#005BBF",
                                            text_color="white",
                                            command=self.iniciar_actualizacion_hilo)
-        self.btn_actualizar.pack(pady=15)
+        self.btn_actualizar.pack(pady=10)
 
         botones_sec_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         botones_sec_frame.pack(pady=5)
@@ -130,12 +123,48 @@ class ActualizadorCAD(ctk.CTk):
 
         self.consola = ctk.CTkTextbox(self.tab_main, 
                                      width=750, 
-                                     height=280, 
+                                     height=260, 
                                      font=FUENTE_CONSOLA, 
                                      fg_color="#222222", 
                                      text_color=COLOR_TEXTO,
                                      state="disabled")
-        self.consola.pack(pady=15)
+        self.consola.pack(pady=10)
+
+        # --- PIE DE PÁGINA (LOGOS) ---
+        footer_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
+        footer_frame.pack(side="bottom", fill="x", padx=20, pady=(0, 10))
+
+        # Logo SINCAL a la izquierda (con marco sólido gris)
+        marco_logo_sincal = ctk.CTkFrame(footer_frame, fg_color="transparent", border_width=2, border_color=COLOR_TEXTO, corner_radius=5)
+        marco_logo_sincal.pack(side="left")
+
+        try:
+            img_logo = Image.open(obtener_ruta_recurso("logo.ico"))
+            self.img_sincal = ctk.CTkImage(light_image=img_logo, dark_image=img_logo, size=(30, 30))
+            lbl_logo_sincal = ctk.CTkLabel(marco_logo_sincal, image=self.img_sincal, text="")
+            lbl_logo_sincal.pack(padx=5, pady=5)
+        except:
+            pass
+
+        # Frame para logos derechos (AutoCAD y ZWCAD)
+        logos_derechos_frame = ctk.CTkFrame(footer_frame, fg_color="transparent")
+        logos_derechos_frame.pack(side="right")
+
+        try:
+            img_acad = Image.open(obtener_ruta_recurso("autocad.png"))
+            self.img_autocad = ctk.CTkImage(light_image=img_acad, dark_image=img_acad, size=(30, 30))
+            lbl_acad = ctk.CTkLabel(logos_derechos_frame, image=self.img_autocad, text="")
+            lbl_acad.pack(side="left", padx=10)
+        except:
+            pass
+
+        try:
+            img_zwcad = Image.open(obtener_ruta_recurso("zwcad.png"))
+            self.img_zwcad = ctk.CTkImage(light_image=img_zwcad, dark_image=img_zwcad, size=(30, 30))
+            lbl_zwcad = ctk.CTkLabel(logos_derechos_frame, image=self.img_zwcad, text="")
+            lbl_zwcad.pack(side="left", padx=10)
+        except:
+            pass
 
     def setup_tab_lisp(self):
         self.help_frame = ctk.CTkFrame(self.tab_lisp, fg_color="transparent")
@@ -270,10 +299,9 @@ class ActualizadorCAD(ctk.CTk):
         self.consola.configure(state="disabled")
         threading.Thread(target=self.motor_actualizacion).start()
 
-    # --- NUEVA FUNCIÓN DE TELEMETRÍA ---
     def enviar_telemetria(self, version_instalada):
         if "TU_CODIGO_AQUI" in URL_WEBHOOK_SHEETS:
-            return # Evita enviar si no has configurado la URL aún
+            return 
         try:
             usuario_windows = os.environ.get('USERNAME', 'Desconocido')
             payload = {
@@ -281,10 +309,9 @@ class ActualizadorCAD(ctk.CTk):
                 "version": version_instalada,
                 "accion": "Actualización Completada"
             }
-            # Se envía de forma silenciosa, timeout corto para no colgar la app
             requests.post(URL_WEBHOOK_SHEETS, json=payload, timeout=3)
         except:
-            pass # Si no hay internet o falla, falla silenciosamente
+            pass 
 
     def motor_actualizacion(self):
         self.log("--- INICIANDO ACTUALIZACIÓN ---")
@@ -310,7 +337,6 @@ class ActualizadorCAD(ctk.CTk):
             self.log(f"\n[!] PROCESO FINALIZADO. VERSIÓN INSTALADA: {version_nube}")
             self.after(0, self.cargar_lista_tutoriales)
             
-            # --- ENVÍO DE DATOS A GOOGLE SHEETS ---
             self.enviar_telemetria(version_nube)
             
         except Exception as e: self.log(f"[!] Error: {e}")
