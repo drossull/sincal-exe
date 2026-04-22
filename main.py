@@ -15,14 +15,14 @@ RAMA = "main"
 URL_BASE_RAW = f"https://raw.githubusercontent.com/{USUARIO_GITHUB}/{REPO_GITHUB}/{RAMA}/"
 RUTA_LOCAL_APP = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL") 
 
-# 👇 PEGA AQUÍ TU URL DE GOOGLE APPS SCRIPT 👇
-URL_WEBHOOK_SHEETS = "https://script.google.com/macros/s/TU_CODIGO_AQUI/exec"
+# URL DEL WEBHOOK (Google Sheets)
+URL_WEBHOOK_SHEETS = "https://script.google.com/macros/s/AKfycbywJwskXQrAhNYHV559ngE5WAPa-bhvrfgcYg0ej_WDfxQMP5vmT31b66mEPqeFCchaPQ/exec"
 
-# Definición de Colores SINCAL
-COLOR_FONDO = "#333333"      
-COLOR_TITULO = "#FFBF00"     
-COLOR_TEXTO = "#CCCCCC"      
-COLOR_ACENTO = "#007FFF"     
+# Definición de Colores SINCAL (RGB solicitados)
+COLOR_FONDO = "#333333"      # RGB 51,51,51
+COLOR_TITULO = "#FFBF00"     # RGB 255,191,0 (Ámbar)
+COLOR_TEXTO = "#CCCCCC"      # RGB 204,204,204 (Gris claro)
+COLOR_ACENTO = "#007FFF"     # RGB 0,127,255 (Azul SINCAL)
 
 # Fuentes
 FUENTE_TITULO = ("Consolas", 24, "bold")
@@ -30,6 +30,7 @@ FUENTE_SUBTITULO = ("Consolas", 18, "bold")
 FUENTE_NORMAL = ("Consolas", 14)
 FUENTE_CONSOLA = ("Consolas", 12)
 
+# Forzar modo oscuro para evitar conflictos con el sistema del usuario
 ctk.set_appearance_mode("dark") 
 
 def obtener_ruta_recurso(ruta_relativa):
@@ -42,12 +43,12 @@ def obtener_ruta_recurso(ruta_relativa):
 class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("SINCAL - Suite de Herramientas v1.1.1")
-        self.geometry("850x620") # Altura ajustada al no tener footer
+        self.title("SINCAL - Suite de Herramientas v1.1.2")
+        self.geometry("850x660")
         self.resizable(False, False)
         self.configure(fg_color=COLOR_FONDO)
 
-        # Icono de la ventana (Barra de título y barra de tareas)
+        # Icono de la ventana
         try:
             self.iconbitmap(obtener_ruta_recurso("logo.ico"))
         except:
@@ -58,7 +59,7 @@ class ActualizadorCAD(ctk.CTk):
         # --- SISTEMA DE PESTAÑAS ---
         self.tabview = ctk.CTkTabview(self, 
                                       width=810, 
-                                      height=570, 
+                                      height=610, 
                                       fg_color=COLOR_FONDO,
                                       segmented_button_selected_color=COLOR_ACENTO,
                                       segmented_button_selected_hover_color=COLOR_ACENTO,
@@ -83,10 +84,11 @@ class ActualizadorCAD(ctk.CTk):
         header_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         header_frame.pack(pady=10, fill="x", padx=10)
 
-        # Título en Mayúsculas y Centrado
+        # Título en MAYÚSCULAS y CENTRADO
         lbl_titulo = ctk.CTkLabel(header_frame, text="ESTÁNDAR SINCAL", font=FUENTE_TITULO, text_color=COLOR_TITULO)
         lbl_titulo.pack(expand=True)
 
+        # Botón Principal
         self.btn_actualizar = ctk.CTkButton(self.tab_main, 
                                            text="Instalar / Actualizar Todo", 
                                            font=FUENTE_NORMAL,
@@ -96,6 +98,7 @@ class ActualizadorCAD(ctk.CTk):
                                            command=self.iniciar_actualizacion_hilo)
         self.btn_actualizar.pack(pady=15)
 
+        # Frame para botones secundarios
         botones_sec_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         botones_sec_frame.pack(pady=5)
 
@@ -264,8 +267,6 @@ class ActualizadorCAD(ctk.CTk):
         threading.Thread(target=self.motor_actualizacion).start()
 
     def enviar_telemetria(self, version_instalada):
-        if "TU_CODIGO_AQUI" in URL_WEBHOOK_SHEETS:
-            return 
         try:
             usuario_windows = os.environ.get('USERNAME', 'Desconocido')
             payload = {
@@ -273,7 +274,7 @@ class ActualizadorCAD(ctk.CTk):
                 "version": version_instalada,
                 "accion": "Actualización Completada"
             }
-            requests.post(URL_WEBHOOK_SHEETS, json=payload, timeout=3)
+            requests.post(URL_WEBHOOK_SHEETS, json=payload, timeout=5)
         except:
             pass 
 
@@ -284,7 +285,7 @@ class ActualizadorCAD(ctk.CTk):
         try:
             r = requests.get(URL_BASE_RAW + "version.json")
             data = r.json()
-            version_nube = data.get("version", "Desconocida")
+            version_nube = data.get("version", "v1.1.2")
             archivos = data.get("archivos", [])
             for a in archivos:
                 r_save = os.path.join(RUTA_LOCAL_APP, a)
@@ -298,9 +299,10 @@ class ActualizadorCAD(ctk.CTk):
             self.actualizar_variable_entorno()
             self.buscar_y_configurar_consolas()
             
-            self.log(f"\n[!] PROCESO FINALIZADO. VERSIÓN INSTALADA: {version_nube}")
+            self.log(f"\n[!] PROCESO FINALIZADO. VERSIÓN: {version_nube}")
             self.after(0, self.cargar_lista_tutoriales)
             
+            # Envío de registro a Google Sheets
             self.enviar_telemetria(version_nube)
             
         except Exception as e: self.log(f"[!] Error: {e}")
@@ -309,6 +311,7 @@ class ActualizadorCAD(ctk.CTk):
     def buscar_y_configurar_consolas(self):
         ruta_env = os.path.join(RUTA_LOCAL_APP, "scripts", "cad_env.bat")
         exe = None
+        # Búsqueda AutoCAD
         try:
             with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Autodesk\AutoCAD") as k:
                 for i in range(winreg.QueryInfoKey(k)[0]):
@@ -322,6 +325,7 @@ class ActualizadorCAD(ctk.CTk):
                                     exe = os.path.join(path, "accoreconsole.exe")
                                     break
         except: pass
+        # Búsqueda ZWCAD
         if not exe:
             try:
                 with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\ZWSOFT\ZWCAD") as k:
@@ -339,7 +343,11 @@ class ActualizadorCAD(ctk.CTk):
 
     def actualizar_rutas_registro(self):
         carpeta_ctb = os.path.join(RUTA_LOCAL_APP, "plotstyles")
-        targets = [{"r": r"Software\Autodesk\AutoCAD", "v": "ACAD"}, {"r": r"Software\ZWSOFT\ZWCAD", "v": "ACAD"}]
+        targets = [
+            {"r": r"Software\Autodesk\AutoCAD", "v": "ACAD"}, 
+            {"r": r"Software\ZWSOFT\ZWCAD", "v": "ZWCAD"},
+            {"r": r"Software\ZWSOFT\ZWCAD", "v": "ACAD"}
+        ]
         for t in targets:
             try:
                 with winreg.OpenKey(winreg.HKEY_CURRENT_USER, t["r"]) as key:
@@ -389,6 +397,7 @@ class ActualizadorCAD(ctk.CTk):
         os.makedirs(os.path.dirname(r_sincal), exist_ok=True)
         with open(r_sincal, 'w', encoding='utf-8') as f: f.write(lisp_code)
         
+        # 1. Generar acaddoc.lsp para AutoCAD
         r_acc = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
         with open(r_acc, 'w', encoding='utf-8') as f:
             r_sincal_escaped = r_sincal.replace("\\", "\\\\")
@@ -397,6 +406,10 @@ class ActualizadorCAD(ctk.CTk):
                 if a.endswith('.lsp') and "SINCAL.lsp" not in a:
                     r = os.path.join(RUTA_LOCAL_APP, a).replace('\\', '\\\\')
                     f.write(f'(if (findfile "{r}") (load "{r}"))\n')
+        
+        # 2. Generar zwcaddoc.lsp (Clon para ZWCAD)
+        r_zwc = os.path.join(RUTA_LOCAL_APP, "zwcaddoc.lsp")
+        shutil.copy2(r_acc, r_zwc)
 
 if __name__ == "__main__":
     app = ActualizadorCAD()
