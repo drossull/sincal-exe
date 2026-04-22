@@ -310,7 +310,9 @@ class ActualizadorCAD(ctk.CTk):
 
     def buscar_y_configurar_consolas(self):
         ruta_env = os.path.join(RUTA_LOCAL_APP, "scripts", "cad_env.bat")
+        ruta_wrapper = os.path.join(RUTA_LOCAL_APP, "scripts", "cad_wrapper.bat")
         exe = None
+        es_zwcad = False
         
         # 1. Búsqueda AutoCAD
         try:
@@ -327,22 +329,20 @@ class ActualizadorCAD(ctk.CTk):
                                     break
         except: pass
 
-        # 2. Búsqueda ZWCAD (Agresiva para versión 2025+)
+        # 2. Búsqueda ZWCAD por Registro
         if not exe:
             try:
                 with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\ZWSOFT\ZWCAD") as k:
                     for i in range(winreg.QueryInfoKey(k)[0]):
-                        v = winreg.EnumKey(k, i) # ej: "2025" o "2025es-ES"
-                        
-                        # Intento A: Directo en la versión (ZWCAD antiguo)
+                        v = winreg.EnumKey(k, i)
                         try:
                             with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"SOFTWARE\\ZWSOFT\\ZWCAD\\{v}") as vk:
                                 path, _ = winreg.QueryValueEx(vk, "InstallPath")
-                                exe = self.validar_exe_zwcad(path)
-                                if exe: break
+                                if os.path.exists(os.path.join(path, "ZWCAD.exe")):
+                                    exe = os.path.join(path, "ZWCAD.exe")
+                                    es_zwcad = True
+                                    break
                         except: pass
-                        
-                        # Intento B: Subcarpeta de idioma (ZWCAD nuevo/2025)
                         if not exe:
                             try:
                                 with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"SOFTWARE\\ZWSOFT\\ZWCAD\\{v}") as vk:
@@ -350,17 +350,48 @@ class ActualizadorCAD(ctk.CTk):
                                         lang = winreg.EnumKey(vk, j)
                                         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"SOFTWARE\\ZWSOFT\\ZWCAD\\{v}\\{lang}") as lk:
                                             path, _ = winreg.QueryValueEx(lk, "InstallPath")
-                                            exe = self.validar_exe_zwcad(path)
-                                            if exe: break
+                                            if os.path.exists(os.path.join(path, "ZWCAD.exe")):
+                                                exe = os.path.join(path, "ZWCAD.exe")
+                                                es_zwcad = True
+                                                break
                             except: pass
                         if exe: break
             except: pass
-            
+
+        # 3. Búsqueda ZWCAD Agresiva (Fuerza Bruta en Disco Duro)
+        if not exe:
+            try:
+                base_dir = r"C:\Program Files\ZWSOFT"
+                if os.path.exists(base_dir):
+                    for folder in os.listdir(base_dir):
+                        if "ZWCAD" in folder.upper():
+                            posible_exe = os.path.join(base_dir, folder, "ZWCAD.exe")
+                            if os.path.exists(posible_exe):
+                                exe = posible_exe
+                                es_zwcad = True
+                                break
+            except: pass
+
+        # 4. Configuración del Puente (Wrapper)
         if exe:
-            with open(ruta_env, 'w') as f: f.write(f'@set "CAD_CONSOLE={exe}"')
-            self.log(f" [+] Consola vinculada: {os.path.basename(exe)}")
+            with open(ruta_wrapper, 'w') as f:
+                f.write('@echo off\n')
+                f.write('set "DWG_FILE=%~2"\n')
+                f.write('set "SCR_FILE=%~4"\n')
+                f.write(f'set "CAD_EXE={exe}"\n\n')
+                if es_zwcad:
+                    # ZWCAD: Requiere esperar que termine la ventana gráfica y usa la orden /b
+                    f.write('start /wait "" "%CAD_EXE%" "%DWG_FILE%" /b "%SCR_FILE%"\n')
+                else:
+                    # AutoCAD: Consola silenciosa y usa la orden /i /s
+                    f.write('"%CAD_EXE%" /i "%DWG_FILE%" /s "%SCR_FILE%"\n')
+            
+            with open(ruta_env, 'w') as f: 
+                f.write(f'@set "CAD_CONSOLE={ruta_wrapper}"')
+                
+            self.log(f" [+] Consola vinculada exitosamente a: {os.path.basename(exe)}")
         else:
-            self.log(" [X] Advertencia: No se detectó consola de AutoCAD ni ZWCAD de fondo.")
+            self.log(" [X] Error crítico: No se encontró AutoCAD ni ZWCAD en el sistema.")
 
     def validar_exe_zwcad(self, path):
         # Busca los posibles nombres de consola introducidos en versiones recientes
