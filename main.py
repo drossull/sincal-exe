@@ -14,7 +14,9 @@ USUARIO_GITHUB = "drossull"
 REPO_GITHUB = "sincal-exe"
 RAMA = "main" 
 URL_BASE_RAW = f"https://raw.githubusercontent.com/{USUARIO_GITHUB}/{REPO_GITHUB}/{RAMA}/"
-RUTA_LOCAL_APP = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL") 
+
+# RUTA DEFINITIVA SIN TILDE
+RUTA_LOCAL_APP = os.path.join(os.getenv('APPDATA'), "Estandar SINCAL") 
 
 # URL DEL WEBHOOK (Google Sheets)
 URL_WEBHOOK_SHEETS = "https://script.google.com/macros/s/AKfycbywJwskXQrAhNYHV559ngE5WAPa-bhvrfgcYg0ej_WDfxQMP5vmT31b66mEPqeFCchaPQ/exec"
@@ -44,7 +46,7 @@ def obtener_ruta_recurso(ruta_relativa):
 class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("SINCAL - Suite de Herramientas v1.1.5")
+        self.title("SINCAL - Suite de Herramientas v1.1.7")
         self.geometry("850x660")
         self.resizable(False, False)
         self.configure(fg_color=COLOR_FONDO)
@@ -176,21 +178,8 @@ class ActualizadorCAD(ctk.CTk):
 
     def forzar_path_manual(self):
         self.log("\n--- REPARACIÓN DE VARIABLES DE ENTORNO (PATH) ---")
-        r_scripts = os.path.join(RUTA_LOCAL_APP, "scripts")
-        try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS) as key:
-                try: p, _ = winreg.QueryValueEx(key, "Path")
-                except: p = ""
-                if r_scripts.lower() not in p.lower():
-                    nuevo_path = f"{p};{r_scripts}" if p else r_scripts
-                    winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, nuevo_path)
-                    self.log(f" [+] ÉXITO: Ruta inyectada en el registro.")
-                else:
-                    self.log(f" [OK] La ruta ya existe en el registro.")
-                ctypes.windll.user32.SendMessageTimeoutW(0xFFFF, 0x001A, 0, "Environment", 0x0002, 5000, None)
-                self.log(" [!] Cierra cualquier CMD abierto para aplicar los cambios.\n")
-        except PermissionError:
-            self.log(" [X] ERROR: Ejecuta SINCAL como administrador.\n")
+        self.actualizar_variable_entorno()
+        self.log(" [!] Cierra cualquier CMD abierto para aplicar los cambios.\n")
 
     def cargar_lista_tutoriales(self):
         for widget in self.list_frame.winfo_children(): widget.destroy()
@@ -227,12 +216,23 @@ class ActualizadorCAD(ctk.CTk):
 
     def motor_actualizacion(self):
         self.log("--- INICIANDO ACTUALIZACIÓN ---")
+        
+        # ELIMINADOR DE CARPETA FANTASMA (Con tilde)
+        old_folder = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL")
+        if os.path.exists(old_folder):
+            try:
+                shutil.rmtree(old_folder)
+                self.log(" [!] Carpeta antigua con tilde eliminada del sistema.")
+            except:
+                self.log(" [X] No se pudo borrar la carpeta antigua (quizas el CAD esta abierto).")
+
         os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
+        
         try:
             # 1. Descarga de archivos
             r = requests.get(URL_BASE_RAW + "version.json")
             data = r.json()
-            version_nube = data.get("version", "v1.1.5")
+            version_nube = data.get("version", "v1.1.7")
             archivos = data.get("archivos", [])
             for a in archivos:
                 r_save = os.path.join(RUTA_LOCAL_APP, a)
@@ -241,17 +241,17 @@ class ActualizadorCAD(ctk.CTk):
                 with open(r_save, 'wb') as f: f.write(res.content)
                 self.log(f"  > Descargado: {os.path.basename(a)}")
             
-            # 2. Generar LISPs (Incluye Caballo de Troya y Copia Nativa)
+            # 2. Generar LISPs
             self.generar_archivos_lisp(archivos)
             
-            # 3. Actualizar Registro y Variables (Método tradicional)
+            # 3. Limpiar y Actualizar Registro
             self.actualizar_rutas_registro()
             self.actualizar_variable_entorno()
             
-            # 4. Configurar Wrapper de Consola (CMD Lotes)
+            # 4. Configurar Wrapper de Consola
             self.buscar_y_configurar_consolas()
             
-            # 5. INYECCIÓN FINAL FORZADA (Lanzamiento de ZWCAD)
+            # 5. INYECCIÓN FINAL FORZADA
             if self.cad_exe_path and self.es_zwcad:
                 self.inyectar_via_comando_directo()
             
@@ -283,7 +283,7 @@ class ActualizadorCAD(ctk.CTk):
                                     break
         except: pass
 
-        # Búsqueda ZWCAD (Registro + Fuerza Bruta)
+        # Búsqueda ZWCAD
         if not self.cad_exe_path:
             try:
                 base_dir = r"C:\Program Files\ZWSOFT"
@@ -311,7 +311,6 @@ class ActualizadorCAD(ctk.CTk):
             self.log(f" [+] Consola de procesos lote (CMD) vinculada.")
 
     def inyectar_via_comando_directo(self):
-        """ Lanza ZWCAD, inyecta la ruta en memoria y lo cierra """
         self.log(" [!] Lanzando ZWCAD para auto-configurar rutas (Espere un momento)...")
         ruta_escapada = RUTA_LOCAL_APP.replace("\\", "\\\\")
         
@@ -333,6 +332,7 @@ class ActualizadorCAD(ctk.CTk):
     def actualizar_rutas_registro(self):
         carpeta_ctb = os.path.join(RUTA_LOCAL_APP, "plotstyles")
         bases = [r"Software\Autodesk\AutoCAD", r"Software\ZWSOFT\ZWCAD"]
+        old_folder = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL") # La ruta vieja a eliminar
         
         for base in bases:
             try:
@@ -354,8 +354,15 @@ class ActualizadorCAD(ctk.CTk):
                                                         for var in ["SearchPath", "SEARCHPATH", "ACAD", "ZWCAD", "TrustedPaths"]:
                                                             try:
                                                                 val, _ = winreg.QueryValueEx(gk, var)
+                                                                
+                                                                # LIMPIADOR FANTASMA EN EL REGISTRO
+                                                                if old_folder in val:
+                                                                    val = val.replace(old_folder, RUTA_LOCAL_APP)
+                                                                    
                                                                 if RUTA_LOCAL_APP.lower() not in val.lower():
                                                                     winreg.SetValueEx(gk, var, 0, winreg.REG_SZ, f"{val};{RUTA_LOCAL_APP}")
+                                                                else:
+                                                                    winreg.SetValueEx(gk, var, 0, winreg.REG_SZ, val) # Guarda limpieza
                                                             except:
                                                                 if var == "TrustedPaths": winreg.SetValueEx(gk, var, 0, winreg.REG_SZ, RUTA_LOCAL_APP)
                                                         try:
@@ -373,13 +380,22 @@ class ActualizadorCAD(ctk.CTk):
 
     def actualizar_variable_entorno(self):
         r_scripts = os.path.join(RUTA_LOCAL_APP, "scripts")
+        old_scripts = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL", "scripts")
         try:
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS) as key:
                 try: p, _ = winreg.QueryValueEx(key, "Path")
                 except: p = ""
+                
+                # LIMPIADOR FANTASMA EN VARIABLES DE ENTORNO
+                if old_scripts in p:
+                    p = p.replace(old_scripts, r_scripts)
+                
                 if r_scripts.lower() not in p.lower():
                     winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, f"{p};{r_scripts}")
-                    ctypes.windll.user32.SendMessageTimeoutW(0xFFFF, 0x001A, 0, "Environment", 0x0002, 5000, None)
+                else:
+                    winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, p) # Guarda limpieza
+                    
+                ctypes.windll.user32.SendMessageTimeoutW(0xFFFF, 0x001A, 0, "Environment", 0x0002, 5000, None)
         except: pass
 
     def generar_archivos_lisp(self, archivos):
@@ -390,7 +406,6 @@ class ActualizadorCAD(ctk.CTk):
         os.makedirs(os.path.dirname(r_sincal), exist_ok=True)
         with open(r_sincal, 'w', encoding='utf-8') as f: f.write(lisp_code)
         
-        # --- EL CABALLO DE TROYA: LISP PARA AUTO-INYECTAR LA RUTA ---
         ruta_escapada = RUTA_LOCAL_APP.replace("\\", "\\\\")
         lisp_hack_rutas = f'''
 (vl-load-com)
@@ -405,12 +420,9 @@ class ActualizadorCAD(ctk.CTk):
   )
 )
 '''
-        # Generar acaddoc.lsp maestro
         r_acc = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
         with open(r_acc, 'w', encoding='utf-8') as f:
             f.write(lisp_hack_rutas)
-            
-            # [CORRECCIÓN]: Sacamos las barras invertidas fuera del f-string
             r_sincal_escapado = r_sincal.replace("\\", "\\\\")
             f.write(f'(load "{r_sincal_escapado}")\n')
             
@@ -419,13 +431,11 @@ class ActualizadorCAD(ctk.CTk):
                     ruta_lisp = os.path.join(RUTA_LOCAL_APP, a).replace("\\", "\\\\")
                     f.write(f'(if (findfile "{ruta_lisp}") (load "{ruta_lisp}"))\n')
         
-        # Generar clones para ZWCAD
         r_zwcdoc = os.path.join(RUTA_LOCAL_APP, "zwcaddoc.lsp")
         r_zwc = os.path.join(RUTA_LOCAL_APP, "zwcad.lsp")
         shutil.copy2(r_acc, r_zwcdoc)
         shutil.copy2(r_acc, r_zwc)
         
-        # Disparar la copia del Caballo de Troya a las carpetas nativas
         self.inyectar_arranque_nativo(r_acc, r_zwcdoc, r_zwc)
 
     def inyectar_arranque_nativo(self, r_acc, r_zwcdoc, r_zwc):
