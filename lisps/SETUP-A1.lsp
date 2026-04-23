@@ -37,11 +37,11 @@
     (if (/= (strcase layoutName) "MODEL")
       (progn
         ;; 1 y 2. Impresora y Papel
-        (vl-catch-all-apply 'vla-put-ConfigName (list layout plotterName))
-        (vl-catch-all-apply 'vla-put-CanonicalMediaName (list layout paperName))
+        (vl-catch-all-apply 'vlax-put-property (list layout 'ConfigName plotterName))
+        (vl-catch-all-apply 'vlax-put-property (list layout 'CanonicalMediaName paperName))
         
         ;; 3. Plumillas
-        (vl-catch-all-apply 'vla-put-StyleSheet (list layout "SINCAL_A1 (2025).ctb"))
+        (vl-catch-all-apply 'vlax-put-property (list layout 'StyleSheet "SINCAL_A1 (2025).ctb"))
         
         ;; 4 y 5. Área y Escala (1:1)
         (vla-put-PlotType layout acLayout)
@@ -56,24 +56,21 @@
         ;; 7. Orientación (Landscape)
         (vla-put-PlotRotation layout ac0degrees)
 
-        ;; --- FIX: CALIDAD CUSTOM A 300 DPI ---
-        ;; 5 equivale a "acShadePlotResCustom"
-        (vl-catch-all-apply 'vla-put-ShadePlotResolutionLevel (list layout 5))
-        (vl-catch-all-apply 'vla-put-ShadePlotCustomDPI (list layout 300))
+        ;; --- FIX UNIVERSAL: CALIDAD CUSTOM A 300 DPI ---
+        ;; Usamos vlax-put-property para que no crashee en ZWCAD si le falta el atajo vla-put-*
+        (vl-catch-all-apply 'vlax-put-property (list layout 'ShadePlotResolutionLevel 5))
+        (vl-catch-all-apply 'vlax-put-property (list layout 'ShadePlotCustomDPI 300))
         
         ;; --- FIX: PLOT TRANSPARENCY MEDIANTE XDATA ---
         (vl-catch-all-apply
           (function
             (lambda ()
-              ;; Crear matrices seguras (Safearrays) para inyectar datos
               (setq xType (vlax-make-safearray vlax-vbInteger '(0 . 1)))
               (vlax-safearray-fill xType '(1001 1071))
               (setq xData (vlax-make-safearray vlax-vbVariant '(0 . 1)))
               (vlax-safearray-fill xData (list (vlax-make-variant "PLOTTRANSPARENCY") (vlax-make-variant 1)))
               
-              ;; Aplicar el dato oculto al Layout
               (vla-SetXdata layout xType xData)
-              ;; Refrescar la entidad para que AutoCAD actualice el cuadro de diálogo
               (entmod (entget (vlax-vla-object->ename layout) '("*")))
             )
           )
