@@ -46,7 +46,7 @@ def obtener_ruta_recurso(ruta_relativa):
 class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("SINCAL - Suite de Herramientas v1.1.7")
+        self.title("SINCAL - Suite de Herramientas v1.2.4")
         self.geometry("850x660")
         self.resizable(False, False)
         self.configure(fg_color=COLOR_FONDO)
