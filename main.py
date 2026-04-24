@@ -48,7 +48,8 @@ class ActualizadorCAD(ctk.CTk):
         super().__init__()
         self.title("SINCAL - Suite de Herramientas v1.2.4")
         self.geometry("850x660")
-        self.resizable(False, False)
+        self.minsize(550, 450) # Tamaño mínimo para que no se deforme
+        self.resizable(True, True) # Ahora la ventana se puede redimensionar
         self.configure(fg_color=COLOR_FONDO)
         
         self.cad_exe_path = None
@@ -62,8 +63,13 @@ class ActualizadorCAD(ctk.CTk):
 
         self.tutoriales = {}
 
+        # --- CONTENEDOR PRINCIPAL CON SCROLL VERTICAL ---
+        self.main_scroll = ctk.CTkScrollableFrame(self, fg_color=COLOR_FONDO, corner_radius=0)
+        self.main_scroll.pack(fill="both", expand=True)
+
         # --- SISTEMA DE PESTAÑAS ---
-        self.tabview = ctk.CTkTabview(self, width=810, height=610, fg_color=COLOR_FONDO,
+        # Anclamos el tabview al nuevo contenedor main_scroll en lugar de 'self'
+        self.tabview = ctk.CTkTabview(self.main_scroll, width=810, height=610, fg_color=COLOR_FONDO,
                                       segmented_button_selected_color=COLOR_ACENTO,
                                       segmented_button_selected_hover_color=COLOR_ACENTO,
                                       segmented_button_unselected_hover_color="#444444")
@@ -80,6 +86,9 @@ class ActualizadorCAD(ctk.CTk):
         self.setup_tab_sincronizador()
         self.setup_tab_lisp()
         self.setup_tab_cmd()
+
+        # Cargar datos de GitHub al abrir (en segundo plano)
+        threading.Thread(target=self.cargar_info_github).start()
 
     def setup_tab_sincronizador(self):
         header_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
@@ -105,9 +114,48 @@ class ActualizadorCAD(ctk.CTk):
                                        text_color=COLOR_TITULO, hover_color="#444444", command=self.forzar_path_manual)
         self.btn_forzar_path.pack(side="left", padx=10)
 
-        self.consola = ctk.CTkTextbox(self.tab_main, width=750, height=280, font=FUENTE_CONSOLA, 
+        # Consola negra principal
+        self.consola = ctk.CTkTextbox(self.tab_main, width=750, height=220, font=FUENTE_CONSOLA, 
                                      fg_color="#222222", text_color=COLOR_TEXTO, state="disabled")
         self.consola.pack(pady=15)
+
+        # --- SECCIÓN DE ÚLTIMAS ACTUALIZACIONES ---
+        self.frame_updates = ctk.CTkFrame(self.tab_main, fg_color="transparent")
+        self.frame_updates.pack(fill="x", padx=30, pady=(0, 10))
+
+        self.lbl_updates_title = ctk.CTkLabel(self.frame_updates, text="Últimas actualizaciones", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO)
+        self.lbl_updates_title.pack(anchor="w", pady=(0, 5))
+
+        self.lbl_updates_data = ctk.CTkLabel(self.frame_updates, text="Buscando novedades en GitHub...", font=FUENTE_NORMAL, text_color=COLOR_TEXTO, wraplength=730, justify="left")
+        self.lbl_updates_data.pack(anchor="w")
+
+    def cargar_info_github(self):
+        try:
+            # 1. Obtener versión de version.json
+            r_ver = requests.get(URL_BASE_RAW + "version.json", timeout=5)
+            if r_ver.status_code == 200:
+                version_str = r_ver.json().get("version", "Desconocida")
+            else:
+                version_str = "Desconocida"
+
+            # 2. Obtener último commit vía API de GitHub
+            url_api = f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits/{RAMA}"
+            r_commit = requests.get(url_api, timeout=5)
+            
+            if r_commit.status_code == 200:
+                data = r_commit.json()
+                fecha_raw = data['commit']['author']['date']
+                fecha = fecha_raw.split("T")[0] 
+                mensaje_completo = data['commit']['message']
+                titulo_commit = mensaje_completo.split("\n")[0]
+            else:
+                fecha = "----/--/--"
+                titulo_commit = "No se pudo conectar con el registro de commits."
+
+            texto_mostrar = f"🗓️ {fecha}   |   ⚙️ v{version_str}   |   📝 {titulo_commit}"
+            self.lbl_updates_data.configure(text=texto_mostrar)
+        except Exception:
+            self.lbl_updates_data.configure(text="No se pudo obtener la información de las actualizaciones recientes.")
 
     def setup_tab_lisp(self):
         self.help_frame = ctk.CTkFrame(self.tab_lisp, fg_color="transparent")
@@ -229,10 +277,9 @@ class ActualizadorCAD(ctk.CTk):
         os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
         
         try:
-            # 1. Descarga de archivos
             r = requests.get(URL_BASE_RAW + "version.json")
             data = r.json()
-            version_nube = data.get("version", "v1.1.7")
+            version_nube = data.get("version", "v1.2.4")
             archivos = data.get("archivos", [])
             for a in archivos:
                 r_save = os.path.join(RUTA_LOCAL_APP, a)
@@ -241,23 +288,21 @@ class ActualizadorCAD(ctk.CTk):
                 with open(r_save, 'wb') as f: f.write(res.content)
                 self.log(f"  > Descargado: {os.path.basename(a)}")
             
-            # 2. Generar LISPs
             self.generar_archivos_lisp(archivos)
-            
-            # 3. Limpiar y Actualizar Registro
             self.actualizar_rutas_registro()
             self.actualizar_variable_entorno()
-            
-            # 4. Configurar Wrapper de Consola
             self.buscar_y_configurar_consolas()
             
-            # 5. INYECCIÓN FINAL FORZADA
             if self.cad_exe_path and self.es_zwcad:
                 self.inyectar_via_comando_directo()
             
             self.log(f"\n[!] PROCESO FINALIZADO. VERSIÓN: {version_nube}")
             self.enviar_telemetria(version_nube)
-            self.after(0, self.cargar_lista_tutoriales)
+            
+            # Recargar la información de GitHub en la interfaz
+            self.cargar_info_github()
+            self.cargar_lista_tutoriales()
+            
         except Exception as e: 
             self.log(f"[!] Error: {e}")
         self.btn_actualizar.configure(state="normal", text="Actualizar Todo")
@@ -268,7 +313,6 @@ class ActualizadorCAD(ctk.CTk):
         self.cad_exe_path = None
         self.es_zwcad = False
         
-        # Búsqueda AutoCAD
         try:
             with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Autodesk\AutoCAD") as k:
                 for i in range(winreg.QueryInfoKey(k)[0]):
@@ -283,7 +327,6 @@ class ActualizadorCAD(ctk.CTk):
                                     break
         except: pass
 
-        # Búsqueda ZWCAD
         if not self.cad_exe_path:
             try:
                 base_dir = r"C:\Program Files\ZWSOFT"
@@ -332,7 +375,7 @@ class ActualizadorCAD(ctk.CTk):
     def actualizar_rutas_registro(self):
         carpeta_ctb = os.path.join(RUTA_LOCAL_APP, "plotstyles")
         bases = [r"Software\Autodesk\AutoCAD", r"Software\ZWSOFT\ZWCAD"]
-        old_folder = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL") # La ruta vieja a eliminar
+        old_folder = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL") 
         
         for base in bases:
             try:
@@ -354,15 +397,12 @@ class ActualizadorCAD(ctk.CTk):
                                                         for var in ["SearchPath", "SEARCHPATH", "ACAD", "ZWCAD", "TrustedPaths"]:
                                                             try:
                                                                 val, _ = winreg.QueryValueEx(gk, var)
-                                                                
-                                                                # LIMPIADOR FANTASMA EN EL REGISTRO
                                                                 if old_folder in val:
                                                                     val = val.replace(old_folder, RUTA_LOCAL_APP)
-                                                                    
                                                                 if RUTA_LOCAL_APP.lower() not in val.lower():
                                                                     winreg.SetValueEx(gk, var, 0, winreg.REG_SZ, f"{val};{RUTA_LOCAL_APP}")
                                                                 else:
-                                                                    winreg.SetValueEx(gk, var, 0, winreg.REG_SZ, val) # Guarda limpieza
+                                                                    winreg.SetValueEx(gk, var, 0, winreg.REG_SZ, val) 
                                                             except:
                                                                 if var == "TrustedPaths": winreg.SetValueEx(gk, var, 0, winreg.REG_SZ, RUTA_LOCAL_APP)
                                                         try:
@@ -385,16 +425,12 @@ class ActualizadorCAD(ctk.CTk):
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS) as key:
                 try: p, _ = winreg.QueryValueEx(key, "Path")
                 except: p = ""
-                
-                # LIMPIADOR FANTASMA EN VARIABLES DE ENTORNO
                 if old_scripts in p:
                     p = p.replace(old_scripts, r_scripts)
-                
                 if r_scripts.lower() not in p.lower():
                     winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, f"{p};{r_scripts}")
                 else:
-                    winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, p) # Guarda limpieza
-                    
+                    winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, p) 
                 ctypes.windll.user32.SendMessageTimeoutW(0xFFFF, 0x001A, 0, "Environment", 0x0002, 5000, None)
         except: pass
 
