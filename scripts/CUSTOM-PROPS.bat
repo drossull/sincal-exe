@@ -37,7 +37,7 @@ set "data_file_lisp=%data_file:\=/%"
 echo (vl-load-com) > "%extract_scr%"
 echo (setq info (vla-get-SummaryInfo (vla-get-ActiveDocument (vlax-get-acad-object)))) >> "%extract_scr%"
 echo (setq f (open "%data_file_lisp%" "w")) >> "%extract_scr%"
-echo (foreach p '("Nombre_Estructura" "Provincia" "Comuna" "Revision" "Fecha_Rev" "Fecha_Inf" "No_total_planos" "Nombre_Plano") (setq val "") (vl-catch-all-apply 'vla-GetCustomByKey (list info p 'val)) (write-line (strcat p "=" val) f)) >> "%extract_scr%"
+echo (foreach p '("Nombre_Estructura" "Provincia" "Comuna" "Revision" "Fecha_Rev" "Fecha_Inf" "No_total_planos" "Nombre_Plano") (setq val "") (vl-catch-all-apply 'vla-GetCustomByKey (list info p 'val)) (if (= val nil) (setq val "")) (write-line (strcat p "=" val) f)) >> "%extract_scr%"
 echo (close f) >> "%extract_scr%"
 echo _.QUIT >> "%extract_scr%"
 echo. >> "%extract_scr%"
@@ -45,7 +45,7 @@ echo. >> "%extract_scr%"
 rem Ejecutar extraccion silenciosa
 call "%CAD_CONSOLE%" /i "%primer_dwg%" /s "%extract_scr%" > nul 2>&1
 
-rem 3. Leer los datos
+rem 3. Leer los datos extraidos
 set "val_Nombre_Estructura="
 set "val_Provincia="
 set "val_Comuna="
@@ -110,18 +110,21 @@ rem 5. Generacion del Script de INYECCION
 set "ruta_script=%~dp0TEMP_PROPS.scr"
 echo (vl-load-com) > "%ruta_script%"
 echo (setq info (vla-get-SummaryInfo (vla-get-ActiveDocument (vlax-get-acad-object)))) >> "%ruta_script%"
+echo (defun setProp (k v) (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-SetCustomByKey (list info k v))) (vl-catch-all-apply 'vla-AddCustomInfo (list info k v)))) >> "%ruta_script%"
 
-if defined in_nombre_est echo (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-SetCustomByKey (list info "Nombre_Estructura" "%in_nombre_est%"))) (vla-AddCustomInfo info "Nombre_Estructura" "%in_nombre_est%")) >> "%ruta_script%"
-if defined in_provincia echo (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-SetCustomByKey (list info "Provincia" "%in_provincia%"))) (vla-AddCustomInfo info "Provincia" "%in_provincia%")) >> "%ruta_script%"
-if defined in_comuna echo (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-SetCustomByKey (list info "Comuna" "%in_comuna%"))) (vla-AddCustomInfo info "Comuna" "%in_comuna%")) >> "%ruta_script%"
-if defined in_revision echo (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-SetCustomByKey (list info "Revision" "%in_revision%"))) (vla-AddCustomInfo info "Revision" "%in_revision%")) >> "%ruta_script%"
-if defined in_fecha_rev echo (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-SetCustomByKey (list info "Fecha_Rev" "%in_fecha_rev%"))) (vla-AddCustomInfo info "Fecha_Rev" "%in_fecha_rev%")) >> "%ruta_script%"
-if defined in_fecha_inf echo (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-SetCustomByKey (list info "Fecha_Inf" "%in_fecha_inf%"))) (vla-AddCustomInfo info "Fecha_Inf" "%in_fecha_inf%")) >> "%ruta_script%"
-if defined in_no_total_planos echo (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-SetCustomByKey (list info "No_total_planos" "%in_no_total_planos%"))) (vla-AddCustomInfo info "No_total_planos" "%in_no_total_planos%")) >> "%ruta_script%"
-if defined in_nombre_plano echo (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-SetCustomByKey (list info "Nombre_Plano" "%in_nombre_plano%"))) (vla-AddCustomInfo info "Nombre_Plano" "%in_nombre_plano%")) >> "%ruta_script%"
+if defined in_nombre_est echo (setProp "Nombre_Estructura" "%in_nombre_est%") >> "%ruta_script%"
+if defined in_provincia echo (setProp "Provincia" "%in_provincia%") >> "%ruta_script%"
+if defined in_comuna echo (setProp "Comuna" "%in_comuna%") >> "%ruta_script%"
+if defined in_revision echo (setProp "Revision" "%in_revision%") >> "%ruta_script%"
+if defined in_fecha_rev echo (setProp "Fecha_Rev" "%in_fecha_rev%") >> "%ruta_script%"
+if defined in_fecha_inf echo (setProp "Fecha_Inf" "%in_fecha_inf%") >> "%ruta_script%"
+if defined in_no_total_planos echo (setProp "No_total_planos" "%in_no_total_planos%") >> "%ruta_script%"
+if defined in_nombre_plano echo (setProp "Nombre_Plano" "%in_nombre_plano%") >> "%ruta_script%"
 
-rem EL TRUCO MAGICO: Ensuciar la base de datos para forzar el guardado
+rem TRUCOS MAGICOS: Ensuciar COM y la base de datos para forzar guardado
+echo (vl-catch-all-apply 'vla-put-Subject (list info "SINCAL")) >> "%ruta_script%"
 echo (setvar "USERI1" (if (= (getvar "USERI1") 1) 2 1)) >> "%ruta_script%"
+echo (setvar "WIPEOUTFRAME" 0) >> "%ruta_script%"
 echo _.QSAVE >> "%ruta_script%"
 echo _.QUIT >> "%ruta_script%"
 echo. >> "%ruta_script%"
