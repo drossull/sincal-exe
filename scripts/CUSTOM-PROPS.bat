@@ -1,16 +1,15 @@
 @echo off
-rem Cargar la ruta de la consola
+rem Cargar la ruta del entorno
 call "%~dp0cad_env.bat"
 
-rem Verificacion de seguridad
-if "%CAD_CONSOLE%"=="" (
-    echo [ERROR] No se pudo cargar la ruta de la consola.
-    echo Asegurate de presionar "Actualizar" en el SINCAL.exe
-    pause
-    exit /b
-)
+rem 1. FORZAR MODO GRAFICO (El Bypass de la consola invisible)
+rem Autodesk bloquea la API de propiedades en accoreconsole.exe, por lo que forzamos acad.exe o ZWCAD
+set "REAL_CAD="
+for /f "tokens=2 delims==" %%I in ('findstr /I "CAD_EXE=" "%~dp0cad_wrapper.bat"') do set "REAL_CAD=%%~I"
+set "REAL_CAD=%REAL_CAD:"=%"
+set "REAL_CAD=%REAL_CAD:accoreconsole.exe=acad.exe%"
 
-rem 1. Buscar el primer DWG de la carpeta
+rem 2. Buscar el primer DWG de la carpeta
 set "primer_dwg="
 for %%f in (*.dwg) do (
     set "primer_dwg=%%f"
@@ -25,31 +24,29 @@ if "%primer_dwg%"=="" (
 
 echo ===================================================
 echo   ANALIZANDO PROPIEDADES ACTUALES...
-echo   (100%% SEGUNDO PLANO - SILENCIOSO)
 echo   Extrayendo datos de: %primer_dwg%
+echo   (Se abrira el CAD brevemente, no toques nada)
 echo ===================================================
 
-rem 2. Generar script temporal de EXTRACCION
+rem 3. Generar script temporal de EXTRACCION
 set "extract_scr=%~dp0TEMP_EXTRACT.scr"
 set "data_file=%~dp0TEMP_DATA.txt"
 set "data_file_lisp=%data_file:\=/%"
 
-echo (vl-load-com) > "%extract_scr%"
-rem TRUCO MAESTRO: Obtener el documento desde la base de datos, ignorando si la App esta apagada
-echo (setq acadObj (vlax-get-acad-object)) >> "%extract_scr%"
-echo (setq doc (if acadObj (vla-get-ActiveDocument acadObj) (vla-get-Document (vlax-ename-^>vla-object (namedobjdict))))) >> "%extract_scr%"
-echo (setq info (vla-get-SummaryInfo doc)) >> "%extract_scr%"
+echo _.OPEN "%primer_dwg%" > "%extract_scr%"
+echo (vl-load-com) >> "%extract_scr%"
+echo (setq info (vla-get-SummaryInfo (vla-get-ActiveDocument (vlax-get-acad-object)))) >> "%extract_scr%"
 echo (setq f (open "%data_file_lisp%" "w")) >> "%extract_scr%"
 echo (foreach p '("Nombre_Estructura" "Provincia" "Comuna" "Revision" "Fecha_Rev" "Fecha_Inf" "No_total_planos" "Nombre_Plano") (setq val "") (vl-catch-all-apply 'vla-GetCustomByKey (list info p 'val)) (if (= val nil) (setq val "")) (write-line (strcat p "=" val) f)) >> "%extract_scr%"
 echo (close f) >> "%extract_scr%"
-echo _.QSAVE >> "%extract_scr%"
+echo (setvar "DBMOD" 0) >> "%extract_scr%"
 echo _.QUIT >> "%extract_scr%"
 echo. >> "%extract_scr%"
 
-rem Ejecutar extraccion silenciosa
-call "%CAD_CONSOLE%" /i "%primer_dwg%" /s "%extract_scr%" > nul 2>&1
+rem Ejecutar extraccion evadiendo la consola invisible
+"%REAL_CAD%" /b "%extract_scr%"
 
-rem 3. Leer los datos
+rem 4. Leer los datos
 set "val_Nombre_Estructura="
 set "val_Provincia="
 set "val_Comuna="
@@ -67,7 +64,7 @@ if exist "%data_file%" (
 )
 del "%extract_scr%"
 
-rem 4. Captura interactiva
+rem 5. Captura interactiva
 cls
 echo ===================================================
 echo    ACTUALIZADOR MASIVO DE DWGPROPS (MULTIPLE)
@@ -110,39 +107,36 @@ set "in_nombre_plano="
 set /p "in_nombre_plano=8. Nombre_Plano [%val_Nombre_Plano%]: "
 if not defined in_nombre_plano set "in_nombre_plano=%val_Nombre_Plano%"
 
-rem 5. Generacion del Script de INYECCION
-set "ruta_script=%~dp0TEMP_PROPS.scr"
-echo (vl-load-com) > "%ruta_script%"
-echo (setq acadObj (vlax-get-acad-object)) >> "%ruta_script%"
-echo (setq doc (if acadObj (vla-get-ActiveDocument acadObj) (vla-get-Document (vlax-ename-^>vla-object (namedobjdict))))) >> "%ruta_script%"
-echo (setq info (vla-get-SummaryInfo doc)) >> "%ruta_script%"
-echo (defun setProp (k v) (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-SetCustomByKey (list info k v))) (vl-catch-all-apply 'vla-AddCustomInfo (list info k v)))) >> "%ruta_script%"
-
-if defined in_nombre_est echo (setProp "Nombre_Estructura" "%in_nombre_est%") >> "%ruta_script%"
-if defined in_provincia echo (setProp "Provincia" "%in_provincia%") >> "%ruta_script%"
-if defined in_comuna echo (setProp "Comuna" "%in_comuna%") >> "%ruta_script%"
-if defined in_revision echo (setProp "Revision" "%in_revision%") >> "%ruta_script%"
-if defined in_fecha_rev echo (setProp "Fecha_Rev" "%in_fecha_rev%") >> "%ruta_script%"
-if defined in_fecha_inf echo (setProp "Fecha_Inf" "%in_fecha_inf%") >> "%ruta_script%"
-if defined in_no_total_planos echo (setProp "No_total_planos" "%in_no_total_planos%") >> "%ruta_script%"
-if defined in_nombre_plano echo (setProp "Nombre_Plano" "%in_nombre_plano%") >> "%ruta_script%"
-
-echo (vl-catch-all-apply 'vla-put-Subject (list info "SINCAL")) >> "%ruta_script%"
-echo (setvar "USERI1" (if (= (getvar "USERI1") 1) 2 1)) >> "%ruta_script%"
-echo (setvar "WIPEOUTFRAME" 0) >> "%ruta_script%"
-echo _.QSAVE >> "%ruta_script%"
-echo _.QUIT >> "%ruta_script%"
-echo. >> "%ruta_script%"
-
 echo.
 echo ---------------------------------------------------
 echo Datos capturados. Iniciando procesamiento masivo...
 echo ---------------------------------------------------
 
-rem 6. Ejecucion Universal Silenciosa
+set "ruta_script=%~dp0TEMP_PROPS.scr"
+
+rem 6. Ejecucion Archivo por Archivo
 for %%f in (*.dwg) do (
     echo Procesando: %%f
-    call "%CAD_CONSOLE%" /i "%%f" /s "%ruta_script%"
+    
+    echo _.OPEN "%%f" > "%ruta_script%"
+    echo (vl-load-com) >> "%ruta_script%"
+    echo (setq info (vla-get-SummaryInfo (vla-get-ActiveDocument (vlax-get-acad-object)))) >> "%ruta_script%"
+    echo (defun setProp (k v) (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-SetCustomByKey (list info k v))) (vl-catch-all-apply 'vla-AddCustomInfo (list info k v)))) >> "%ruta_script%"
+
+    if defined in_nombre_est echo (setProp "Nombre_Estructura" "%in_nombre_est%") >> "%ruta_script%"
+    if defined in_provincia echo (setProp "Provincia" "%in_provincia%") >> "%ruta_script%"
+    if defined in_comuna echo (setProp "Comuna" "%in_comuna%") >> "%ruta_script%"
+    if defined in_revision echo (setProp "Revision" "%in_revision%") >> "%ruta_script%"
+    if defined in_fecha_rev echo (setProp "Fecha_Rev" "%in_fecha_rev%") >> "%ruta_script%"
+    if defined in_fecha_inf echo (setProp "Fecha_Inf" "%in_fecha_inf%") >> "%ruta_script%"
+    if defined in_no_total_planos echo (setProp "No_total_planos" "%in_no_total_planos%") >> "%ruta_script%"
+    if defined in_nombre_plano echo (setProp "Nombre_Plano" "%in_nombre_plano%") >> "%ruta_script%"
+
+    echo _.QSAVE >> "%ruta_script%"
+    echo (setvar "DBMOD" 0) >> "%ruta_script%"
+    echo _.QUIT >> "%ruta_script%"
+    
+    "%REAL_CAD%" /b "%ruta_script%"
 )
 
 rem 7. Limpieza
