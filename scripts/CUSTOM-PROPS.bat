@@ -1,18 +1,16 @@
 @echo off
-:: Forzar consola a leer caracteres especiales (tildes) correctamente
-chcp 65001 > nul
-
-:: Cargar la ruta de la consola buscando en la MISMA carpeta del script
+rem Cargar la ruta de la consola buscando en la MISMA carpeta del script
 call "%~dp0cad_env.bat"
 
-:: Verificación de seguridad
+rem Verificacion de seguridad
 if "%CAD_CONSOLE%"=="" (
     echo [ERROR] No se pudo cargar la ruta de la consola.
+    echo Asegurate de presionar "Actualizar" en el SINCAL.exe
     pause
     exit /b
 )
 
-:: 1. Buscar el primer DWG de la carpeta
+rem 1. Buscar el primer DWG de la carpeta
 set "primer_dwg="
 for %%f in (*.dwg) do (
     set "primer_dwg=%%f"
@@ -31,7 +29,7 @@ echo   Extrayendo datos de: %primer_dwg%
 echo   (Por favor espera unos segundos)
 echo ===================================================
 
-:: 2. Generar script temporal de EXTRACCION
+rem 2. Generar script temporal de EXTRACCION
 set "extract_scr=%~dp0TEMP_EXTRACT.scr"
 set "data_file=%~dp0TEMP_DATA.txt"
 set "data_file_lisp=%data_file:\=/%"
@@ -44,10 +42,10 @@ echo (close f) >> "%extract_scr%"
 echo _.QUIT >> "%extract_scr%"
 echo. >> "%extract_scr%"
 
-:: Ejecutar extraccion silenciosa
+rem Ejecutar extraccion silenciosa
 "%CAD_CONSOLE%" /i "%primer_dwg%" /s "%extract_scr%" > nul 2>&1
 
-:: 3. Leer los datos (CON MODO USEBACKQ PARA EVITAR ERRORES DE ESPACIO)
+rem 3. Leer los datos
 set "val_Nombre_Estructura="
 set "val_Provincia="
 set "val_Comuna="
@@ -65,7 +63,7 @@ if exist "%data_file%" (
 )
 del "%extract_scr%"
 
-:: 4. Captura interactiva
+rem 4. Captura interactiva
 cls
 echo ===================================================
 echo    ACTUALIZADOR MASIVO DE DWGPROPS (MULTIPLE)
@@ -108,7 +106,7 @@ set "in_nombre_plano="
 set /p "in_nombre_plano=8. Nombre_Plano [%val_Nombre_Plano%]: "
 if not defined in_nombre_plano set "in_nombre_plano=%val_Nombre_Plano%"
 
-:: 5. Generacion del Script de INYECCION
+rem 5. Generacion del Script de INYECCION
 set "ruta_script=%~dp0TEMP_PROPS.scr"
 echo (vl-load-com) > "%ruta_script%"
 echo (setq info (vla-get-SummaryInfo (vla-get-ActiveDocument (vlax-get-acad-object)))) >> "%ruta_script%"
@@ -132,17 +130,17 @@ echo ---------------------------------------------------
 echo Datos capturados. Iniciando procesamiento masivo...
 echo ---------------------------------------------------
 
-:: 6. Ejecucion Universal
+rem 6. Ejecucion Universal
 for %%f in (*.dwg) do (
     echo Procesando: %%f
     "%CAD_CONSOLE%" /i "%%f" /s "%ruta_script%"
 )
 
-:: 7. Limpieza
+rem 7. Limpieza
 del "%ruta_script%"
 
 echo.
 echo ===================================================
-echo ¡Proceso finalizado con éxito!
+echo Proceso finalizado con exito!
 echo ===================================================
 pause
