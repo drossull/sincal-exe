@@ -46,20 +46,18 @@ def obtener_ruta_recurso(ruta_relativa):
 class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("SINCAL - Suite de Herramientas v1.2.4")
+        self.title("SINCAL - Suite de Herramientas v1.2.5")
         self.geometry("850x660")
-        self.minsize(550, 450) # Tamaño mínimo para que no se deforme
-        self.resizable(True, True) # Ahora la ventana se puede redimensionar
+        self.minsize(550, 450) 
+        self.resizable(True, True) 
         self.configure(fg_color=COLOR_FONDO)
         
         self.cad_exe_path = None
         self.es_zwcad = False
 
-        # Icono de la ventana
         try:
             self.iconbitmap(obtener_ruta_recurso("logo.ico"))
-        except:
-            pass
+        except: pass
 
         self.tutoriales = {}
 
@@ -68,7 +66,6 @@ class ActualizadorCAD(ctk.CTk):
         self.main_scroll.pack(fill="both", expand=True)
 
         # --- SISTEMA DE PESTAÑAS ---
-        # Anclamos el tabview al nuevo contenedor main_scroll en lugar de 'self'
         self.tabview = ctk.CTkTabview(self.main_scroll, width=810, height=610, fg_color=COLOR_FONDO,
                                       segmented_button_selected_color=COLOR_ACENTO,
                                       segmented_button_selected_hover_color=COLOR_ACENTO,
@@ -114,7 +111,6 @@ class ActualizadorCAD(ctk.CTk):
                                        text_color=COLOR_TITULO, hover_color="#444444", command=self.forzar_path_manual)
         self.btn_forzar_path.pack(side="left", padx=10)
 
-        # Consola negra principal
         self.consola = ctk.CTkTextbox(self.tab_main, width=750, height=220, font=FUENTE_CONSOLA, 
                                      fg_color="#222222", text_color=COLOR_TEXTO, state="disabled")
         self.consola.pack(pady=15)
@@ -131,23 +127,16 @@ class ActualizadorCAD(ctk.CTk):
 
     def cargar_info_github(self):
         try:
-            # 1. Obtener versión de version.json
             r_ver = requests.get(URL_BASE_RAW + "version.json", timeout=5)
-            if r_ver.status_code == 200:
-                version_str = r_ver.json().get("version", "Desconocida")
-            else:
-                version_str = "Desconocida"
+            version_str = r_ver.json().get("version", "Desconocida") if r_ver.status_code == 200 else "Desconocida"
 
-            # 2. Obtener último commit vía API de GitHub
             url_api = f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits/{RAMA}"
             r_commit = requests.get(url_api, timeout=5)
             
             if r_commit.status_code == 200:
                 data = r_commit.json()
-                fecha_raw = data['commit']['author']['date']
-                fecha = fecha_raw.split("T")[0] 
-                mensaje_completo = data['commit']['message']
-                titulo_commit = mensaje_completo.split("\n")[0]
+                fecha = data['commit']['author']['date'].split("T")[0] 
+                titulo_commit = data['commit']['message'].split("\n")[0]
             else:
                 fecha = "----/--/--"
                 titulo_commit = "No se pudo conectar con el registro de commits."
@@ -188,27 +177,6 @@ class ActualizadorCAD(ctk.CTk):
             "- ZE:           Aplica 'Zoom Extents' y guarda cada archivo.\n"
             "- RC-CAPAS:     Normaliza los colores al estándar SINCAL.\n"
             "- CUSTOM-PROPS: Inyección masiva de propiedades de viñeta.\n"
-            "                (Ver detalles más abajo).\n\n"
-            "📖 INSTRUCCIONES DE USO GENERAL:\n"
-            "1. Abra la carpeta de Windows que contiene sus archivos .dwg.\n"
-            "2. Haga clic en la barra de direcciones superior.\n"
-            "3. Escriba 'cmd' y presione ENTER.\n"
-            "4. En la ventana negra, escriba el comando (ej: AUDIT) y ENTER.\n"
-            "5. El sistema procesará cada archivo automáticamente.\n\n"
-            "📝 DETALLE ESPECIAL: USO DE 'CUSTOM-PROPS'\n"
-            "Este comando es interactivo. Al escribir 'CUSTOM-PROPS' y dar\n"
-            "ENTER, la consola hará una pausa y le pedirá escribir los\n"
-            "datos para 5 campos paramétricos de su proyecto:\n"
-            "  1. Nombre_Estructura\n"
-            "  2. Revision\n"
-            "  3. Fecha_Rev\n"
-            "  4. Fecha_Inf\n"
-            "  5. No_total_planos\n\n"
-            "Escriba el valor de cada uno y presione ENTER. Al terminar el\n"
-            "último, el sistema inyectará esa información en TODOS los planos\n"
-            "de la carpeta a la vez, actualizando las carátulas al instante.\n\n"
-            "--------------------------------------------------\n"
-            "Nota: El tiempo dependerá de la cantidad y peso de los planos."
         )
         self.cmd_readme = ctk.CTkTextbox(self.tab_cmd, width=750, height=430, font=FUENTE_CONSOLA, fg_color="#222222", text_color=COLOR_TEXTO)
         self.cmd_readme.insert("0.0", readme_text)
@@ -265,21 +233,19 @@ class ActualizadorCAD(ctk.CTk):
     def motor_actualizacion(self):
         self.log("--- INICIANDO ACTUALIZACIÓN ---")
         
-        # ELIMINADOR DE CARPETA FANTASMA (Con tilde)
         old_folder = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL")
         if os.path.exists(old_folder):
             try:
                 shutil.rmtree(old_folder)
-                self.log(" [!] Carpeta antigua con tilde eliminada del sistema.")
-            except:
-                self.log(" [X] No se pudo borrar la carpeta antigua (quizas el CAD esta abierto).")
+                self.log(" [!] Carpeta antigua eliminada.")
+            except: pass
 
         os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
         
         try:
             r = requests.get(URL_BASE_RAW + "version.json")
             data = r.json()
-            version_nube = data.get("version", "v1.2.4")
+            version_nube = data.get("version", "v1.2.5")
             archivos = data.get("archivos", [])
             for a in archivos:
                 r_save = os.path.join(RUTA_LOCAL_APP, a)
@@ -291,6 +257,8 @@ class ActualizadorCAD(ctk.CTk):
             self.generar_archivos_lisp(archivos)
             self.actualizar_rutas_registro()
             self.actualizar_variable_entorno()
+            
+            # --- NUEVA FUNCIÓN AGRESIVA ---
             self.buscar_y_configurar_consolas()
             
             if self.cad_exe_path and self.es_zwcad:
@@ -298,8 +266,6 @@ class ActualizadorCAD(ctk.CTk):
             
             self.log(f"\n[!] PROCESO FINALIZADO. VERSIÓN: {version_nube}")
             self.enviar_telemetria(version_nube)
-            
-            # Recargar la información de GitHub en la interfaz
             self.cargar_info_github()
             self.cargar_lista_tutoriales()
             
@@ -313,6 +279,7 @@ class ActualizadorCAD(ctk.CTk):
         self.cad_exe_path = None
         self.es_zwcad = False
         
+        # 1. Búsqueda AutoCAD en Registro
         try:
             with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Autodesk\AutoCAD") as k:
                 for i in range(winreg.QueryInfoKey(k)[0]):
@@ -327,11 +294,28 @@ class ActualizadorCAD(ctk.CTk):
                                     break
         except: pass
 
+        # 2. Búsqueda AutoCAD Fuerza Bruta (NUEVO)
+        # Si el registro oculta a AutoCAD 2025, lo buscamos directo en el disco
+        if not self.cad_exe_path:
+            try:
+                base_dir = r"C:\Program Files\Autodesk"
+                if os.path.exists(base_dir):
+                    carpetas = sorted(os.listdir(base_dir), reverse=True) # Busca primero en la versión más alta (ej: 2025)
+                    for folder in carpetas:
+                        if "AutoCAD" in folder:
+                            posible_exe = os.path.join(base_dir, folder, "accoreconsole.exe")
+                            if os.path.exists(posible_exe):
+                                self.cad_exe_path = posible_exe
+                                break
+            except: pass
+
+        # 3. Búsqueda ZWCAD (SOLO si no encontró nada de AutoCAD)
         if not self.cad_exe_path:
             try:
                 base_dir = r"C:\Program Files\ZWSOFT"
                 if os.path.exists(base_dir):
-                    for folder in os.listdir(base_dir):
+                    carpetas = sorted(os.listdir(base_dir), reverse=True)
+                    for folder in carpetas:
                         if "ZWCAD" in folder.upper():
                             posible_exe = os.path.join(base_dir, folder, "ZWCAD.exe")
                             if os.path.exists(posible_exe):
@@ -351,7 +335,9 @@ class ActualizadorCAD(ctk.CTk):
                     f.write('"%CAD_EXE%" /i "%DWG_FILE%" /s "%SCR_FILE%"\n')
             with open(ruta_env, 'w') as f: 
                 f.write(f'@set "CAD_CONSOLE={ruta_wrapper}"')
-            self.log(f" [+] Consola de procesos lote (CMD) vinculada.")
+            
+            tipo = "ZWCAD (Gráfico)" if self.es_zwcad else "AutoCAD (Silencioso)"
+            self.log(f" [+] Consola de procesos lote vinculada a: {tipo}")
 
     def inyectar_via_comando_directo(self):
         self.log(" [!] Lanzando ZWCAD para auto-configurar rutas (Espere un momento)...")
@@ -476,26 +462,20 @@ class ActualizadorCAD(ctk.CTk):
 
     def inyectar_arranque_nativo(self, r_acc, r_zwcdoc, r_zwc):
         appdata = os.getenv('APPDATA')
-        
-        # ZWCAD
-        zwsoft_dir = os.path.join(appdata, "ZWSOFT")
-        if os.path.exists(zwsoft_dir):
-            for root, dirs, files in os.walk(zwsoft_dir):
+        if os.path.exists(os.path.join(appdata, "ZWSOFT")):
+            for root, dirs, files in os.walk(os.path.join(appdata, "ZWSOFT")):
                 if os.path.basename(root).lower() == "support":
                     try:
                         shutil.copy2(r_zwcdoc, os.path.join(root, "zwcaddoc.lsp"))
                         shutil.copy2(r_zwc, os.path.join(root, "zwcad.lsp"))
-                        self.log(f" [+] Archivo de arranque copiado en: {os.path.basename(os.path.dirname(root))}\\Support")
+                        self.log(f" [+] Arranque inyectado en: ZWSOFT\\..\\Support")
                     except: pass
-
-        # AutoCAD
-        autodesk_dir = os.path.join(appdata, "Autodesk")
-        if os.path.exists(autodesk_dir):
-            for root, dirs, files in os.walk(autodesk_dir):
+        if os.path.exists(os.path.join(appdata, "Autodesk")):
+            for root, dirs, files in os.walk(os.path.join(appdata, "Autodesk")):
                 if os.path.basename(root).lower() == "support":
                     try:
                         shutil.copy2(r_acc, os.path.join(root, "acaddoc.lsp"))
-                        self.log(f" [+] Archivo de arranque copiado en: {os.path.basename(os.path.dirname(root))}\\Support")
+                        self.log(f" [+] Arranque inyectado en: Autodesk\\..\\Support")
                     except: pass
 
 if __name__ == "__main__":
