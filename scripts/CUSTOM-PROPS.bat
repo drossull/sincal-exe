@@ -1,15 +1,7 @@
 @echo off
-rem Cargar la ruta del entorno
-call "%~dp0cad_env.bat"
+chcp 65001 > nul
 
-rem 1. FORZAR MODO GRAFICO (El Bypass de la consola invisible)
-rem Autodesk bloquea la API de propiedades en accoreconsole.exe, por lo que forzamos acad.exe o ZWCAD
-set "REAL_CAD="
-for /f "tokens=2 delims==" %%I in ('findstr /I "CAD_EXE=" "%~dp0cad_wrapper.bat"') do set "REAL_CAD=%%~I"
-set "REAL_CAD=%REAL_CAD:"=%"
-set "REAL_CAD=%REAL_CAD:accoreconsole.exe=acad.exe%"
-
-rem 2. Buscar el primer DWG de la carpeta
+rem 1. Buscar el primer DWG de la carpeta
 set "primer_dwg="
 for %%f in (*.dwg) do (
     set "primer_dwg=%%f"
@@ -24,29 +16,41 @@ if "%primer_dwg%"=="" (
 
 echo ===================================================
 echo   ANALIZANDO PROPIEDADES ACTUALES...
-echo   Extrayendo datos de: %primer_dwg%
-echo   (Se abrira el CAD brevemente, no toques nada)
+echo   (Motor ObjectDBX - 100%% en segundo plano)
 echo ===================================================
 
-rem 3. Generar script temporal de EXTRACCION
-set "extract_scr=%~dp0TEMP_EXTRACT.scr"
-set "data_file=%~dp0TEMP_DATA.txt"
-set "data_file_lisp=%data_file:\=/%"
+rem 2. Generar motor de extraccion nativo (VBScript)
+set "vbs_read=%~dp0TEMP_READ.vbs"
+set "data_file=TEMP_DATA.txt"
 
-echo _.OPEN "%primer_dwg%" > "%extract_scr%"
-echo (vl-load-com) >> "%extract_scr%"
-echo (setq info (vla-get-SummaryInfo (vla-get-ActiveDocument (vlax-get-acad-object)))) >> "%extract_scr%"
-echo (setq f (open "%data_file_lisp%" "w")) >> "%extract_scr%"
-echo (foreach p '("Nombre_Estructura" "Provincia" "Comuna" "Revision" "Fecha_Rev" "Fecha_Inf" "No_total_planos" "Nombre_Plano") (setq val "") (vl-catch-all-apply 'vla-GetCustomByKey (list info p 'val)) (if (= val nil) (setq val "")) (write-line (strcat p "=" val) f)) >> "%extract_scr%"
-echo (close f) >> "%extract_scr%"
-echo (setvar "DBMOD" 0) >> "%extract_scr%"
-echo _.QUIT >> "%extract_scr%"
-echo. >> "%extract_scr%"
+(
+echo On Error Resume Next
+echo Set fso = CreateObject("Scripting.FileSystemObject"^)
+echo Set outFile = fso.CreateTextFile("%data_file%", True^)
+echo Set dbx = CreateObject("ObjectDBX.AxDbDocument.25"^)
+echo If dbx Is Nothing Then Set dbx = CreateObject("ObjectDBX.AxDbDocument.24"^)
+echo If dbx Is Nothing Then Set dbx = CreateObject("ObjectDBX.AxDbDocument.23"^)
+echo If dbx Is Nothing Then Set dbx = CreateObject("ObjectDBX.AxDbDocument.22"^)
+echo If dbx Is Nothing Then Set dbx = CreateObject("ZWCAD.ZcadDbDocument"^)
+echo If dbx Is Nothing Then
+echo   outFile.WriteLine "ERROR=NODBX"
+echo   WScript.Quit
+echo End If
+echo dbx.Open "%primer_dwg%"
+echo Set info = dbx.SummaryInfo
+echo props = Array("Nombre_Estructura", "Provincia", "Comuna", "Revision", "Fecha_Rev", "Fecha_Inf", "No_total_planos", "Nombre_Plano"^)
+echo For Each p In props
+echo   val = ""
+echo   info.GetCustomByKey p, val
+echo   outFile.WriteLine p ^& "=" ^& val
+echo Next
+echo outFile.Close
+) > "%vbs_read%"
 
-rem Ejecutar extraccion evadiendo la consola invisible
-"%REAL_CAD%" /b "%extract_scr%"
+rem Ejecutar lectura silenciosa
+cscript //nologo "%vbs_read%"
 
-rem 4. Leer los datos
+rem 3. Leer los datos
 set "val_Nombre_Estructura="
 set "val_Provincia="
 set "val_Comuna="
@@ -62,9 +66,9 @@ if exist "%data_file%" (
     )
     del "%data_file%"
 )
-del "%extract_scr%"
+del "%vbs_read%"
 
-rem 5. Captura interactiva
+rem 4. Captura interactiva
 cls
 echo ===================================================
 echo    ACTUALIZADOR MASIVO DE DWGPROPS (MULTIPLE)
@@ -109,41 +113,57 @@ if not defined in_nombre_plano set "in_nombre_plano=%val_Nombre_Plano%"
 
 echo.
 echo ---------------------------------------------------
-echo Datos capturados. Iniciando procesamiento masivo...
+echo Datos capturados. Inyectando sin abrir AutoCAD...
 echo ---------------------------------------------------
 
-set "ruta_script=%~dp0TEMP_PROPS.scr"
+rem 5. Generar motor de INYECCION nativo (VBScript)
+set "vbs_write=%~dp0TEMP_WRITE.vbs"
 
-rem 6. Ejecucion Archivo por Archivo
-for %%f in (*.dwg) do (
-    echo Procesando: %%f
-    
-    echo _.OPEN "%%f" > "%ruta_script%"
-    echo (vl-load-com) >> "%ruta_script%"
-    echo (setq info (vla-get-SummaryInfo (vla-get-ActiveDocument (vlax-get-acad-object)))) >> "%ruta_script%"
-    echo (defun setProp (k v) (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-SetCustomByKey (list info k v))) (vl-catch-all-apply 'vla-AddCustomInfo (list info k v)))) >> "%ruta_script%"
+(
+echo On Error Resume Next
+echo Set fso = CreateObject("Scripting.FileSystemObject"^)
+echo Set folder = fso.GetFolder("."^)
+echo Set dbx = CreateObject("ObjectDBX.AxDbDocument.25"^)
+echo If dbx Is Nothing Then Set dbx = CreateObject("ObjectDBX.AxDbDocument.24"^)
+echo If dbx Is Nothing Then Set dbx = CreateObject("ObjectDBX.AxDbDocument.23"^)
+echo If dbx Is Nothing Then Set dbx = CreateObject("ObjectDBX.AxDbDocument.22"^)
+echo If dbx Is Nothing Then Set dbx = CreateObject("ZWCAD.ZcadDbDocument"^)
+echo For Each file In folder.Files
+echo   If LCase(fso.GetExtensionName(file.Name^)^) = "dwg" Then
+echo     WScript.Echo "Procesando de fondo: " ^& file.Name
+echo     dbx.Open file.Path
+echo     Set info = dbx.SummaryInfo
+echo     Sub SetProp(k, v^)
+echo       If v ^<^> "" Then
+echo         Err.Clear
+echo         info.SetCustomByKey k, v
+echo         If Err.Number ^<^> 0 Then
+echo           Err.Clear
+echo           info.AddCustomInfo k, v
+echo         End If
+echo       End If
+echo     End Sub
+echo     SetProp "Nombre_Estructura", "%in_nombre_est%"
+echo     SetProp "Provincia", "%in_provincia%"
+echo     SetProp "Comuna", "%in_comuna%"
+echo     SetProp "Revision", "%in_revision%"
+echo     SetProp "Fecha_Rev", "%in_fecha_rev%"
+echo     SetProp "Fecha_Inf", "%in_fecha_inf%"
+echo     SetProp "No_total_planos", "%in_no_total_planos%"
+echo     SetProp "Nombre_Plano", "%in_nombre_plano%"
+echo     dbx.SaveAs file.Path
+echo   End If
+echo Next
+) > "%vbs_write%"
 
-    if defined in_nombre_est echo (setProp "Nombre_Estructura" "%in_nombre_est%") >> "%ruta_script%"
-    if defined in_provincia echo (setProp "Provincia" "%in_provincia%") >> "%ruta_script%"
-    if defined in_comuna echo (setProp "Comuna" "%in_comuna%") >> "%ruta_script%"
-    if defined in_revision echo (setProp "Revision" "%in_revision%") >> "%ruta_script%"
-    if defined in_fecha_rev echo (setProp "Fecha_Rev" "%in_fecha_rev%") >> "%ruta_script%"
-    if defined in_fecha_inf echo (setProp "Fecha_Inf" "%in_fecha_inf%") >> "%ruta_script%"
-    if defined in_no_total_planos echo (setProp "No_total_planos" "%in_no_total_planos%") >> "%ruta_script%"
-    if defined in_nombre_plano echo (setProp "Nombre_Plano" "%in_nombre_plano%") >> "%ruta_script%"
-
-    echo _.QSAVE >> "%ruta_script%"
-    echo (setvar "DBMOD" 0) >> "%ruta_script%"
-    echo _.QUIT >> "%ruta_script%"
-    
-    "%REAL_CAD%" /b "%ruta_script%"
-)
+rem 6. Ejecutar Inyeccion
+cscript //nologo "%vbs_write%"
 
 rem 7. Limpieza
-del "%ruta_script%"
+del "%vbs_write%"
 
 echo.
 echo ===================================================
-echo Proceso finalizado con exito!
+echo ¡Proceso finalizado con éxito (Sin abrir CAD)!
 echo ===================================================
 pause
