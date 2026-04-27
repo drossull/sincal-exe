@@ -43,7 +43,7 @@ echo _.QUIT >> "%extract_scr%"
 echo. >> "%extract_scr%"
 
 rem Ejecutar extraccion silenciosa
-"%CAD_CONSOLE%" /i "%primer_dwg%" /s "%extract_scr%" > nul 2>&1
+call "%CAD_CONSOLE%" /i "%primer_dwg%" /s "%extract_scr%" > nul 2>&1
 
 rem 3. Leer los datos
 set "val_Nombre_Estructura="
@@ -120,7 +120,8 @@ if defined in_fecha_inf echo (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-
 if defined in_no_total_planos echo (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-SetCustomByKey (list info "No_total_planos" "%in_no_total_planos%"))) (vla-AddCustomInfo info "No_total_planos" "%in_no_total_planos%")) >> "%ruta_script%"
 if defined in_nombre_plano echo (if (vl-catch-all-error-p (vl-catch-all-apply 'vla-SetCustomByKey (list info "Nombre_Plano" "%in_nombre_plano%"))) (vla-AddCustomInfo info "Nombre_Plano" "%in_nombre_plano%")) >> "%ruta_script%"
 
-echo (setvar "WIPEOUTFRAME" 0) >> "%ruta_script%"
+rem EL TRUCO MAGICO: Ensuciar la base de datos para forzar el guardado
+echo (setvar "USERI1" (if (= (getvar "USERI1") 1) 2 1)) >> "%ruta_script%"
 echo _.QSAVE >> "%ruta_script%"
 echo _.QUIT >> "%ruta_script%"
 echo. >> "%ruta_script%"
@@ -133,7 +134,7 @@ echo ---------------------------------------------------
 rem 6. Ejecucion Universal
 for %%f in (*.dwg) do (
     echo Procesando: %%f
-    "%CAD_CONSOLE%" /i "%%f" /s "%ruta_script%"
+    call "%CAD_CONSOLE%" /i "%%f" /s "%ruta_script%"
 )
 
 rem 7. Limpieza
