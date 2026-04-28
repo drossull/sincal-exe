@@ -40,7 +40,9 @@ foreach ($file in $dwgFiles) {
     Write-Host "Limpiando: $($file.Name)" -ForegroundColor Green
     
     # Ejecución controlada invocando el wrapper
-    $procArgs = "/c `"$wrapperPath`" /i `"$($file.FullName)`" /s `"$scriptPath`""
+    # SOLUCIÓN: Se agregan comillas al principio y al final de todos los argumentos (`" ... `") 
+    # para evitar que cmd.exe elimine las comillas internas de las rutas con espacios.
+    $procArgs = "/c `"`"$wrapperPath`" /i `"$($file.FullName)`" /s `"$scriptPath`"`""
     Start-Process -FilePath "cmd.exe" -ArgumentList $procArgs -Wait -NoNewWindow
 }
 
