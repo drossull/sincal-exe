@@ -14,6 +14,7 @@
     "lisps/W08.lsp",
     "lisps/ESTRUCTURA.lsp",
     "lisps/RC-CAPAS.lsp",
+    "lisps/CUSTOM-PROPS.lsp",
     "startup/MisColores.lsp",
     "startup/AutoCrearPropiedad.lsp",
     "startup/AUTO-DYNMODE.lsp",
