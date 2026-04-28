@@ -1,5 +1,5 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "archivos": [
     "lisps/BV.lsp",
     "lisps/DL2.lsp",
@@ -15,6 +15,7 @@
     "lisps/ESTRUCTURA.lsp",
     "lisps/RC-CAPAS.lsp",
     "lisps/CUSTOM-PROPS.lsp",
+    "lisps/COPY-PROPS.lsp",
     "startup/MisColores.lsp",
     "startup/AutoCrearPropiedad.lsp",
     "startup/AUTO-DYNMODE.lsp",
