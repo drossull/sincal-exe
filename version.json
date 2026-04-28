@@ -1,5 +1,5 @@
 {
-  "version": "1.4.2",
+  "version": "1.4.4",
   "archivos": [
     "lisps/BV.lsp",
     "lisps/DL2.lsp",
@@ -29,6 +29,7 @@
     "scripts/PAGESETUP-A1.bat",
     "scripts/PUBLISH.bat",
     "scripts/PURGEALL.bat",
+    "scripts/PURGEALL.ps1",
     "scripts/RC-CAPAS.bat",
     "scripts/ZE.bat",
     "scripts/AUDIT.scr",
