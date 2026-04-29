@@ -7,7 +7,20 @@ import threading
 import ctypes
 import shutil
 import subprocess
+import time
 import customtkinter as ctk
+from tkinter import messagebox
+
+# --- 1. FORZAR MODO ADMINISTRADOR ESTRICTO ---
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False
+
+if not is_admin():
+    ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
+    sys.exit()
 
 # --- CONFIGURACIÓN ---
 USUARIO_GITHUB = "drossull" 
@@ -33,7 +46,6 @@ FUENTE_SUBTITULO = ("Consolas", 18, "bold")
 FUENTE_NORMAL = ("Consolas", 14)
 FUENTE_CONSOLA = ("Consolas", 12)
 
-# Forzar modo oscuro
 ctk.set_appearance_mode("dark") 
 
 def obtener_ruta_recurso(ruta_relativa):
@@ -46,14 +58,15 @@ def obtener_ruta_recurso(ruta_relativa):
 class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("SINCAL - Suite de Herramientas v1.2.5")
-        self.geometry("850x660")
-        self.minsize(550, 450) 
+        self.title("SINCAL - Suite de Herramientas (Modo Admin)")
+        self.geometry("900x700")
+        self.minsize(700, 500) 
         self.resizable(True, True) 
         self.configure(fg_color=COLOR_FONDO)
         
         self.cad_exe_path = None
         self.es_zwcad = False
+        self.version_local_actual = "v1.4.7" # Versión base inicial
 
         try:
             self.iconbitmap(obtener_ruta_recurso("logo.ico"))
@@ -65,8 +78,8 @@ class ActualizadorCAD(ctk.CTk):
         self.main_scroll = ctk.CTkScrollableFrame(self, fg_color=COLOR_FONDO, corner_radius=0)
         self.main_scroll.pack(fill="both", expand=True)
 
-        # --- SISTEMA DE PESTAÑAS ---
-        self.tabview = ctk.CTkTabview(self.main_scroll, width=810, height=610, fg_color=COLOR_FONDO,
+        # --- SISTEMA DE PESTAÑAS (FUSIONADO) ---
+        self.tabview = ctk.CTkTabview(self.main_scroll, width=850, height=650, fg_color=COLOR_FONDO,
                                       segmented_button_selected_color=COLOR_ACENTO,
                                       segmented_button_selected_hover_color=COLOR_ACENTO,
                                       segmented_button_unselected_hover_color="#444444")
@@ -74,18 +87,17 @@ class ActualizadorCAD(ctk.CTk):
         self.tabview._segmented_button.configure(font=FUENTE_NORMAL, text_color=COLOR_TEXTO)
         
         self.tab_main = self.tabview.add("Sincronizador")
-        self.tab_lisp = self.tabview.add("Instructivo LISP")
-        self.tab_cmd = self.tabview.add("Instructivo CMD")
+        self.tab_docs = self.tabview.add("Documentación Wiki")
 
-        for tab in [self.tab_main, self.tab_lisp, self.tab_cmd]:
+        for tab in [self.tab_main, self.tab_docs]:
             tab.configure(fg_color=COLOR_FONDO)
 
         self.setup_tab_sincronizador()
-        self.setup_tab_lisp()
-        self.setup_tab_cmd()
+        self.setup_tab_docs()
 
-        # Cargar datos de GitHub al abrir (en segundo plano)
-        threading.Thread(target=self.cargar_info_github).start()
+        # Hilos en segundo plano
+        threading.Thread(target=self.cargar_info_github, daemon=True).start()
+        threading.Thread(target=self.loop_verificador_actualizaciones, daemon=True).start()
 
     def setup_tab_sincronizador(self):
         header_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
@@ -111,77 +123,144 @@ class ActualizadorCAD(ctk.CTk):
                                        text_color=COLOR_TITULO, hover_color="#444444", command=self.forzar_path_manual)
         self.btn_forzar_path.pack(side="left", padx=10)
 
-        self.consola = ctk.CTkTextbox(self.tab_main, width=750, height=220, font=FUENTE_CONSOLA, 
+        self.consola = ctk.CTkTextbox(self.tab_main, width=800, height=180, font=FUENTE_CONSOLA, 
                                      fg_color="#222222", text_color=COLOR_TEXTO, state="disabled")
         self.consola.pack(pady=15)
 
-        # --- SECCIÓN DE ÚLTIMAS ACTUALIZACIONES ---
+        # --- SECCIÓN DE ÚLTIMAS ACTUALIZACIONES (10 COMMITS) ---
         self.frame_updates = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         self.frame_updates.pack(fill="x", padx=30, pady=(0, 10))
 
-        self.lbl_updates_title = ctk.CTkLabel(self.frame_updates, text="Últimas actualizaciones", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO)
+        self.lbl_updates_title = ctk.CTkLabel(self.frame_updates, text="Últimas 10 actualizaciones", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO)
         self.lbl_updates_title.pack(anchor="w", pady=(0, 5))
 
-        self.lbl_updates_data = ctk.CTkLabel(self.frame_updates, text="Buscando novedades en GitHub...", font=FUENTE_NORMAL, text_color=COLOR_TEXTO, wraplength=730, justify="left")
-        self.lbl_updates_data.pack(anchor="w")
+        self.txt_updates = ctk.CTkTextbox(self.frame_updates, width=800, height=120, font=FUENTE_NORMAL, 
+                                          fg_color="#1E1E1E", text_color=COLOR_TEXTO, state="disabled")
+        self.txt_updates.pack(anchor="w")
+
+    def setup_tab_docs(self):
+        # Layout tipo Wiki: Menú Izquierda, Contenido Derecha
+        self.wiki_frame = ctk.CTkFrame(self.tab_docs, fg_color="transparent")
+        self.wiki_frame.pack(fill="both", expand=True)
+        
+        self.menu_frame = ctk.CTkScrollableFrame(self.wiki_frame, width=220, label_text="Índice", 
+                                                label_text_color=COLOR_TITULO, fg_color="#222222")
+        self.menu_frame._label.configure(font=FUENTE_NORMAL)
+        self.menu_frame.pack(side="left", fill="y", padx=(0, 10), pady=10)
+        
+        self.content_frame = ctk.CTkFrame(self.wiki_frame, fg_color="#222222")
+        self.content_frame.pack(side="right", fill="both", expand=True, pady=10)
+        
+        self.lbl_wiki_title = ctk.CTkLabel(self.content_frame, text="Documentación SINCAL", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO)
+        self.lbl_wiki_title.pack(pady=15)
+        
+        self.txt_wiki_content = ctk.CTkTextbox(self.content_frame, width=500, height=450, font=FUENTE_NORMAL, fg_color="#1E1E1E", text_color=COLOR_TEXTO)
+        self.txt_wiki_content.pack(padx=20, pady=10, fill="both", expand=True)
+        
+        self.cargar_lista_tutoriales()
 
     def cargar_info_github(self):
         try:
             r_ver = requests.get(URL_BASE_RAW + "version.json", timeout=5)
-            version_str = r_ver.json().get("version", "Desconocida") if r_ver.status_code == 200 else "Desconocida"
+            if r_ver.status_code == 200:
+                self.version_local_actual = r_ver.json().get("version", "Desconocida")
 
-            url_api = f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits/{RAMA}"
-            r_commit = requests.get(url_api, timeout=5)
+            # Pedir los últimos 10 commits
+            url_api = f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits"
+            params = {"sha": RAMA, "per_page": 10}
+            r_commit = requests.get(url_api, params=params, timeout=5)
             
+            self.txt_updates.configure(state="normal")
+            self.txt_updates.delete("1.0", "end")
+
             if r_commit.status_code == 200:
-                data = r_commit.json()
-                fecha = data['commit']['author']['date'].split("T")[0] 
-                titulo_commit = data['commit']['message'].split("\n")[0]
+                commits = r_commit.json()
+                self.txt_updates.insert("end", f"Versión actual en la nube: {self.version_local_actual}\n\n")
+                for c in commits:
+                    fecha = c['commit']['author']['date'].split("T")[0] 
+                    mensaje = c['commit']['message'].split("\n")[0]
+                    self.txt_updates.insert("end", f"🗓️ {fecha} | 📝 {mensaje}\n")
             else:
-                fecha = "----/--/--"
-                titulo_commit = "No se pudo conectar con el registro de commits."
-
-            texto_mostrar = f"🗓️ {fecha}   |   ⚙️ v{version_str}   |   📝 {titulo_commit}"
-            self.lbl_updates_data.configure(text=texto_mostrar)
+                self.txt_updates.insert("end", "No se pudo conectar con el registro de commits de GitHub.")
+            
+            self.txt_updates.configure(state="disabled")
         except Exception:
-            self.lbl_updates_data.configure(text="No se pudo obtener la información de las actualizaciones recientes.")
+            self.txt_updates.configure(state="normal")
+            self.txt_updates.insert("end", "Error obteniendo la información de actualizaciones.")
+            self.txt_updates.configure(state="disabled")
 
-    def setup_tab_lisp(self):
-        self.help_frame = ctk.CTkFrame(self.tab_lisp, fg_color="transparent")
-        self.help_frame.pack(fill="both", expand=True)
-        self.list_frame = ctk.CTkScrollableFrame(self.help_frame, width=220, label_text="Comandos", 
-                                                label_text_color=COLOR_TITULO, fg_color="#222222")
-        self.list_frame._label.configure(font=FUENTE_NORMAL)
-        self.list_frame.pack(side="left", fill="y", padx=(0, 10), pady=10)
-        self.content_frame = ctk.CTkFrame(self.help_frame, fg_color="#222222")
-        self.content_frame.pack(side="right", fill="both", expand=True, pady=10)
-        self.help_title = ctk.CTkLabel(self.content_frame, text="LISP: Selecciona un comando", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO)
-        self.help_title.pack(pady=20)
-        self.help_desc = ctk.CTkLabel(self.content_frame, text="Selecciona una rutina en la lista para ver su descripción técnica.", wraplength=450, justify="left", font=FUENTE_NORMAL, text_color=COLOR_TEXTO)
-        self.help_desc.pack(padx=30, pady=20)
-        self.cargar_lista_tutoriales()
+    def loop_verificador_actualizaciones(self):
+        """Sabueso en segundo plano: Revisa cada 60 min si hay cambios en version.json"""
+        while True:
+            time.sleep(3600) # Espera 1 hora
+            try:
+                r_ver = requests.get(URL_BASE_RAW + "version.json", timeout=5)
+                if r_ver.status_code == 200:
+                    version_nube = r_ver.json().get("version")
+                    # Validar si version_local_actual existe y es distinta
+                    if version_nube and version_nube != self.version_local_actual:
+                        self.mostrar_popup_actualizacion(version_nube)
+            except:
+                pass
 
-    def setup_tab_cmd(self):
-        lbl_cmd_title = ctk.CTkLabel(self.tab_cmd, text="Guía de Procesamiento por Lotes (CMD)", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO)
-        lbl_cmd_title.pack(pady=(10, 5))
-        readme_text = (
-            "💻 PROCESAMIENTO MASIVO DE ARCHIVOS DWG\n"
-            "--------------------------------------------------\n\n"
-            "Esta función permite ejecutar procesos automáticos sobre múltiples\n"
-            "archivos DWG sin necesidad de abrirlos uno por uno, utilizando\n"
-            "el motor de fondo de AutoCAD o ZWCAD.\n\n"
-            "🛠️ COMANDOS DISPONIBLES:\n"
-            "- AUDIT:        Repara y audita errores en todos los DWG.\n"
-            "- PURGEALL:     Limpieza profunda de capas, bloques y estilos.\n"
-            "- PUBLISH:      Genera PDFs automáticos de cada plano.\n"
-            "- ZE:           Aplica 'Zoom Extents' y guarda cada archivo.\n"
-            "- RC-CAPAS:     Normaliza los colores al estándar SINCAL.\n"
-            "- CUSTOM-PROPS: Inyección masiva de propiedades de viñeta.\n"
+    def mostrar_popup_actualizacion(self, nueva_version):
+        respuesta = messagebox.askyesno(
+            title="¡Nueva Actualización SINCAL!", 
+            message=f"Se ha detectado una nueva versión del Estándar en la nube ({nueva_version}).\n\n¿Deseas descargarla y aplicarla ahora?"
         )
-        self.cmd_readme = ctk.CTkTextbox(self.tab_cmd, width=750, height=430, font=FUENTE_CONSOLA, fg_color="#222222", text_color=COLOR_TEXTO)
-        self.cmd_readme.insert("0.0", readme_text)
-        self.cmd_readme.configure(state="disabled")
-        self.cmd_readme.pack(pady=10)
+        if respuesta:
+            self.iniciar_actualizacion_hilo()
+
+    def cargar_lista_tutoriales(self):
+        for widget in self.menu_frame.winfo_children(): widget.destroy()
+        
+        # 1. Botón fijo para el README
+        btn_readme = ctk.CTkButton(self.menu_frame, text="Guía de Inicio (README)", font=FUENTE_NORMAL, fg_color="#444444", text_color=COLOR_TITULO,
+                                    hover_color=COLOR_ACENTO, command=self.mostrar_readme)
+        btn_readme.pack(fill="x", pady=(5, 15), padx=5)
+
+        # 2. Cargar Comandos desde JSON
+        ruta_json = os.path.join(RUTA_LOCAL_APP, "tutoriales.json")
+        if os.path.exists(ruta_json):
+            try:
+                with open(ruta_json, 'r', encoding='utf-8') as f:
+                    self.tutoriales = json.load(f)
+                
+                for cmd, data in self.tutoriales.items():
+                    btn = ctk.CTkButton(self.menu_frame, text=cmd, font=FUENTE_NORMAL, fg_color="transparent", text_color=COLOR_TEXTO,
+                                        border_width=1, border_color="#555555", hover_color=COLOR_ACENTO,
+                                        command=lambda c=cmd: self.mostrar_comando_wiki(c))
+                    btn.pack(fill="x", pady=2, padx=5)
+            except: pass
+        
+        self.mostrar_readme()
+
+    def mostrar_readme(self):
+        self.lbl_wiki_title.configure(text="Guía de Inicio y Configuración")
+        self.txt_wiki_content.configure(state="normal")
+        self.txt_wiki_content.delete("1.0", "end")
+        
+        # Leer el README local descargado, si no existe, texto por defecto
+        ruta_readme = os.path.join(RUTA_LOCAL_APP, "README.md")
+        if os.path.exists(ruta_readme):
+            with open(ruta_readme, 'r', encoding='utf-8') as f:
+                contenido = f.read()
+        else:
+            contenido = "El archivo README.md aún no se ha descargado. Por favor, presiona 'Actualizar Todo'."
+            
+        self.txt_wiki_content.insert("0.0", contenido)
+        self.txt_wiki_content.configure(state="disabled")
+
+    def mostrar_comando_wiki(self, cmd):
+        data = self.tutoriales.get(cmd, {})
+        titulo = data.get("titulo", cmd)
+        descripcion = data.get("descripcion", "Descripción no disponible.")
+        
+        self.lbl_wiki_title.configure(text=titulo)
+        self.txt_wiki_content.configure(state="normal")
+        self.txt_wiki_content.delete("1.0", "end")
+        self.txt_wiki_content.insert("0.0", descripcion)
+        self.txt_wiki_content.configure(state="disabled")
 
     def log(self, mensaje):
         self.consola.configure(state="normal")
@@ -195,33 +274,14 @@ class ActualizadorCAD(ctk.CTk):
     def forzar_path_manual(self):
         self.log("\n--- REPARACIÓN DE VARIABLES DE ENTORNO (PATH) ---")
         self.actualizar_variable_entorno()
-        self.log(" [!] Cierra cualquier CMD abierto para aplicar los cambios.\n")
-
-    def cargar_lista_tutoriales(self):
-        for widget in self.list_frame.winfo_children(): widget.destroy()
-        ruta_json = os.path.join(RUTA_LOCAL_APP, "tutoriales.json")
-        if os.path.exists(ruta_json):
-            try:
-                with open(ruta_json, 'r', encoding='utf-8') as f:
-                    self.tutoriales = json.load(f)
-                for cmd in self.tutoriales.keys():
-                    btn = ctk.CTkButton(self.list_frame, text=cmd, font=FUENTE_NORMAL, fg_color="transparent", text_color=COLOR_TEXTO,
-                                        border_width=1, border_color="#444444", hover_color=COLOR_ACENTO,
-                                        command=lambda c=cmd: self.mostrar_tutorial(c))
-                    btn.pack(fill="x", pady=2, padx=5)
-            except: pass
-
-    def mostrar_tutorial(self, cmd):
-        data = self.tutoriales.get(cmd, {})
-        self.help_title.configure(text=data.get("titulo", cmd))
-        self.help_desc.configure(text=data.get("descripcion", "Descripción no disponible."))
+        self.log(" [!] Cierra cualquier consola o programa abierto para aplicar los cambios.\n")
 
     def iniciar_actualizacion_hilo(self):
         self.btn_actualizar.configure(state="disabled", text="Sincronizando...")
         self.consola.configure(state="normal")
         self.consola.delete("1.0", "end")
         self.consola.configure(state="disabled")
-        threading.Thread(target=self.motor_actualizacion).start()
+        threading.Thread(target=self.motor_actualizacion, daemon=True).start()
 
     def enviar_telemetria(self, version_instalada):
         try:
@@ -233,45 +293,59 @@ class ActualizadorCAD(ctk.CTk):
     def motor_actualizacion(self):
         self.log("--- INICIANDO ACTUALIZACIÓN ---")
         
+        # 1. LIMPIEZA AGRESIVA
         old_folder = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL")
         if os.path.exists(old_folder):
-            try:
-                shutil.rmtree(old_folder)
-                self.log(" [!] Carpeta antigua eliminada.")
+            try: shutil.rmtree(old_folder)
             except: pass
+
+        if os.path.exists(RUTA_LOCAL_APP):
+            try:
+                shutil.rmtree(RUTA_LOCAL_APP)
+                self.log(" [!] Carpeta local eliminada para instalación limpia.")
+            except Exception as e:
+                self.log(f" [X] Aviso al limpiar carpeta: Cierre archivos abiertos. ({e})")
 
         os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
         
         try:
+            # 2. DESCARGA DE RECURSOS
             r = requests.get(URL_BASE_RAW + "version.json")
             data = r.json()
-            version_nube = data.get("version", "v1.2.5")
+            version_nube = data.get("version", "v1.0.0")
             archivos = data.get("archivos", [])
+            
+            # Forzar descarga de README.md
+            archivos.append("README.md")
+
             for a in archivos:
                 r_save = os.path.join(RUTA_LOCAL_APP, a)
                 os.makedirs(os.path.dirname(r_save), exist_ok=True)
                 res = requests.get(URL_BASE_RAW + a)
-                with open(r_save, 'wb') as f: f.write(res.content)
-                self.log(f"  > Descargado: {os.path.basename(a)}")
+                if res.status_code == 200:
+                    with open(r_save, 'wb') as f: f.write(res.content)
+                    self.log(f"  > Descargado: {os.path.basename(a)}")
             
+            # 3. CONFIGURACIONES NATIVAS
             self.generar_archivos_lisp(archivos)
             self.actualizar_rutas_registro()
             self.actualizar_variable_entorno()
             
-            # --- NUEVA FUNCIÓN AGRESIVA ---
             self.buscar_y_configurar_consolas()
             
             if self.cad_exe_path and self.es_zwcad:
                 self.inyectar_via_comando_directo()
             
+            self.version_local_actual = version_nube
             self.log(f"\n[!] PROCESO FINALIZADO. VERSIÓN: {version_nube}")
             self.enviar_telemetria(version_nube)
             self.cargar_info_github()
             self.cargar_lista_tutoriales()
             
         except Exception as e: 
-            self.log(f"[!] Error: {e}")
-        self.btn_actualizar.configure(state="normal", text="Actualizar Todo")
+            self.log(f"[!] Error durante la descarga: {e}")
+        
+        self.btn_actualizar.configure(state="normal", text="Instalar / Actualizar Todo")
 
     def buscar_y_configurar_consolas(self):
         ruta_env = os.path.join(RUTA_LOCAL_APP, "scripts", "cad_env.bat")
@@ -279,7 +353,7 @@ class ActualizadorCAD(ctk.CTk):
         self.cad_exe_path = None
         self.es_zwcad = False
         
-        # 1. Búsqueda AutoCAD en Registro
+        # Búsqueda AutoCAD en Registro
         try:
             with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Autodesk\AutoCAD") as k:
                 for i in range(winreg.QueryInfoKey(k)[0]):
@@ -294,13 +368,12 @@ class ActualizadorCAD(ctk.CTk):
                                     break
         except: pass
 
-        # 2. Búsqueda AutoCAD Fuerza Bruta (NUEVO)
-        # Si el registro oculta a AutoCAD 2025, lo buscamos directo en el disco
+        # Búsqueda AutoCAD Fuerza Bruta
         if not self.cad_exe_path:
             try:
                 base_dir = r"C:\Program Files\Autodesk"
                 if os.path.exists(base_dir):
-                    carpetas = sorted(os.listdir(base_dir), reverse=True) # Busca primero en la versión más alta (ej: 2025)
+                    carpetas = sorted(os.listdir(base_dir), reverse=True)
                     for folder in carpetas:
                         if "AutoCAD" in folder:
                             posible_exe = os.path.join(base_dir, folder, "accoreconsole.exe")
@@ -309,7 +382,7 @@ class ActualizadorCAD(ctk.CTk):
                                 break
             except: pass
 
-        # 3. Búsqueda ZWCAD (SOLO si no encontró nada de AutoCAD)
+        # Búsqueda ZWCAD
         if not self.cad_exe_path:
             try:
                 base_dir = r"C:\Program Files\ZWSOFT"
@@ -325,6 +398,7 @@ class ActualizadorCAD(ctk.CTk):
             except: pass
 
         if self.cad_exe_path:
+            os.makedirs(os.path.dirname(ruta_wrapper), exist_ok=True)
             with open(ruta_wrapper, 'w') as f:
                 f.write('@echo off\n')
                 f.write('set "DWG_FILE=%~2"\nset "SCR_FILE=%~4"\n')
@@ -337,12 +411,11 @@ class ActualizadorCAD(ctk.CTk):
                 f.write(f'@set "CAD_CONSOLE={ruta_wrapper}"')
             
             tipo = "ZWCAD (Gráfico)" if self.es_zwcad else "AutoCAD (Silencioso)"
-            self.log(f" [+] Consola de procesos lote vinculada a: {tipo}")
+            self.log(f" [+] Motor Batch vinculado a: {tipo}")
 
     def inyectar_via_comando_directo(self):
         self.log(" [!] Lanzando ZWCAD para auto-configurar rutas (Espere un momento)...")
         ruta_escapada = RUTA_LOCAL_APP.replace("\\", "\\\\")
-        
         lisp_cmd = (
             f'(vl-load-com) '
             f'(setq p (vla-get-Files (vla-get-Preferences (vlax-get-acad-object)))) '
@@ -351,10 +424,8 @@ class ActualizadorCAD(ctk.CTk):
             f'(setvar "TRUSTEDPATHS" (strcat (getvar "TRUSTEDPATHS") ";{ruta_escapada}")) '
             f'_.QSAVE (command "_QUIT")'
         )
-
         try:
             subprocess.Popen([self.cad_exe_path, "/cmd", lisp_cmd])
-            self.log(" [+] ZWCAD registrará las rutas y se cerrará automáticamente.")
         except Exception as e:
             self.log(f" [X] Falló el auto-lanzamiento: {e}")
 

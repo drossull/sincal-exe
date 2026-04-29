@@ -54,5 +54,17 @@
     "ZE": {
         "titulo": "Comando: ZE (Zoom Extents)",
         "descripcion": "Ejecuta un Zoom Extents instantáneo mediante un atajo corto de teclado para visualizar todos los elementos del dibujo."
+    },
+    "AutoCrearPropiedad": {
+        "titulo": "Preparación Automática de Propiedades",
+        "descripcion": "🔧 EJECUCIÓN AUTOMÁTICA\n\nEste script actúa en segundo plano sin que debas teclear nada. Cada vez que abres un plano, revisa su base de datos (SummaryInfo) y se asegura de que existan todas las propiedades requeridas por el Estándar SINCAL (Nombre_Estructura, Provincia, Comuna, etc.).\n\nSi el plano no tiene las propiedades, las inyecta automáticamente con valores por defecto. Esto es un escudo de seguridad que evita que los procesamientos masivos por lotes fallen al intentar leer planos muy antiguos o en blanco."
+    },
+    "AUTO-DYNMODE": {
+        "titulo": "Entrada Dinámica (DYNMODE)",
+        "descripcion": "🔧 EJECUCIÓN AUTOMÁTICA\n\nEste script se lanza de forma invisible al iniciar el CAD y fuerza la variable de sistema DYNMODE al valor 3.\n\n¿Para qué sirve?\nGarantiza que las cajas de texto de coordenadas, comandos y medidas sigan a tu cursor mientras dibujas. Evita la molestia de tener que estar prendiendo esta función manualmente si el CAD se desconfigura."
+    },
+    "Atajos de Color": {
+        "titulo": "Atajos Ultra Rápidos de Color (C1 a C0)",
+        "descripcion": "🎨 COMANDOS DE USO DIARIO\n\nSelecciona cualquier cantidad de objetos en tu pantalla y teclea uno de los siguientes comandos para cambiar su color instantáneamente. Esta herramienta utiliza el motor profundo ActiveX, por lo que es inmune a bloqueos y errores de idioma del CAD.\n\nComandos:\n• C1 : Rojo\n• C2 : Amarillo\n• C3 : Verde\n• C4 : Cian\n• C5 : Azul\n• C6 : Magenta\n• C7 : Blanco/Negro\n• C8 : Gris oscuro\n• C9 : Gris claro\n• C0 : Restaura el color original 'Por Capa' (ByLayer)"
     }
 }
