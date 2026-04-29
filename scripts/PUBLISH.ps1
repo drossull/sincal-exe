@@ -7,10 +7,9 @@ if ($dwgFiles.Count -eq 0) {
     exit
 }
 
-# Obtener rutas absolutas de los scripts base
 $PSScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $wrapperPath = Join-Path $PSScriptRoot "cad_wrapper.bat"
-$scrPath = Join-Path $PSScriptRoot "PAGESETUP-A1.scr"
+$scrPath = Join-Path $PSScriptRoot "PUBLISH.scr"
 
 if (-not (Test-Path $wrapperPath)) {
     Write-Host "[ERROR] Consola CAD no detectada. Actualiza SINCAL.exe." -ForegroundColor Red
@@ -18,18 +17,17 @@ if (-not (Test-Path $wrapperPath)) {
 }
 
 if (-not (Test-Path $scrPath)) {
-    Write-Host "[ERROR] Archivo PAGESETUP-A1.scr no encontrado." -ForegroundColor Red
+    Write-Host "[ERROR] Archivo PUBLISH.scr no encontrado." -ForegroundColor Red
     exit
 }
 
 Write-Host "---------------------------------------------------" -ForegroundColor Cyan
-Write-Host "Configuración masiva de página A1 iniciada" -ForegroundColor Cyan
+Write-Host "Publicación masiva de PDF" -ForegroundColor Cyan
 Write-Host "---------------------------------------------------" -ForegroundColor Cyan
 
 foreach ($file in $dwgFiles) {
-    Write-Host "Configurando página A1 en: $($file.Name)" -ForegroundColor Green
+    Write-Host "Publicando PDF de: $($file.Name)" -ForegroundColor Green
     
-    # Ejecución controlada DIRECTA (Evita el bug de espacios de cmd.exe)
     $argList = "/i `"$($file.FullName)`" /s `"$scrPath`""
     Start-Process -FilePath $wrapperPath -ArgumentList $argList -Wait -NoNewWindow
 }

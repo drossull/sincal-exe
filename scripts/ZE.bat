@@ -1,22 +1,2 @@
 @echo off
-chcp 65001 > nul
-call "%~dp0cad_env.bat"
-
-echo ---------------------------------------------------
-echo Consola detectada: %CAD_CONSOLE%
-echo ---------------------------------------------------
-
-if "%CAD_CONSOLE%"=="" (
-    echo [ERROR] No se pudo cargar la ruta de la consola.
-    pause
-    exit /b
-)
-
-for %%f in (*.dwg) do (
-    echo Aplicando Zoom Extents a: %%f
-    "%CAD_CONSOLE%" /i "%%f" /s "%~dp0ZE.scr"
-)
-
-echo.
-echo ¡Proceso finalizado!
-pause
+pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0ZE.ps1"
