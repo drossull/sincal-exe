@@ -1,70 +1,70 @@
 {
     "SINCAL": {
-        "titulo": "Comando: SINCAL (Importar Estándar)",
-        "descripcion": "El comando maestro de estandarización. Importa automáticamente todas las capas, estilos de texto (RomanD), estilos de cota y bloques necesarios desde el archivo maestro DWG.\n\nUso: Escribe SINCAL y presiona Enter.\n\nTodos los estilos, capas y bloques de 'FORMATOS ANOTATIVOS ACAD_2025.dwg' se importarán al archivo actual donde se ejecute el comando. Dicho archivo maestro fue convenido en la reunión de estándar de la oficina de SINCAL."
+        "titulo": "Importar Estándar SINCAL",
+        "descripcion": "El comando núcleo del estándar. Importa de forma masiva todas las capas oficiales, estilos de texto RomanD, dimensiones y bloques desde el archivo maestro central. Si el bloque o estilo ya existe, lo redefine para asegurar que el plano esté actualizado según la última normativa de la oficina."
     },
     "BV": {
-        "titulo": "Comando: BV (Bloquear Viewports)",
-        "descripcion": "Bloquea automáticamente todas las ventanas gráficas (Viewports) de la presentación (Layout) actual para asegurar la integridad de la vista.\n\nEs fundamental bloquear los viewports para evitar que, al trabajar en el layout y hacer doble clic dentro de una ventana, la escala y el encuadre se pierdan accidentalmente con el uso de la rueda del mouse."
+        "titulo": "Bloqueo de Viewports",
+        "descripcion": "Escanea el layout actual y bloquea la visualización de todas las ventanas gráficas. Es una medida de seguridad vital para evitar que el encuadre o la escala de impresión se pierdan accidentalmente al navegar por el plano."
+    },
+    "COPY-PROPS / PASTE-PROPS": {
+        "titulo": "Clonar Propiedades entre Planos",
+        "descripcion": "Conjunto de comandos para copiar datos de viñetas entre archivos.\n\n• COPY-PROPS: Copia las 6 propiedades generales (Estructura, Revisión, Fechas y Ubicación) a la memoria.\n• PASTE-PROPS: Pega las propiedades copiadas en el archivo actual, te pregunta por los 2 datos específicos de esa hoja (Nombre del plano y Total de planos), y regenera la viñeta automáticamente."
+    },
+    "CUSTOM-PROPS": {
+        "titulo": "Actualizador de Propiedades (DWGPROPS)",
+        "descripcion": "Inicia un asistente interactivo en la línea de comandos para rellenar o modificar los datos de la viñeta del archivo actual. Muestra los valores actuales y te permite sobrescribirlos paso a paso (presionando Enter para mantener el actual) o seleccionar editar solo una propiedad específica."
     },
     "DL2": {
-        "titulo": "Comando: DL2 (Eliminar Layout2)",
-        "descripcion": "Elimina instantáneamente la pestaña 'Layout2' de tu dibujo para optimizar el archivo.\n\nSoftware como Tekla Structures produce planos con layouts llamados 'Layout1' y 'Layout2' de forma predeterminada. 'Layout2' es una hoja que no se utiliza y su presencia entorpece los procesos de ploteo por lote (Publish). Nota: Con el nuevo método de generación de formas mediante FreeCAD, esta pestaña excedente ya no se produce."
-    },
-    "ESTRUCTURA": {
-        "titulo": "Comando: ESTRUCTURA (Gestión Paramétrica)",
-        "descripcion": "Como parte de las configuraciones de este software, se ha instalado la función de adición de CUSTOM PROPERTIES (DWGPROPS). Estas propiedades personalizadas se comunican con el formato de viñeta parametrizada del nuevo estándar. Mediante este comando, se define la propiedad 'Nombre_Estructura', la cual actualiza automáticamente el campo de texto correspondiente en la carátula. Esto permite que el cambio de datos sea paramétrico, centralizado y no manual."
+        "titulo": "Eliminar Layout Sobrante",
+        "descripcion": "Elimina la pestaña 'Layout2' que suelen generar programas externos como Tekla. Esto limpia el archivo y acelera el proceso de ploteo por lote al tener solo las hojas necesarias."
     },
     "MC": {
-        "titulo": "Comando: MC (Middle Center)",
-        "descripcion": "Cambia la justificación de textos simples (DText) y múltiples (MText) a 'Medio Centro' (Middle Center) sin alterar su posición visual en el plano."
+        "titulo": "Middle Center (Centrar Textos)",
+        "descripcion": "Cambia la justificación de textos simples (DText) y múltiples (MText) a 'Medio Centro' (Middle Center) usando el comando nativo JUSTIFYTEXT, lo que permite cambiar el punto de inserción sin alterar su posición visual en el plano."
     },
     "MPEND": {
-        "titulo": "Comando: MPEND (Pendiente Multileader)",
-        "descripcion": "Alinea e inclina Multileaders basándose en un porcentaje de pendiente ingresado (ej. 2 o -2), calculando el ángulo matemático exacto de la directriz."
-    },
-    "NOMBRAR": {
-        "titulo": "Comando: NOMBRAR (Propiedad de Plano)",
-        "descripcion": "Permite editar rápidamente la propiedad personalizada 'Nombre_Plano'. Al actualizarse, el comando regenera los campos (Fields) de la viñeta para reflejar el nuevo nombre automáticamente."
+        "titulo": "Inclinación de Pendiente (Multileader)",
+        "descripcion": "Alinea e inclina flechas de anotación (Multileaders) basándose en un porcentaje de pendiente ingresado por el usuario (ej. 2 o -2.5), calculando el ángulo matemático exacto de rotación de la directriz."
     },
     "P0": {
-        "titulo": "Comando: P0 (Pegar en Origen)",
-        "descripcion": "Pega el contenido del portapapeles como bloque exactamente en las coordenadas 0,0,0 del espacio actual, ya sea en el Espacio Modelo o Layout."
+        "titulo": "Pegar en Origen (0,0,0)",
+        "descripcion": "Pega el contenido del portapapeles como un bloque exactamente en las coordenadas 0,0,0 del espacio actual, ya sea en el Espacio Modelo o Layout, ignorando las referencias a objetos activas."
     },
     "PND": {
-        "titulo": "Comando: PND (Calculadora de Pendiente)",
-        "descripcion": "Calcula y muestra en una ventana emergente la pendiente porcentual de cualquier línea o polilínea seleccionada en el dibujo."
-    },
-    "RC-CAPAS": {
-        "titulo": "Comando: RC-CAPAS (Restaurar Colores)",
-        "descripcion": "Escanea todas las capas y corrige sus colores convirtiendo valores True Color (RGB) a los colores base del estándar SINCAL (Index Color 1 al 8)."
+        "titulo": "Calculadora de Pendiente",
+        "descripcion": "Calcula de forma automática y muestra en una ventana emergente la pendiente porcentual de cualquier línea o polilínea seleccionada en el dibujo."
     },
     "RMLAY": {
-        "titulo": "Comando: RMLAY (Renombrar Layout)",
-        "descripcion": "Permite renombrar la pestaña de presentación actual de forma ágil.\n\nRecordar que, según el estándar, el layout debe nombrarse con el número del plano actual. Por ejemplo, si el plano de disposición general es el 01, el layout debe llamarse '01'. Ejecutar RMLAY y escribir '01' asegura esta consistencia."
+        "titulo": "Renombrar Layout",
+        "descripcion": "Permite renombrar la pestaña de presentación actual de forma ágil sin tener que hacer doble clic en ella. Soporta espacios y valida automáticamente que el nombre no esté duplicado."
+    },
+    "SETUP-A1": {
+        "titulo": "Configurar Layout a A1",
+        "descripcion": "Configura automáticamente todos los Layouts del archivo al formato estándar ISO A1 (841 x 594 mm). Asigna la impresora PDF de Alta Calidad (detecta automáticamente si usas AutoCAD o ZWCAD), establece la escala 1:1, carga la plumilla 'SINCAL_A1 (2025).ctb' y activa la transparencia de trazado y calidad a 300 DPI."
     },
     "ST0": {
-        "titulo": "Comando: ST0 (Altura de Texto 0.0)",
-        "descripcion": "Establece masivamente la altura de todos los estilos de texto a 0.0.\n\nEs necesario ejecutar este comando cuando los estilos tienen tamaños fijos (como 2.5) que limitan la edición. El estándar promueve el uso de textos anotativos, donde el tamaño final se gestiona mediante las propiedades del objeto y la escala anotativa de la vista."
+        "titulo": "Altura de Texto 0.0",
+        "descripcion": "Establece masivamente la altura de todos los estilos de texto a 0.0. Es necesario cuando los estilos tienen tamaños fijos que limitan la edición. El estándar promueve el uso de textos anotativos gestionados por las propiedades del objeto."
     },
     "W08": {
-        "titulo": "Comando: W08 (Factor de Ancho 0.8)",
-        "descripcion": "Aplica de forma global un factor de ancho (Width Factor) de 0.8 a todos los estilos de texto para estandarizar la estética de los planos."
+        "titulo": "Factor de Ancho 0.8",
+        "descripcion": "Aplica de forma global un factor de compresión o ancho (Width Factor) de 0.8 a todos los estilos de texto para estandarizar la estética de los planos de ingeniería."
     },
     "ZE": {
-        "titulo": "Comando: ZE (Zoom Extents)",
-        "descripcion": "Ejecuta un Zoom Extents instantáneo mediante un atajo corto de teclado para visualizar todos los elementos del dibujo."
+        "titulo": "Zoom Extents Rápido",
+        "descripcion": "Atajo optimizado para encuadrar todo el dibujo en pantalla y limpiar la memoria visual de la tarjeta de video en un solo paso."
     },
     "AutoCrearPropiedad": {
-        "titulo": "Preparación Automática de Propiedades",
-        "descripcion": "🔧 EJECUCIÓN AUTOMÁTICA\n\nEste script actúa en segundo plano sin que debas teclear nada. Cada vez que abres un plano, revisa su base de datos (SummaryInfo) y se asegura de que existan todas las propiedades requeridas por el Estándar SINCAL (Nombre_Estructura, Provincia, Comuna, etc.).\n\nSi el plano no tiene las propiedades, las inyecta automáticamente con valores por defecto. Esto es un escudo de seguridad que evita que los procesamientos masivos por lotes fallen al intentar leer planos muy antiguos o en blanco."
+        "titulo": "Preparación de Propiedades",
+        "descripcion": "Este proceso se ejecuta automáticamente cada vez que abres un plano. Analiza la base de datos SummaryInfo del dibujo y se asegura de que existan los campos Nombre_Estructura, Provincia, Comuna, Revisión, entre otros. Si el archivo es antiguo o no tiene estas propiedades, el script las inyecta silenciosamente con valores predeterminados para evitar que los procesos masivos de viñetas fallen."
     },
     "AUTO-DYNMODE": {
         "titulo": "Entrada Dinámica (DYNMODE)",
-        "descripcion": "🔧 EJECUCIÓN AUTOMÁTICA\n\nEste script se lanza de forma invisible al iniciar el CAD y fuerza la variable de sistema DYNMODE al valor 3.\n\n¿Para qué sirve?\nGarantiza que las cajas de texto de coordenadas, comandos y medidas sigan a tu cursor mientras dibujas. Evita la molestia de tener que estar prendiendo esta función manualmente si el CAD se desconfigura."
+        "descripcion": "Configuración automática que fuerza el encendido de la entrada dinámica (DYNMODE = 3). Esto garantiza que las ayudas visuales y la línea de comandos flotante estén siempre disponibles al dibujar, estandarizando la forma en que el equipo interactúa con el cursor."
     },
     "Atajos de Color": {
-        "titulo": "Atajos Ultra Rápidos de Color (C1 a C0)",
-        "descripcion": "🎨 COMANDOS DE USO DIARIO\n\nSelecciona cualquier cantidad de objetos en tu pantalla y teclea uno de los siguientes comandos para cambiar su color instantáneamente. Esta herramienta utiliza el motor profundo ActiveX, por lo que es inmune a bloqueos y errores de idioma del CAD.\n\nComandos:\n• C1 : Rojo\n• C2 : Amarillo\n• C3 : Verde\n• C4 : Cian\n• C5 : Azul\n• C6 : Magenta\n• C7 : Blanco/Negro\n• C8 : Gris oscuro\n• C9 : Gris claro\n• C0 : Restaura el color original 'Por Capa' (ByLayer)"
+        "titulo": "Paleta de Colores ActiveX",
+        "descripcion": "Comandos rápidos para cambiar el color de los objetos seleccionados sin usar la interfaz lenta de AutoCAD.\n\nComandos: C1 (Rojo), C2 (Amarillo), C3 (Verde), C4 (Cian), C5 (Azul), C6 (Magenta), C7 (Blanco), C8 (Gris), C9 (Gris Claro) y C0 (Por Capa)."
     }
 }
