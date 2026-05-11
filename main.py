@@ -10,6 +10,8 @@ import subprocess
 import time
 import customtkinter as ctk
 from tkinter import messagebox
+import win32com.client
+import pythoncom
 
 # --- 1. FORZAR MODO ADMINISTRADOR ---
 def is_admin():
@@ -71,12 +73,13 @@ class ActualizadorCAD(ctk.CTk):
         self.tutoriales = {}
         self.cad_exe_path = None
         self.es_zwcad = False
+        self.cancelar_comando_vivo = False  # <-- BANDERA DE CANCELACIÓN
 
         # Contenedor Principal
         self.main_scroll = ctk.CTkScrollableFrame(self, fg_color=COLOR_FONDO, corner_radius=0)
         self.main_scroll.pack(fill="both", expand=True)
 
-        # Tabview (Renombrado a "Documentación")
+        # Tabview
         self.tabview = ctk.CTkTabview(self.main_scroll, width=950, height=680, fg_color=COLOR_FONDO,
                                       segmented_button_selected_color=COLOR_ACENTO)
         self.tabview.pack(padx=20, pady=10)
@@ -119,10 +122,32 @@ class ActualizadorCAD(ctk.CTk):
                                      fg_color="#1E1E1E", text_color=COLOR_TEXTO, state="disabled")
         self.consola.pack(pady=15)
 
+        # --- CONSOLA EN VIVO PARA ARCHIVOS ABIERTOS ---
+        self.frame_live = ctk.CTkFrame(self.tab_main, fg_color="transparent")
+        self.frame_live.pack(fill="x", padx=40, pady=(5, 10))
+        
+        ctk.CTkLabel(self.frame_live, text="Ejecutar en planos abiertos:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(side="left")
+        
+        self.entrada_comando = ctk.CTkEntry(self.frame_live, font=FUENTE_NORMAL, width=250, placeholder_text="Ej: ZE, _QSAVE", corner_radius=0)
+        self.entrada_comando.pack(side="left", padx=10)
+        
+        self.btn_enviar_cmd = ctk.CTkButton(self.frame_live, text="Enviar", font=FUENTE_NORMAL, 
+                                            fg_color="transparent", border_width=1, border_color=COLOR_ACENTO, corner_radius=0,
+                                            hover_color="#444444", text_color=COLOR_TEXTO, width=80,
+                                            command=self.enviar_comando_en_vivo)
+        self.btn_enviar_cmd.pack(side="left", padx=(0, 10))
+        
+        # --- NUEVO BOTÓN CANCELAR ---
+        self.btn_cancelar_cmd = ctk.CTkButton(self.frame_live, text="Cancelar", font=FUENTE_NORMAL, 
+                                              fg_color="#D9534F", hover_color="#C9302C", width=80, corner_radius=0,
+                                              state="disabled", command=self.detener_comando_en_vivo)
+        self.btn_cancelar_cmd.pack(side="left")
+
+        # Historial de cambios
         self.frame_updates = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         self.frame_updates.pack(fill="x", padx=40)
         ctk.CTkLabel(self.frame_updates, text="Historial de cambios (Últimos 10)", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(anchor="w")
-        self.txt_updates = ctk.CTkTextbox(self.frame_updates, width=850, height=150, font=FUENTE_NORMAL, fg_color="#1E1E1E", state="disabled")
+        self.txt_updates = ctk.CTkTextbox(self.frame_updates, width=850, height=130, font=FUENTE_NORMAL, fg_color="#1E1E1E", state="disabled")
         self.txt_updates.pack(pady=5)
 
     def setup_tab_docs(self):
@@ -191,7 +216,6 @@ class ActualizadorCAD(ctk.CTk):
         for k, v in self.tutoriales.items():
             if k not in excluir:
                 t = v.get('titulo', k)
-                # Formatear título para que diga "COMANDO [NOMBRE]: [Descripción]"
                 if t.lower().startswith("comando:"):
                     t = t[8:].strip()
                 if t.startswith(k):
@@ -249,6 +273,101 @@ class ActualizadorCAD(ctk.CTk):
         self.log("\n--- REPARACIÓN DE VARIABLES DE ENTORNO (PATH) ---")
         self.actualizar_variable_entorno()
         self.log(" [!] Cierra cualquier consola o programa abierto para aplicar los cambios.\n")
+
+    # --- LÓGICA CONSOLA EN VIVO (COM) ---
+    def detener_comando_en_vivo(self):
+        self.cancelar_comando_vivo = True
+        self.btn_cancelar_cmd.configure(state="disabled", text="Deteniendo...")
+
+    def enviar_comando_en_vivo(self):
+        comando_crudo = self.entrada_comando.get()
+        if not comando_crudo:
+            return
+            
+        comando = comando_crudo.strip() + "\n"
+        
+        self.cancelar_comando_vivo = False
+        self.btn_enviar_cmd.configure(state="disabled", text="Enviando...")
+        self.btn_cancelar_cmd.configure(state="normal", text="Cancelar")
+        
+        threading.Thread(target=self._hilo_comando_en_vivo, args=(comando,), daemon=True).start()
+
+    def _hilo_comando_en_vivo(self, comando):
+        pythoncom.CoInitialize() 
+        try:
+            app = None
+            try:
+                app = win32com.client.GetActiveObject("ZWCAD.Application")
+                self.log(f"\n--- CONECTADO A ZWCAD EN VIVO ---")
+            except:
+                try:
+                    app = win32com.client.GetActiveObject("AutoCAD.Application")
+                    self.log(f"\n--- CONECTADO A AUTOCAD EN VIVO ---")
+                except:
+                    try:
+                        app = win32com.client.GetActiveObject("AutoCAD.Application.25")
+                        self.log(f"\n--- CONECTADO A AUTOCAD 2025 EN VIVO ---")
+                    except:
+                        self.log("\n[X] Error: No se detecta CAD abierto.")
+                        self.log(" [!] NOTA: AutoCAD/ZWCAD debe estar abierto como Administrador.")
+                        return
+
+            documentos = app.Documents
+            total = documentos.Count
+            
+            if total == 0:
+                self.log(" [!] No hay ningún plano abierto en este momento.")
+                return
+
+            self.log(f" Ejecutando comando en {total} pestañas...")
+            
+            # TRUCO PRO: \x03 es el código ASCII para la tecla ESC.
+            # Enviamos dos ESC antes del comando para limpiar la línea de comandos de AutoCAD.
+            comando_seguro = "\x03\x03" + comando
+
+            for i in range(total):
+                if self.cancelar_comando_vivo:
+                    self.log(" [!] PROCESO ABORTADO POR EL USUARIO.")
+                    break
+                
+                try:
+                    doc = documentos.Item(i)
+                except:
+                    continue 
+
+                try:
+                    # 1. Comprobación anti-redundancia: Solo activar si NO es la pestaña actual
+                    if app.ActiveDocument.Name != doc.Name:
+                        doc.Activate()
+                        time.sleep(0.1) 
+                    
+                    # 2. Enviar el comando seguro (Doble ESC + Tu Comando + Enter)
+                    doc.SendCommand(comando_seguro)
+                    self.log(f"  > Aplicado en: {doc.Name}")
+                    
+                except Exception as e:
+                    # 3. Reintento forzado por si la interfaz gráfica de ZWCAD tuvo lag
+                    try:
+                        time.sleep(0.5)
+                        app.ActiveDocument = doc # Método alternativo de activación COM
+                        doc.SendCommand(comando_seguro)
+                        self.log(f"  > Aplicado en: {doc.Name} (Vía reintento)")
+                    except Exception as ex:
+                        self.log(f"  > [X] Omitido '{doc.Name}': Hay una ventana emergente bloqueando el CAD.")
+                
+                time.sleep(0.1) 
+
+            if not self.cancelar_comando_vivo:
+                self.log(" Proceso en vivo finalizado.")
+                
+            self.entrada_comando.delete(0, 'end')
+
+        except Exception as e:
+            self.log(f"\n[X] Fallo crítico en la comunicación COM: {e}")
+        finally:
+            self.btn_enviar_cmd.configure(state="normal", text="Ejecutar")
+            self.btn_cancelar_cmd.configure(state="disabled", text="Cancelar")
+            pythoncom.CoUninitialize()
 
     # --- LÓGICA CORE RESTAURADA ---
     def iniciar_actualizacion_hilo(self):
