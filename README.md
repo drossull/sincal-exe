@@ -6,11 +6,12 @@
 
 ## 🚀 Características Principales
 
-* **Sincronización en la Nube:** Descarga automáticamente LISPs, scripts, formatos y configuraciones nuevas desde GitHub pulsando un solo botón.
+* **Sincronización en la Nube (OTA):** Descarga automáticamente LISPs, scripts, formatos y configuraciones nuevas desde GitHub pulsando un solo botón.
 * **Inyección Automática:** Se vincula silenciosamente a tu versión de AutoCAD o ZWCAD, cargando todos los comandos al iniciar el programa.
 * **Instalación de Plumillas (CTB):** Copia los estilos de impresión corporativos directamente a las carpetas internas del software de CAD.
 * **Procesamiento Masivo Nativo (PowerShell):** Permite procesar decenas de planos de golpe directamente desde la carpeta de Windows sin abrir AutoCAD.
-* **Documentación (Wiki):** Una biblioteca interactiva dentro del .exe que explica cómo usar todos los comandos LISP y herramientas de procesamiento en lote.
+* **Herramientas de Interfaz (NUEVO):** Incorpora un panel en vivo para secuestrar pestañas abiertas de CAD y una herramienta ultrarrápida de renombrado de revisiones.
+* **Documentación (Wiki):** Una biblioteca interactiva dentro del `.exe` que explica cómo usar todos los comandos LISP y herramientas de procesamiento.
 
 ---
 
@@ -19,41 +20,26 @@
 1. **Descarga el ejecutable:** Obten el archivo `SINCAL.exe`.
 2. **Ejecuta como Administrador:** El programa solicitará permisos automáticamente para poder modificar los registros del sistema.
 3. **Actualiza:** Ve a la pestaña "Sincronizador" y haz clic en **"Instalar / Actualizar Todo"**.
-4. **Navega por la Wiki:** Usa el menú lateral de esta pestaña para descubrir qué hace cada comando y cómo te ahorrará horas de trabajo.
+4. **Navega por la Wiki:** Usa el menú lateral de la pestaña "Documentación" para descubrir qué hace cada comando y cómo te ahorrará horas de trabajo.
 
 ---
 
 ## ⚙️ Uso de Comandos Masivos (PowerShell)
 
-Ahora SINCAL utiliza **PowerShell 7** para procesar docenas de planos `.dwg` a la vez. No necesitas abrir AutoCAD.
+SINCAL utiliza **PowerShell 7** para procesar docenas de planos `.dwg` a la vez. No necesitas abrir AutoCAD.
 
 1. Abre la carpeta de Windows donde están tus planos.
 2. Haz clic en la barra de direcciones superior (donde sale la ruta).
 3. Borra el texto, escribe `cmd` y presiona **Enter**.
-4. En la ventana negra, escribe directamente el nombre de la herramienta (ej. `PURGEALL`, `CUSTOM-PROPS`, `PUBLISH`) y presiona **Enter**.
+4. En la ventana negra, escribe directamente el nombre de la herramienta (ej. `PURGEALL`, `PAGESETUP-A1`, `PUBLISH`) y presiona **Enter**.
 
-*(El sistema detectará el comando puente y llamará a PowerShell de fondo de forma segura y transparente).*
+*(El sistema detectará el comando puente y llamará al motor de fondo de forma segura).*
 
 ---
 
-## 🚀 Configuraciones de Inicio y Atajos (Startup)
+## ⚡ Nuevas Herramientas Integradas
 
-El Estándar SINCAL incluye rutinas que se ejecutan automáticamente en segundo plano cada vez que abres un plano en AutoCAD o ZWCAD para prepararte el entorno de trabajo:
+El programa ahora cuenta con dos herramientas que interactúan directamente desde su interfaz:
 
-* **AutoCrearPropiedad (`AutoCrearPropiedad.lsp`):** Se ejecuta automáticamente al abrir un DWG. Su función es inyectar en la base de datos del archivo las propiedades personalizadas necesarias para las viñetas (Nombre_Estructura, Provincia, Comuna, Revisión, etc.). Si el plano es nuevo o le faltan estas propiedades, el script las crea con un valor por defecto. Si ya existen, las respeta. Esto prepara el terreno para que el actualizador masivo (`CUSTOM-PROPS`) funcione sin errores.
-
-* **Activación de Entrada Dinámica (`AUTO-DYNMODE.lsp`):** Se ejecuta silenciosamente al arrancar y fuerza el encendido de la variable de sistema `DYNMODE` a valor 3. Esto garantiza que la "Entrada Dinámica" (las ventanas emergentes de medidas y comandos que siguen a tu cursor) esté siempre activa, estandarizando la experiencia de dibujo para todo el equipo.
-
-* **Atajos Ultra Rápidos de Color (`MisColores.lsp`):** Este script te permite cambiar el color de cualquier objeto (o grupo de objetos) seleccionado de forma instantánea usando comandos de dos teclas. Está blindado mediante programación Visual LISP (ActiveX) para funcionar en cualquier idioma de CAD sin errores.
-  
-  **Comandos disponibles:**
-  - Escribe **`C1`** + Enter: Cambia a Rojo
-  - Escribe **`C2`** + Enter: Cambia a Amarillo
-  - Escribe **`C3`** + Enter: Cambia a Verde
-  - Escribe **`C4`** + Enter: Cambia a Cian
-  - Escribe **`C5`** + Enter: Cambia a Azul
-  - Escribe **`C6`** + Enter: Cambia a Magenta
-  - Escribe **`C7`** + Enter: Cambia a Blanco/Negro
-  - Escribe **`C8`** + Enter: Cambia a Gris
-  - Escribe **`C9`** + Enter: Cambia a Gris Claro
-  - Escribe **`C0`** + Enter: Restaura el color "Por Capa" (ByLayer)
+1. **Comandos en Vivo (Conexión COM):** Te permite escribir un comando (ej. `_.QSAVE` o `_.ZOOM _E`) en la caja de texto de SINCAL y enviarlo a todas las pestañas que tengas abiertas en tu AutoCAD/ZWCAD en ese momento. *(Nota: Requiere que abras tu programa de dibujo como Administrador para que se puedan comunicar).*
+2. **Renombrado Masivo de Revisiones:** Si tienes una carpeta con 50 planos y necesitas subirles la revisión (ej. de la "C" a la "D"), usa el módulo de Renombrado. Escaneará la carpeta y cambiará la última letra de todos los nombres en un milisegundo sin tener que abrirlos.

@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import time
 import customtkinter as ctk
+from customtkinter import filedialog
 from tkinter import messagebox
 import win32com.client
 import pythoncom
@@ -51,7 +52,6 @@ ctk.set_appearance_mode("dark")
 # --- FUNCIÓN PARA EL ÍCONO ---
 def obtener_ruta_recurso(ruta_relativa):
     try:
-        # PyInstaller crea una carpeta temporal _MEIPASS
         ruta_base = sys._MEIPASS
     except Exception:
         ruta_base = os.path.abspath(".")
@@ -61,10 +61,9 @@ class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("SINCAL - Suite de Herramientas Professional")
-        self.geometry("1000x750")
+        self.geometry("1000x800")
         self.configure(fg_color=COLOR_FONDO)
         
-        # Cargar Ícono Oficial
         try:
             self.iconbitmap(obtener_ruta_recurso("logo.ico"))
         except: pass
@@ -73,17 +72,18 @@ class ActualizadorCAD(ctk.CTk):
         self.tutoriales = {}
         self.cad_exe_path = None
         self.es_zwcad = False
-        self.cancelar_comando_vivo = False  # <-- BANDERA DE CANCELACIÓN
+        self.cancelar_comando_vivo = False
 
-        # Contenedor Principal
         self.main_scroll = ctk.CTkScrollableFrame(self, fg_color=COLOR_FONDO, corner_radius=0)
         self.main_scroll.pack(fill="both", expand=True)
 
-        # Tabview
-        self.tabview = ctk.CTkTabview(self.main_scroll, width=950, height=680, fg_color=COLOR_FONDO,
+        self.tabview = ctk.CTkTabview(self.main_scroll, width=950, height=750, fg_color=COLOR_FONDO,
                                       segmented_button_selected_color=COLOR_ACENTO)
         self.tabview.pack(padx=20, pady=10)
         
+        # Forzar fuente Consolas en los botones de las pestañas
+        self.tabview._segmented_button.configure(font=FUENTE_NORMAL)
+
         self.tab_main = self.tabview.add("Sincronizador")
         self.tab_docs = self.tabview.add("Documentación")
 
@@ -95,16 +95,15 @@ class ActualizadorCAD(ctk.CTk):
 
     def setup_tab_sincronizador(self):
         lbl_titulo = ctk.CTkLabel(self.tab_main, text="ESTÁNDAR SINCAL", font=FUENTE_TITULO, text_color=COLOR_TITULO)
-        lbl_titulo.pack(pady=20)
+        lbl_titulo.pack(pady=10)
 
-        # Botón Actualizar (Cuadrado, Contorno, Sin fondo)
+        # Botón con border_spacing para que el texto no pise el contorno
         self.btn_actualizar = ctk.CTkButton(self.tab_main, text="Instalar / Actualizar Todo", font=FUENTE_SUBTITULO,
                                            fg_color="transparent", border_width=2, border_color=COLOR_ACENTO,
                                            corner_radius=0, hover_color="#444444", text_color=COLOR_TEXTO,
-                                           height=45, command=self.iniciar_actualizacion_hilo)
-        self.btn_actualizar.pack(pady=10)
+                                           border_spacing=8, command=self.iniciar_actualizacion_hilo)
+        self.btn_actualizar.pack(pady=5)
 
-        # Restauración de Botones Secundarios
         botones_sec_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         botones_sec_frame.pack(pady=5)
 
@@ -118,38 +117,213 @@ class ActualizadorCAD(ctk.CTk):
                                        text_color=COLOR_TITULO, hover_color="#444444", command=self.forzar_path_manual)
         self.btn_forzar_path.pack(side="left", padx=10)
 
-        self.consola = ctk.CTkTextbox(self.tab_main, width=850, height=180, font=FUENTE_CONSOLA, 
+        self.consola = ctk.CTkTextbox(self.tab_main, width=850, height=150, font=FUENTE_CONSOLA, 
                                      fg_color="#1E1E1E", text_color=COLOR_TEXTO, state="disabled")
-        self.consola.pack(pady=15)
+        self.consola.pack(pady=10)
 
-        # --- CONSOLA EN VIVO PARA ARCHIVOS ABIERTOS ---
+        # --- HERRAMIENTA 1: CONSOLA EN VIVO ---
         self.frame_live = ctk.CTkFrame(self.tab_main, fg_color="transparent")
-        self.frame_live.pack(fill="x", padx=40, pady=(5, 10))
+        self.frame_live.pack(fill="x", padx=40, pady=(5, 5))
         
-        ctk.CTkLabel(self.frame_live, text="Ejecutar en planos abiertos:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(side="left")
+        # Títulos de la consola en vivo con advertencia
+        top_live_frame = ctk.CTkFrame(self.frame_live, fg_color="transparent")
+        top_live_frame.pack(fill="x", pady=(0, 5))
+        ctk.CTkLabel(top_live_frame, text="Comandos en vivo:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(side="left")
+        ctk.CTkLabel(top_live_frame, text="* AutoCAD/ZWCAD debe estar en modo Administrador", font=("Consolas", 11, "italic"), text_color="#D9534F").pack(side="left", padx=15)
         
-        self.entrada_comando = ctk.CTkEntry(self.frame_live, font=FUENTE_NORMAL, width=250, placeholder_text="Ej: ZE, _QSAVE", corner_radius=0)
-        self.entrada_comando.pack(side="left", padx=10)
+        bot_live_frame = ctk.CTkFrame(self.frame_live, fg_color="transparent")
+        bot_live_frame.pack(fill="x")
+        self.entrada_comando = ctk.CTkEntry(bot_live_frame, font=FUENTE_NORMAL, width=300, placeholder_text="Ej: ZE, _QSAVE", corner_radius=0)
+        self.entrada_comando.pack(side="left", padx=(0, 10))
         
-        self.btn_enviar_cmd = ctk.CTkButton(self.frame_live, text="Enviar", font=FUENTE_NORMAL, 
+        self.btn_enviar_cmd = ctk.CTkButton(bot_live_frame, text="Ejecutar", font=FUENTE_NORMAL, 
                                             fg_color="transparent", border_width=1, border_color=COLOR_ACENTO, corner_radius=0,
                                             hover_color="#444444", text_color=COLOR_TEXTO, width=80,
                                             command=self.enviar_comando_en_vivo)
         self.btn_enviar_cmd.pack(side="left", padx=(0, 10))
         
-        # --- NUEVO BOTÓN CANCELAR ---
-        self.btn_cancelar_cmd = ctk.CTkButton(self.frame_live, text="Cancelar", font=FUENTE_NORMAL, 
+        self.btn_cancelar_cmd = ctk.CTkButton(bot_live_frame, text="Cancelar", font=FUENTE_NORMAL, 
                                               fg_color="#D9534F", hover_color="#C9302C", width=80, corner_radius=0,
                                               state="disabled", command=self.detener_comando_en_vivo)
         self.btn_cancelar_cmd.pack(side="left")
 
-        # Historial de cambios
+        # --- HERRAMIENTA 2: RENOMBRADO MASIVO ---
+        self.frame_rename = ctk.CTkFrame(self.tab_main, fg_color="#1E1E1E", border_width=1, border_color="#444444", corner_radius=0)
+        self.frame_rename.pack(fill="x", padx=40, pady=(10, 10))
+
+        top_frame = ctk.CTkFrame(self.frame_rename, fg_color="transparent")
+        top_frame.pack(fill="x", padx=10, pady=(10, 5))
+        
+        ctk.CTkLabel(top_frame, text="Renombrar Archivos DWG", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(side="left")
+        self.btn_browse = ctk.CTkButton(top_frame, text="📁 Seleccionar Carpeta", font=FUENTE_NORMAL, width=150, fg_color="#444444", hover_color="#555555", corner_radius=0, command=self.seleccionar_carpeta_renombre)
+        self.btn_browse.pack(side="right")
+
+        self.lbl_ruta_rename = ctk.CTkLabel(self.frame_rename, text="Ruta: Ninguna", font=FUENTE_NORMAL, text_color="#888888")
+        self.lbl_ruta_rename.pack(fill="x", padx=10, pady=2, anchor="w")
+
+        bot_frame = ctk.CTkFrame(self.frame_rename, fg_color="transparent")
+        bot_frame.pack(fill="x", padx=10, pady=(5, 10))
+
+        ctk.CTkLabel(bot_frame, text="Nueva Revisión (Reemplaza última letra):", font=FUENTE_NORMAL).pack(side="left")
+        self.ent_nueva_rev = ctk.CTkEntry(bot_frame, font=FUENTE_NORMAL, width=80, placeholder_text="Ej: D", corner_radius=0)
+        self.ent_nueva_rev.pack(side="left", padx=10)
+
+        self.btn_ejecutar_rename = ctk.CTkButton(bot_frame, text="Actualizar Nombres", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_TITULO, text_color=COLOR_TITULO, hover_color="#444444", corner_radius=0, command=self.ejecutar_renombrado)
+        self.btn_ejecutar_rename.pack(side="right")
+        self.ruta_renombre = ""
+
+        # Historial de Updates
         self.frame_updates = ctk.CTkFrame(self.tab_main, fg_color="transparent")
-        self.frame_updates.pack(fill="x", padx=40)
-        ctk.CTkLabel(self.frame_updates, text="Historial de cambios (Últimos 10)", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(anchor="w")
-        self.txt_updates = ctk.CTkTextbox(self.frame_updates, width=850, height=130, font=FUENTE_NORMAL, fg_color="#1E1E1E", state="disabled")
+        self.frame_updates.pack(fill="x", padx=40, pady=5)
+        ctk.CTkLabel(self.frame_updates, text="Historial de cambios", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(anchor="w")
+        self.txt_updates = ctk.CTkTextbox(self.frame_updates, width=850, height=80, font=FUENTE_NORMAL, fg_color="#1E1E1E", state="disabled")
         self.txt_updates.pack(pady=5)
 
+    # --- LÓGICA DE RENOMBRADO MASIVO ---
+    def seleccionar_carpeta_renombre(self):
+        carpeta = filedialog.askdirectory(title="Seleccionar carpeta con planos DWG")
+        if carpeta:
+            self.ruta_renombre = carpeta
+            self.lbl_ruta_rename.configure(text=f"Ruta: {carpeta}", text_color=COLOR_TEXTO)
+
+    def ejecutar_renombrado(self):
+        if not self.ruta_renombre:
+            self.log("[X] Renombrado: Primero debes seleccionar una carpeta.")
+            return
+            
+        nueva_rev = self.ent_nueva_rev.get().strip()
+        
+        if not nueva_rev:
+            self.log("[X] Renombrado: Debes ingresar la nueva letra o número de revisión.")
+            return
+
+        try:
+            archivos = [f for f in os.listdir(self.ruta_renombre) if f.lower().endswith('.dwg')]
+            contador = 0
+            self.log(f"\n--- ACTUALIZANDO REVISIONES EN: {os.path.basename(self.ruta_renombre)} ---")
+            
+            for arc in archivos:
+                nombre_base, ext = os.path.splitext(arc)
+                if len(nombre_base) > 0:
+                    nuevo_nombre_base = nombre_base[:-1] + nueva_rev
+                    nuevo_nombre = nuevo_nombre_base + ext
+                    
+                    if arc != nuevo_nombre:
+                        vieja_ruta = os.path.join(self.ruta_renombre, arc)
+                        nueva_ruta = os.path.join(self.ruta_renombre, nuevo_nombre)
+                        os.rename(vieja_ruta, nueva_ruta)
+                        self.log(f" > {arc} \n   -> {nuevo_nombre}")
+                        contador += 1
+                    
+            if contador > 0:
+                self.log(f" [!] Proceso completado. {contador} planos actualizados a revisión '{nueva_rev}'.")
+            else:
+                self.log(f" [!] No hubo cambios (los archivos ya tenían esa revisión).")
+                
+        except Exception as e:
+            self.log(f"[X] Error en el sistema de Windows: {e}")
+
+    # --- LÓGICA DE CONSOLA EN VIVO ---
+    def detener_comando_en_vivo(self):
+        self.cancelar_comando_vivo = True
+        self.btn_cancelar_cmd.configure(state="disabled", text="Deteniendo...")
+
+    def enviar_comando_en_vivo(self):
+        comando_crudo = self.entrada_comando.get()
+        if not comando_crudo: return
+        comando = comando_crudo.strip() + "\n"
+        self.cancelar_comando_vivo = False
+        self.btn_enviar_cmd.configure(state="disabled", text="Enviando...")
+        self.btn_cancelar_cmd.configure(state="normal", text="Cancelar")
+        threading.Thread(target=self._hilo_comando_en_vivo, args=(comando,), daemon=True).start()
+
+    def _hilo_comando_en_vivo(self, comando):
+        pythoncom.CoInitialize() 
+        try:
+            app = None
+            try:
+                app = win32com.client.GetActiveObject("ZWCAD.Application")
+                self.log(f"\n--- CONECTADO A ZWCAD EN VIVO ---")
+            except:
+                try:
+                    app = win32com.client.GetActiveObject("AutoCAD.Application")
+                    self.log(f"\n--- CONECTADO A AUTOCAD EN VIVO ---")
+                except:
+                    try:
+                        app = win32com.client.GetActiveObject("AutoCAD.Application.25")
+                        self.log(f"\n--- CONECTADO A AUTOCAD 2025 EN VIVO ---")
+                    except:
+                        self.log("\n[X] Error: No se detecta CAD abierto.")
+                        self.log(" [!] NOTA: AutoCAD/ZWCAD debe estar abierto como Administrador.")
+                        return
+
+            documentos = app.Documents
+            total = documentos.Count
+            if total == 0:
+                self.log(" [!] No hay ningún plano abierto en este momento.")
+                return
+
+            self.log(f" Ejecutando comando en {total} pestañas...")
+            
+            # Ahora el comando viaja limpio, sin caracteres especiales que ofendan a AutoCAD
+            comando_limpio = comando
+
+            for i in range(total):
+                if self.cancelar_comando_vivo:
+                    self.log(" [!] PROCESO ABORTADO POR EL USUARIO.")
+                    break
+                
+                try: 
+                    doc = documentos.Item(i)
+                except Exception as e:
+                    self.log(f"  > [X] Error leyendo la memoria de la pestaña: {e}")
+                    continue 
+
+                exito = False
+                intentos = 0
+                ultimo_error = ""
+
+                # MODO AGRESIVO: Intentar hasta 3 veces por pestaña
+                while intentos < 3 and not exito:
+                    try:
+                        # Forzar la pestaña al frente si no es la actual
+                        if app.ActiveDocument.Name != doc.Name:
+                            app.ActiveDocument = doc
+                            time.sleep(0.3) 
+                        
+                        # 1. Silenciador: Intentamos enviar el ESC para cancelar comandos a medias.
+                        # Si AutoCAD se queja de "Invalid input", lo ignoramos y seguimos.
+                        try: doc.SendCommand("\x03\x03")
+                        except: pass
+                        
+                        # 2. Enviamos tu comando real, limpio de caracteres raros.
+                        doc.SendCommand(comando_limpio)
+                        self.log(f"  > Aplicado en: {doc.Name}")
+                        exito = True
+                        
+                    except Exception as e:
+                        intentos += 1
+                        ultimo_error = str(e)
+                        time.sleep(0.5) 
+
+                if not exito:
+                    self.log(f"  > [X] Omitido '{doc.Name}'.")
+                    self.log(f"      (Causa: {ultimo_error})")
+                
+                time.sleep(0.1) 
+
+            if not self.cancelar_comando_vivo:
+                self.log(" Proceso en vivo finalizado.")
+            self.entrada_comando.delete(0, 'end')
+
+        except Exception as e:
+            self.log(f"\n[X] Fallo crítico en la comunicación COM: {e}")
+        finally:
+            self.btn_enviar_cmd.configure(state="normal", text="Ejecutar")
+            self.btn_cancelar_cmd.configure(state="disabled", text="Cancelar")
+            pythoncom.CoUninitialize()
+
+    # --- PESTAÑA DE DOCUMENTACIÓN ---
     def setup_tab_docs(self):
         self.wiki_master = ctk.CTkFrame(self.tab_docs, fg_color="transparent")
         self.wiki_master.pack(fill="both", expand=True, padx=10, pady=10)
@@ -188,6 +362,7 @@ class ActualizadorCAD(ctk.CTk):
         crear_link(self.menu_container, "INICIO AUTOMÁTICO", self.mostrar_inicio_auto)
         crear_link(self.menu_container, "COMANDOS LISP", self.mostrar_comandos_lisp)
         crear_link(self.menu_container, "PROCESAMIENTO MASIVO", self.mostrar_procesamiento_lote)
+        crear_link(self.menu_container, "HERRAMIENTAS EXTRA", self.mostrar_herramientas_extra)
 
     def mostrar_texto_wiki(self, titulo, contenido):
         self.lbl_wiki_title.configure(text=titulo.upper())
@@ -254,6 +429,24 @@ class ActualizadorCAD(ctk.CTk):
         )
         self.mostrar_texto_wiki("Procesamiento Masivo", guia)
 
+    def mostrar_herramientas_extra(self):
+        guia = (
+            "HERRAMIENTAS INTEGRADAS DE INTERFAZ\n\n"
+            "► COMANDOS EN VIVO (Conexión COM)\n"
+            "Envía comandos LISP o nativos a TODAS las pestañas que tengas abiertas actualmente en tu CAD.\n\n"
+            "REQUISITO: AutoCAD o ZWCAD debe haber sido ejecutado previamente como Administrador.\n\n"
+            "Ejemplos útiles (Soporta código LISP cerrado):\n"
+            "• Guardar todo: _.QSAVE\n"
+            "• Zoom general: _.ZOOM _E\n"
+            "• Purgar todo silencioso: (command \"_.-PURGE\" \"_A\" \"*\" \"_N\")\n\n"
+            "► RENOMBRADO MASIVO (Cambio de Revisión)\n"
+            "Herramienta ultrarrápida nativa de Windows que escanea una carpeta completa de planos y modifica exclusivamente el último carácter del nombre (la letra o número de revisión) antes del .dwg.\n\n"
+            "Ejemplo:\n"
+            "Si ingresas la letra 'D' en la interfaz:\n"
+            "ROS-B-ES-V0TPT-DD-PILAR-01-C.dwg -> pasará a ser -> ROS-B-ES-V0TPT-DD-PILAR-01-D.dwg"
+        )
+        self.mostrar_texto_wiki("Herramientas Extra", guia)
+
     def cargar_datos_tutoriales(self):
         ruta_json = os.path.join(RUTA_LOCAL_APP, "tutoriales.json")
         if os.path.exists(ruta_json):
@@ -274,102 +467,6 @@ class ActualizadorCAD(ctk.CTk):
         self.actualizar_variable_entorno()
         self.log(" [!] Cierra cualquier consola o programa abierto para aplicar los cambios.\n")
 
-    # --- LÓGICA CONSOLA EN VIVO (COM) ---
-    def detener_comando_en_vivo(self):
-        self.cancelar_comando_vivo = True
-        self.btn_cancelar_cmd.configure(state="disabled", text="Deteniendo...")
-
-    def enviar_comando_en_vivo(self):
-        comando_crudo = self.entrada_comando.get()
-        if not comando_crudo:
-            return
-            
-        comando = comando_crudo.strip() + "\n"
-        
-        self.cancelar_comando_vivo = False
-        self.btn_enviar_cmd.configure(state="disabled", text="Enviando...")
-        self.btn_cancelar_cmd.configure(state="normal", text="Cancelar")
-        
-        threading.Thread(target=self._hilo_comando_en_vivo, args=(comando,), daemon=True).start()
-
-    def _hilo_comando_en_vivo(self, comando):
-        pythoncom.CoInitialize() 
-        try:
-            app = None
-            try:
-                app = win32com.client.GetActiveObject("ZWCAD.Application")
-                self.log(f"\n--- CONECTADO A ZWCAD EN VIVO ---")
-            except:
-                try:
-                    app = win32com.client.GetActiveObject("AutoCAD.Application")
-                    self.log(f"\n--- CONECTADO A AUTOCAD EN VIVO ---")
-                except:
-                    try:
-                        app = win32com.client.GetActiveObject("AutoCAD.Application.25")
-                        self.log(f"\n--- CONECTADO A AUTOCAD 2025 EN VIVO ---")
-                    except:
-                        self.log("\n[X] Error: No se detecta CAD abierto.")
-                        self.log(" [!] NOTA: AutoCAD/ZWCAD debe estar abierto como Administrador.")
-                        return
-
-            documentos = app.Documents
-            total = documentos.Count
-            
-            if total == 0:
-                self.log(" [!] No hay ningún plano abierto en este momento.")
-                return
-
-            self.log(f" Ejecutando comando en {total} pestañas...")
-            
-            # TRUCO PRO: \x03 es el código ASCII para la tecla ESC.
-            # Enviamos dos ESC antes del comando para limpiar la línea de comandos de AutoCAD.
-            comando_seguro = "\x03\x03" + comando
-
-            for i in range(total):
-                if self.cancelar_comando_vivo:
-                    self.log(" [!] PROCESO ABORTADO POR EL USUARIO.")
-                    break
-                
-                try:
-                    doc = documentos.Item(i)
-                except:
-                    continue 
-
-                try:
-                    # 1. Comprobación anti-redundancia: Solo activar si NO es la pestaña actual
-                    if app.ActiveDocument.Name != doc.Name:
-                        doc.Activate()
-                        time.sleep(0.1) 
-                    
-                    # 2. Enviar el comando seguro (Doble ESC + Tu Comando + Enter)
-                    doc.SendCommand(comando_seguro)
-                    self.log(f"  > Aplicado en: {doc.Name}")
-                    
-                except Exception as e:
-                    # 3. Reintento forzado por si la interfaz gráfica de ZWCAD tuvo lag
-                    try:
-                        time.sleep(0.5)
-                        app.ActiveDocument = doc # Método alternativo de activación COM
-                        doc.SendCommand(comando_seguro)
-                        self.log(f"  > Aplicado en: {doc.Name} (Vía reintento)")
-                    except Exception as ex:
-                        self.log(f"  > [X] Omitido '{doc.Name}': Hay una ventana emergente bloqueando el CAD.")
-                
-                time.sleep(0.1) 
-
-            if not self.cancelar_comando_vivo:
-                self.log(" Proceso en vivo finalizado.")
-                
-            self.entrada_comando.delete(0, 'end')
-
-        except Exception as e:
-            self.log(f"\n[X] Fallo crítico en la comunicación COM: {e}")
-        finally:
-            self.btn_enviar_cmd.configure(state="normal", text="Ejecutar")
-            self.btn_cancelar_cmd.configure(state="disabled", text="Cancelar")
-            pythoncom.CoUninitialize()
-
-    # --- LÓGICA CORE RESTAURADA ---
     def iniciar_actualizacion_hilo(self):
         self.btn_actualizar.configure(state="disabled", text="Sincronizando...")
         self.consola.configure(state="normal")
@@ -418,7 +515,6 @@ class ActualizadorCAD(ctk.CTk):
             self.generar_archivos_lisp(archivos)
             self.actualizar_rutas_registro()
             self.actualizar_variable_entorno()
-            
             self.buscar_y_configurar_consolas()
             
             if self.cad_exe_path and self.es_zwcad:
@@ -494,12 +590,8 @@ class ActualizadorCAD(ctk.CTk):
                     f.write('"%CAD_EXE%" /i "%DWG_FILE%" /s "%SCR_FILE%"\n')
             with open(ruta_env, 'w') as f: 
                 f.write(f'@set "CAD_CONSOLE={ruta_wrapper}"')
-            
-            tipo = "ZWCAD (Gráfico)" if self.es_zwcad else "AutoCAD (Silencioso)"
-            self.log(f" [+] Motor Batch vinculado a: {tipo}")
 
     def inyectar_via_comando_directo(self):
-        self.log(" [!] Lanzando ZWCAD para auto-configurar rutas (Espere un momento)...")
         ruta_escapada = RUTA_LOCAL_APP.replace("\\", "\\\\")
         lisp_cmd = (
             f'(vl-load-com) '
@@ -624,14 +716,12 @@ class ActualizadorCAD(ctk.CTk):
                     try:
                         shutil.copy2(r_zwcdoc, os.path.join(root, "zwcaddoc.lsp"))
                         shutil.copy2(r_zwc, os.path.join(root, "zwcad.lsp"))
-                        self.log(f" [+] Arranque inyectado en: ZWSOFT\\..\\Support")
                     except: pass
         if os.path.exists(os.path.join(appdata, "Autodesk")):
             for root, dirs, files in os.walk(os.path.join(appdata, "Autodesk")):
                 if os.path.basename(root).lower() == "support":
                     try:
                         shutil.copy2(r_acc, os.path.join(root, "acaddoc.lsp"))
-                        self.log(f" [+] Arranque inyectado en: Autodesk\\..\\Support")
                     except: pass
 
     def cargar_info_github(self):
