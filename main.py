@@ -73,31 +73,36 @@ class ActualizadorCAD(ctk.CTk):
         self.cad_exe_path = None
         self.es_zwcad = False
         self.cancelar_comando_vivo = False
+        self.ruta_renombre = ""
+        self.checkboxes_archivos = []
 
         self.main_scroll = ctk.CTkScrollableFrame(self, fg_color=COLOR_FONDO, corner_radius=0)
         self.main_scroll.pack(fill="both", expand=True)
 
+        # TABVIEW ACTUALIZADO A 3 PESTAÑAS
         self.tabview = ctk.CTkTabview(self.main_scroll, width=950, height=750, fg_color=COLOR_FONDO,
                                       segmented_button_selected_color=COLOR_ACENTO)
         self.tabview.pack(padx=20, pady=10)
-        
-        # Forzar fuente Consolas en los botones de las pestañas
         self.tabview._segmented_button.configure(font=FUENTE_NORMAL)
 
         self.tab_main = self.tabview.add("Sincronizador")
+        self.tab_renombrado = self.tabview.add("Renombrado Avanzado")
         self.tab_docs = self.tabview.add("Documentación")
 
         self.setup_tab_sincronizador()
+        self.setup_tab_renombrado()
         self.setup_tab_docs()
 
         threading.Thread(target=self.cargar_info_github, daemon=True).start()
         threading.Thread(target=self.loop_verificador_actualizaciones, daemon=True).start()
 
+    # ==========================================================
+    # PESTAÑA 1: SINCRONIZADOR Y CONSOLA EN VIVO
+    # ==========================================================
     def setup_tab_sincronizador(self):
         lbl_titulo = ctk.CTkLabel(self.tab_main, text="ESTÁNDAR SINCAL", font=FUENTE_TITULO, text_color=COLOR_TITULO)
         lbl_titulo.pack(pady=10)
 
-        # Botón con border_spacing para que el texto no pise el contorno
         self.btn_actualizar = ctk.CTkButton(self.tab_main, text="Instalar / Actualizar Todo", font=FUENTE_SUBTITULO,
                                            fg_color="transparent", border_width=2, border_color=COLOR_ACENTO,
                                            corner_radius=0, hover_color="#444444", text_color=COLOR_TEXTO,
@@ -117,22 +122,21 @@ class ActualizadorCAD(ctk.CTk):
                                        text_color=COLOR_TITULO, hover_color="#444444", command=self.forzar_path_manual)
         self.btn_forzar_path.pack(side="left", padx=10)
 
-        self.consola = ctk.CTkTextbox(self.tab_main, width=850, height=150, font=FUENTE_CONSOLA, 
+        self.consola = ctk.CTkTextbox(self.tab_main, width=850, height=200, font=FUENTE_CONSOLA, 
                                      fg_color="#1E1E1E", text_color=COLOR_TEXTO, state="disabled")
         self.consola.pack(pady=10)
 
-        # --- HERRAMIENTA 1: CONSOLA EN VIVO ---
-        self.frame_live = ctk.CTkFrame(self.tab_main, fg_color="transparent")
-        self.frame_live.pack(fill="x", padx=40, pady=(5, 5))
+        # --- CONSOLA EN VIVO ---
+        self.frame_live = ctk.CTkFrame(self.tab_main, fg_color="#1E1E1E", border_width=1, border_color="#444444", corner_radius=0)
+        self.frame_live.pack(fill="x", padx=40, pady=(10, 10))
         
-        # Títulos de la consola en vivo con advertencia
         top_live_frame = ctk.CTkFrame(self.frame_live, fg_color="transparent")
-        top_live_frame.pack(fill="x", pady=(0, 5))
+        top_live_frame.pack(fill="x", padx=15, pady=(15, 5))
         ctk.CTkLabel(top_live_frame, text="Comandos en vivo:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(side="left")
         ctk.CTkLabel(top_live_frame, text="* AutoCAD/ZWCAD debe estar en modo Administrador", font=("Consolas", 11, "italic"), text_color="#D9534F").pack(side="left", padx=15)
         
         bot_live_frame = ctk.CTkFrame(self.frame_live, fg_color="transparent")
-        bot_live_frame.pack(fill="x")
+        bot_live_frame.pack(fill="x", padx=15, pady=(0, 15))
         self.entrada_comando = ctk.CTkEntry(bot_live_frame, font=FUENTE_NORMAL, width=300, placeholder_text="Ej: ZE, _QSAVE", corner_radius=0)
         self.entrada_comando.pack(side="left", padx=(0, 10))
         
@@ -147,83 +151,168 @@ class ActualizadorCAD(ctk.CTk):
                                               state="disabled", command=self.detener_comando_en_vivo)
         self.btn_cancelar_cmd.pack(side="left")
 
-        # --- HERRAMIENTA 2: RENOMBRADO MASIVO ---
-        self.frame_rename = ctk.CTkFrame(self.tab_main, fg_color="#1E1E1E", border_width=1, border_color="#444444", corner_radius=0)
-        self.frame_rename.pack(fill="x", padx=40, pady=(10, 10))
-
-        top_frame = ctk.CTkFrame(self.frame_rename, fg_color="transparent")
-        top_frame.pack(fill="x", padx=10, pady=(10, 5))
-        
-        ctk.CTkLabel(top_frame, text="Renombrar Archivos DWG", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(side="left")
-        self.btn_browse = ctk.CTkButton(top_frame, text="📁 Seleccionar Carpeta", font=FUENTE_NORMAL, width=150, fg_color="#444444", hover_color="#555555", corner_radius=0, command=self.seleccionar_carpeta_renombre)
-        self.btn_browse.pack(side="right")
-
-        self.lbl_ruta_rename = ctk.CTkLabel(self.frame_rename, text="Ruta: Ninguna", font=FUENTE_NORMAL, text_color="#888888")
-        self.lbl_ruta_rename.pack(fill="x", padx=10, pady=2, anchor="w")
-
-        bot_frame = ctk.CTkFrame(self.frame_rename, fg_color="transparent")
-        bot_frame.pack(fill="x", padx=10, pady=(5, 10))
-
-        ctk.CTkLabel(bot_frame, text="Nueva Revisión (Reemplaza última letra):", font=FUENTE_NORMAL).pack(side="left")
-        self.ent_nueva_rev = ctk.CTkEntry(bot_frame, font=FUENTE_NORMAL, width=80, placeholder_text="Ej: D", corner_radius=0)
-        self.ent_nueva_rev.pack(side="left", padx=10)
-
-        self.btn_ejecutar_rename = ctk.CTkButton(bot_frame, text="Actualizar Nombres", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_TITULO, text_color=COLOR_TITULO, hover_color="#444444", corner_radius=0, command=self.ejecutar_renombrado)
-        self.btn_ejecutar_rename.pack(side="right")
-        self.ruta_renombre = ""
-
-        # Historial de Updates
+        # Historial
         self.frame_updates = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         self.frame_updates.pack(fill="x", padx=40, pady=5)
         ctk.CTkLabel(self.frame_updates, text="Historial de cambios", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(anchor="w")
         self.txt_updates = ctk.CTkTextbox(self.frame_updates, width=850, height=80, font=FUENTE_NORMAL, fg_color="#1E1E1E", state="disabled")
         self.txt_updates.pack(pady=5)
 
-    # --- LÓGICA DE RENOMBRADO MASIVO ---
-    def seleccionar_carpeta_renombre(self):
-        carpeta = filedialog.askdirectory(title="Seleccionar carpeta con planos DWG")
-        if carpeta:
-            self.ruta_renombre = carpeta
-            self.lbl_ruta_rename.configure(text=f"Ruta: {carpeta}", text_color=COLOR_TEXTO)
+    # ==========================================================
+    # PESTAÑA 2: RENOMBRADO MASIVO AVANZADO
+    # ==========================================================
+    def setup_tab_renombrado(self):
+        lbl_titulo = ctk.CTkLabel(self.tab_renombrado, text="RENOMBRADO PARAMÉTRICO DE PLANOS", font=FUENTE_TITULO, text_color=COLOR_TITULO)
+        lbl_titulo.pack(pady=10)
 
-    def ejecutar_renombrado(self):
-        if not self.ruta_renombre:
-            self.log("[X] Renombrado: Primero debes seleccionar una carpeta.")
-            return
-            
-        nueva_rev = self.ent_nueva_rev.get().strip()
+        # Barra superior
+        top_frame = ctk.CTkFrame(self.tab_renombrado, fg_color="transparent")
+        top_frame.pack(fill="x", padx=20, pady=5)
+        self.btn_browse_adv = ctk.CTkButton(top_frame, text="📁 Cargar Carpeta DWG", font=FUENTE_NORMAL, width=150, corner_radius=0, fg_color="#444444", hover_color="#555555", command=self.cargar_archivos_renombrado)
+        self.btn_browse_adv.pack(side="left")
+        self.lbl_ruta_adv = ctk.CTkLabel(top_frame, text="Ruta: Ninguna", font=FUENTE_NORMAL, text_color="#888888")
+        self.lbl_ruta_adv.pack(side="left", padx=15)
+
+        # Contenedor dividido
+        split_frame = ctk.CTkFrame(self.tab_renombrado, fg_color="transparent")
+        split_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+        # Lado Izquierdo: Lista de archivos con checkboxes
+        left_frame = ctk.CTkFrame(split_frame, fg_color="#1E1E1E", corner_radius=0, border_width=1, border_color="#444444")
+        left_frame.pack(side="left", fill="both", expand=True, padx=(0, 10))
+
+        lbl_lista = ctk.CTkLabel(left_frame, text="1. Selecciona los archivos a modificar:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO)
+        lbl_lista.pack(pady=(15, 5), padx=15, anchor="w")
+
+        btn_tools = ctk.CTkFrame(left_frame, fg_color="transparent")
+        btn_tools.pack(fill="x", padx=15, pady=5)
+        ctk.CTkButton(btn_tools, text="Marcar Todos", width=100, corner_radius=0, font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", command=self.marcar_todos).pack(side="left", padx=(0, 5))
+        ctk.CTkButton(btn_tools, text="Desmarcar Todos", width=100, corner_radius=0, font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", command=self.desmarcar_todos).pack(side="left")
+
+        self.scroll_archivos = ctk.CTkScrollableFrame(left_frame, fg_color="#2B2B2B", corner_radius=0)
+        self.scroll_archivos.pack(fill="both", expand=True, padx=15, pady=(5, 15))
+
+        # Lado Derecho: Herramientas de edición
+        right_frame = ctk.CTkFrame(split_frame, fg_color="transparent", width=350)
+        right_frame.pack(side="right", fill="y")
+        right_frame.pack_propagate(False)
+
+        lbl_tools = ctk.CTkLabel(right_frame, text="2. Aplicar a la selección:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO)
+        lbl_tools.pack(pady=(15, 5), anchor="w")
+
+        # Herramienta 1: Búsqueda y Reemplazo (Ej: HL a PL)
+        h1_frame = ctk.CTkFrame(right_frame, fg_color="#1E1E1E", corner_radius=0, border_width=1, border_color="#444444")
+        h1_frame.pack(fill="x", pady=5)
+        ctk.CTkLabel(h1_frame, text="A. Buscar y Reemplazar", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).pack(anchor="w", padx=15, pady=(15, 5))
+        ctk.CTkLabel(h1_frame, text="(Ej: Modificar tipo de plano o número)", font=FUENTE_CONSOLA, text_color="#888888").pack(anchor="w", padx=15)
         
-        if not nueva_rev:
-            self.log("[X] Renombrado: Debes ingresar la nueva letra o número de revisión.")
+        self.ent_buscar_adv = ctk.CTkEntry(h1_frame, placeholder_text="Buscar texto (Ej: HL-)", font=FUENTE_NORMAL, corner_radius=0)
+        self.ent_buscar_adv.pack(fill="x", padx=15, pady=5)
+        self.ent_reemplazo_adv = ctk.CTkEntry(h1_frame, placeholder_text="Reemplazar con (Ej: PL-)", font=FUENTE_NORMAL, corner_radius=0)
+        self.ent_reemplazo_adv.pack(fill="x", padx=15, pady=5)
+        ctk.CTkButton(h1_frame, text="Aplicar Reemplazo", font=FUENTE_NORMAL, corner_radius=0, fg_color="transparent", border_width=1, border_color=COLOR_TITULO, text_color=COLOR_TITULO, hover_color="#444444", command=self.aplicar_reemplazo_adv).pack(pady=15, padx=15, fill="x")
+
+        # Herramienta 2: Cambio de Revisión Final
+        h2_frame = ctk.CTkFrame(right_frame, fg_color="#1E1E1E", corner_radius=0, border_width=1, border_color="#444444")
+        h2_frame.pack(fill="x", pady=10)
+        ctk.CTkLabel(h2_frame, text="B. Cambio de Revisión", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).pack(anchor="w", padx=15, pady=(15, 5))
+        ctk.CTkLabel(h2_frame, text="(Reemplaza solo el último carácter)", font=FUENTE_CONSOLA, text_color="#888888").pack(anchor="w", padx=15)
+        
+        self.ent_rev_adv = ctk.CTkEntry(h2_frame, placeholder_text="Nueva letra/número (Ej: D)", font=FUENTE_NORMAL, corner_radius=0)
+        self.ent_rev_adv.pack(fill="x", padx=15, pady=5)
+        ctk.CTkButton(h2_frame, text="Aplicar Revisión", font=FUENTE_NORMAL, corner_radius=0, fg_color="transparent", border_width=1, border_color=COLOR_TITULO, text_color=COLOR_TITULO, hover_color="#444444", command=self.aplicar_revision_adv).pack(pady=15, padx=15, fill="x")
+
+        # Consola Log de Renombrado
+        self.log_rename = ctk.CTkTextbox(right_frame, height=120, font=FUENTE_CONSOLA, fg_color="#1E1E1E", state="disabled", corner_radius=0)
+        self.log_rename.pack(fill="both", expand=True, pady=(0, 10))
+
+    # Métodos Lógicos de Renombrado Avanzado
+    def log_r(self, mensaje):
+        self.log_rename.configure(state="normal")
+        self.log_rename.insert("end", mensaje + "\n")
+        self.log_rename.see("end")
+        self.log_rename.configure(state="disabled")
+
+    def cargar_archivos_renombrado(self):
+        carpeta = filedialog.askdirectory(title="Seleccionar carpeta con planos DWG")
+        if not carpeta: return
+        self.ruta_renombre = carpeta
+        self.lbl_ruta_adv.configure(text=f"Ruta: {carpeta}", text_color=COLOR_TEXTO)
+        
+        # Limpiar lista anterior
+        for widget in self.scroll_archivos.winfo_children():
+            widget.destroy()
+        self.checkboxes_archivos = []
+        
+        archivos = [f for f in os.listdir(self.ruta_renombre) if f.lower().endswith('.dwg')]
+        if not archivos:
+            self.log_r("[!] No se encontraron archivos DWG en la carpeta.")
             return
 
-        try:
-            archivos = [f for f in os.listdir(self.ruta_renombre) if f.lower().endswith('.dwg')]
-            contador = 0
-            self.log(f"\n--- ACTUALIZANDO REVISIONES EN: {os.path.basename(self.ruta_renombre)} ---")
+        for arc in archivos:
+            cb = ctk.CTkCheckBox(self.scroll_archivos, text=arc, font=FUENTE_NORMAL, text_color=COLOR_TEXTO, 
+                                 fg_color=COLOR_ACENTO, hover_color="#005BBF")
+            cb.pack(anchor="w", pady=5, padx=5)
+            cb.select() # Marcados por defecto
+            self.checkboxes_archivos.append(cb)
             
-            for arc in archivos:
-                nombre_base, ext = os.path.splitext(arc)
-                if len(nombre_base) > 0:
-                    nuevo_nombre_base = nombre_base[:-1] + nueva_rev
-                    nuevo_nombre = nuevo_nombre_base + ext
-                    
-                    if arc != nuevo_nombre:
-                        vieja_ruta = os.path.join(self.ruta_renombre, arc)
-                        nueva_ruta = os.path.join(self.ruta_renombre, nuevo_nombre)
-                        os.rename(vieja_ruta, nueva_ruta)
-                        self.log(f" > {arc} \n   -> {nuevo_nombre}")
-                        contador += 1
-                    
-            if contador > 0:
-                self.log(f" [!] Proceso completado. {contador} planos actualizados a revisión '{nueva_rev}'.")
-            else:
-                self.log(f" [!] No hubo cambios (los archivos ya tenían esa revisión).")
-                
-        except Exception as e:
-            self.log(f"[X] Error en el sistema de Windows: {e}")
+        self.log_r(f"[*] {len(archivos)} archivos cargados.")
 
-    # --- LÓGICA DE CONSOLA EN VIVO ---
+    def marcar_todos(self):
+        for cb in self.checkboxes_archivos: cb.select()
+
+    def desmarcar_todos(self):
+        for cb in self.checkboxes_archivos: cb.deselect()
+
+    def aplicar_reemplazo_adv(self):
+        if not self.ruta_renombre: return self.log_r("[X] Carga una carpeta primero.")
+        buscar = self.ent_buscar_adv.get()
+        reemplazar = self.ent_reemplazo_adv.get()
+        if not buscar: return self.log_r("[X] Ingresa texto a buscar.")
+
+        contador = 0
+        for cb in self.checkboxes_archivos:
+            if cb.get() == 1: # Si está marcado
+                old_name = cb.cget("text")
+                if buscar in old_name:
+                    new_name = old_name.replace(buscar, reemplazar)
+                    try:
+                        os.rename(os.path.join(self.ruta_renombre, old_name), os.path.join(self.ruta_renombre, new_name))
+                        cb.configure(text=new_name)
+                        contador += 1
+                    except Exception as e:
+                        self.log_r(f"[X] Error en '{old_name}': {e}")
+        
+        if contador > 0: self.log_r(f"[OK] {contador} archivos reemplazados.")
+        else: self.log_r("[!] No se encontraron coincidencias en la selección.")
+
+    def aplicar_revision_adv(self):
+        if not self.ruta_renombre: return self.log_r("[X] Carga una carpeta primero.")
+        nueva_rev = self.ent_rev_adv.get().strip()
+        if not nueva_rev: return self.log_r("[X] Ingresa la nueva revisión.")
+
+        contador = 0
+        for cb in self.checkboxes_archivos:
+            if cb.get() == 1:
+                old_name = cb.cget("text")
+                nombre_base, ext = os.path.splitext(old_name)
+                if len(nombre_base) > 0:
+                    new_name = nombre_base[:-1] + nueva_rev + ext
+                    if old_name != new_name:
+                        try:
+                            os.rename(os.path.join(self.ruta_renombre, old_name), os.path.join(self.ruta_renombre, new_name))
+                            cb.configure(text=new_name)
+                            contador += 1
+                        except Exception as e:
+                            self.log_r(f"[X] Error en '{old_name}': {e}")
+                            
+        if contador > 0: self.log_r(f"[OK] {contador} revisiones actualizadas.")
+        else: self.log_r("[!] No hubo cambios en la selección.")
+
+
+    # ==========================================================
+    # LÓGICA DE CONSOLA EN VIVO (MANTENIDA EXACTA)
+    # ==========================================================
     def detener_comando_en_vivo(self):
         self.cancelar_comando_vivo = True
         self.btn_cancelar_cmd.configure(state="disabled", text="Deteniendo...")
@@ -264,8 +353,6 @@ class ActualizadorCAD(ctk.CTk):
                 return
 
             self.log(f" Ejecutando comando en {total} pestañas...")
-            
-            # Ahora el comando viaja limpio, sin caracteres especiales que ofendan a AutoCAD
             comando_limpio = comando
 
             for i in range(total):
@@ -283,20 +370,15 @@ class ActualizadorCAD(ctk.CTk):
                 intentos = 0
                 ultimo_error = ""
 
-                # MODO AGRESIVO: Intentar hasta 3 veces por pestaña
                 while intentos < 3 and not exito:
                     try:
-                        # Forzar la pestaña al frente si no es la actual
                         if app.ActiveDocument.Name != doc.Name:
                             app.ActiveDocument = doc
                             time.sleep(0.3) 
                         
-                        # 1. Silenciador: Intentamos enviar el ESC para cancelar comandos a medias.
-                        # Si AutoCAD se queja de "Invalid input", lo ignoramos y seguimos.
                         try: doc.SendCommand("\x03\x03")
                         except: pass
                         
-                        # 2. Enviamos tu comando real, limpio de caracteres raros.
                         doc.SendCommand(comando_limpio)
                         self.log(f"  > Aplicado en: {doc.Name}")
                         exito = True
@@ -323,7 +405,9 @@ class ActualizadorCAD(ctk.CTk):
             self.btn_cancelar_cmd.configure(state="disabled", text="Cancelar")
             pythoncom.CoUninitialize()
 
-    # --- PESTAÑA DE DOCUMENTACIÓN ---
+    # ==========================================================
+    # PESTAÑA 3: DOCUMENTACIÓN WIKI
+    # ==========================================================
     def setup_tab_docs(self):
         self.wiki_master = ctk.CTkFrame(self.tab_docs, fg_color="transparent")
         self.wiki_master.pack(fill="both", expand=True, padx=10, pady=10)
@@ -433,17 +517,16 @@ class ActualizadorCAD(ctk.CTk):
         guia = (
             "HERRAMIENTAS INTEGRADAS DE INTERFAZ\n\n"
             "► COMANDOS EN VIVO (Conexión COM)\n"
-            "Envía comandos LISP o nativos a TODAS las pestañas que tengas abiertas actualmente en tu CAD.\n\n"
-            "REQUISITO: AutoCAD o ZWCAD debe haber sido ejecutado previamente como Administrador.\n\n"
+            "Pestaña 'Sincronizador'. Envía comandos LISP o nativos a TODAS las pestañas abiertas actualmente en tu CAD.\n\n"
+            "REQUISITO: AutoCAD o ZWCAD debe haber sido ejecutado como Administrador.\n\n"
             "Ejemplos útiles (Soporta código LISP cerrado):\n"
             "• Guardar todo: _.QSAVE\n"
             "• Zoom general: _.ZOOM _E\n"
-            "• Purgar todo silencioso: (command \"_.-PURGE\" \"_A\" \"*\" \"_N\")\n\n"
-            "► RENOMBRADO MASIVO (Cambio de Revisión)\n"
-            "Herramienta ultrarrápida nativa de Windows que escanea una carpeta completa de planos y modifica exclusivamente el último carácter del nombre (la letra o número de revisión) antes del .dwg.\n\n"
-            "Ejemplo:\n"
-            "Si ingresas la letra 'D' en la interfaz:\n"
-            "ROS-B-ES-V0TPT-DD-PILAR-01-C.dwg -> pasará a ser -> ROS-B-ES-V0TPT-DD-PILAR-01-D.dwg"
+            "• Ejecutar LISP masivo: (c:SETUP-A1)\n\n"
+            "► RENOMBRADO MASIVO AVANZADO\n"
+            "Pestaña 'Renombrado Avanzado'. Esta herramienta dedicada te permite cargar una carpeta y mediante casillas de verificación (checkboxes) escoger grupos de archivos específicos para aplicarles reglas de nombrado estructuradas:\n\n"
+            "1. Buscar y Reemplazar: Ideal para cambiar fragmentos interiores de la nomenclatura, como cambiar el tipo de plano (Ej. HL- a PL-) o alterar el número base sin dañar la estructura del prefijo SINCAL.\n"
+            "2. Cambio de Revisión: Modifica matemáticamente la última letra de los archivos seleccionados sin importar cómo se llamen."
         )
         self.mostrar_texto_wiki("Herramientas Extra", guia)
 
@@ -453,6 +536,9 @@ class ActualizadorCAD(ctk.CTk):
             with open(ruta_json, 'r', encoding='utf-8') as f:
                 self.tutoriales = json.load(f)
 
+    # ==========================================================
+    # CORE: ACTUALIZACIÓN Y REGISTROS
+    # ==========================================================
     def log(self, mensaje):
         self.consola.configure(state="normal")
         self.consola.insert("end", mensaje + "\n")
@@ -601,10 +687,8 @@ class ActualizadorCAD(ctk.CTk):
             f'(setvar "TRUSTEDPATHS" (strcat (getvar "TRUSTEDPATHS") ";{ruta_escapada}")) '
             f'_.QSAVE (command "_QUIT")'
         )
-        try:
-            subprocess.Popen([self.cad_exe_path, "/cmd", lisp_cmd])
-        except Exception as e:
-            self.log(f" [X] Falló el auto-lanzamiento: {e}")
+        try: subprocess.Popen([self.cad_exe_path, "/cmd", lisp_cmd])
+        except: pass
 
     def actualizar_rutas_registro(self):
         carpeta_ctb = os.path.join(RUTA_LOCAL_APP, "plotstyles")
@@ -631,8 +715,7 @@ class ActualizadorCAD(ctk.CTk):
                                                         for var in ["SearchPath", "SEARCHPATH", "ACAD", "ZWCAD", "TrustedPaths"]:
                                                             try:
                                                                 val, _ = winreg.QueryValueEx(gk, var)
-                                                                if old_folder in val:
-                                                                    val = val.replace(old_folder, RUTA_LOCAL_APP)
+                                                                if old_folder in val: val = val.replace(old_folder, RUTA_LOCAL_APP)
                                                                 if RUTA_LOCAL_APP.lower() not in val.lower():
                                                                     winreg.SetValueEx(gk, var, 0, winreg.REG_SZ, f"{val};{RUTA_LOCAL_APP}")
                                                                 else:
@@ -659,12 +742,9 @@ class ActualizadorCAD(ctk.CTk):
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS) as key:
                 try: p, _ = winreg.QueryValueEx(key, "Path")
                 except: p = ""
-                if old_scripts in p:
-                    p = p.replace(old_scripts, r_scripts)
-                if r_scripts.lower() not in p.lower():
-                    winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, f"{p};{r_scripts}")
-                else:
-                    winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, p) 
+                if old_scripts in p: p = p.replace(old_scripts, r_scripts)
+                if r_scripts.lower() not in p.lower(): winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, f"{p};{r_scripts}")
+                else: winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, p) 
                 ctypes.windll.user32.SendMessageTimeoutW(0xFFFF, 0x001A, 0, "Environment", 0x0002, 5000, None)
         except: pass
 
@@ -720,8 +800,7 @@ class ActualizadorCAD(ctk.CTk):
         if os.path.exists(os.path.join(appdata, "Autodesk")):
             for root, dirs, files in os.walk(os.path.join(appdata, "Autodesk")):
                 if os.path.basename(root).lower() == "support":
-                    try:
-                        shutil.copy2(r_acc, os.path.join(root, "acaddoc.lsp"))
+                    try: shutil.copy2(r_acc, os.path.join(root, "acaddoc.lsp"))
                     except: pass
 
     def cargar_info_github(self):
