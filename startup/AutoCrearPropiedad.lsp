@@ -14,6 +14,7 @@
       ("Provincia"         . "Ingrese provincia")
       ("Comuna"            . "Ingrese comuna")
       ("Revision"          . "rev")
+      ("Dibujante"         . "DIB")
       ("Fecha_Rev"         . "F_REV")
       ("Fecha_Inf"         . "F_INF")
       ("No_total_planos"   . "Ingrese número total de planos")
