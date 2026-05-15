@@ -42,4 +42,6 @@ SINCAL utiliza **PowerShell 7** para procesar docenas de planos `.dwg` a la vez.
 El programa ahora cuenta con dos herramientas que interactúan directamente desde su interfaz:
 
 1. **Comandos en Vivo (Conexión COM):** Te permite escribir un comando (ej. `_.QSAVE` o `_.ZOOM _E`) en la caja de texto de SINCAL y enviarlo a todas las pestañas que tengas abiertas en tu AutoCAD/ZWCAD en ese momento. *(Nota: Requiere que abras tu programa de dibujo como Administrador para que se puedan comunicar).*
-2. **Renombrado Masivo de Revisiones:** Si tienes una carpeta con 50 planos y necesitas subirles la revisión (ej. de la "C" a la "D"), usa el módulo de Renombrado. Escaneará la carpeta y cambiará la última letra de todos los nombres en un milisegundo sin tener que abrirlos.
+2. **Renombrado Masivo Avanzado:** Herramienta dedicada con interfaz de selección múltiple (checkboxes). Permite cargar una carpeta completa y procesar solo los planos marcados:
+   * **Buscar y Reemplazar:** Cambiar fragmentos de texto en los nombres de archivo (Ej. modificar el tipo de plano de `HL-` a `PL-`) sin alterar la estructura general.
+   * **Cambio de Revisión:** Modifica automáticamente la última letra o número (la revisión) de todos los planos seleccionados en un milisegundo sin tener que abrirlos.

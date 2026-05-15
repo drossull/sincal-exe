@@ -68,7 +68,8 @@ class ActualizadorCAD(ctk.CTk):
             self.iconbitmap(obtener_ruta_recurso("logo.ico"))
         except: pass
         
-        self.version_local_actual = "v1.4.8"
+        # VERSIÓN BASE ACTUALIZADA
+        self.version_local_actual = "v1.5.6"
         self.tutoriales = {}
         self.cad_exe_path = None
         self.es_zwcad = False
