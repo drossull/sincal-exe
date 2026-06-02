@@ -31,11 +31,11 @@
 
 ;;; =========================================================================
 ;;; COMANDO 1: CUSTOM-PROPS 
-;;; Pregunta y permite editar las 9 propiedades en el archivo actual
+;;; Pregunta y permite editar las 10 propiedades en el archivo actual
 ;;; =========================================================================
 (defun c:CUSTOM-PROPS (/ listaProps val input)
   (setq listaProps 
-    '("Nombre_Estructura" "Provincia" "Comuna" "Revision" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos" "Nombre_Plano")
+    '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Revision" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos" "Nombre_Plano")
   )
   (princ "\n--- EDITOR DE PROPIEDADES SINCAL ---")
   (foreach prop listaProps
@@ -52,15 +52,15 @@
 
 ;;; =========================================================================
 ;;; COMANDO 2: COPY-PROPS 
-;;; Copia las 5 propiedades generales a la memoria de Windows
+;;; Copia las 6 propiedades generales a la memoria de Windows
 ;;; =========================================================================
 (defun c:COPY-PROPS (/ propsToCopy val regPath)
   ;; Ruta en el registro para que sobreviva entre pestañas
   (setq regPath "HKEY_CURRENT_USER\\Software\\SINCAL\\CopiedProps")
   
-  ;; Solo copia las 5 que se repiten en todo el proyecto
+  ;; Solo copia las 6 que se repiten en todo el proyecto
   (setq propsToCopy 
-    '("Nombre_Estructura" "Provincia" "Comuna" "Fecha_Rev" "Fecha_Inf")
+    '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Fecha_Rev" "Fecha_Inf")
   )
   
   (foreach prop propsToCopy
@@ -73,13 +73,13 @@
 
 ;;; =========================================================================
 ;;; COMANDO 3: PASTE-PROPS 
-;;; Pega las 5 propiedades generales y pregunta por las 4 especificas
+;;; Pega las 6 propiedades generales y pregunta por las 4 especificas
 ;;; =========================================================================
 (defun c:PASTE-PROPS (/ regPath propsToPaste propsToAsk val input)
   (setq regPath "HKEY_CURRENT_USER\\Software\\SINCAL\\CopiedProps")
   
-  ;; 5 propiedades maestras
-  (setq propsToPaste '("Nombre_Estructura" "Provincia" "Comuna" "Fecha_Rev" "Fecha_Inf"))
+  ;; 6 propiedades maestras
+  (setq propsToPaste '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Fecha_Rev" "Fecha_Inf"))
   
   ;; 4 propiedades variables por plano
   (setq propsToAsk '("Revision" "Dibujante" "No_total_planos" "Nombre_Plano"))

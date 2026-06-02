@@ -11,6 +11,7 @@
   (setq listaProps
     '(
       ("Nombre_Estructura" . "Ingrese nombre estructura")
+      ("Region"            . "Ingrese region")
       ("Provincia"         . "Ingrese provincia")
       ("Comuna"            . "Ingrese comuna")
       ("Revision"          . "rev")
