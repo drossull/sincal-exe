@@ -1,4 +1,4 @@
-(defun c:SETUP-A1 ( / acadObj doc layouts layoutName appName isZWCAD plotterName paperName xType xData)
+(defun c:SETUP-A1 ( / acadObj doc layouts layoutName appName isZWCAD plotterName paperName xType xData originPt)
   ;; Cargar funciones de Visual LISP
   (vl-load-com)
   
@@ -55,6 +55,20 @@
         
         ;; 7. Orientación (Landscape)
         (vla-put-PlotRotation layout ac0degrees)
+
+        ;; --- NUEVO: DESFASE A CERO (PLOT OFFSET X=0, Y=0) ---
+        ;; Primero desactivamos el centrado automatico para que respete nuestras coordenadas
+        (vl-catch-all-apply 'vla-put-CenterPlot (list layout :vlax-false))
+        (vl-catch-all-apply
+          (function
+            (lambda ()
+              ;; Crear una matriz (Array) de 2 decimales para la coordenada X,Y
+              (setq originPt (vlax-make-safearray vlax-vbDouble '(0 . 1)))
+              (vlax-safearray-fill originPt '(0.0 0.0))
+              (vla-put-PlotOrigin layout originPt)
+            )
+          )
+        )
 
         ;; --- FIX UNIVERSAL: CALIDAD CUSTOM A 300 DPI ---
         ;; Usamos vlax-put-property para que no crashee en ZWCAD si le falta el atajo vla-put-*
