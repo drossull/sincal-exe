@@ -1,52 +1,59 @@
 (vl-load-com)
 (setvar "FILEDIA" 0)
+(setvar "EXPERT" 5)
 
-;; 1. Obtener documento en modo consola de fondo
-(setq acadApp (vl-catch-all-apply 'vlax-get-acad-object))
-(setq doc (if (not (vl-catch-all-error-p acadApp))
-              (vla-get-ActiveDocument acadApp)
-              (vla-get-Document (vlax-ename->vla-object (namedobjdict)))))
+(setq acadApp (vlax-get-acad-object))
+(setq doc (vla-get-ActiveDocument acadApp))
 
-;; 2. Definir rutas maestras
+;; 1. Definir rutas maestras
 (setq appPath (vl-string-translate "\\" "/" (getenv "APPDATA")))
 (setq masterPath (strcat appPath "/Estandar SINCAL/masters/FORMATOS ANOTATIVOS ACAD_2025.dwg"))
 
-;; 3. Borrar silenciosamente el Page Setup viejo si es que existe (Evita el cuelgue por la pregunta "Redefinir?")
+;; 2. Borrar Page Setup viejo si existe
 (setq psets (vla-get-PlotConfigurations doc))
 (setq oldSetup (vl-catch-all-apply 'vla-Item (list psets "SINCAL-A1")))
-(if (not (vl-catch-all-error-p oldSetup))
-  (vl-catch-all-apply 'vla-Delete (list oldSetup))
-)
+(if (not (vl-catch-all-error-p oldSetup)) (vl-catch-all-apply 'vla-Delete (list oldSetup)))
 
-;; 4. Importar el Page Setup limpio
+;; 3. Importar el Page Setup
 (vl-cmdf "_.-PSETUPIN" masterPath "SINCAL-A1")
 
-;; 5. Capturar el nuevo Page Setup
+;; Si por algun error no se importo, forzar su creacion desde cero
 (setq psetup (vl-catch-all-apply 'vla-Item (list psets "SINCAL-A1")))
+(if (vl-catch-all-error-p psetup)
+  (setq psetup (vla-Add psets "SINCAL-A1" :vlax-false))
+)
 
-;; 6. Deteccion de ZWCAD
-(setq rrp (vl-catch-all-apply 'getvar '("ROAMABLEROOTPREFIX")))
-(setq isZW (if (vl-catch-all-error-p rrp) nil (vl-string-search "ZWCAD" (strcase rrp))))
+;; 4. Deteccion de impresora base segura
+(setq isZW (vl-string-search "ZWCAD" (strcase (getvar "ROAMABLEROOTPREFIX"))))
+(setq pdfPrinter (if isZW "ZWCAD PDF(High Quality Print).pc5" "DWG To PDF.pc3"))
+(setq ctbName "SINCAL_A1 (2025).ctb")
 
-;; 7. Aplicar a cada una de las pestañas (Layouts)
-(if (not (vl-catch-all-error-p psetup))
-  (progn
-    (if isZW (vl-catch-all-apply 'vla-put-ConfigName (list psetup "ZWCAD PDF(High Quality Print).pc5")))
-    (vlax-for lay (vla-get-Layouts doc)
-      (if (/= (strcase (vla-get-Name lay)) "MODEL")
-        (progn
-          (vl-catch-all-apply 'vla-CopyFrom (list lay psetup))
-          (if isZW (vl-catch-all-apply 'vla-put-ConfigName (list lay "ZWCAD PDF(High Quality Print).pc5")))
-          (vl-catch-all-apply 'vla-put-StyleSheet (list lay "SINCAL_A1 (2025).ctb"))
-        )
-      )
+;; 5. INYECTAR PROPIEDADES AL PAGE SETUP (Corrige el error de Name: None)
+(vl-catch-all-apply 'vla-put-ConfigName (list psetup pdfPrinter))
+(vl-catch-all-apply 'vla-put-CanonicalMediaName (list psetup "ISO_A1_(841.00_x_594.00_MM)"))
+(vl-catch-all-apply 'vla-put-StyleSheet (list psetup ctbName))
+(vl-catch-all-apply 'vla-put-PlotWithPlotStyles (list psetup :vlax-true))
+(vl-catch-all-apply 'vla-put-PlotType (list psetup 1)) 
+(vl-catch-all-apply 'vla-put-CenterPlot (list psetup :vlax-true))
+(vl-catch-all-apply 'vla-put-StandardScale (list psetup 16))
+
+;; 6. APLICAR a todos los Layouts
+(vlax-for lay (vla-get-Layouts doc)
+  (if (/= (strcase (vla-get-Name lay)) "MODEL")
+    (progn
+      (vl-catch-all-apply 'vla-CopyFrom (list lay psetup))
+      
+      ;; Seguro de vida: Forzar la impresora y plumilla directamente en la pestaña
+      (vl-catch-all-apply 'vla-put-ConfigName (list lay pdfPrinter))
+      (vl-catch-all-apply 'vla-put-StyleSheet (list lay ctbName))
     )
   )
 )
 
-;; 8. Ajustes finales y Guardado seguro desde LISP
+;; 7. Guardado seguro
 (setvar "DYNMODE" 3)
 (setvar "WIPEOUTFRAME" 0)
+(setvar "EXPERT" 0)
 (vl-cmdf "_.QSAVE")
 (princ)
 _.QUIT
