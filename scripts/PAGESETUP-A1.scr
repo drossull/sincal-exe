@@ -9,7 +9,7 @@
 (setq paperSize (if isZW "ISO A1 (841 x 594 mm)" "ISO A1 (841.00 x 594.00 MM)"))
 (setq ctbName "SINCAL_A1 (2025).ctb")
 
-;; 2. Obtener la lista de Layouts de forma nativa (Sin ActiveX)
+;; 2. Obtener la lista de Layouts
 (setq layouts nil)
 (setq dict (dictsearch (namedobjdict) "ACAD_LAYOUT"))
 (foreach item dict
@@ -20,7 +20,7 @@
   )
 )
 
-;; 3. Forzar configuracion pestaña por pestaña simulando la escritura de un usuario
+;; 3. Forzar configuracion pestaña por pestaña
 (foreach lay layouts
   (vl-cmdf "_.-PLOT" 
            "_Y"         ;; Configuracion detallada? [Si]
@@ -32,13 +32,14 @@
            "_N"         ;; Trazar al reves? [No]
            "_L"         ;; Area de trazado? [Layout/Presentacion]
            "1:1"        ;; Escala de impresion
+           "_C"         ;; Centrar trazado (Desfase x,y)? [Center]
            "_Y"         ;; Trazar con estilos de plumilla? [Si]
            ctbName      ;; Nombre del CTB
            "_Y"         ;; Trazar grosores de linea? [Si]
            "_N"         ;; Escalar grosores con el trazado? [No]
-           "_N"         ;; Imprimir espacio papel primero? [No, significa al ultimo]
+           "_N"         ;; Imprimir espacio papel primero? [No]
            "_N"         ;; Ocultar objetos de espacio papel? [No]
-           "_Y"         ;; GUARDAR CAMBIOS AL PAGE SETUP? [SI, AQUI SE INYECTA]
+           "_Y"         ;; GUARDAR CAMBIOS AL PAGE SETUP? [SI]
            "_N"         ;; Proceder con la impresion ahora? [No]
   )
 )
