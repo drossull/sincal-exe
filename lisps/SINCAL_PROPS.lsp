@@ -52,15 +52,15 @@
 
 ;;; =========================================================================
 ;;; COMANDO 2: COPY-PROPS 
-;;; Copia las 6 propiedades generales a la memoria de Windows
+;;; Copia las 9 propiedades generales a la memoria de Windows
 ;;; =========================================================================
 (defun c:COPY-PROPS (/ propsToCopy val regPath)
   ;; Ruta en el registro para que sobreviva entre pestañas
   (setq regPath "HKEY_CURRENT_USER\\Software\\SINCAL\\CopiedProps")
   
-  ;; Solo copia las 6 que se repiten en todo el proyecto
+  ;; Copia las 9 que se repiten en todo el proyecto
   (setq propsToCopy 
-    '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Fecha_Rev" "Fecha_Inf")
+    '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Revision" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos")
   )
   
   (foreach prop propsToCopy
@@ -73,16 +73,16 @@
 
 ;;; =========================================================================
 ;;; COMANDO 3: PASTE-PROPS 
-;;; Pega las 6 propiedades generales y pregunta por las 4 especificas
+;;; Pega las 9 propiedades generales y pregunta por 1 especifica
 ;;; =========================================================================
 (defun c:PASTE-PROPS (/ regPath propsToPaste propsToAsk val input)
   (setq regPath "HKEY_CURRENT_USER\\Software\\SINCAL\\CopiedProps")
   
-  ;; 6 propiedades maestras
-  (setq propsToPaste '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Fecha_Rev" "Fecha_Inf"))
+  ;; 9 propiedades maestras
+  (setq propsToPaste '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Revision" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos"))
   
-  ;; 4 propiedades variables por plano
-  (setq propsToAsk '("Revision" "Dibujante" "No_total_planos" "Nombre_Plano"))
+  ;; 1 propiedad variable por plano
+  (setq propsToAsk '("Nombre_Plano"))
 
   (princ "\n--- PEGANDO PROPIEDADES DE PROYECTO ---")
   
@@ -95,8 +95,8 @@
   )
   (princ (strcat "\n[SINCAL] " (itoa (length propsToPaste)) " propiedades generales aplicadas."))
 
-  ;; 2. Preguntar al usuario por las específicas 
-  (princ "\n--- COMPLETE LAS PROPIEDADES ESPECIFICAS ---")
+  ;; 2. Preguntar al usuario por la específica 
+  (princ "\n--- COMPLETE LA PROPIEDAD ESPECIFICA ---")
   (foreach prop propsToAsk
     (setq val (SINCAL:GetProp prop))
     (setq input (getstring T (strcat "\nIngrese " prop " <" val ">: ")))
