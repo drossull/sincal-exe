@@ -15,10 +15,12 @@ if (-not (Test-Path $wrapper)) {
     exit
 }
 
-# 2. Buscar todos los archivos DWG en la carpeta actual
-$archivos = Get-ChildItem -Path $PSScriptRoot -Filter *.dwg
+# 2. Buscar todos los archivos DWG en la carpeta actual (donde se abrio la consola)
+$rutaActual = (Get-Location).Path
+$archivos = @(Get-ChildItem -Path $rutaActual -Filter *.dwg)
+
 if ($archivos.Count -eq 0) {
-    Write-Host "`n[!] No se encontraron archivos DWG en esta carpeta." -ForegroundColor Yellow
+    Write-Host "`n[!] No se encontraron archivos DWG en: $rutaActual" -ForegroundColor Yellow
     Pause
     exit
 }
