@@ -1,47 +1,49 @@
-(vl-load-com)
 (setvar "FILEDIA" 0)
 (setvar "EXPERT" 5)
 
-;; 1. TRUCO VITAL PARA LA CONSOLA INVISIBLE
-(setq doc (vla-get-Document (vlax-ename->vla-object (namedobjdict))))
-
-;; 2. Definir rutas maestras
-(setq appPath (vl-string-translate "\\" "/" (getenv "APPDATA")))
-(setq masterPath (strcat appPath "/Estandar SINCAL/masters/FORMATOS ANOTATIVOS ACAD_2025.dwg"))
-
-;; 3. Importar el Page Setup (EXPERT 5 se salta cualquier pregunta)
-(vl-catch-all-apply 'vl-cmdf (list "_.-PSETUPIN" masterPath "SINCAL-A1"))
-
-;; 4. Detectar el motor de CAD para la impresora correcta
+;; 1. Detectar Impresora y Papel segun el CAD
 (setq rrp (vl-catch-all-apply 'getvar '("ROAMABLEROOTPREFIX")))
 (setq isZW (if (vl-catch-all-error-p rrp) nil (vl-string-search "ZWCAD" (strcase rrp))))
+
 (setq pdfPrinter (if isZW "ZWCAD PDF(High Quality Print).pc5" "DWG To PDF.pc3"))
+(setq paperSize (if isZW "ISO A1 (841 x 594 mm)" "ISO A1 (841.00 x 594.00 MM)"))
 (setq ctbName "SINCAL_A1 (2025).ctb")
 
-;; 5. Buscar el Page Setup importado y forzarle la impresora
-(setq psets (vla-get-PlotConfigurations doc))
-(setq psetup (vl-catch-all-apply 'vla-Item (list psets "SINCAL-A1")))
-
-(if (not (vl-catch-all-error-p psetup))
-  (progn
-    (vl-catch-all-apply 'vla-put-ConfigName (list psetup pdfPrinter))
-    (vl-catch-all-apply 'vla-put-StyleSheet (list psetup ctbName))
-    (vl-catch-all-apply 'vla-put-PlotWithPlotStyles (list psetup :vlax-true))
-
-    ;; 6. APLICAR a todos los Layouts (Pestañas)
-    (vlax-for lay (vla-get-Layouts doc)
-      (if (/= (strcase (vla-get-Name lay)) "MODEL")
-        (progn
-          (vl-catch-all-apply 'vla-CopyFrom (list lay psetup))
-          (vl-catch-all-apply 'vla-put-ConfigName (list lay pdfPrinter))
-          (vl-catch-all-apply 'vla-put-StyleSheet (list lay ctbName))
-        )
-      )
+;; 2. Obtener la lista de Layouts de forma nativa (Sin ActiveX)
+(setq layouts nil)
+(setq dict (dictsearch (namedobjdict) "ACAD_LAYOUT"))
+(foreach item dict
+  (if (= (car item) 3)
+    (if (/= (strcase (cdr item)) "MODEL")
+      (setq layouts (cons (cdr item) layouts))
     )
   )
 )
 
-;; 7. Guardado seguro
+;; 3. Forzar configuracion pestaña por pestaña simulando la escritura de un usuario
+(foreach lay layouts
+  (vl-cmdf "_.-PLOT" 
+           "_Y"         ;; Configuracion detallada? [Si]
+           lay          ;; Nombre de la pestaña
+           pdfPrinter   ;; Dispositivo de impresion
+           paperSize    ;; Tamaño de papel
+           "_M"         ;; Unidades en Milimetros
+           "_L"         ;; Orientacion Landscape (Horizontal)
+           "_N"         ;; Trazar al reves? [No]
+           "_L"         ;; Area de trazado? [Layout/Presentacion]
+           "1:1"        ;; Escala de impresion
+           "_Y"         ;; Trazar con estilos de plumilla? [Si]
+           ctbName      ;; Nombre del CTB
+           "_Y"         ;; Trazar grosores de linea? [Si]
+           "_N"         ;; Escalar grosores con el trazado? [No]
+           "_N"         ;; Imprimir espacio papel primero? [No, significa al ultimo]
+           "_N"         ;; Ocultar objetos de espacio papel? [No]
+           "_Y"         ;; GUARDAR CAMBIOS AL PAGE SETUP? [SI, AQUI SE INYECTA]
+           "_N"         ;; Proceder con la impresion ahora? [No]
+  )
+)
+
+;; 4. Limpieza y Guardado
 (setvar "DYNMODE" 3)
 (setvar "WIPEOUTFRAME" 0)
 (setvar "EXPERT" 0)
