@@ -1,37 +1,37 @@
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
+$appData = [Environment]::GetFolderPath('ApplicationData')
+$wrapper = "$appData\Estandar SINCAL\scripts\cad_wrapper.bat"
+$scrFile = "$PSScriptRoot\PAGESETUP-A1.scr"
 
-$dwgFiles = Get-ChildItem -Path .\ -Filter *.dwg
-if ($dwgFiles.Count -eq 0) {
-    Write-Host "[ERROR] No hay archivos DWG en esta carpeta." -ForegroundColor Yellow
+Write-Host "=========================================" -ForegroundColor Cyan
+Write-Host "  SINCAL - CONFIGURACION DE PAGINA A1" -ForegroundColor Cyan
+Write-Host "=========================================" -ForegroundColor Cyan
+
+# 1. Validar que el programa base SINCAL este instalado
+if (-not (Test-Path $wrapper)) {
+    Write-Host "`n[X] ERROR FATAL: No se encontro el puente de CAD (cad_wrapper.bat)." -ForegroundColor Red
+    Write-Host "Por favor, abre SINCAL.exe y presiona 'Instalar / Actualizar Todo'." -ForegroundColor Yellow
+    Pause
     exit
 }
 
-# Obtener rutas absolutas de los scripts base
-$PSScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-$wrapperPath = Join-Path $PSScriptRoot "cad_wrapper.bat"
-$scrPath = Join-Path $PSScriptRoot "PAGESETUP-A1.scr"
-
-if (-not (Test-Path $wrapperPath)) {
-    Write-Host "[ERROR] Consola CAD no detectada. Actualiza SINCAL.exe." -ForegroundColor Red
+# 2. Buscar todos los archivos DWG en la carpeta actual
+$archivos = Get-ChildItem -Path $PSScriptRoot -Filter *.dwg
+if ($archivos.Count -eq 0) {
+    Write-Host "`n[!] No se encontraron archivos DWG en esta carpeta." -ForegroundColor Yellow
+    Pause
     exit
 }
 
-if (-not (Test-Path $scrPath)) {
-    Write-Host "[ERROR] Archivo PAGESETUP-A1.scr no encontrado." -ForegroundColor Red
-    exit
-}
+Write-Host "`nSe encontraron $($archivos.Count) planos. Iniciando procesamiento en segundo plano...`n" -ForegroundColor Green
 
-Write-Host "---------------------------------------------------" -ForegroundColor Cyan
-Write-Host "Configuración masiva de página A1 iniciada" -ForegroundColor Cyan
-Write-Host "---------------------------------------------------" -ForegroundColor Cyan
-
-foreach ($file in $dwgFiles) {
-    Write-Host "Configurando página A1 en: $($file.Name)" -ForegroundColor Green
+# 3. Enviar cada plano a la consola invisible de CAD
+foreach ($dwg in $archivos) {
+    Write-Host "> Aplicando a: $($dwg.Name)..." -ForegroundColor White
     
-    # Ejecución controlada DIRECTA (Evita el bug de espacios de cmd.exe)
-    $argList = "/i `"$($file.FullName)`" /s `"$scrPath`""
-    Start-Process -FilePath $wrapperPath -ArgumentList $argList -Wait -NoNewWindow
+    # Los argumentos /i y /s son vitales para que el cad_wrapper.bat los lea correctamente
+    Start-Process -FilePath $wrapper -ArgumentList "/i", "`"$($dwg.FullName)`"", "/s", "`"$scrFile`"" -Wait -NoNewWindow
 }
 
-Write-Host "`n¡Proceso finalizado!" -ForegroundColor Cyan
+Write-Host "`n[OK] Tarea finalizada exitosamente." -ForegroundColor Green
+Pause

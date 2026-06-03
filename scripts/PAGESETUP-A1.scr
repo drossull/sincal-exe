@@ -1,10 +1,14 @@
 (vl-load-com)
+;; Forzar nivel de experto al maximo para suprimir preguntas de "Desea sobreescribir?"
+(setvar "EXPERT" 5)
+
 (setq appPath (vl-string-translate "\\" "/" (getenv "APPDATA")))
 (setq masterPath (strcat appPath "/Estandar SINCAL/masters/FORMATOS ANOTATIVOS ACAD_2025.dwg"))
-(command "_-PSETUPIN" masterPath "SINCAL-A1")
-(if (= (logand (getvar "CMDACTIVE") 1) 1) (command "_Y"))
 
-;; TRUCO MAESTRO: Obtener el documento aunque la interfaz grafica este apagada
+;; Importar silenciosamente. Al ser EXPERT 5, se salta la confirmacion de reescribir.
+(vl-catch-all-apply 'vl-cmdf (list "_.-PSETUPIN" masterPath "SINCAL-A1"))
+
+;; Truco Maestro: Obtener el documento en consola de fondo
 (setq acadObj (vlax-get-acad-object))
 (setq doc (if acadObj (vla-get-ActiveDocument acadObj) (vla-get-Document (vlax-ename->vla-object (namedobjdict)))))
 
@@ -33,5 +37,6 @@
 
 (setvar "DYNMODE" 3)
 (setvar "WIPEOUTFRAME" 0)
+(setvar "EXPERT" 0)
 _.QSAVE
 _.QUIT
