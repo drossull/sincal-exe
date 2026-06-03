@@ -2,14 +2,14 @@
 (setvar "FILEDIA" 0)
 (setvar "EXPERT" 5)
 
-;; 1. TRUCO VITAL PARA LA CONSOLA INVISIBLE (Sin esto, el script muere al instante)
+;; 1. TRUCO VITAL PARA LA CONSOLA INVISIBLE
 (setq doc (vla-get-Document (vlax-ename->vla-object (namedobjdict))))
 
 ;; 2. Definir rutas maestras
 (setq appPath (vl-string-translate "\\" "/" (getenv "APPDATA")))
 (setq masterPath (strcat appPath "/Estandar SINCAL/masters/FORMATOS ANOTATIVOS ACAD_2025.dwg"))
 
-;; 3. Importar el Page Setup (EXPERT 5 se salta cualquier pregunta de reescribir)
+;; 3. Importar el Page Setup (EXPERT 5 se salta cualquier pregunta)
 (vl-catch-all-apply 'vl-cmdf (list "_.-PSETUPIN" masterPath "SINCAL-A1"))
 
 ;; 4. Detectar el motor de CAD para la impresora correcta
@@ -18,13 +18,12 @@
 (setq pdfPrinter (if isZW "ZWCAD PDF(High Quality Print).pc5" "DWG To PDF.pc3"))
 (setq ctbName "SINCAL_A1 (2025).ctb")
 
-;; 5. Buscar el Page Setup importado y forzarle la impresora y plumilla
+;; 5. Buscar el Page Setup importado y forzarle la impresora
 (setq psets (vla-get-PlotConfigurations doc))
 (setq psetup (vl-catch-all-apply 'vla-Item (list psets "SINCAL-A1")))
 
 (if (not (vl-catch-all-error-p psetup))
   (progn
-    ;; Inyectar directo al Page Setup por si AutoCAD lo blanqueo
     (vl-catch-all-apply 'vla-put-ConfigName (list psetup pdfPrinter))
     (vl-catch-all-apply 'vla-put-StyleSheet (list psetup ctbName))
     (vl-catch-all-apply 'vla-put-PlotWithPlotStyles (list psetup :vlax-true))
@@ -34,7 +33,6 @@
       (if (/= (strcase (vla-get-Name lay)) "MODEL")
         (progn
           (vl-catch-all-apply 'vla-CopyFrom (list lay psetup))
-          ;; Doble seguro: Forzar los valores directamente en la pestaña
           (vl-catch-all-apply 'vla-put-ConfigName (list lay pdfPrinter))
           (vl-catch-all-apply 'vla-put-StyleSheet (list lay ctbName))
         )
