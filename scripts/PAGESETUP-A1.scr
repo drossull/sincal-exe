@@ -1,53 +1,79 @@
+(vl-load-com)
 (setvar "FILEDIA" 0)
-(setvar "EXPERT" 5)
 
-;; 1. Detectar Impresora y Papel segun el CAD
+;; 1. OBTENER DOCUMENTO EN CONSOLA INVISIBLE (Reemplaza vlax-get-acad-object)
+(setq doc (vla-get-Document (vlax-ename->vla-object (namedobjdict))))
+(setq layouts (vla-get-Layouts doc))
+
+;; 2. DETECCIÓN DE PROGRAMA (ZWCAD / AUTOCAD)
 (setq rrp (vl-catch-all-apply 'getvar '("ROAMABLEROOTPREFIX")))
-(setq isZW (if (vl-catch-all-error-p rrp) nil (vl-string-search "ZWCAD" (strcase rrp))))
+(setq isZWCAD (if (vl-catch-all-error-p rrp) nil (vl-string-search "ZWCAD" (strcase rrp))))
 
-(setq pdfPrinter (if isZW "ZWCAD PDF(High Quality Print).pc5" "DWG To PDF.pc3"))
-(setq paperSize (if isZW "ISO A1 (841 x 594 mm)" "ISO A1 (841.00 x 594.00 MM)"))
-(setq ctbName "SINCAL_A1 (2025).ctb")
+(if isZWCAD
+  (progn
+    (setq plotterName "ZWCAD PDF(High Quality Print).pc5")
+    (setq paperName "ISO_full_bleed_A1_(841.00_x_594.00_MM)") 
+  )
+  (progn
+    (setq plotterName "AutoCAD PDF (High Quality Print).pc3")
+    (setq paperName "ISO_full_bleed_A1_(841.00_x_594.00_MM)")
+  )
+)
 
-;; 2. Obtener la lista de Layouts
-(setq layouts nil)
-(setq dict (dictsearch (namedobjdict) "ACAD_LAYOUT"))
-(foreach item dict
-  (if (= (car item) 3)
-    (if (/= (strcase (cdr item)) "MODEL")
-      (setq layouts (cons (cdr item) layouts))
+;; 3. REGISTRAR APPID PARA TRANSPARENCIA
+(if (not (tblsearch "APPID" "PLOTTRANSPARENCY"))
+  (regapp "PLOTTRANSPARENCY")
+)
+
+;; 4. APLICAR CONFIGURACION A CADA PESTAÑA (Usando tu lógica)
+(vlax-for layout layouts
+  (setq layoutName (vla-get-Name layout))
+  
+  (if (/= (strcase layoutName) "MODEL")
+    (progn
+      ;; Impresora y Papel
+      (vl-catch-all-apply 'vlax-put-property (list layout 'ConfigName plotterName))
+      (vl-catch-all-apply 'vlax-put-property (list layout 'CanonicalMediaName paperName))
+      
+      ;; Plumillas
+      (vl-catch-all-apply 'vlax-put-property (list layout 'StyleSheet "SINCAL_A1 (2025).ctb"))
+      
+      ;; Area y Escala (Reemplazo las constantes por sus números nativos: acLayout=5, ac1_1=16)
+      (vl-catch-all-apply 'vla-put-PlotType (list layout 5))
+      (vl-catch-all-apply 'vla-put-UseStandardScale (list layout :vlax-true))
+      (vl-catch-all-apply 'vla-put-StandardScale (list layout 16))
+      
+      ;; Opciones de Trazado
+      (vl-catch-all-apply 'vla-put-PlotWithLineweights (list layout :vlax-true))  
+      (vl-catch-all-apply 'vla-put-PlotWithPlotStyles (list layout :vlax-true))   
+      (vl-catch-all-apply 'vla-put-PlotViewportsFirst (list layout :vlax-false))  
+      
+      ;; Rotación (ac0degrees = 0)
+      (vl-catch-all-apply 'vla-put-PlotRotation (list layout 0))
+
+      ;; Calidad Custom a 300 DPI
+      (vl-catch-all-apply 'vlax-put-property (list layout 'ShadePlotResolutionLevel 5))
+      (vl-catch-all-apply 'vlax-put-property (list layout 'ShadePlotCustomDPI 300))
+      
+      ;; Transparencia XDATA (Reemplazo enumeraciones por enteros para entorno de fondo: 2 y 12)
+      (vl-catch-all-apply
+        (function
+          (lambda ()
+            (setq xType (vlax-make-safearray 2 '(0 . 1)))
+            (vlax-safearray-fill xType '(1001 1071))
+            (setq xData (vlax-make-safearray 12 '(0 . 1)))
+            (vlax-safearray-fill xData (list (vlax-make-variant "PLOTTRANSPARENCY") (vlax-make-variant 1)))
+            (vla-SetXdata layout xType xData)
+          )
+        )
+      )
     )
   )
 )
 
-;; 3. Forzar configuracion pestaña por pestaña
-(foreach lay layouts
-  (vl-cmdf "_.-PLOT" 
-           "_Y"         ;; Configuracion detallada? [Si]
-           lay          ;; Nombre de la pestaña
-           pdfPrinter   ;; Dispositivo de impresion
-           paperSize    ;; Tamaño de papel
-           "_M"         ;; Unidades en Milimetros
-           "_L"         ;; Orientacion Landscape (Horizontal)
-           "_N"         ;; Trazar al reves? [No]
-           "_L"         ;; Area de trazado? [Layout/Presentacion]
-           "1:1"        ;; Escala de impresion
-           "_C"         ;; Centrar trazado (Desfase x,y)? [Center]
-           "_Y"         ;; Trazar con estilos de plumilla? [Si]
-           ctbName      ;; Nombre del CTB
-           "_Y"         ;; Trazar grosores de linea? [Si]
-           "_N"         ;; Escalar grosores con el trazado? [No]
-           "_N"         ;; Imprimir espacio papel primero? [No]
-           "_N"         ;; Ocultar objetos de espacio papel? [No]
-           "_Y"         ;; GUARDAR CAMBIOS AL PAGE SETUP? [SI]
-           "_N"         ;; Proceder con la impresion ahora? [No]
-  )
-)
-
-;; 4. Limpieza y Guardado
+;; 5. LIMPIEZA Y GUARDADO
 (setvar "DYNMODE" 3)
 (setvar "WIPEOUTFRAME" 0)
-(setvar "EXPERT" 0)
 (vl-cmdf "_.QSAVE")
 (princ)
 _.QUIT
