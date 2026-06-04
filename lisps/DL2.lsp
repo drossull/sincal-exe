@@ -1,10 +1,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Rutina AutoLISP: DeleteLayout2
 ; Nombre del Comando: DL2
-; Descripción: Elimina únicamente la pestaña "Layout2" sin cambiar de vista.
+; Descripción: Elimina las pestañas "Layout2" y "A1" sin cambiar de vista.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun c:DL2 (/ acadObj doc layouts layout2Obj currentTab)
+(defun c:DL2 (/ acadObj doc layouts currentTab targets target layoutObj)
   (vl-load-com)
 
   ; Obtener objetos principales
@@ -13,25 +13,32 @@
   (setq layouts (vla-get-Layouts doc))
   (setq currentTab (getvar "CTAB"))
 
-  ; Intentar capturar "Layout2"
-  (if (not (vl-catch-all-error-p (setq layout2Obj (vl-catch-all-apply 'vla-Item (list layouts "Layout2")))))
-    (progn
-      ; Verificar si el usuario está actualmente DENTRO de Layout2
-      (if (= (strcase currentTab) "LAYOUT2")
-        (princ "\nXX Error: No se puede eliminar 'Layout2' porque estás actualmente en él. Cambia a otra pestaña e intenta de nuevo.")
-        ; Si no está en Layout2, proceder a borrarlo
-        (if (not (vl-catch-all-error-p (vl-catch-all-apply 'vla-delete (list layout2Obj))))
-          (princ "\n>> 'Layout2' fue eliminado con éxito.")
-          (princ "\nXX Ocurrió un error inesperado al intentar eliminar 'Layout2'.")
+  ; --- CONFIGURACIÓN ---
+  ; Lista de pestañas que la rutina intentará eliminar
+  (setq targets '("Layout2" "A1"))
+
+  ; Bucle para evaluar cada pestaña en la lista
+  (foreach target targets
+    ; Intentar capturar la pestaña actual
+    (if (not (vl-catch-all-error-p (setq layoutObj (vl-catch-all-apply 'vla-Item (list layouts target)))))
+      (progn
+        ; Verificar si el usuario está actualmente DENTRO de la pestaña a borrar
+        (if (= (strcase currentTab) (strcase target))
+          (princ (strcat "\nXX Error: No se puede eliminar '" target "' porque estás actualmente en él. Cambia a otra pestaña e intenta de nuevo."))
+          ; Si no está en esa pestaña, proceder a borrarla
+          (if (not (vl-catch-all-error-p (vl-catch-all-apply 'vla-delete (list layoutObj))))
+            (princ (strcat "\n>> '" target "' fue eliminado con éxito."))
+            (princ (strcat "\nXX Ocurrió un error inesperado al intentar eliminar '" target "'."))
+          )
         )
       )
+      ; Mensaje si la pestaña no existe en el dibujo
+      (princ (strcat "\n-- '" target "' no existe en este dibujo."))
     )
-    ; Mensaje si Layout2 no existe en el dibujo
-    (princ "\n-- 'Layout2' no existe en este dibujo.")
   )
   
   (princ) ; Salida limpia
 )
 
-(princ "\nComando cargado. Escribe DL2 para eliminar Layout2.")
+(princ "\nComando cargado. Escribe DL2 para eliminar Layout2 y A1.")
 (princ)
