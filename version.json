@@ -1,8 +1,9 @@
 {
-  "version": "v1.6.1",
+  "version": "v1.6.2",
   "archivos": [
     "lisps/BV.lsp",
     "lisps/DL2.lsp",
+    "lisps/CPOL.lsp",
     "lisps/MC.lsp",
     "lisps/MPEND.lsp",
     "lisps/P0.lsp",
