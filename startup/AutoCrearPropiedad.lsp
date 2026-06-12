@@ -2,11 +2,19 @@
 (defun c:AutoCrearPropiedad (/ acadObj doc props listaProps err)
   (vl-load-com)
 
+  ;; --- 1. AJUSTE DE VARIABLES DE ENTORNO ---
+  (if (/= (getvar "MIRRTEXT") 0)
+    (progn
+      (setvar "MIRRTEXT" 0)
+      (princ "\n[SINCAL] Variable MIRRTEXT ajustada a 0 (Textos no se invierten al hacer Mirror).")
+    )
+  )
+
+  ;; --- 2. INYECCION DE PROPIEDADES CUSTOM ---
   (setq acadObj (vlax-get-acad-object))
   (setq doc (vlax-get-property acadObj 'ActiveDocument))
   (setq props (vlax-get-property doc 'SummaryInfo))
 
-  ;; --- CONFIGURACION ---
   ;; Lista de propiedades organizada de lo general a lo particular
   (setq listaProps
     '(
@@ -24,7 +32,6 @@
       ("Nombre_Plano"      . "Ingrese nombre plano")
      )
   )
-  ;; ---------------------
 
   ;; ESTRATEGIA: Recorrer la lista e intentar agregar cada propiedad
   (foreach prop listaProps
@@ -41,7 +48,7 @@
        (princ (strcat "\n[AutoCAD] Propiedad '" (car prop) "' creada exitosamente."))
     )
   )
-  (princ "\n[AutoCAD] Proceso de creación de propiedades finalizado.")
+  (princ "\n[AutoCAD] Proceso de inicializacion y propiedades finalizado.")
   (princ)
 )
 
