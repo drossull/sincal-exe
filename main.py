@@ -13,6 +13,8 @@ from customtkinter import filedialog
 from tkinter import messagebox
 import win32com.client
 import pythoncom
+import pystray
+from PIL import Image
 
 # --- 1. FORZAR MODO ADMINISTRADOR ---
 def is_admin():
@@ -49,7 +51,6 @@ FUENTE_CONSOLA = ("Consolas", 11)
 
 ctk.set_appearance_mode("dark") 
 
-# --- FUNCIÓN PARA EL ÍCONO ---
 def obtener_ruta_recurso(ruta_relativa):
     try:
         ruta_base = sys._MEIPASS
@@ -68,7 +69,6 @@ class ActualizadorCAD(ctk.CTk):
             self.iconbitmap(obtener_ruta_recurso("logo.ico"))
         except: pass
         
-        # VERSIÓN BASE ACTUALIZADA
         self.version_local_actual = "v1.5.6"
         self.tutoriales = {}
         self.cad_exe_path = None
@@ -76,11 +76,14 @@ class ActualizadorCAD(ctk.CTk):
         self.cancelar_comando_vivo = False
         self.ruta_renombre = ""
         self.checkboxes_archivos = []
+        self.tray_activo = False
+
+        # --- INTERCEPTAR EL BOTÓN 'X' DE CERRAR ---
+        self.protocol("WM_DELETE_WINDOW", self.ocultar_a_bandeja)
 
         self.main_scroll = ctk.CTkScrollableFrame(self, fg_color=COLOR_FONDO, corner_radius=0)
         self.main_scroll.pack(fill="both", expand=True)
 
-        # TABVIEW ACTUALIZADO A 3 PESTAÑAS
         self.tabview = ctk.CTkTabview(self.main_scroll, width=950, height=750, fg_color=COLOR_FONDO,
                                       segmented_button_selected_color=COLOR_ACENTO)
         self.tabview.pack(padx=20, pady=10)
@@ -94,8 +97,54 @@ class ActualizadorCAD(ctk.CTk):
         self.setup_tab_renombrado()
         self.setup_tab_docs()
 
+        if getattr(sys, 'frozen', False):
+            self.configurar_inicio_con_windows()
+
         threading.Thread(target=self.cargar_info_github, daemon=True).start()
-        threading.Thread(target=self.loop_verificador_actualizaciones, daemon=True).start()
+        threading.Thread(target=self.loop_verificador_actualizaciones_silencioso, daemon=True).start()
+
+    # ==========================================================
+    # LÓGICA DE BANDEJA DE SISTEMA (SYSTEM TRAY)
+    # ==========================================================
+    def ocultar_a_bandeja(self):
+        self.withdraw()  # Esconde la ventana
+        if not self.tray_activo:
+            self.mostrar_icono_bandeja()
+
+    def mostrar_icono_bandeja(self):
+        try:
+            icono = Image.open(obtener_ruta_recurso("logo.ico"))
+        except:
+            icono = Image.new('RGB', (64, 64), color = (43, 43, 43))
+        
+        def abrir_ventana(icon, item):
+            icon.stop()
+            self.tray_activo = False
+            self.deiconify()  # Muestra la ventana
+            
+        def salir_app(icon, item):
+            icon.stop()
+            os._exit(0)  # Mata el proceso por completo
+            
+        self.tray = pystray.Icon("SINCAL", icono, "SINCAL Suite", menu=pystray.Menu(
+            pystray.MenuItem("Abrir SINCAL", abrir_ventana, default=True),
+            pystray.MenuItem("Cerrar por completo", salir_app)
+        ))
+        
+        self.tray_activo = True
+        threading.Thread(target=self.tray.run, daemon=True).start()
+
+    # ==========================================================
+    # CONFIGURACIÓN DE INICIO AUTOMÁTICO
+    # ==========================================================
+    def configurar_inicio_con_windows(self):
+        ruta_exe = sys.executable
+        nombre_llave = "SINCAL_Suite"
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_ALL_ACCESS)
+            winreg.SetValueEx(key, nombre_llave, 0, winreg.REG_SZ, f'"{ruta_exe}" --background')
+            winreg.CloseKey(key)
+        except: pass
 
     # ==========================================================
     # PESTAÑA 1: SINCRONIZADOR Y CONSOLA EN VIVO
@@ -123,11 +172,10 @@ class ActualizadorCAD(ctk.CTk):
                                        text_color=COLOR_TITULO, hover_color="#444444", command=self.forzar_path_manual)
         self.btn_forzar_path.pack(side="left", padx=10)
 
-        self.consola = ctk.CTkTextbox(self.tab_main, width=850, height=200, font=FUENTE_CONSOLA, 
+        self.consola = ctk.CTkTextbox(self.tab_main, width=850, height=180, font=FUENTE_CONSOLA, 
                                      fg_color="#1E1E1E", text_color=COLOR_TEXTO, state="disabled")
         self.consola.pack(pady=10)
 
-        # --- CONSOLA EN VIVO ---
         self.frame_live = ctk.CTkFrame(self.tab_main, fg_color="#1E1E1E", border_width=1, border_color="#444444", corner_radius=0)
         self.frame_live.pack(fill="x", padx=40, pady=(10, 10))
         
@@ -152,11 +200,10 @@ class ActualizadorCAD(ctk.CTk):
                                               state="disabled", command=self.detener_comando_en_vivo)
         self.btn_cancelar_cmd.pack(side="left")
 
-        # Historial
         self.frame_updates = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         self.frame_updates.pack(fill="x", padx=40, pady=5)
         ctk.CTkLabel(self.frame_updates, text="Historial de cambios", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(anchor="w")
-        self.txt_updates = ctk.CTkTextbox(self.frame_updates, width=850, height=80, font=FUENTE_NORMAL, fg_color="#1E1E1E", state="disabled")
+        self.txt_updates = ctk.CTkTextbox(self.frame_updates, width=850, height=160, font=FUENTE_NORMAL, fg_color="#1E1E1E", state="disabled")
         self.txt_updates.pack(pady=5)
 
     # ==========================================================
@@ -166,7 +213,6 @@ class ActualizadorCAD(ctk.CTk):
         lbl_titulo = ctk.CTkLabel(self.tab_renombrado, text="RENOMBRADO PARAMÉTRICO DE PLANOS", font=FUENTE_TITULO, text_color=COLOR_TITULO)
         lbl_titulo.pack(pady=10)
 
-        # Barra superior
         top_frame = ctk.CTkFrame(self.tab_renombrado, fg_color="transparent")
         top_frame.pack(fill="x", padx=20, pady=5)
         self.btn_browse_adv = ctk.CTkButton(top_frame, text="📁 Cargar Carpeta DWG", font=FUENTE_NORMAL, width=150, corner_radius=0, fg_color="#444444", hover_color="#555555", command=self.cargar_archivos_renombrado)
@@ -174,11 +220,9 @@ class ActualizadorCAD(ctk.CTk):
         self.lbl_ruta_adv = ctk.CTkLabel(top_frame, text="Ruta: Ninguna", font=FUENTE_NORMAL, text_color="#888888")
         self.lbl_ruta_adv.pack(side="left", padx=15)
 
-        # Contenedor dividido
         split_frame = ctk.CTkFrame(self.tab_renombrado, fg_color="transparent")
         split_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
-        # Lado Izquierdo: Lista de archivos con checkboxes
         left_frame = ctk.CTkFrame(split_frame, fg_color="#1E1E1E", corner_radius=0, border_width=1, border_color="#444444")
         left_frame.pack(side="left", fill="both", expand=True, padx=(0, 10))
 
@@ -193,7 +237,6 @@ class ActualizadorCAD(ctk.CTk):
         self.scroll_archivos = ctk.CTkScrollableFrame(left_frame, fg_color="#2B2B2B", corner_radius=0)
         self.scroll_archivos.pack(fill="both", expand=True, padx=15, pady=(5, 15))
 
-        # Lado Derecho: Herramientas de edición
         right_frame = ctk.CTkFrame(split_frame, fg_color="transparent", width=350)
         right_frame.pack(side="right", fill="y")
         right_frame.pack_propagate(False)
@@ -201,7 +244,6 @@ class ActualizadorCAD(ctk.CTk):
         lbl_tools = ctk.CTkLabel(right_frame, text="2. Aplicar a la selección:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO)
         lbl_tools.pack(pady=(15, 5), anchor="w")
 
-        # Herramienta 1: Búsqueda y Reemplazo (Ej: HL a PL)
         h1_frame = ctk.CTkFrame(right_frame, fg_color="#1E1E1E", corner_radius=0, border_width=1, border_color="#444444")
         h1_frame.pack(fill="x", pady=5)
         ctk.CTkLabel(h1_frame, text="A. Buscar y Reemplazar", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).pack(anchor="w", padx=15, pady=(15, 5))
@@ -213,7 +255,6 @@ class ActualizadorCAD(ctk.CTk):
         self.ent_reemplazo_adv.pack(fill="x", padx=15, pady=5)
         ctk.CTkButton(h1_frame, text="Aplicar Reemplazo", font=FUENTE_NORMAL, corner_radius=0, fg_color="transparent", border_width=1, border_color=COLOR_TITULO, text_color=COLOR_TITULO, hover_color="#444444", command=self.aplicar_reemplazo_adv).pack(pady=15, padx=15, fill="x")
 
-        # Herramienta 2: Cambio de Revisión Final
         h2_frame = ctk.CTkFrame(right_frame, fg_color="#1E1E1E", corner_radius=0, border_width=1, border_color="#444444")
         h2_frame.pack(fill="x", pady=10)
         ctk.CTkLabel(h2_frame, text="B. Cambio de Revisión", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).pack(anchor="w", padx=15, pady=(15, 5))
@@ -223,11 +264,9 @@ class ActualizadorCAD(ctk.CTk):
         self.ent_rev_adv.pack(fill="x", padx=15, pady=5)
         ctk.CTkButton(h2_frame, text="Aplicar Revisión", font=FUENTE_NORMAL, corner_radius=0, fg_color="transparent", border_width=1, border_color=COLOR_TITULO, text_color=COLOR_TITULO, hover_color="#444444", command=self.aplicar_revision_adv).pack(pady=15, padx=15, fill="x")
 
-        # Consola Log de Renombrado
         self.log_rename = ctk.CTkTextbox(right_frame, height=120, font=FUENTE_CONSOLA, fg_color="#1E1E1E", state="disabled", corner_radius=0)
         self.log_rename.pack(fill="both", expand=True, pady=(0, 10))
 
-    # Métodos Lógicos de Renombrado Avanzado
     def log_r(self, mensaje):
         self.log_rename.configure(state="normal")
         self.log_rename.insert("end", mensaje + "\n")
@@ -240,7 +279,6 @@ class ActualizadorCAD(ctk.CTk):
         self.ruta_renombre = carpeta
         self.lbl_ruta_adv.configure(text=f"Ruta: {carpeta}", text_color=COLOR_TEXTO)
         
-        # Limpiar lista anterior
         for widget in self.scroll_archivos.winfo_children():
             widget.destroy()
         self.checkboxes_archivos = []
@@ -254,7 +292,7 @@ class ActualizadorCAD(ctk.CTk):
             cb = ctk.CTkCheckBox(self.scroll_archivos, text=arc, font=FUENTE_NORMAL, text_color=COLOR_TEXTO, 
                                  fg_color=COLOR_ACENTO, hover_color="#005BBF")
             cb.pack(anchor="w", pady=5, padx=5)
-            cb.select() # Marcados por defecto
+            cb.select() 
             self.checkboxes_archivos.append(cb)
             
         self.log_r(f"[*] {len(archivos)} archivos cargados.")
@@ -273,7 +311,7 @@ class ActualizadorCAD(ctk.CTk):
 
         contador = 0
         for cb in self.checkboxes_archivos:
-            if cb.get() == 1: # Si está marcado
+            if cb.get() == 1: 
                 old_name = cb.cget("text")
                 if buscar in old_name:
                     new_name = old_name.replace(buscar, reemplazar)
@@ -310,9 +348,8 @@ class ActualizadorCAD(ctk.CTk):
         if contador > 0: self.log_r(f"[OK] {contador} revisiones actualizadas.")
         else: self.log_r("[!] No hubo cambios en la selección.")
 
-
     # ==========================================================
-    # LÓGICA DE CONSOLA EN VIVO (MANTENIDA EXACTA)
+    # LÓGICA DE CONSOLA EN VIVO
     # ==========================================================
     def detener_comando_en_vivo(self):
         self.cancelar_comando_vivo = True
@@ -816,19 +853,35 @@ class ActualizadorCAD(ctk.CTk):
                 self.txt_updates.configure(state="disabled")
         except: pass
 
-    def loop_verificador_actualizaciones(self):
+    def cad_esta_ejecutandose(self):
+        try:
+            salida = subprocess.check_output("tasklist", creationflags=0x08000000).decode('utf-8', errors='ignore').lower()
+            if "acad.exe" in salida or "zwcad.exe" in salida or "accoreconsole.exe" in salida:
+                return True
+            return False
+        except Exception:
+            return False
+
+    def loop_verificador_actualizaciones_silencioso(self):
         while True:
-            time.sleep(3600)
+            time.sleep(600)  
             try:
                 r = requests.get(URL_BASE_RAW + "version.json", timeout=5)
-                if r.json().get("version") != self.version_local_actual:
-                    self.mostrar_popup_actualizacion(r.json().get("version"))
+                version_nube = r.json().get("version")
+                
+                if version_nube and version_nube != self.version_local_actual:
+                    while self.cad_esta_ejecutandose():
+                        time.sleep(15) 
+                    self.iniciar_actualizacion_hilo()
             except: pass
 
-    def mostrar_popup_actualizacion(self, v):
-        if messagebox.askyesno("Actualización", f"Nueva versión disponible: {v}\n¿Actualizar ahora?"):
-            self.iniciar_actualizacion_hilo()
-
+# ==========================================================
+# INICIO DE LA APLICACIÓN
+# ==========================================================
 if __name__ == "__main__":
     app = ActualizadorCAD()
+    
+    if "--background" in sys.argv:
+        app.ocultar_a_bandeja()
+        
     app.mainloop()
