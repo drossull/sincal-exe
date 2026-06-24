@@ -1,5 +1,5 @@
-;;; INICIO DEL CODIGO (COMPATIBLE AUTOCAD 2025)
-(defun c:AutoCrearPropiedad (/ acadObj doc props listaProps err)
+;;; INICIO DEL CODIGO (COMPATIBLE AUTOCAD Y ZWCAD)
+(defun c:AutoCrearPropiedad (/ acadObj doc props listaProps propName propVal num i k v exists)
   (vl-load-com)
 
   ;; --- 1. AJUSTE DE VARIABLES DE ENTORNO ---
@@ -10,7 +10,7 @@
     )
   )
 
-  ;; --- 2. INYECCION DE PROPIEDADES CUSTOM ---
+  ;; --- 2. INYECCION DE PROPIEDADES CUSTOM SEGURA ---
   (setq acadObj (vlax-get-acad-object))
   (setq doc (vlax-get-property acadObj 'ActiveDocument))
   (setq props (vlax-get-property doc 'SummaryInfo))
@@ -33,22 +33,33 @@
      )
   )
 
-  ;; ESTRATEGIA: Recorrer la lista e intentar agregar cada propiedad
+  ;; ESTRATEGIA: Revisar manualmente si existe antes de agregar (Filtro Anti-Bug ZWCAD)
   (foreach prop listaProps
-    (setq err 
-      (vl-catch-all-apply 
-        'vlax-invoke-method
-        (list props 'AddCustomInfo (car prop) (cdr prop))
+    (setq propName (car prop))
+    (setq propVal (cdr prop))
+    (setq exists nil)
+    
+    (setq num (vla-NumCustomInfo props))
+    (setq i 0)
+    
+    ;; Buscar si la llave ya existe
+    (while (< i num)
+      (vla-GetCustomByIndex props i 'k 'v)
+      (if (= (strcase k) (strcase propName))
+        (setq exists T)
       )
+      (setq i (1+ i))
     )
 
-    ;; Si se crea con éxito, informa al usuario.
-    ;; Si falla (porque ya existe), el programa continúa sin detenerse.
-    (if (not (vl-catch-all-error-p err))
-       (princ (strcat "\n[AutoCAD] Propiedad '" (car prop) "' creada exitosamente."))
+    ;; Solo agregar si no fue encontrada en el bucle anterior
+    (if (not exists)
+      (progn
+        (vl-catch-all-apply 'vla-AddCustomInfo (list props propName propVal))
+        (princ (strcat "\n[SINCAL] Propiedad '" propName "' creada exitosamente."))
+      )
     )
   )
-  (princ "\n[AutoCAD] Proceso de inicializacion y propiedades finalizado.")
+  (princ "\n[SINCAL] Proceso de inicializacion y propiedades finalizado.")
   (princ)
 )
 

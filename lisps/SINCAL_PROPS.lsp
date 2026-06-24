@@ -1,5 +1,5 @@
 ;;; =========================================================================
-;;; HERRAMIENTAS DE PROPIEDADES CUSTOM (CUSTOM-PROPS, COPY-PROPS, PASTE-PROPS)
+;;; HERRAMIENTAS DE PROPIEDADES CUSTOM (CUSTOM-PROPS, COPY-PROPS, PASTE-PROPS, REPARAR-PROPS)
 ;;; =========================================================================
 
 ;;; --- FUNCIONES AUXILIARES (NUCLEO) ---
@@ -105,6 +105,39 @@
     )
   )
   (princ "\n[SINCAL] Configuracion de plano finalizada. Recuerde regenerar (RE) para actualizar los textos.")
+  (princ)
+)
+
+;;; =========================================================================
+;;; COMANDO 4: REPARAR-PROPS 
+;;; Limpia las propiedades duplicadas generadas por el bug de ZWCAD
+;;; =========================================================================
+(defun c:REPARAR-PROPS (/ acadObj doc props num i k v dict)
+  (vl-load-com)
+  (setq doc (vla-get-ActiveDocument (vlax-get-acad-object)))
+  (setq props (vla-get-SummaryInfo doc))
+  (setq num (vla-NumCustomInfo props))
+  (setq i 0 dict nil)
+  
+  ;; Rescatar las propiedades sin repetir
+  (while (< i num)
+    (vla-GetCustomByIndex props i 'k 'v)
+    (if (not (assoc (strcase k) dict))
+      (setq dict (append dict (list (cons (strcase k) (cons k v)))))
+    )
+    (setq i (1+ i))
+  )
+  
+  ;; Borrar TODO el registro corrupto
+  (while (> (vla-NumCustomInfo props) 0)
+    (vl-catch-all-apply 'vla-RemoveCustomByIndex (list props 0))
+  )
+  
+  ;; Inyectarlas de nuevo limpias
+  (foreach item dict
+    (vla-AddCustomInfo props (cadr item) (cddr item))
+  )
+  (princ "\n[SINCAL] ¡Duplicados eliminados! Ya puedes abrir DWGPROPS sin errores.")
   (princ)
 )
 
