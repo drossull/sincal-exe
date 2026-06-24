@@ -134,6 +134,14 @@ class ActualizadorCAD(ctk.CTk):
         self.tray_activo = True
         threading.Thread(target=self.tray.run, daemon=True).start()
 
+    def mostrar_notificacion(self, titulo, mensaje):
+        # Lanza el mensaje solo si el ícono de la bandeja está activo
+        if getattr(self, 'tray_activo', False) and hasattr(self, 'tray'):
+            try:
+                self.tray.notify(mensaje, titulo)
+            except Exception:
+                pass
+
     # ==========================================================
     # CONFIGURACIÓN DE INICIO AUTOMÁTICO
     # ==========================================================
@@ -649,6 +657,9 @@ class ActualizadorCAD(ctk.CTk):
             self.enviar_telemetria(version_nube)
             self.cargar_info_github()
             self.renderizar_menu_wiki()
+            
+            # --- LANZAR LA NOTIFICACIÓN AL FINALIZAR ---
+            self.mostrar_notificacion("SINCAL Actualizado", f"Se instalaron las últimas herramientas de la versión {version_nube}.")
             
         except Exception as e: 
             self.log(f"[!] Error durante la descarga: {e}")
