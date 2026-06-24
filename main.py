@@ -864,7 +864,7 @@ class ActualizadorCAD(ctk.CTk):
 
     def loop_verificador_actualizaciones_silencioso(self):
         while True:
-            time.sleep(600)  
+            time.sleep(15)  
             try:
                 r = requests.get(URL_BASE_RAW + "version.json", timeout=5)
                 version_nube = r.json().get("version")
