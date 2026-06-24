@@ -31,11 +31,11 @@
 
 ;;; =========================================================================
 ;;; COMANDO 1: CUSTOM-PROPS 
-;;; Pregunta y permite editar las 12 propiedades en el archivo actual
+;;; Pregunta y permite editar las 13 propiedades en el archivo actual
 ;;; =========================================================================
 (defun c:CUSTOM-PROPS (/ listaProps val input)
   (setq listaProps 
-    '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Sector" "Tramo" "Revision" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos" "Nombre_Plano")
+    '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Sector" "Tramo" "Revision" "Comentario-rev" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos" "Nombre_Plano")
   )
   (princ "\n--- EDITOR DE PROPIEDADES SINCAL ---")
   (foreach prop listaProps
@@ -52,15 +52,15 @@
 
 ;;; =========================================================================
 ;;; COMANDO 2: COPY-PROPS 
-;;; Copia las 11 propiedades generales a la memoria de Windows
+;;; Copia las 12 propiedades generales a la memoria de Windows
 ;;; =========================================================================
 (defun c:COPY-PROPS (/ propsToCopy val regPath)
   ;; Ruta en el registro para que sobreviva entre pestañas
   (setq regPath "HKEY_CURRENT_USER\\Software\\SINCAL\\CopiedProps")
   
-  ;; Copia las 11 que se repiten en todo el proyecto
+  ;; Copia las 12 que se repiten en todo el proyecto
   (setq propsToCopy 
-    '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Sector" "Tramo" "Revision" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos")
+    '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Sector" "Tramo" "Revision" "Comentario-rev" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos")
   )
   
   (foreach prop propsToCopy
@@ -73,13 +73,13 @@
 
 ;;; =========================================================================
 ;;; COMANDO 3: PASTE-PROPS 
-;;; Pega las 11 propiedades generales y pregunta solo por el Nombre del Plano
+;;; Pega las 12 propiedades generales y pregunta solo por el Nombre del Plano
 ;;; =========================================================================
 (defun c:PASTE-PROPS (/ regPath propsToPaste propsToAsk val input)
   (setq regPath "HKEY_CURRENT_USER\\Software\\SINCAL\\CopiedProps")
   
-  ;; 11 propiedades maestras
-  (setq propsToPaste '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Sector" "Tramo" "Revision" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos"))
+  ;; 12 propiedades maestras
+  (setq propsToPaste '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Sector" "Tramo" "Revision" "Comentario-rev" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos"))
   
   ;; 1 propiedad variable por plano
   (setq propsToAsk '("Nombre_Plano"))
