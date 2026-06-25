@@ -1,75 +1,114 @@
-(defun c:CEVIADA ( / p1 p2 p3 ang_rad d_esv d_rect d_rect_cm text_override ent edata user_ang loop)
+(vl-load-com) ; Carga las funciones de Visual LISP necesarias
+
+(defun c:CEVIADA ( / old_err *error* p1 p2 pre_ent last_ent ent_cursor ang_rad factor acadObj doc util user_ang loop _InyectarCampo)
   
-  ;; 1. Si es la PRIMERA VEZ que se ejecuta, obliga a ingresar el ángulo.
+  ;; 1. Inicialización de entornos de Visual LISP
+  (setq acadObj (vlax-get-acad-object)
+        doc (vla-get-ActiveDocument acadObj)
+        util (vla-get-Utility doc))
+
+  ;; 2. Lógica del ángulo de esviaje
   (if (not *ang_esviaje*)
     (progn
       (setq *ang_esviaje* (getreal "\nEs la primera vez que usas el comando. Ingrese el ángulo de esviaje en grados: "))
-      ;; Si el usuario presiona Enter sin escribir nada, asignamos 15 por defecto.
       (if (not *ang_esviaje*) (setq *ang_esviaje* 15.0)) 
     )
   )
+  (setq ang_rad (* pi (/ *ang_esviaje* 180.0))
+        factor (cos ang_rad))
 
-  ;; 2. Bucle para permitir elegir entre "Hacer Clic" o "Cambiar Ángulo"
+  ;; ---> FUNCIÓN INTERNA: Inyecta la fórmula a una cota específica
+  (defun _InyectarCampo (vla_obj / obj_id f_str)
+    (if (vlax-method-applicable-p util 'GetObjectIdString)
+      (setq obj_id (vla-GetObjectIdString util vla_obj :vlax-false))
+      (setq obj_id (itoa (vla-get-ObjectId vla_obj)))
+    )
+    (setq f_str (strcat 
+      "<>\\X("
+      "%<\\AcExpr (%<\\AcObjProp Object(%<\\_ObjId " obj_id ">%).Measurement>% * " (rtos factor 2 8) ") \\f \"%lu2%pr0\">%"
+      ")"
+    ))
+    (vla-put-TextOverride vla_obj f_str)
+  )
+
+  ;; ---> MANEJADOR DE ERRORES: Captura la tecla ESC para no perder el trabajo
+  (setq old_err *error*)
+  (defun *error* (msg)
+    ;; Si existe una cota base y se crearon nuevas cotas continuas, aplícales el cálculo
+    (if (and last_ent (not (eq last_ent (entlast))))
+      (progn
+        (setq ent_cursor last_ent)
+        (while (setq ent_cursor (entnext ent_cursor))
+          (if (wcmatch (cdr (assoc 0 (entget ent_cursor))) "*DIMENSION")
+            (_InyectarCampo (vlax-ename->vla-object ent_cursor))
+          )
+        )
+        (vla-Regen doc acActiveViewport)
+      )
+    )
+    (setq *error* old_err) ; Restaurar AutoCAD a la normalidad
+    (princ "\nComando finalizado.")
+    (princ)
+  )
+
+  ;; 3. Bucle para interactuar (Hacer clic o cambiar ángulo)
   (setq loop T)
   (while loop
-    ;; Configuramos "Angulo" como palabra clave permitida
     (initget "Angulo")
-    ;; Pedimos el primer punto, mostrando el ángulo actual en la consola
-    (setq p1 (getpoint (strcat "\nSeleccione el primer punto o [Angulo para cambiar de " (rtos *ang_esviaje* 2 2) "°]: ")))
+    (setq p1 (getpoint (strcat "\nSeleccione el primer punto (Medida Esviada) o [Angulo para cambiar de " (rtos *ang_esviaje* 2 2) "°]: ")))
 
     (cond
-      ;; CASO A: El usuario escribió "A" o hizo clic en "Angulo"
       ((= p1 "Angulo")
-       (setq user_ang (getreal (strcat "\nIngrese el nuevo ángulo de esviaje en grados <" (rtos *ang_esviaje* 2 2) ">: ")))
+       (setq user_ang (getreal (strcat "\nIngrese el nuevo ángulo en grados <" (rtos *ang_esviaje* 2 2) ">: ")))
        (if user_ang (setq *ang_esviaje* user_ang))
-       ;; El bucle vuelve a empezar, pidiendo el primer punto nuevamente.
+       ;; Se actualiza la matemática por si cambió el ángulo
+       (setq ang_rad (* pi (/ *ang_esviaje* 180.0)) factor (cos ang_rad))
       )
-
-      ;; CASO B: El usuario hizo clic en la pantalla (coordenada válida)
-      ((= (type p1) 'LIST)
-       (setq loop nil) ;; Rompe el bucle para continuar con la cota
-      )
-
-      ;; CASO C: El usuario presionó Enter o Esc sin hacer nada
-      (T
-       (setq loop nil)
-      )
+      ((= (type p1) 'LIST) (setq loop nil))
+      (T (setq loop nil))
     )
   )
 
-  ;; 3. Si tenemos un punto 1 válido, procedemos con la cota
+  ;; 4. Procedimiento Principal
   (if (and p1 (= (type p1) 'LIST))
-    (progn
-      (if (and
-            (setq p2 (getpoint p1 "\nSeleccione el segundo punto del elemento: "))
-            (setq p3 (getpoint "\nSeleccione la ubicación de la línea de cota: "))
+    (if (setq p2 (getpoint p1 "\nSeleccione el segundo punto del elemento esviado: "))
+      (progn
+        (setq pre_ent (entlast)) ; Tomamos una "foto" de la base de datos antes de dibujar
+        
+        ;; ---> COTA INICIAL CON PREVISUALIZACIÓN (PAUSE)
+        (princ "\nEspecifique la ubicación de la cota: ")
+        (command "_dimaligned" p1 p2 pause)
+
+        ;; Verificamos si el usuario realmente colocó la cota (no canceló)
+        (if (not (eq pre_ent (entlast)))
+          (progn
+            (setq last_ent (entlast)) ; Esta es nuestra primera cota
+            (_InyectarCampo (vlax-ename->vla-object last_ent))
+            (vla-Regen doc acActiveViewport) ; Actualizamos la pantalla al instante
+
+            ;; ---> MODO CONTINUO CON PREVISUALIZACIÓN NATIVA
+            (princ "\nMODO CONTINUO -> Seleccione los siguientes puntos (Enter o ESC para terminar)...")
+            (command "_dimcontinue")
+            
+            ;; Pausa indefinida mientras la cota continua esté activa
+            (while (> (getvar "CMDACTIVE") 0)
+              (command pause)
+            )
+
+            ;; Si el usuario termina presionando Enter (en vez de ESC), procesamos todo aquí:
+            (setq ent_cursor last_ent)
+            (while (setq ent_cursor (entnext ent_cursor))
+              (if (wcmatch (cdr (assoc 0 (entget ent_cursor))) "*DIMENSION")
+                (_InyectarCampo (vlax-ename->vla-object ent_cursor))
+              )
+            )
+            (vla-Regen doc acActiveViewport)
           )
-        (progn
-          ;; 4. Calcula la distancia esviada (real) y la recta (proyectada)
-          (setq ang_rad (* pi (/ *ang_esviaje* 180.0)))
-          (setq d_esv (distance p1 p2))
-          (setq d_rect (* d_esv (cos ang_rad)))
-          
-          ;; ---> NUEVO: Multiplicamos por 100 para pasar de metros a centímetros
-          (setq d_rect_cm (* d_rect 100.0))
-
-          ;; 5. Formatea el texto: <> es el valor original, \X salta la línea
-          ;; (rtos d_rect_cm 2 1) muestra el valor en cm con 1 decimal. 
-          ;; Si quieres números enteros pon un 0, si quieres 2 decimales pon un 2.
-          (setq text_override (strcat "<>\\X(" (rtos d_rect_cm 2 1) ")"))
-
-          ;; 6. Dibuja la cota alineada usando el estilo actual
-          (command "_dimaligned" p1 p2 p3)
-
-          ;; 7. Captura la última entidad dibujada (la cota) y le inyecta el nuevo texto
-          (setq ent (entlast))
-          (setq edata (entget ent))
-          (setq edata (subst (cons 1 text_override) (assoc 1 edata) edata))
-          (entmod edata)
         )
-        (princ "\nComando cancelado o faltan puntos.")
       )
     )
   )
+  
+  (setq *error* old_err) ; Si todo salió bien, restauramos los errores al salir
   (princ)
 )
