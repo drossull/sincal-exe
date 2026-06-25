@@ -1,4 +1,4 @@
-(defun c:CEVIADA ( / p1 p2 p3 ang_rad d_esv d_rect text_override ent edata user_ang loop)
+(defun c:CEVIADA ( / p1 p2 p3 ang_rad d_esv d_rect d_rect_cm text_override ent edata user_ang loop)
   
   ;; 1. Si es la PRIMERA VEZ que se ejecuta, obliga a ingresar el ángulo.
   (if (not *ang_esviaje*)
@@ -49,9 +49,14 @@
           (setq ang_rad (* pi (/ *ang_esviaje* 180.0)))
           (setq d_esv (distance p1 p2))
           (setq d_rect (* d_esv (cos ang_rad)))
+          
+          ;; ---> NUEVO: Multiplicamos por 100 para pasar de metros a centímetros
+          (setq d_rect_cm (* d_rect 100.0))
 
           ;; 5. Formatea el texto: <> es el valor original, \X salta la línea
-          (setq text_override (strcat "<>\\X(" (rtos d_rect 2 3) ")"))
+          ;; (rtos d_rect_cm 2 1) muestra el valor en cm con 1 decimal. 
+          ;; Si quieres números enteros pon un 0, si quieres 2 decimales pon un 2.
+          (setq text_override (strcat "<>\\X(" (rtos d_rect_cm 2 1) ")"))
 
           ;; 6. Dibuja la cota alineada usando el estilo actual
           (command "_dimaligned" p1 p2 p3)
