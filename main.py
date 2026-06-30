@@ -115,14 +115,14 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkLabel(frame_top, text="DICCIONARIO DE DATOS (ESTRIBOS)", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(side="left", padx=15, pady=15)
         ctk.CTkButton(frame_top, text="📁 Cargar JSON de Proyecto", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", corner_radius=0, command=self.cargar_json_bim).pack(side="right", padx=15, pady=15)
 
-        self.tab_estribo = ctk.CTkTabview(self.tab_armaduras, width=800, height=400, fg_color="#1E1E1E", segmented_button_selected_color=COLOR_ACENTO)
+        self.tab_estribo = ctk.CTkTabview(self.tab_armaduras, width=800, height=420, fg_color="#1E1E1E", segmented_button_selected_color=COLOR_ACENTO)
         self.tab_estribo.pack(padx=20, pady=5, fill="x")
         self.tab_estribo._segmented_button.configure(font=FUENTE_NORMAL)
 
         tab_zap, tab_muros, tab_consola = [self.tab_estribo.add(x) for x in ["Geometría Zapata", "Muros", "Consola y Topes"]]
 
         # --- I. DIMENSIONES GENERALES ---
-        ctk.CTkLabel(tab_zap, text="DIMENSIONES GENERALES (cm):", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=(10,0))
+        ctk.CTkLabel(tab_zap, text="I. DIMENSIONES GENERALES (cm):", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=(10,0))
         
         ctk.CTkLabel(tab_zap, text="Largo:", font=FUENTE_NORMAL).grid(row=1, column=0, sticky="w", padx=10, pady=5)
         self.ent_z_largo = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=80, corner_radius=0); self.ent_z_largo.grid(row=1, column=1, padx=5, pady=5)
@@ -134,7 +134,7 @@ class ActualizadorCAD(ctk.CTk):
         self.ent_z_alto = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=80, corner_radius=0); self.ent_z_alto.grid(row=1, column=5, padx=5, pady=5)
 
         # --- II. RECUBRIMIENTOS ---
-        ctk.CTkLabel(tab_zap, text="RECUBRIMIENTOS (cm):", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).grid(row=2, column=0, columnspan=2, sticky="w", padx=10, pady=(15,0))
+        ctk.CTkLabel(tab_zap, text="II. RECUBRIMIENTOS (cm):", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).grid(row=2, column=0, columnspan=2, sticky="w", padx=10, pady=(15,0))
         
         ctk.CTkLabel(tab_zap, text="Cara inferior:", font=FUENTE_NORMAL).grid(row=3, column=0, sticky="w", padx=10, pady=5)
         self.ent_rec_inf = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=80, corner_radius=0); self.ent_rec_inf.grid(row=3, column=1, padx=5, pady=5)
@@ -146,89 +146,208 @@ class ActualizadorCAD(ctk.CTk):
         self.ent_rec_lat = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=80, corner_radius=0); self.ent_rec_lat.grid(row=3, column=5, padx=5, pady=5)
 
         # --- III. ARMADURA ---
-        ctk.CTkLabel(tab_zap, text="ARMADURA:", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).grid(row=4, column=0, sticky="w", padx=10, pady=(15,0))
+        ctk.CTkLabel(tab_zap, text="III. ARMADURA:", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).grid(row=4, column=0, sticky="w", padx=10, pady=(15,0))
         
-        # Malla Inferior
         ctk.CTkLabel(tab_zap, text="Malla inferior:", font=FUENTE_NORMAL).grid(row=5, column=0, sticky="w", padx=10, pady=5)
         ctk.CTkLabel(tab_zap, text="Ø (mm):", font=FUENTE_NORMAL).grid(row=5, column=1, sticky="e", padx=5, pady=5)
         self.ent_phi_inf = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=60, corner_radius=0); self.ent_phi_inf.grid(row=5, column=2, sticky="w", padx=5, pady=5)
         ctk.CTkLabel(tab_zap, text="@ (cm):", font=FUENTE_NORMAL).grid(row=5, column=3, sticky="e", padx=5, pady=5)
         self.ent_espac_inf = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=60, corner_radius=0); self.ent_espac_inf.grid(row=5, column=4, sticky="w", padx=5, pady=5)
 
-        # Malla Superior
         ctk.CTkLabel(tab_zap, text="Malla superior:", font=FUENTE_NORMAL).grid(row=6, column=0, sticky="w", padx=10, pady=5)
         ctk.CTkLabel(tab_zap, text="Ø (mm):", font=FUENTE_NORMAL).grid(row=6, column=1, sticky="e", padx=5, pady=5)
         self.ent_phi_sup = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=60, corner_radius=0); self.ent_phi_sup.grid(row=6, column=2, sticky="w", padx=5, pady=5)
         ctk.CTkLabel(tab_zap, text="@ (cm):", font=FUENTE_NORMAL).grid(row=6, column=3, sticky="e", padx=5, pady=5)
         self.ent_espac_sup = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=60, corner_radius=0); self.ent_espac_sup.grid(row=6, column=4, sticky="w", padx=5, pady=5)
 
-        # Laterales
         ctk.CTkLabel(tab_zap, text="Laterales:", font=FUENTE_NORMAL).grid(row=7, column=0, sticky="w", padx=10, pady=5)
         ctk.CTkLabel(tab_zap, text="Ø (mm):", font=FUENTE_NORMAL).grid(row=7, column=1, sticky="e", padx=5, pady=5)
         self.ent_phi_lat = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=60, corner_radius=0); self.ent_phi_lat.grid(row=7, column=2, sticky="w", padx=5, pady=5)
         ctk.CTkLabel(tab_zap, text="@ (cm):", font=FUENTE_NORMAL).grid(row=7, column=3, sticky="e", padx=5, pady=5)
         self.ent_espac_lat = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=60, corner_radius=0); self.ent_espac_lat.grid(row=7, column=4, sticky="w", padx=5, pady=5)
+        
+        ctk.CTkLabel(tab_zap, text="Gancho (cm):", font=FUENTE_NORMAL).grid(row=7, column=5, sticky="e", padx=5, pady=5)
+        self.ent_gancho = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=60, corner_radius=0); self.ent_gancho.grid(row=7, column=6, sticky="w", padx=5, pady=5)
 
-        # Inicialización de placeholders base
+        # Inicialización
         for ent, val in [(self.ent_z_largo, "750"), (self.ent_z_ancho, "1159.6"), (self.ent_z_alto, "150"), 
                          (self.ent_rec_inf, "7.5"), (self.ent_rec_sup, "5"), (self.ent_rec_lat, "5"), 
                          (self.ent_phi_inf, "22"), (self.ent_espac_inf, "15"),
                          (self.ent_phi_sup, "22"), (self.ent_espac_sup, "15"),
-                         (self.ent_phi_lat, "16"), (self.ent_espac_lat, "20")]:
+                         (self.ent_phi_lat, "16"), (self.ent_espac_lat, "20"),
+                         (self.ent_gancho, "20")]:
             ent.insert(0, val)
 
-        # BOTONERA DE LAS 4 VISTAS
-        frame_vistas = ctk.CTkFrame(self.tab_armaduras, fg_color="transparent")
-        frame_vistas.pack(fill="x", padx=20, pady=20)
+        frame_vistas = ctk.CTkFrame(self.tab_armaduras, fg_color="transparent"); frame_vistas.pack(fill="x", padx=20, pady=20)
         ctk.CTkLabel(frame_vistas, text="GENERACIÓN DE VISTAS 2D:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(anchor="w", pady=(0,10))
-        
         btn_container = ctk.CTkFrame(frame_vistas, fg_color="transparent"); btn_container.pack(fill="x")
         
-        vistas = [("1. Vista Frontal", "FRONTAL"), ("2. Sección A-A", "SEC_A"), 
-                  ("3. Sección B-B", "SEC_B"), ("4. Sección C-C", "SEC_C")]
-                  
-        for txt, vista in vistas:
-            ctk.CTkButton(btn_container, text=txt, font=FUENTE_NORMAL, corner_radius=0, height=40, 
-                          fg_color="transparent", border_width=1, border_color=COLOR_ACENTO, text_color=COLOR_TEXTO, 
-                          hover_color="#444444", command=lambda v=vista: self.generar_vista_cad(v)).pack(side="left", expand=True, fill="x", padx=2)
+        for txt, vista in [("1. Vista Frontal", "FRONTAL"), ("2. Sección A-A", "SEC_A"), ("3. Sección B-B", "SEC_B"), ("4. Sección C-C", "SEC_C")]:
+            ctk.CTkButton(btn_container, text=txt, font=FUENTE_NORMAL, corner_radius=0, height=40, fg_color="transparent", border_width=1, border_color=COLOR_ACENTO, text_color=COLOR_TEXTO, hover_color="#444444", command=lambda v=vista: self.generar_vista_cad(v)).pack(side="left", expand=True, fill="x", padx=2)
 
     def generar_vista_cad(self, tipo_vista):
         try:
-            lz, az, hz = float(self.ent_z_largo.get()), float(self.ent_z_ancho.get()), float(self.ent_z_alto.get())
-            rec_inf, rec_sup, rec_lat = float(self.ent_rec_inf.get()), float(self.ent_rec_sup.get()), float(self.ent_rec_lat.get())
-            # Extraemos la armadura de la malla inferior para la vista frontal de la zapata
-            phi_inf, esp_inf = float(self.ent_phi_inf.get()), float(self.ent_espac_inf.get())
-        except ValueError: return messagebox.showerror("Error", "Entradas numéricas inválidas en la pestaña Zapata.")
+            # 1. Dimensiones a METROS
+            lz = float(self.ent_z_largo.get()) / 100.0
+            az = float(self.ent_z_ancho.get()) / 100.0
+            hz = float(self.ent_z_alto.get()) / 100.0
+            
+            # Recubrimientos a METROS
+            r_inf = float(self.ent_rec_inf.get()) / 100.0
+            r_sup = float(self.ent_rec_sup.get()) / 100.0
+            r_lat = float(self.ent_rec_lat.get()) / 100.0
+            
+            # Diámetros y Separaciones a METROS
+            phi_inf, esp_inf = float(self.ent_phi_inf.get()) / 1000.0, float(self.ent_espac_inf.get()) / 100.0
+            phi_sup, esp_sup = float(self.ent_phi_sup.get()) / 1000.0, float(self.ent_espac_sup.get()) / 100.0
+            phi_lat, esp_lat = float(self.ent_phi_lat.get()) / 1000.0, float(self.ent_espac_lat.get()) / 100.0
+            
+            # Gancho GUI a METROS
+            l_gancho = float(self.ent_gancho.get()) / 100.0
+            
+            # Tabla de traslapes en METROS según diámetro (Normativo)
+            traslapes = {12: 0.80, 16: 1.10, 18: 1.20, 22: 1.50, 25: 1.70, 28: 1.90, 32: 2.20, 36: 2.50}
+            t_lap_inf = traslapes.get(int(self.ent_phi_inf.get()), 1.50)
+            t_lap_sup = traslapes.get(int(self.ent_phi_sup.get()), 1.50)
+
+        except ValueError: 
+            return messagebox.showerror("Error", "Entradas numéricas inválidas.")
 
         ruta_temp = os.path.join(RUTA_LOCAL_APP, f"Estribo_{tipo_vista}.lsp")
         
-        lisp_safe_header = """(setvar "CMDECHO" 0)
-          (setq old_os (getvar "OSMODE") old_att (getvar "ATTREQ"))
-          (setvar "OSMODE" 0) (setvar "ATTREQ" 0)
+        # Limpieza de entorno y capa
+        lisp_safe_header = f"""(setvar "CMDECHO" 0) (setq old_att (getvar "ATTREQ") old_fillet (getvar "FILLETRAD")) (setvar "ATTREQ" 0)
           (if (not (tblsearch "LAYER" "FIERROS")) (command "._layer" "_M" "FIERROS" "_C" "5" "" "") (command "._layer" "_T" "FIERROS" "_ON" "FIERROS" "_S" "FIERROS" "" "._layer" "_C" "5" "FIERROS" ""))"""
-          
-        lisp_safe_footer = """(setvar "OSMODE" old_os) (setvar "ATTREQ" old_att) (princ)"""
+        lisp_safe_footer = """(setvar "ATTREQ" old_att) (setvar "FILLETRAD" old_fillet) (princ)"""
 
         if tipo_vista == "FRONTAL":
-            lisp_code = f"""(defun c:SINCAL-DIBUJAR (/ p1 p2 p_start p_end dist num_b i pto nom_b old_os old_att)
+            lisp_code = f"""(defun c:SINCAL-DIBUJAR (/ p1 p2 X_left X_right Y_bot Y_top cv_xl cv_xr cv_yb cv_yt cx_l cx_r cy_b cy_t rad_b rad_t arr_x_start arr_x_end arr_y_b arr_y_t arr_xl arr_xr arr_y_start arr_y_end len_u_bot len_u_top pti_b pbi_b pbd_b ptd_b x_split_b pt_s1_b pt_s2_start pbd_b_up ptd_b_up pbi_t pti_t ptd_t pbd_t x_split_t pt_s1_t pt_s2_start_t pti_t_dn pbi_t_dn draw-circles-hatch old_att old_fillet c_ent)
               {lisp_safe_header}
-              (setq nom_b "fi{int(phi_inf)}")
-              (setq p1 (getpoint "\\n[SINCAL] Clic esquina INFERIOR-IZQUIERDA de la zapata (Hormigón): "))
-              (if p1 (progn
-                (setq p2 (getpoint p1 "\\n[SINCAL] Clic esquina INFERIOR-DERECHA de la zapata (Hormigón): "))
-                (if p2 (progn
-                    (setq p_start (list (+ (car p1) {rec_lat}) (+ (cadr p1) {rec_inf}) 0.0))
-                    (setq p_end (list (- (car p2) {rec_lat}) (+ (cadr p2) {rec_inf}) 0.0))
-                    (setq dist (- (car p_end) (car p_start)))
-                    
-                    (setq num_b (1+ (fix (/ dist {esp_inf}))))
-                    (setq i 0)
-                    (while (< i num_b)
-                      (setq pto (list (+ (car p_start) (* i {esp_inf})) (cadr p_start) 0.0))
-                      (if (tblsearch "BLOCK" nom_b) (command "._insert" nom_b "_NON" pto 1 1 0) (command "._circle" "_NON" pto {phi_inf/20.0}))
-                      (setq i (1+ i))
+              
+              ;; Dibujo puro de circulos + Hatch ANSI31 color bylayer
+              (defun draw-circles-hatch (pt1 pt2 esp phi_m / dist ang current_dist pto c_ent)
+                (setq dist (distance pt1 pt2) ang (angle pt1 pt2) current_dist 0.0)
+                (if (> dist 0)
+                  (progn
+                    (while (<= current_dist dist)
+                      (setq pto (polar pt1 ang current_dist))
+                      (command "._circle" "_NON" pto (/ phi_m 2.0))
+                      (setq c_ent (entlast))
+                      (command "._-hatch" "_P" "ANSI31" "1.6" "0" "_S" c_ent "" "")
+                      (setq current_dist (+ current_dist esp))
                     )
-                    (princ (strcat "\\n[SINCAL] Colocados " (itoa num_b) " fierros en X+."))
+                    (if (> (- dist (- current_dist esp)) 0.001)
+                      (progn
+                        (command "._circle" "_NON" pt2 (/ phi_m 2.0))
+                        (setq c_ent (entlast))
+                        (command "._-hatch" "_P" "ANSI31" "1.6" "0" "_S" c_ent "" "")
+                      )
+                    )
+                  )
+                )
+              )
+
+              (setq p1 (getpoint "\\n[SINCAL] Clic esquina INFERIOR-IZQUIERDA (Hormigon): "))
+              (if p1 (progn
+                (setq p2 (getcorner p1 "\\n[SINCAL] Clic esquina SUPERIOR-DERECHA (Hormigon): "))
+                (if p2 (progn
+                    (setq X_left (min (car p1) (car p2)) X_right (max (car p1) (car p2)))
+                    (setq Y_bot (min (cadr p1) (cadr p2)) Y_top (max (cadr p1) (cadr p2)))
+                    
+                    ;; 1. Lineas de Recubrimiento Puro (0 width lines)
+                    (setq cv_xl (+ X_left {r_lat}))
+                    (setq cv_xr (- X_right {r_lat}))
+                    (setq cv_yb (+ Y_bot {r_inf}))
+                    (setq cv_yt (- Y_top {r_sup}))
+                    
+                    ;; 2. Coordenadas EJE de las U-Bars
+                    (setq cy_b cv_yb)
+                    (setq cy_t cv_yt)
+                    ;; Tangentes verticales abrazando circulos laterales por DENTRO
+                    (setq cx_l (+ cv_xl {phi_lat}))
+                    (setq cx_r (- cv_xr {phi_lat}))
+                    
+                    (setq rad_b (* 3.0 {phi_inf}))
+                    (setq rad_t (* 3.0 {phi_sup}))
+                    
+                    ;; --- DIBUJO DE MALS (CIRCULOS + HATCH) ---
+                    ;; Limites en X (respetando tangencia de curvas)
+                    (setq arr_x_start (+ cx_l rad_b))
+                    (setq arr_x_end (- cx_r rad_b))
+                    
+                    ;; Inferior (Sentada SOBRE U-Bar)
+                    (setq arr_y_b (+ cy_b (/ {phi_inf} 2.0)))
+                    (draw-circles-hatch (list arr_x_start arr_y_b 0.0) (list arr_x_end arr_y_b 0.0) {esp_inf} {phi_inf})
+                    
+                    ;; Superior (Colgando DEBAJO U-Bar)
+                    (setq arr_y_t (- cy_t (/ {phi_sup} 2.0)))
+                    (draw-circles-hatch (list arr_x_start arr_y_t 0.0) (list arr_x_end arr_y_t 0.0) {esp_sup} {phi_sup})
+                    
+                    ;; Laterales
+                    (setq arr_xl (+ cv_xl (/ {phi_lat} 2.0)))
+                    (setq arr_xr (- cv_xr (/ {phi_lat} 2.0)))
+                    (setq arr_y_start (+ cy_b rad_b))
+                    (setq arr_y_end (- cy_t rad_t))
+                    
+                    (draw-circles-hatch (list arr_xl arr_y_start 0.0) (list arr_xl arr_y_end 0.0) {esp_lat} {phi_lat})
+                    (draw-circles-hatch (list arr_xr arr_y_start 0.0) (list arr_xr arr_y_end 0.0) {esp_lat} {phi_lat})
+                    
+                    ;; --- DIBUJO U-BAR INFERIOR (12m MAX, TRASLAPE IZQUIERDA) ---
+                    (setq len_u_bot (+ (* 2.0 {l_gancho}) (- cx_r cx_l)))
+                    (setq pti_b (list cx_l (+ cy_b {l_gancho})))
+                    (setq pbi_b (list cx_l cy_b))
+                    (setq pbd_b (list cx_r cy_b))
+                    (setq ptd_b (list cx_r (+ cy_b {l_gancho})))
+                    
+                    (setvar "FILLETRAD" rad_b)
+                    (if (<= len_u_bot 12.0)
+                      (progn
+                        (command "._pline" "_NON" pti_b "_NON" pbi_b "_NON" pbd_b "_NON" ptd_b "")
+                        (command "._fillet" "P" (entlast))
+                      )
+                      (progn
+                        ;; Barra 1: Arranca desde Izquierda
+                        (setq x_split_b (+ cx_l (- 12.0 {l_gancho})))
+                        (setq pt_s1_b (list x_split_b cy_b))
+                        (command "._pline" "_NON" pti_b "_NON" pbi_b "_NON" pt_s1_b "")
+                        (command "._fillet" "P" (entlast))
+                        ;; Barra 2: Traslape
+                        (setq pt_s2_start (list (- x_split_b {t_lap_inf}) (+ cy_b {phi_inf})))
+                        (setq pbd_b_up (list cx_r (+ cy_b {phi_inf})))
+                        (setq ptd_b_up (list cx_r (+ cy_b {phi_inf} {l_gancho})))
+                        (command "._pline" "_NON" pt_s2_start "_NON" pbd_b_up "_NON" ptd_b_up "")
+                        (command "._fillet" "P" (entlast))
+                      )
+                    )
+                    
+                    ;; --- DIBUJO U-BAR SUPERIOR (12m MAX, TRASLAPE DERECHA) ---
+                    (setq len_u_top (+ (* 2.0 {l_gancho}) (- cx_r cx_l)))
+                    (setq pbi_t (list cx_l (- cy_t {l_gancho})))
+                    (setq pti_t (list cx_l cy_t))
+                    (setq ptd_t (list cx_r cy_t))
+                    (setq pbd_t (list cx_r (- cy_t {l_gancho})))
+                    
+                    (setvar "FILLETRAD" rad_t)
+                    (if (<= len_u_top 12.0)
+                      (progn
+                        (command "._pline" "_NON" pbi_t "_NON" pti_t "_NON" ptd_t "_NON" pbd_t "")
+                        (command "._fillet" "P" (entlast))
+                      )
+                      (progn
+                        ;; Barra 1: Arranca desde Derecha
+                        (setq x_split_t (- cx_r (- 12.0 {l_gancho})))
+                        (setq pt_s1_t (list x_split_t cy_t))
+                        (command "._pline" "_NON" pbd_t "_NON" ptd_t "_NON" pt_s1_t "")
+                        (command "._fillet" "P" (entlast))
+                        ;; Barra 2: Traslape hacia izquierda (desfasada abajo)
+                        (setq pt_s2_start_t (list (+ x_split_t {t_lap_sup}) (- cy_t {phi_sup})))
+                        (setq pti_t_dn (list cx_l (- cy_t {phi_sup})))
+                        (setq pbi_t_dn (list cx_l (- cy_t {phi_sup} {l_gancho})))
+                        (command "._pline" "_NON" pt_s2_start_t "_NON" pti_t_dn "_NON" pbi_t_dn "")
+                        (command "._fillet" "P" (entlast))
+                      )
+                    )
+                    (princ "\\n[SINCAL] Armadura estructural calculada e inyectada.")
                 ))
               )) 
               {lisp_safe_footer}
@@ -460,17 +579,25 @@ class ActualizadorCAD(ctk.CTk):
 
     def motor_actualizacion(self):
         try:
-            if os.path.exists(RUTA_LOCAL_APP): shutil.rmtree(RUTA_LOCAL_APP)
+            # ❌ BOMBA ELIMINADA: if os.path.exists(RUTA_LOCAL_APP): shutil.rmtree(RUTA_LOCAL_APP)
+            
+            # Solo aseguramos que la carpeta exista, sin borrar NADA de lo que ya tiene adentro
             os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
             r = requests.get(URL_BASE_RAW + "version.json").json()
             archivos = r.get("archivos", []) + ["README.md"]
             
             for a in archivos:
-                r_save = os.path.join(RUTA_LOCAL_APP, a); os.makedirs(os.path.dirname(r_save), exist_ok=True)
+                r_save = os.path.join(RUTA_LOCAL_APP, a)
+                os.makedirs(os.path.dirname(r_save), exist_ok=True)
                 res = requests.get(URL_BASE_RAW + a)
-                if res.status_code == 200: open(r_save, 'wb').write(res.content)
+                if res.status_code == 200: 
+                    with open(r_save, 'wb') as f:
+                        f.write(res.content)
             
-            self.generar_archivos_lisp(archivos); self.actualizar_rutas_registro(); self.actualizar_variable_entorno(); self.buscar_y_configurar_consolas()
+            self.generar_archivos_lisp(archivos)
+            self.actualizar_rutas_registro()
+            self.actualizar_variable_entorno()
+            self.buscar_y_configurar_consolas()
             self.version_local_actual = r.get("version", "v1.0.0")
             self.log(f"\n[!] SINCAL Sincronizado: {self.version_local_actual}")
             self.mostrar_notificacion("SINCAL Actualizado", f"Instalada versión {self.version_local_actual}")
@@ -504,8 +631,11 @@ class ActualizadorCAD(ctk.CTk):
         except: pass
 
     def generar_archivos_lisp(self, archivos):
-        r_sincal = os.path.join(RUTA_LOCAL_APP, "lisps", "SINCAL.lsp"); os.makedirs(os.path.dirname(r_sincal), exist_ok=True)
-        open(r_sincal, 'w', encoding='utf-8').write('(defun c:SINCAL () (princ "\\nEstandar oficial SINCAL cargado."))')
+        # 1. Definimos las rutas
+        r_sincal = os.path.join(RUTA_LOCAL_APP, "lisps", "SINCAL.lsp")
+        os.makedirs(os.path.dirname(r_sincal), exist_ok=True)
+        
+        # 2. Creamos SOLO el puente de arranque (acaddoc.lsp)
         r_acc = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
         with open(r_acc, 'w', encoding='utf-8') as f:
             r_sincal_esc = r_sincal.replace("\\", "\\\\")
