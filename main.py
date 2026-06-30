@@ -579,10 +579,14 @@ class ActualizadorCAD(ctk.CTk):
 
     def motor_actualizacion(self):
         try:
-            # ❌ BOMBA ELIMINADA: if os.path.exists(RUTA_LOCAL_APP): shutil.rmtree(RUTA_LOCAL_APP)
+            # 1. DESTRUCCIÓN TOTAL (Nuke & Pave): Borra la carpeta local y todo su contenido
+            if os.path.exists(RUTA_LOCAL_APP): 
+                shutil.rmtree(RUTA_LOCAL_APP)
             
-            # Solo aseguramos que la carpeta exista, sin borrar NADA de lo que ya tiene adentro
+            # 2. Reconstrucción desde cero
             os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
+            
+            # 3. Descarga de la nueva versión (La Fuente de la Verdad)
             r = requests.get(URL_BASE_RAW + "version.json").json()
             archivos = r.get("archivos", []) + ["README.md"]
             
@@ -594,15 +598,20 @@ class ActualizadorCAD(ctk.CTk):
                     with open(r_save, 'wb') as f:
                         f.write(res.content)
             
+            # 4. Post-procesamiento
             self.generar_archivos_lisp(archivos)
             self.actualizar_rutas_registro()
             self.actualizar_variable_entorno()
             self.buscar_y_configurar_consolas()
+            
             self.version_local_actual = r.get("version", "v1.0.0")
             self.log(f"\n[!] SINCAL Sincronizado: {self.version_local_actual}")
             self.mostrar_notificacion("SINCAL Actualizado", f"Instalada versión {self.version_local_actual}")
-        except Exception as e: self.log(f"[!] Error: {e}")
-        finally: self.btn_actualizar.configure(state="normal", text="Instalar / Actualizar Todo")
+            
+        except Exception as e: 
+            self.log(f"[!] Error crítico en actualización: {e}")
+        finally: 
+            self.btn_actualizar.configure(state="normal", text="Instalar / Actualizar Todo")
 
     def buscar_y_configurar_consolas(self):
         self.cad_exe_path = None
