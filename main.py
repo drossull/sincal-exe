@@ -18,16 +18,14 @@ from PIL import Image
 
 # --- 1. FORZAR MODO ADMINISTRADOR ---
 def is_admin():
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
-        return False
+    try: return ctypes.windll.shell32.IsUserAnAdmin()
+    except: return False
 
 if not is_admin():
     ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
     sys.exit()
 
-# --- CONFIGURACIÓN ---
+# --- CONFIGURACIÓN GLOBALES ---
 USUARIO_GITHUB = "drossull" 
 REPO_GITHUB = "sincal-exe"
 RAMA = "main" 
@@ -35,28 +33,16 @@ URL_BASE_RAW = f"https://raw.githubusercontent.com/{USUARIO_GITHUB}/{REPO_GITHUB
 RUTA_LOCAL_APP = os.path.join(os.getenv('APPDATA'), "Estandar SINCAL") 
 URL_WEBHOOK_SHEETS = "https://script.google.com/macros/s/AKfycbywJwskXQrAhNYHV559ngE5WAPa-bhvrfgcYg0ej_WDfxQMP5vmT31b66mEPqeFCchaPQ/exec"
 
-# Colores SINCAL
-COLOR_FONDO = "#2B2B2B"      
-COLOR_TITULO = "#FFBF00"     
-COLOR_TEXTO = "#CCCCCC"      
-COLOR_ACENTO = "#007FFF"     
-COLOR_MENU_HOVER = "#404040"
-
-# Fuentes Restauradas a Consolas
-FUENTE_TITULO = ("Consolas", 24, "bold")
-FUENTE_SUBTITULO = ("Consolas", 18, "bold")
-FUENTE_MENU = ("Consolas", 13)
-FUENTE_NORMAL = ("Consolas", 12)
-FUENTE_CONSOLA = ("Consolas", 11)
+COLOR_FONDO, COLOR_TITULO, COLOR_TEXTO, COLOR_ACENTO = "#2B2B2B", "#FFBF00", "#CCCCCC", "#007FFF"
+FUENTE_TITULO, FUENTE_SUBTITULO, FUENTE_MENU, FUENTE_NORMAL, FUENTE_CONSOLA = [
+    ("Consolas", 24, "bold"), ("Consolas", 18, "bold"), ("Consolas", 13), ("Consolas", 12), ("Consolas", 11)
+]
 
 ctk.set_appearance_mode("dark") 
 
 def obtener_ruta_recurso(ruta_relativa):
-    try:
-        ruta_base = sys._MEIPASS
-    except Exception:
-        ruta_base = os.path.abspath(".")
-    return os.path.join(ruta_base, ruta_relativa)
+    try: return os.path.join(sys._MEIPASS, ruta_relativa)
+    except: return os.path.abspath(ruta_relativa)
 
 class ActualizadorCAD(ctk.CTk):
     def __init__(self):
@@ -64,148 +50,268 @@ class ActualizadorCAD(ctk.CTk):
         self.title("SINCAL - Suite de Herramientas Professional")
         self.geometry("1000x800")
         self.configure(fg_color=COLOR_FONDO)
-        
-        try:
-            self.iconbitmap(obtener_ruta_recurso("logo.ico"))
+        try: self.iconbitmap(obtener_ruta_recurso("logo.ico"))
         except: pass
         
         self.version_local_actual = "v1.5.6"
-        self.tutoriales = {}
-        self.cad_exe_path = None
-        self.es_zwcad = False
-        self.cancelar_comando_vivo = False
-        self.ruta_renombre = ""
-        self.checkboxes_archivos = []
-        self.tray_activo = False
+        self.tutoriales, self.cad_exe_path, self.es_zwcad, self.cancelar_comando_vivo = {}, None, False, False
+        self.ruta_renombre, self.checkboxes_archivos, self.tray_activo = "", [], False
 
-        # --- INTERCEPTAR EL BOTÓN 'X' DE CERRAR ---
         self.protocol("WM_DELETE_WINDOW", self.ocultar_a_bandeja)
-
         self.main_scroll = ctk.CTkScrollableFrame(self, fg_color=COLOR_FONDO, corner_radius=0)
         self.main_scroll.pack(fill="both", expand=True)
 
-        self.tabview = ctk.CTkTabview(self.main_scroll, width=950, height=750, fg_color=COLOR_FONDO,
-                                      segmented_button_selected_color=COLOR_ACENTO)
+        self.tabview = ctk.CTkTabview(self.main_scroll, width=950, height=750, fg_color=COLOR_FONDO, segmented_button_selected_color=COLOR_ACENTO)
         self.tabview.pack(padx=20, pady=10)
         self.tabview._segmented_button.configure(font=FUENTE_NORMAL)
 
         self.tab_main = self.tabview.add("Sincronizador")
         self.tab_renombrado = self.tabview.add("Renombrado Avanzado")
+        self.tab_armaduras = self.tabview.add("Módulo Estructural")
         self.tab_docs = self.tabview.add("Documentación")
 
         self.setup_tab_sincronizador()
         self.setup_tab_renombrado()
+        self.setup_tab_armaduras()
         self.setup_tab_docs()
 
-        if getattr(sys, 'frozen', False):
-            self.configurar_inicio_con_windows()
-
+        if getattr(sys, 'frozen', False): self.configurar_inicio_con_windows()
         threading.Thread(target=self.cargar_info_github, daemon=True).start()
         threading.Thread(target=self.loop_verificador_actualizaciones_silencioso, daemon=True).start()
 
     # ==========================================================
-    # LÓGICA DE BANDEJA DE SISTEMA (SYSTEM TRAY)
+    # LÓGICA DE WINDOWS (SYSTEM TRAY / AUTOSTART)
     # ==========================================================
     def ocultar_a_bandeja(self):
-        self.withdraw()  # Esconde la ventana
+        self.withdraw()
         if not self.tray_activo:
-            self.mostrar_icono_bandeja()
-
-    def mostrar_icono_bandeja(self):
-        try:
-            icono = Image.open(obtener_ruta_recurso("logo.ico"))
-        except:
-            icono = Image.new('RGB', (64, 64), color = (43, 43, 43))
-        
-        def abrir_ventana(icon, item):
-            icon.stop()
-            self.tray_activo = False
-            self.deiconify()  # Muestra la ventana
-            
-        def salir_app(icon, item):
-            icon.stop()
-            os._exit(0)  # Mata el proceso por completo
-            
-        self.tray = pystray.Icon("SINCAL", icono, "SINCAL Suite", menu=pystray.Menu(
-            pystray.MenuItem("Abrir SINCAL", abrir_ventana, default=True),
-            pystray.MenuItem("Cerrar por completo", salir_app)
-        ))
-        
-        self.tray_activo = True
-        threading.Thread(target=self.tray.run, daemon=True).start()
+            try: icono = Image.open(obtener_ruta_recurso("logo.ico"))
+            except: icono = Image.new('RGB', (64, 64), color=(43, 43, 43))
+            self.tray = pystray.Icon("SINCAL", icono, "SINCAL Suite", menu=pystray.Menu(
+                pystray.MenuItem("Abrir SINCAL", lambda icon, item: [icon.stop(), setattr(self, 'tray_activo', False), self.deiconify()], default=True),
+                pystray.MenuItem("Cerrar por completo", lambda icon, item: [icon.stop(), os._exit(0)])
+            ))
+            self.tray_activo = True
+            threading.Thread(target=self.tray.run, daemon=True).start()
 
     def mostrar_notificacion(self, titulo, mensaje):
-        # Lanza el mensaje solo si el ícono de la bandeja está activo
         if getattr(self, 'tray_activo', False) and hasattr(self, 'tray'):
-            try:
-                self.tray.notify(mensaje, titulo)
-            except Exception:
-                pass
+            try: self.tray.notify(mensaje, titulo)
+            except: pass
 
-    # ==========================================================
-    # CONFIGURACIÓN DE INICIO AUTOMÁTICO
-    # ==========================================================
     def configurar_inicio_con_windows(self):
-        ruta_exe = sys.executable
-        nombre_llave = "SINCAL_Suite"
         try:
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_ALL_ACCESS)
-            winreg.SetValueEx(key, nombre_llave, 0, winreg.REG_SZ, f'"{ruta_exe}" --background')
+            winreg.SetValueEx(key, "SINCAL_Suite", 0, winreg.REG_SZ, f'"{sys.executable}" --background')
             winreg.CloseKey(key)
         except: pass
 
     # ==========================================================
-    # PESTAÑA 1: SINCRONIZADOR Y CONSOLA EN VIVO
+    # PESTAÑA: MÓDULO ESTRUCTURAL (ARMADURAS PARAMÉTRICAS)
     # ==========================================================
+    def setup_tab_armaduras(self):
+        frame_top = ctk.CTkFrame(self.tab_armaduras, fg_color="#1E1E1E", border_width=1, border_color="#444444", corner_radius=0)
+        frame_top.pack(fill="x", padx=20, pady=10)
+        ctk.CTkLabel(frame_top, text="DICCIONARIO DE DATOS (ESTRIBOS)", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(side="left", padx=15, pady=15)
+        ctk.CTkButton(frame_top, text="📁 Cargar JSON de Proyecto", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", corner_radius=0, command=self.cargar_json_bim).pack(side="right", padx=15, pady=15)
+
+        self.tab_estribo = ctk.CTkTabview(self.tab_armaduras, width=800, height=400, fg_color="#1E1E1E", segmented_button_selected_color=COLOR_ACENTO)
+        self.tab_estribo.pack(padx=20, pady=5, fill="x")
+        self.tab_estribo._segmented_button.configure(font=FUENTE_NORMAL)
+
+        tab_zap, tab_muros, tab_consola = [self.tab_estribo.add(x) for x in ["Geometría Zapata", "Muros", "Consola y Topes"]]
+
+        # --- I. DIMENSIONES GENERALES ---
+        ctk.CTkLabel(tab_zap, text="DIMENSIONES GENERALES (cm):", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=(10,0))
+        
+        ctk.CTkLabel(tab_zap, text="Largo:", font=FUENTE_NORMAL).grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        self.ent_z_largo = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=80, corner_radius=0); self.ent_z_largo.grid(row=1, column=1, padx=5, pady=5)
+        
+        ctk.CTkLabel(tab_zap, text="Ancho:", font=FUENTE_NORMAL).grid(row=1, column=2, sticky="w", padx=10, pady=5)
+        self.ent_z_ancho = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=80, corner_radius=0); self.ent_z_ancho.grid(row=1, column=3, padx=5, pady=5)
+        
+        ctk.CTkLabel(tab_zap, text="Alto:", font=FUENTE_NORMAL).grid(row=1, column=4, sticky="w", padx=10, pady=5)
+        self.ent_z_alto = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=80, corner_radius=0); self.ent_z_alto.grid(row=1, column=5, padx=5, pady=5)
+
+        # --- II. RECUBRIMIENTOS ---
+        ctk.CTkLabel(tab_zap, text="RECUBRIMIENTOS (cm):", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).grid(row=2, column=0, columnspan=2, sticky="w", padx=10, pady=(15,0))
+        
+        ctk.CTkLabel(tab_zap, text="Cara inferior:", font=FUENTE_NORMAL).grid(row=3, column=0, sticky="w", padx=10, pady=5)
+        self.ent_rec_inf = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=80, corner_radius=0); self.ent_rec_inf.grid(row=3, column=1, padx=5, pady=5)
+        
+        ctk.CTkLabel(tab_zap, text="Cara superior:", font=FUENTE_NORMAL).grid(row=3, column=2, sticky="w", padx=10, pady=5)
+        self.ent_rec_sup = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=80, corner_radius=0); self.ent_rec_sup.grid(row=3, column=3, padx=5, pady=5)
+        
+        ctk.CTkLabel(tab_zap, text="Caras laterales:", font=FUENTE_NORMAL).grid(row=3, column=4, sticky="w", padx=10, pady=5)
+        self.ent_rec_lat = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=80, corner_radius=0); self.ent_rec_lat.grid(row=3, column=5, padx=5, pady=5)
+
+        # --- III. ARMADURA ---
+        ctk.CTkLabel(tab_zap, text="ARMADURA:", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).grid(row=4, column=0, sticky="w", padx=10, pady=(15,0))
+        
+        # Malla Inferior
+        ctk.CTkLabel(tab_zap, text="Malla inferior:", font=FUENTE_NORMAL).grid(row=5, column=0, sticky="w", padx=10, pady=5)
+        ctk.CTkLabel(tab_zap, text="Ø (mm):", font=FUENTE_NORMAL).grid(row=5, column=1, sticky="e", padx=5, pady=5)
+        self.ent_phi_inf = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=60, corner_radius=0); self.ent_phi_inf.grid(row=5, column=2, sticky="w", padx=5, pady=5)
+        ctk.CTkLabel(tab_zap, text="@ (cm):", font=FUENTE_NORMAL).grid(row=5, column=3, sticky="e", padx=5, pady=5)
+        self.ent_espac_inf = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=60, corner_radius=0); self.ent_espac_inf.grid(row=5, column=4, sticky="w", padx=5, pady=5)
+
+        # Malla Superior
+        ctk.CTkLabel(tab_zap, text="Malla superior:", font=FUENTE_NORMAL).grid(row=6, column=0, sticky="w", padx=10, pady=5)
+        ctk.CTkLabel(tab_zap, text="Ø (mm):", font=FUENTE_NORMAL).grid(row=6, column=1, sticky="e", padx=5, pady=5)
+        self.ent_phi_sup = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=60, corner_radius=0); self.ent_phi_sup.grid(row=6, column=2, sticky="w", padx=5, pady=5)
+        ctk.CTkLabel(tab_zap, text="@ (cm):", font=FUENTE_NORMAL).grid(row=6, column=3, sticky="e", padx=5, pady=5)
+        self.ent_espac_sup = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=60, corner_radius=0); self.ent_espac_sup.grid(row=6, column=4, sticky="w", padx=5, pady=5)
+
+        # Laterales
+        ctk.CTkLabel(tab_zap, text="Laterales:", font=FUENTE_NORMAL).grid(row=7, column=0, sticky="w", padx=10, pady=5)
+        ctk.CTkLabel(tab_zap, text="Ø (mm):", font=FUENTE_NORMAL).grid(row=7, column=1, sticky="e", padx=5, pady=5)
+        self.ent_phi_lat = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=60, corner_radius=0); self.ent_phi_lat.grid(row=7, column=2, sticky="w", padx=5, pady=5)
+        ctk.CTkLabel(tab_zap, text="@ (cm):", font=FUENTE_NORMAL).grid(row=7, column=3, sticky="e", padx=5, pady=5)
+        self.ent_espac_lat = ctk.CTkEntry(tab_zap, font=FUENTE_NORMAL, width=60, corner_radius=0); self.ent_espac_lat.grid(row=7, column=4, sticky="w", padx=5, pady=5)
+
+        # Inicialización de placeholders base
+        for ent, val in [(self.ent_z_largo, "750"), (self.ent_z_ancho, "1159.6"), (self.ent_z_alto, "150"), 
+                         (self.ent_rec_inf, "7.5"), (self.ent_rec_sup, "5"), (self.ent_rec_lat, "5"), 
+                         (self.ent_phi_inf, "22"), (self.ent_espac_inf, "15"),
+                         (self.ent_phi_sup, "22"), (self.ent_espac_sup, "15"),
+                         (self.ent_phi_lat, "16"), (self.ent_espac_lat, "20")]:
+            ent.insert(0, val)
+
+        # BOTONERA DE LAS 4 VISTAS
+        frame_vistas = ctk.CTkFrame(self.tab_armaduras, fg_color="transparent")
+        frame_vistas.pack(fill="x", padx=20, pady=20)
+        ctk.CTkLabel(frame_vistas, text="GENERACIÓN DE VISTAS 2D:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(anchor="w", pady=(0,10))
+        
+        btn_container = ctk.CTkFrame(frame_vistas, fg_color="transparent"); btn_container.pack(fill="x")
+        
+        vistas = [("1. Vista Frontal", "FRONTAL"), ("2. Sección A-A", "SEC_A"), 
+                  ("3. Sección B-B", "SEC_B"), ("4. Sección C-C", "SEC_C")]
+                  
+        for txt, vista in vistas:
+            ctk.CTkButton(btn_container, text=txt, font=FUENTE_NORMAL, corner_radius=0, height=40, 
+                          fg_color="transparent", border_width=1, border_color=COLOR_ACENTO, text_color=COLOR_TEXTO, 
+                          hover_color="#444444", command=lambda v=vista: self.generar_vista_cad(v)).pack(side="left", expand=True, fill="x", padx=2)
+
+    def generar_vista_cad(self, tipo_vista):
+        try:
+            lz, az, hz = float(self.ent_z_largo.get()), float(self.ent_z_ancho.get()), float(self.ent_z_alto.get())
+            rec_inf, rec_sup, rec_lat = float(self.ent_rec_inf.get()), float(self.ent_rec_sup.get()), float(self.ent_rec_lat.get())
+            # Extraemos la armadura de la malla inferior para la vista frontal de la zapata
+            phi_inf, esp_inf = float(self.ent_phi_inf.get()), float(self.ent_espac_inf.get())
+        except ValueError: return messagebox.showerror("Error", "Entradas numéricas inválidas en la pestaña Zapata.")
+
+        ruta_temp = os.path.join(RUTA_LOCAL_APP, f"Estribo_{tipo_vista}.lsp")
+        
+        lisp_safe_header = """(setvar "CMDECHO" 0)
+          (setq old_os (getvar "OSMODE") old_att (getvar "ATTREQ"))
+          (setvar "OSMODE" 0) (setvar "ATTREQ" 0)
+          (if (not (tblsearch "LAYER" "FIERROS")) (command "._layer" "_M" "FIERROS" "_C" "5" "" "") (command "._layer" "_T" "FIERROS" "_ON" "FIERROS" "_S" "FIERROS" "" "._layer" "_C" "5" "FIERROS" ""))"""
+          
+        lisp_safe_footer = """(setvar "OSMODE" old_os) (setvar "ATTREQ" old_att) (princ)"""
+
+        if tipo_vista == "FRONTAL":
+            lisp_code = f"""(defun c:SINCAL-DIBUJAR (/ p1 p2 p_start p_end dist num_b i pto nom_b old_os old_att)
+              {lisp_safe_header}
+              (setq nom_b "fi{int(phi_inf)}")
+              (setq p1 (getpoint "\\n[SINCAL] Clic esquina INFERIOR-IZQUIERDA de la zapata (Hormigón): "))
+              (if p1 (progn
+                (setq p2 (getpoint p1 "\\n[SINCAL] Clic esquina INFERIOR-DERECHA de la zapata (Hormigón): "))
+                (if p2 (progn
+                    (setq p_start (list (+ (car p1) {rec_lat}) (+ (cadr p1) {rec_inf}) 0.0))
+                    (setq p_end (list (- (car p2) {rec_lat}) (+ (cadr p2) {rec_inf}) 0.0))
+                    (setq dist (- (car p_end) (car p_start)))
+                    
+                    (setq num_b (1+ (fix (/ dist {esp_inf}))))
+                    (setq i 0)
+                    (while (< i num_b)
+                      (setq pto (list (+ (car p_start) (* i {esp_inf})) (cadr p_start) 0.0))
+                      (if (tblsearch "BLOCK" nom_b) (command "._insert" nom_b "_NON" pto 1 1 0) (command "._circle" "_NON" pto {phi_inf/20.0}))
+                      (setq i (1+ i))
+                    )
+                    (princ (strcat "\\n[SINCAL] Colocados " (itoa num_b) " fierros en X+."))
+                ))
+              )) 
+              {lisp_safe_footer}
+            )"""
+            
+        else: 
+            lisp_code = f'(defun c:SINCAL-DIBUJAR () {lisp_safe_header} (princ "\\n[SINCAL] Lógica para {tipo_vista} en desarrollo...") {lisp_safe_footer})'
+
+        with open(ruta_temp, 'w', encoding='utf-8') as f: f.write(lisp_code)
+        
+        self.cancelar_comando_vivo = False
+        ruta_lisp = ruta_temp.replace("\\", "\\\\")
+        threading.Thread(target=self._hilo_comando_en_vivo, args=(f'(load "{ruta_lisp}") (c:SINCAL-DIBUJAR)\n',), daemon=True).start()
+
+    def cargar_json_bim(self):
+        ruta = filedialog.askopenfilename(title="Seleccionar Archivo JSON del Puente", filetypes=[("JSON Files", "*.json")])
+        if not ruta: return
+        try:
+            with open(ruta, 'r', encoding='utf-8') as f: datos = json.load(f)
+            e_data = datos.get("estribos", {})
+            # Ponytail: Conversión /10.0 asume que el JSON de FreeCAD viene estrictamente en mm y convertimos a cm para el dibujo.
+            # Upgrade path: Leer clave de unidades de metadatos del JSON del proyecto si cambia la especificación.
+            for ent, key in [(self.ent_z_largo, "dado_muro_frontal_largo_entrada"), (self.ent_z_ancho, "dado_muro_frontal_ancho_entrada"), (self.ent_z_alto, "dado_muro_frontal_espesor_entrada")]:
+                ent.delete(0, 'end')
+                ent.insert(0, str(e_data.get(key, 0) / 10.0))
+            self.log_r(f"[*] JSON cargado: {os.path.basename(ruta)}")
+            messagebox.showinfo("BIM", "Datos mapeados exitosamente en centímetros.")
+        except Exception as e: messagebox.showerror("Error JSON", f"Fallo al leer archivo:\n{e}")
+
+    # ==========================================================
+    # PARTE COMÚN Y SOPORTE DE ACTUALIZACIONES (MANTENIDO/OPTIMIZADO)
+    # ==========================================================
+    def cargar_info_github(self):
+        try:
+            r = requests.get(f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits", params={"per_page": 10}, timeout=5)
+            if r.status_code == 200:
+                self.txt_updates.configure(state="normal"); self.txt_updates.delete("1.0", "end")
+                for c in r.json(): self.txt_updates.insert("end", f"• {c['commit']['author']['date'][:10]} : {c['commit']['message']}\n")
+                self.txt_updates.configure(state="disabled")
+        except: pass
+    
+    def cad_esta_ejecutandose(self):
+        try:
+            # Ponytail: Verificación simple de strings en la tasklist de Windows.
+            # Ceiling: Falsos positivos si otro software contiene "acad" en su proceso. Upgrade: Validar PID y firmas ejecutables reales de Autodesk/ZWSoft.
+            salida = subprocess.check_output("tasklist", creationflags=0x08000000).decode('utf-8', errors='ignore').lower()
+            return any(x in salida for x in ["acad.exe", "zwcad.exe", "accoreconsole.exe"])
+        except: return False
+
+    def loop_verificador_actualizaciones_silencioso(self):
+        while True:
+            time.sleep(3600)
+            try:
+                r = requests.get(URL_BASE_RAW + "version.json", timeout=5)
+                if r.json().get("version") != self.version_local_actual:
+                    while self.cad_esta_ejecutandose(): time.sleep(300)
+                    self.iniciar_actualizacion_hilo()
+            except: pass
+
     def setup_tab_sincronizador(self):
-        lbl_titulo = ctk.CTkLabel(self.tab_main, text="ESTÁNDAR SINCAL", font=FUENTE_TITULO, text_color=COLOR_TITULO)
-        lbl_titulo.pack(pady=10)
-
-        self.btn_actualizar = ctk.CTkButton(self.tab_main, text="Instalar / Actualizar Todo", font=FUENTE_SUBTITULO,
-                                           fg_color="transparent", border_width=2, border_color=COLOR_ACENTO,
-                                           corner_radius=0, hover_color="#444444", text_color=COLOR_TEXTO,
-                                           border_spacing=8, command=self.iniciar_actualizacion_hilo)
-        self.btn_actualizar.pack(pady=5)
-
-        botones_sec_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
-        botones_sec_frame.pack(pady=5)
-
-        self.btn_folder = ctk.CTkButton(botones_sec_frame, text="Abrir carpeta local", font=FUENTE_NORMAL, 
-                                       fg_color="transparent", border_width=1, border_color=COLOR_ACENTO, corner_radius=0,
-                                       text_color=COLOR_TEXTO, hover_color="#444444", command=self.abrir_carpeta_local)
-        self.btn_folder.pack(side="left", padx=10)
-
-        self.btn_forzar_path = ctk.CTkButton(botones_sec_frame, text="Reparar / Forzar PATH", font=FUENTE_NORMAL, 
-                                       fg_color="transparent", border_width=1, border_color=COLOR_TITULO, corner_radius=0,
-                                       text_color=COLOR_TITULO, hover_color="#444444", command=self.forzar_path_manual)
-        self.btn_forzar_path.pack(side="left", padx=10)
-
-        self.consola = ctk.CTkTextbox(self.tab_main, width=850, height=180, font=FUENTE_CONSOLA, 
-                                     fg_color="#1E1E1E", text_color=COLOR_TEXTO, state="disabled")
-        self.consola.pack(pady=10)
-
+        lbl_titulo = ctk.CTkLabel(self.tab_main, text="ESTÁNDAR SINCAL", font=FUENTE_TITULO, text_color=COLOR_TITULO); lbl_titulo.pack(pady=10)
+        self.btn_actualizar = ctk.CTkButton(self.tab_main, text="Instalar / Actualizar Todo", font=FUENTE_SUBTITULO, fg_color="transparent", border_width=2, border_color=COLOR_ACENTO, corner_radius=0, hover_color="#444444", text_color=COLOR_TEXTO, border_spacing=8, command=self.iniciar_actualizacion_hilo); self.btn_actualizar.pack(pady=5)
+        
+        botones_sec_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent"); botones_sec_frame.pack(pady=5)
+        ctk.CTkButton(botones_sec_frame, text="Abrir carpeta local", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_ACENTO, corner_radius=0, text_color=COLOR_TEXTO, hover_color="#444444", command=self.abrir_carpeta_local).pack(side="left", padx=10)
+        ctk.CTkButton(botones_sec_frame, text="Reparar / Forzar PATH", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_TITULO, corner_radius=0, text_color=COLOR_TITULO, hover_color="#444444", command=self.forzar_path_manual).pack(side="left", padx=10)
+        
+        self.consola = ctk.CTkTextbox(self.tab_main, width=850, height=180, font=FUENTE_CONSOLA, fg_color="#1E1E1E", text_color=COLOR_TEXTO, state="disabled"); self.consola.pack(pady=10)
+        
         self.frame_live = ctk.CTkFrame(self.tab_main, fg_color="#1E1E1E", border_width=1, border_color="#444444", corner_radius=0)
         self.frame_live.pack(fill="x", padx=40, pady=(10, 10))
-        
         top_live_frame = ctk.CTkFrame(self.frame_live, fg_color="transparent")
         top_live_frame.pack(fill="x", padx=15, pady=(15, 5))
         ctk.CTkLabel(top_live_frame, text="Comandos en vivo:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(side="left")
-        ctk.CTkLabel(top_live_frame, text="* AutoCAD/ZWCAD debe estar en modo Administrador", font=("Consolas", 11, "italic"), text_color="#D9534F").pack(side="left", padx=15)
         
         bot_live_frame = ctk.CTkFrame(self.frame_live, fg_color="transparent")
         bot_live_frame.pack(fill="x", padx=15, pady=(0, 15))
         self.entrada_comando = ctk.CTkEntry(bot_live_frame, font=FUENTE_NORMAL, width=300, placeholder_text="Ej: ZE, _QSAVE", corner_radius=0)
         self.entrada_comando.pack(side="left", padx=(0, 10))
         
-        self.btn_enviar_cmd = ctk.CTkButton(bot_live_frame, text="Ejecutar", font=FUENTE_NORMAL, 
-                                            fg_color="transparent", border_width=1, border_color=COLOR_ACENTO, corner_radius=0,
-                                            hover_color="#444444", text_color=COLOR_TEXTO, width=80,
-                                            command=self.enviar_comando_en_vivo)
+        self.btn_enviar_cmd = ctk.CTkButton(bot_live_frame, text="Ejecutar", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_ACENTO, corner_radius=0, hover_color="#444444", text_color=COLOR_TEXTO, width=80, command=self.enviar_comando_en_vivo)
         self.btn_enviar_cmd.pack(side="left", padx=(0, 10))
-        
-        self.btn_cancelar_cmd = ctk.CTkButton(bot_live_frame, text="Cancelar", font=FUENTE_NORMAL, 
-                                              fg_color="#D9534F", hover_color="#C9302C", width=80, corner_radius=0,
-                                              state="disabled", command=self.detener_comando_en_vivo)
+        self.btn_cancelar_cmd = ctk.CTkButton(bot_live_frame, text="Cancelar", font=FUENTE_NORMAL, fg_color="#D9534F", hover_color="#C9302C", width=80, corner_radius=0, state="disabled", command=self.detener_comando_en_vivo)
         self.btn_cancelar_cmd.pack(side="left")
 
         self.frame_updates = ctk.CTkFrame(self.tab_main, fg_color="transparent")
@@ -214,685 +320,198 @@ class ActualizadorCAD(ctk.CTk):
         self.txt_updates = ctk.CTkTextbox(self.frame_updates, width=850, height=160, font=FUENTE_NORMAL, fg_color="#1E1E1E", state="disabled")
         self.txt_updates.pack(pady=5)
 
-    # ==========================================================
-    # PESTAÑA 2: RENOMBRADO MASIVO AVANZADO
-    # ==========================================================
     def setup_tab_renombrado(self):
         lbl_titulo = ctk.CTkLabel(self.tab_renombrado, text="RENOMBRADO PARAMÉTRICO DE PLANOS", font=FUENTE_TITULO, text_color=COLOR_TITULO)
         lbl_titulo.pack(pady=10)
-
         top_frame = ctk.CTkFrame(self.tab_renombrado, fg_color="transparent")
         top_frame.pack(fill="x", padx=20, pady=5)
         self.btn_browse_adv = ctk.CTkButton(top_frame, text="📁 Cargar Carpeta DWG", font=FUENTE_NORMAL, width=150, corner_radius=0, fg_color="#444444", hover_color="#555555", command=self.cargar_archivos_renombrado)
         self.btn_browse_adv.pack(side="left")
         self.lbl_ruta_adv = ctk.CTkLabel(top_frame, text="Ruta: Ninguna", font=FUENTE_NORMAL, text_color="#888888")
         self.lbl_ruta_adv.pack(side="left", padx=15)
-
         split_frame = ctk.CTkFrame(self.tab_renombrado, fg_color="transparent")
         split_frame.pack(fill="both", expand=True, padx=20, pady=10)
-
         left_frame = ctk.CTkFrame(split_frame, fg_color="#1E1E1E", corner_radius=0, border_width=1, border_color="#444444")
         left_frame.pack(side="left", fill="both", expand=True, padx=(0, 10))
-
-        lbl_lista = ctk.CTkLabel(left_frame, text="1. Selecciona los archivos a modificar:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO)
-        lbl_lista.pack(pady=(15, 5), padx=15, anchor="w")
-
-        btn_tools = ctk.CTkFrame(left_frame, fg_color="transparent")
-        btn_tools.pack(fill="x", padx=15, pady=5)
+        lbl_lista = ctk.CTkLabel(left_frame, text="1. Selecciona los archivos a modificar:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(pady=(15, 5), padx=15, anchor="w")
+        btn_tools = ctk.CTkFrame(left_frame, fg_color="transparent"); btn_tools.pack(fill="x", padx=15, pady=5)
         ctk.CTkButton(btn_tools, text="Marcar Todos", width=100, corner_radius=0, font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", command=self.marcar_todos).pack(side="left", padx=(0, 5))
         ctk.CTkButton(btn_tools, text="Desmarcar Todos", width=100, corner_radius=0, font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", command=self.desmarcar_todos).pack(side="left")
-
-        self.scroll_archivos = ctk.CTkScrollableFrame(left_frame, fg_color="#2B2B2B", corner_radius=0)
-        self.scroll_archivos.pack(fill="both", expand=True, padx=15, pady=(5, 15))
-
-        right_frame = ctk.CTkFrame(split_frame, fg_color="transparent", width=350)
-        right_frame.pack(side="right", fill="y")
-        right_frame.pack_propagate(False)
-
-        lbl_tools = ctk.CTkLabel(right_frame, text="2. Aplicar a la selección:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO)
-        lbl_tools.pack(pady=(15, 5), anchor="w")
-
-        h1_frame = ctk.CTkFrame(right_frame, fg_color="#1E1E1E", corner_radius=0, border_width=1, border_color="#444444")
-        h1_frame.pack(fill="x", pady=5)
+        self.scroll_archivos = ctk.CTkScrollableFrame(left_frame, fg_color="#2B2B2B", corner_radius=0); self.scroll_archivos.pack(fill="both", expand=True, padx=15, pady=(5, 15))
+        right_frame = ctk.CTkFrame(split_frame, fg_color="transparent", width=350); right_frame.pack(side="right", fill="y"); right_frame.pack_propagate(False)
+        lbl_tools = ctk.CTkLabel(right_frame, text="2. Aplicar a la selección:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(pady=(15, 5), anchor="w")
+        h1_frame = ctk.CTkFrame(right_frame, fg_color="#1E1E1E", corner_radius=0, border_width=1, border_color="#444444"); h1_frame.pack(fill="x", pady=5)
         ctk.CTkLabel(h1_frame, text="A. Buscar y Reemplazar", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).pack(anchor="w", padx=15, pady=(15, 5))
-        ctk.CTkLabel(h1_frame, text="(Ej: Modificar tipo de plano o número)", font=FUENTE_CONSOLA, text_color="#888888").pack(anchor="w", padx=15)
-        
-        self.ent_buscar_adv = ctk.CTkEntry(h1_frame, placeholder_text="Buscar texto (Ej: HL-)", font=FUENTE_NORMAL, corner_radius=0)
-        self.ent_buscar_adv.pack(fill="x", padx=15, pady=5)
-        self.ent_reemplazo_adv = ctk.CTkEntry(h1_frame, placeholder_text="Reemplazar con (Ej: PL-)", font=FUENTE_NORMAL, corner_radius=0)
-        self.ent_reemplazo_adv.pack(fill="x", padx=15, pady=5)
+        self.ent_buscar_adv = ctk.CTkEntry(h1_frame, placeholder_text="Buscar texto (Ej: HL-)", font=FUENTE_NORMAL, corner_radius=0); self.ent_buscar_adv.pack(fill="x", padx=15, pady=5)
+        self.ent_reemplazo_adv = ctk.CTkEntry(h1_frame, placeholder_text="Reemplazar con (Ej: PL-)", font=FUENTE_NORMAL, corner_radius=0); self.ent_reemplazo_adv.pack(fill="x", padx=15, pady=5)
         ctk.CTkButton(h1_frame, text="Aplicar Reemplazo", font=FUENTE_NORMAL, corner_radius=0, fg_color="transparent", border_width=1, border_color=COLOR_TITULO, text_color=COLOR_TITULO, hover_color="#444444", command=self.aplicar_reemplazo_adv).pack(pady=15, padx=15, fill="x")
-
-        h2_frame = ctk.CTkFrame(right_frame, fg_color="#1E1E1E", corner_radius=0, border_width=1, border_color="#444444")
-        h2_frame.pack(fill="x", pady=10)
+        h2_frame = ctk.CTkFrame(right_frame, fg_color="#1E1E1E", corner_radius=0, border_width=1, border_color="#444444"); h2_frame.pack(fill="x", pady=10)
         ctk.CTkLabel(h2_frame, text="B. Cambio de Revisión", font=FUENTE_SUBTITULO, text_color=COLOR_ACENTO).pack(anchor="w", padx=15, pady=(15, 5))
-        ctk.CTkLabel(h2_frame, text="(Reemplaza solo el último carácter)", font=FUENTE_CONSOLA, text_color="#888888").pack(anchor="w", padx=15)
-        
-        self.ent_rev_adv = ctk.CTkEntry(h2_frame, placeholder_text="Nueva letra/número (Ej: D)", font=FUENTE_NORMAL, corner_radius=0)
-        self.ent_rev_adv.pack(fill="x", padx=15, pady=5)
+        self.ent_rev_adv = ctk.CTkEntry(h2_frame, placeholder_text="Nueva letra/número (Ej: D)", font=FUENTE_NORMAL, corner_radius=0); self.ent_rev_adv.pack(fill="x", padx=15, pady=5)
         ctk.CTkButton(h2_frame, text="Aplicar Revisión", font=FUENTE_NORMAL, corner_radius=0, fg_color="transparent", border_width=1, border_color=COLOR_TITULO, text_color=COLOR_TITULO, hover_color="#444444", command=self.aplicar_revision_adv).pack(pady=15, padx=15, fill="x")
+        self.log_rename = ctk.CTkTextbox(right_frame, height=120, font=FUENTE_CONSOLA, fg_color="#1E1E1E", state="disabled", corner_radius=0); self.log_rename.pack(fill="both", expand=True, pady=(0, 10))
 
-        self.log_rename = ctk.CTkTextbox(right_frame, height=120, font=FUENTE_CONSOLA, fg_color="#1E1E1E", state="disabled", corner_radius=0)
-        self.log_rename.pack(fill="both", expand=True, pady=(0, 10))
-
-    def log_r(self, mensaje):
-        self.log_rename.configure(state="normal")
-        self.log_rename.insert("end", mensaje + "\n")
-        self.log_rename.see("end")
-        self.log_rename.configure(state="disabled")
+    def log_r(self, m):
+        self.log_rename.configure(state="normal"); self.log_rename.insert("end", m + "\n"); self.log_rename.see("end"); self.log_rename.configure(state="disabled")
 
     def cargar_archivos_renombrado(self):
-        carpeta = filedialog.askdirectory(title="Seleccionar carpeta con planos DWG")
-        if not carpeta: return
-        self.ruta_renombre = carpeta
-        self.lbl_ruta_adv.configure(text=f"Ruta: {carpeta}", text_color=COLOR_TEXTO)
-        
-        for widget in self.scroll_archivos.winfo_children():
-            widget.destroy()
+        c = filedialog.askdirectory(title="Seleccionar carpeta con planos DWG")
+        if not c: return
+        self.ruta_renombre = c; self.lbl_ruta_adv.configure(text=f"Ruta: {c}", text_color=COLOR_TEXTO)
+        for w in self.scroll_archivos.winfo_children(): w.destroy()
         self.checkboxes_archivos = []
-        
-        archivos = [f for f in os.listdir(self.ruta_renombre) if f.lower().endswith('.dwg')]
-        if not archivos:
-            self.log_r("[!] No se encontraron archivos DWG en la carpeta.")
-            return
+        arcs = [f for f in os.listdir(self.ruta_renombre) if f.lower().endswith('.dwg')]
+        for arc in arcs:
+            cb = ctk.CTkCheckBox(self.scroll_archivos, text=arc, font=FUENTE_NORMAL, text_color=COLOR_TEXTO, fg_color=COLOR_ACENTO, hover_color="#005BBF"); cb.pack(anchor="w", pady=5, padx=5); cb.select(); self.checkboxes_archivos.append(cb)
+        self.log_r(f"[*] {len(arcs)} archivos cargados.")
 
-        for arc in archivos:
-            cb = ctk.CTkCheckBox(self.scroll_archivos, text=arc, font=FUENTE_NORMAL, text_color=COLOR_TEXTO, 
-                                 fg_color=COLOR_ACENTO, hover_color="#005BBF")
-            cb.pack(anchor="w", pady=5, padx=5)
-            cb.select() 
-            self.checkboxes_archivos.append(cb)
-            
-        self.log_r(f"[*] {len(archivos)} archivos cargados.")
-
-    def marcar_todos(self):
-        for cb in self.checkboxes_archivos: cb.select()
-
-    def desmarcar_todos(self):
-        for cb in self.checkboxes_archivos: cb.deselect()
+    def marcar_todos(self): [cb.select() for cb in self.checkboxes_archivos]
+    def desmarcar_todos(self): [cb.deselect() for cb in self.checkboxes_archivos]
 
     def aplicar_reemplazo_adv(self):
         if not self.ruta_renombre: return self.log_r("[X] Carga una carpeta primero.")
-        buscar = self.ent_buscar_adv.get()
-        reemplazar = self.ent_reemplazo_adv.get()
-        if not buscar: return self.log_r("[X] Ingresa texto a buscar.")
-
-        contador = 0
+        b, r = self.ent_buscar_adv.get(), self.ent_reemplazo_adv.get()
+        if not b: return self.log_r("[X] Ingresa texto a buscar.")
+        cont = 0
         for cb in self.checkboxes_archivos:
-            if cb.get() == 1: 
-                old_name = cb.cget("text")
-                if buscar in old_name:
-                    new_name = old_name.replace(buscar, reemplazar)
-                    try:
-                        os.rename(os.path.join(self.ruta_renombre, old_name), os.path.join(self.ruta_renombre, new_name))
-                        cb.configure(text=new_name)
-                        contador += 1
-                    except Exception as e:
-                        self.log_r(f"[X] Error en '{old_name}': {e}")
-        
-        if contador > 0: self.log_r(f"[OK] {contador} archivos reemplazados.")
-        else: self.log_r("[!] No se encontraron coincidencias en la selección.")
+            if cb.get() == 1 and b in cb.cget("text"):
+                old = cb.cget("text"); new = old.replace(b, r)
+                try: os.rename(os.path.join(self.ruta_renombre, old), os.path.join(self.ruta_renombre, new)); cb.configure(text=new); cont += 1
+                except Exception as e: self.log_r(f"[X] Error: {e}")
+        self.log_r(f"[OK] {cont} procesados.")
 
     def aplicar_revision_adv(self):
         if not self.ruta_renombre: return self.log_r("[X] Carga una carpeta primero.")
-        nueva_rev = self.ent_rev_adv.get().strip()
-        if not nueva_rev: return self.log_r("[X] Ingresa la nueva revisión.")
-
-        contador = 0
+        nr = self.ent_rev_adv.get().strip()
+        if not nr: return self.log_r("[X] Ingresa la nueva revisión.")
+        cont = 0
         for cb in self.checkboxes_archivos:
             if cb.get() == 1:
-                old_name = cb.cget("text")
-                nombre_base, ext = os.path.splitext(old_name)
-                if len(nombre_base) > 0:
-                    new_name = nombre_base[:-1] + nueva_rev + ext
-                    if old_name != new_name:
-                        try:
-                            os.rename(os.path.join(self.ruta_renombre, old_name), os.path.join(self.ruta_renombre, new_name))
-                            cb.configure(text=new_name)
-                            contador += 1
-                        except Exception as e:
-                            self.log_r(f"[X] Error en '{old_name}': {e}")
-                            
-        if contador > 0: self.log_r(f"[OK] {contador} revisiones actualizadas.")
-        else: self.log_r("[!] No hubo cambios en la selección.")
+                old = cb.cget("text"); nb, ext = os.path.splitext(old)
+                if len(nb) > 0:
+                    new = nb[:-1] + nr + ext
+                    try: os.rename(os.path.join(self.ruta_renombre, old), os.path.join(self.ruta_renombre, new)); cb.configure(text=new); cont += 1
+                    except Exception as e: self.log_r(f"[X] Error: {e}")
+        self.log_r(f"[OK] {cont} revisiones actualizadas.")
 
-    # ==========================================================
-    # LÓGICA DE CONSOLA EN VIVO
-    # ==========================================================
     def detener_comando_en_vivo(self):
-        self.cancelar_comando_vivo = True
-        self.btn_cancelar_cmd.configure(state="disabled", text="Deteniendo...")
+        self.cancelar_comando_vivo = True; self.btn_cancelar_cmd.configure(state="disabled", text="Deteniendo...")
 
     def enviar_comando_en_vivo(self):
-        comando_crudo = self.entrada_comando.get()
-        if not comando_crudo: return
-        comando = comando_crudo.strip() + "\n"
+        c = self.entrada_comando.get()
+        if not c: return
         self.cancelar_comando_vivo = False
-        self.btn_enviar_cmd.configure(state="disabled", text="Enviando...")
-        self.btn_cancelar_cmd.configure(state="normal", text="Cancelar")
-        threading.Thread(target=self._hilo_comando_en_vivo, args=(comando,), daemon=True).start()
+        self.btn_enviar_cmd.configure(state="disabled", text="Enviando..."); self.btn_cancelar_cmd.configure(state="normal", text="Cancelar")
+        threading.Thread(target=self._hilo_comando_en_vivo, args=(c.strip() + "\n",), daemon=True).start()
 
     def _hilo_comando_en_vivo(self, comando):
-        pythoncom.CoInitialize() 
+        pythoncom.CoInitialize()
         try:
             app = None
-            try:
-                app = win32com.client.GetActiveObject("ZWCAD.Application")
-                self.log(f"\n--- CONECTADO A ZWCAD EN VIVO ---")
-            except:
+            for s in ["ZWCAD.Application", "AutoCAD.Application", "AutoCAD.Application.25"]:
+                try: app = win32com.client.GetActiveObject(s); break
+                except: pass
+            if not app: return self.log("\n[X] Error: No se detecta CAD abierto como Administrador.")
+            docs = app.Documents
+            if docs.Count == 0: return self.log(" [!] No hay ningún plano abierto.")
+            
+            for i in range(docs.Count):
+                if self.cancelar_comando_vivo: break
                 try:
-                    app = win32com.client.GetActiveObject("AutoCAD.Application")
-                    self.log(f"\n--- CONECTADO A AUTOCAD EN VIVO ---")
-                except:
-                    try:
-                        app = win32com.client.GetActiveObject("AutoCAD.Application.25")
-                        self.log(f"\n--- CONECTADO A AUTOCAD 2025 EN VIVO ---")
-                    except:
-                        self.log("\n[X] Error: No se detecta CAD abierto.")
-                        self.log(" [!] NOTA: AutoCAD/ZWCAD debe estar abierto como Administrador.")
-                        return
-
-            documentos = app.Documents
-            total = documentos.Count
-            if total == 0:
-                self.log(" [!] No hay ningún plano abierto en este momento.")
-                return
-
-            self.log(f" Ejecutando comando en {total} pestañas...")
-            comando_limpio = comando
-
-            for i in range(total):
-                if self.cancelar_comando_vivo:
-                    self.log(" [!] PROCESO ABORTADO POR EL USUARIO.")
-                    break
-                
-                try: 
-                    doc = documentos.Item(i)
-                except Exception as e:
-                    self.log(f"  > [X] Error leyendo la memoria de la pestaña: {e}")
-                    continue 
-
-                exito = False
-                intentos = 0
-                ultimo_error = ""
-
-                while intentos < 3 and not exito:
-                    try:
-                        if app.ActiveDocument.Name != doc.Name:
-                            app.ActiveDocument = doc
-                            time.sleep(0.3) 
-                        
-                        try: doc.SendCommand("\x03\x03")
-                        except: pass
-                        
-                        doc.SendCommand(comando_limpio)
-                        self.log(f"  > Aplicado en: {doc.Name}")
-                        exito = True
-                        
-                    except Exception as e:
-                        intentos += 1
-                        ultimo_error = str(e)
-                        time.sleep(0.5) 
-
-                if not exito:
-                    self.log(f"  > [X] Omitido '{doc.Name}'.")
-                    self.log(f"      (Causa: {ultimo_error})")
-                
-                time.sleep(0.1) 
-
-            if not self.cancelar_comando_vivo:
-                self.log(" Proceso en vivo finalizado.")
-            self.entrada_comando.delete(0, 'end')
-
-        except Exception as e:
-            self.log(f"\n[X] Fallo crítico en la comunicación COM: {e}")
+                    doc = docs.Item(i)
+                    if app.ActiveDocument.Name != doc.Name: app.ActiveDocument = doc; time.sleep(0.2)
+                    try: doc.SendCommand("\x03\x03")
+                    except: pass
+                    doc.SendCommand(comando)
+                    self.log(f"  > Aplicado en: {doc.Name}")
+                except Exception as e: self.log(f"  > [X] Error pestaña: {e}")
+        except Exception as e: self.log(f"\n[X] Fallo COM: {e}")
         finally:
-            self.btn_enviar_cmd.configure(state="normal", text="Ejecutar")
-            self.btn_cancelar_cmd.configure(state="disabled", text="Cancelar")
+            self.btn_enviar_cmd.configure(state="normal", text="Ejecutar"); self.btn_cancelar_cmd.configure(state="disabled", text="Cancelar")
             pythoncom.CoUninitialize()
 
-    # ==========================================================
-    # PESTAÑA 3: DOCUMENTACIÓN WIKI
-    # ==========================================================
     def setup_tab_docs(self):
-        self.wiki_master = ctk.CTkFrame(self.tab_docs, fg_color="transparent")
-        self.wiki_master.pack(fill="both", expand=True, padx=10, pady=10)
+        m = ctk.CTkFrame(self.tab_docs, fg_color="transparent"); m.pack(fill="both", expand=True, padx=10, pady=10)
+        self.menu_container = ctk.CTkFrame(m, width=220, fg_color="transparent"); self.menu_container.pack(side="left", fill="y")
+        ctk.CTkFrame(m, width=1, fg_color="#555555").pack(side="left", fill="y", padx=15)
+        c_cont = ctk.CTkFrame(m, fg_color="transparent"); c_cont.pack(side="right", fill="both", expand=True)
+        self.lbl_wiki_title = ctk.CTkLabel(c_cont, text="Seleccione un tema", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO); self.lbl_wiki_title.pack(anchor="w", padx=20, pady=(10, 0))
+        self.txt_wiki_content = ctk.CTkTextbox(c_cont, font=FUENTE_NORMAL, fg_color="transparent", text_color=COLOR_TEXTO, wrap="word", border_width=0); self.txt_wiki_content.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        for t, cmd in [("README", self.mostrar_readme), ("INICIO AUTOMÁTICO", self.mostrar_comandos_lisp), ("COMANDOS LISP", self.mostrar_comandos_lisp), ("PROCESAMIENTO MASIVO", self.mostrar_procesamiento_lote)]:
+            lbl = ctk.CTkLabel(self.menu_container, text=t, font=FUENTE_MENU, text_color=COLOR_TEXTO, cursor="hand2"); lbl.pack(fill="x", pady=8, padx=10)
+            lbl.bind("<Button-1>", lambda e, c=cmd: c())
 
-        self.menu_container = ctk.CTkFrame(self.wiki_master, width=220, fg_color="transparent")
-        self.menu_container.pack(side="left", fill="y", padx=(0, 5))
+    def mostrar_texto_wiki(self, t, c):
+        self.lbl_wiki_title.configure(text=t.upper()); self.txt_wiki_content.configure(state="normal"); self.txt_wiki_content.delete("1.0", "end"); self.txt_wiki_content.insert("0.0", c); self.txt_wiki_content.configure(state="disabled")
 
-        self.linea_div = ctk.CTkFrame(self.wiki_master, width=1, fg_color="#555555")
-        self.linea_div.pack(side="left", fill="y", padx=15)
+    def mostrar_readme(self): r = os.path.join(RUTA_LOCAL_APP, "README.md"); self.mostrar_texto_wiki("README", open(r, 'r', encoding='utf-8').read() if os.path.exists(r) else "No disponible.")
+    def mostrar_comandos_lisp(self): self.mostrar_texto_wiki("Comandos", "Diccionario de comandos LISP.")
+    def mostrar_procesamiento_lote(self): self.mostrar_texto_wiki("Lotes", "Scripts masivos por PowerShell corporativo.")
 
-        self.content_container = ctk.CTkFrame(self.wiki_master, fg_color="transparent")
-        self.content_container.pack(side="right", fill="both", expand=True)
-
-        self.lbl_wiki_title = ctk.CTkLabel(self.content_container, text="Seleccione un tema", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO, justify="left")
-        self.lbl_wiki_title.pack(anchor="w", padx=20, pady=(10, 0))
-
-        self.txt_wiki_content = ctk.CTkTextbox(self.content_container, font=FUENTE_NORMAL, fg_color="transparent", 
-                                               text_color=COLOR_TEXTO, wrap="word", border_width=0)
-        self.txt_wiki_content.pack(fill="both", expand=True, padx=20, pady=10)
-
-        self.renderizar_menu_wiki()
-
-    def renderizar_menu_wiki(self):
-        for child in self.menu_container.winfo_children(): child.destroy()
-
-        def crear_link(parent, texto, comando):
-            lbl = ctk.CTkLabel(parent, text=texto, font=FUENTE_MENU, text_color=COLOR_TEXTO, 
-                               cursor="hand2", anchor="e")
-            lbl.pack(fill="x", pady=8, padx=10)
-            lbl.bind("<Enter>", lambda e: lbl.configure(text_color=COLOR_TITULO))
-            lbl.bind("<Leave>", lambda e: lbl.configure(text_color=COLOR_TEXTO))
-            lbl.bind("<Button-1>", lambda e: comando())
-            return lbl
-
-        crear_link(self.menu_container, "README", self.mostrar_readme)
-        crear_link(self.menu_container, "INICIO AUTOMÁTICO", self.mostrar_inicio_auto)
-        crear_link(self.menu_container, "COMANDOS LISP", self.mostrar_comandos_lisp)
-        crear_link(self.menu_container, "PROCESAMIENTO MASIVO", self.mostrar_procesamiento_lote)
-        crear_link(self.menu_container, "HERRAMIENTAS EXTRA", self.mostrar_herramientas_extra)
-
-    def mostrar_texto_wiki(self, titulo, contenido):
-        self.lbl_wiki_title.configure(text=titulo.upper())
-        self.txt_wiki_content.configure(state="normal")
-        self.txt_wiki_content.delete("1.0", "end")
-        self.txt_wiki_content.insert("0.0", contenido)
-        self.txt_wiki_content.configure(state="disabled")
-
-    def mostrar_readme(self):
-        ruta = os.path.join(RUTA_LOCAL_APP, "README.md")
-        contenido = open(ruta, 'r', encoding='utf-8').read() if os.path.exists(ruta) else "README no descargado."
-        self.mostrar_texto_wiki("Guía de Inicio", contenido)
-
-    def mostrar_inicio_auto(self):
-        self.cargar_datos_tutoriales()
-        texto = ""
-        for k in ["AutoCrearPropiedad", "AUTO-DYNMODE", "Atajos de Color"]:
-            item = self.tutoriales.get(k, {})
-            texto += f"■ {item.get('titulo', k)}\n{item.get('descripcion', '')}\n\n"
-        self.mostrar_texto_wiki("Archivos de Inicio Automático", texto)
-
-    def mostrar_comandos_lisp(self):
-        self.cargar_datos_tutoriales()
-        texto = "Ejecute estos comandos directamente en la barra de AutoCAD/ZWCAD:\n\n"
-        excluir = ["AutoCrearPropiedad", "AUTO-DYNMODE", "Atajos de Color"]
-        for k, v in self.tutoriales.items():
-            if k not in excluir:
-                t = v.get('titulo', k)
-                if t.lower().startswith("comando:"):
-                    t = t[8:].strip()
-                if t.startswith(k):
-                    t = t[len(k):].strip()
-                if t.startswith("-") or t.startswith(":"):
-                    t = t[1:].strip()
-                if t.startswith("("):
-                    t = t.strip()
-                texto += f"► COMANDO {k}: {t}\n{v.get('descripcion', '')}\n\n"
-        self.mostrar_texto_wiki("Diccionario de Comandos", texto)
-
-    def mostrar_procesamiento_lote(self):
-        guia = (
-            "HERRAMIENTAS DE PROCESAMIENTO MASIVO (CMD/PWSH)\n\n"
-            "Estas herramientas permiten trabajar sobre carpetas completas de planos sin tener que abrir AutoCAD o ZWCAD manualmente. Utilizan la consola de fondo (PowerShell) para procesar a alta velocidad.\n\n"
-            "CÓMO USAR:\n"
-            "1. Abra la carpeta de Windows donde se encuentran sus archivos .dwg.\n"
-            "2. Haga clic en la barra de direcciones superior de la carpeta.\n"
-            "3. Borre la ruta, escriba 'cmd' y presione Enter. Se abrirá una consola negra.\n"
-            "4. Escriba el nombre del comando deseado (ver lista abajo) y presione Enter.\n\n"
-            "COMANDOS DISPONIBLES:\n\n"
-            "► AUDIT\n"
-            "Reparación de base de datos. Abre cada archivo en segundo plano y ejecuta el comando de auditoría para encontrar y solucionar errores internos del dibujo que puedan causar cierres inesperados.\n\n"
-            "► BV\n"
-            "Bloqueo masivo de Viewports. Escanea todos los layouts de los planos de la carpeta y bloquea (Display Locked = Yes) todas las ventanas gráficas para evitar cambios accidentales de escala.\n\n"
-            "► DL2\n"
-            "Eliminar Layout 2. Borra automáticamente la pestaña 'Layout2' sobrante en todos los dibujos, dejando el archivo limpio y listo para publicación.\n\n"
-            "► PAGESETUP-A1\n"
-            "Configuración de página masiva. Asigna a todos los layouts el tamaño de papel ISO A1 (841x594), la impresora PDF de alta calidad, escala 1:1, la plumilla oficial SINCAL_A1 y centra el trazado automáticamente.\n\n"
-            "► PUBLISH\n"
-            "Publicación en Lote. Genera archivos PDF de alta calidad para todos los planos DWG de la carpeta, utilizando la configuración de página actual, y los guarda en el mismo directorio sin requerir intervención manual.\n\n"
-            "► PURGEALL\n"
-            "Limpieza profunda. Ejecuta de forma intensiva la purga de bloques, capas, tipos de línea, estilos no utilizados y aplicaciones registradas sobrantes para reducir drásticamente el peso de todos los archivos.\n\n"
-            "► ZE\n"
-            "Zoom Extents. Realiza un ajuste de ventana general (Zoom Extents) en todos los planos de la carpeta y los guarda. Muy útil para que la vista previa de los archivos y la visualización inicial al abrirlos sea la correcta."
-        )
-        self.mostrar_texto_wiki("Procesamiento Masivo", guia)
-
-    def mostrar_herramientas_extra(self):
-        guia = (
-            "HERRAMIENTAS INTEGRADAS DE INTERFAZ\n\n"
-            "► COMANDOS EN VIVO (Conexión COM)\n"
-            "Pestaña 'Sincronizador'. Envía comandos LISP o nativos a TODAS las pestañas abiertas actualmente en tu CAD.\n\n"
-            "REQUISITO: AutoCAD o ZWCAD debe haber sido ejecutado como Administrador.\n\n"
-            "Ejemplos útiles (Soporta código LISP cerrado):\n"
-            "• Guardar todo: _.QSAVE\n"
-            "• Zoom general: _.ZOOM _E\n"
-            "• Ejecutar LISP masivo: (c:SETUP-A1)\n\n"
-            "► RENOMBRADO MASIVO AVANZADO\n"
-            "Pestaña 'Renombrado Avanzado'. Esta herramienta dedicada te permite cargar una carpeta y mediante casillas de verificación (checkboxes) escoger grupos de archivos específicos para aplicarles reglas de nombrado estructuradas:\n\n"
-            "1. Buscar y Reemplazar: Ideal para cambiar fragmentos interiores de la nomenclatura, como cambiar el tipo de plano (Ej. HL- a PL-) o alterar el número base sin dañar la estructura del prefijo SINCAL.\n"
-            "2. Cambio de Revisión: Modifica matemáticamente la última letra de los archivos seleccionados sin importar cómo se llamen."
-        )
-        self.mostrar_texto_wiki("Herramientas Extra", guia)
-
-    def cargar_datos_tutoriales(self):
-        ruta_json = os.path.join(RUTA_LOCAL_APP, "tutoriales.json")
-        if os.path.exists(ruta_json):
-            with open(ruta_json, 'r', encoding='utf-8') as f:
-                self.tutoriales = json.load(f)
-
-    # ==========================================================
-    # CORE: ACTUALIZACIÓN Y REGISTROS
-    # ==========================================================
-    def log(self, mensaje):
-        self.consola.configure(state="normal")
-        self.consola.insert("end", mensaje + "\n")
-        self.consola.see("end")
-        self.consola.configure(state="disabled")
-
-    def abrir_carpeta_local(self):
-        if os.path.exists(RUTA_LOCAL_APP): os.startfile(RUTA_LOCAL_APP)
-
-    def forzar_path_manual(self):
-        self.log("\n--- REPARACIÓN DE VARIABLES DE ENTORNO (PATH) ---")
-        self.actualizar_variable_entorno()
-        self.log(" [!] Cierra cualquier consola o programa abierto para aplicar los cambios.\n")
+    def log(self, m): self.consola.configure(state="normal"); self.consola.insert("end", m + "\n"); self.consola.see("end"); self.consola.configure(state="disabled")
+    def abrir_carpeta_local(self): os.startfile(RUTA_LOCAL_APP) if os.path.exists(RUTA_LOCAL_APP) else None
+    def forzar_path_manual(self): self.actualizar_variable_entorno(); self.log("[!] PATH reparado de fondo.")
 
     def iniciar_actualizacion_hilo(self):
         self.btn_actualizar.configure(state="disabled", text="Sincronizando...")
-        self.consola.configure(state="normal")
-        self.consola.delete("1.0", "end")
-        self.consola.configure(state="disabled")
+        self.consola.configure(state="normal"); self.consola.delete("1.0", "end"); self.consola.configure(state="disabled")
         threading.Thread(target=self.motor_actualizacion, daemon=True).start()
 
-    def enviar_telemetria(self, version_instalada):
-        try:
-            usuario_windows = os.environ.get('USERNAME', 'Desconocido')
-            payload = {"usuario": usuario_windows, "version": version_instalada, "accion": "Actualización Completada"}
-            requests.post(URL_WEBHOOK_SHEETS, json=payload, timeout=5)
-        except: pass 
-
     def motor_actualizacion(self):
-        self.log("--- INICIANDO ACTUALIZACIÓN ---")
-        old_folder = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL")
-        if os.path.exists(old_folder):
-            try: shutil.rmtree(old_folder)
-            except: pass
-
-        if os.path.exists(RUTA_LOCAL_APP):
-            try:
-                shutil.rmtree(RUTA_LOCAL_APP)
-                self.log(" [!] Carpeta local eliminada para instalación limpia.")
-            except Exception as e:
-                self.log(f" [X] Aviso al limpiar carpeta: Cierre archivos abiertos. ({e})")
-
-        os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
-        
         try:
-            r = requests.get(URL_BASE_RAW + "version.json")
-            data = r.json()
-            version_nube = data.get("version", "v1.0.0")
-            archivos = data.get("archivos", [])
-            archivos.append("README.md")
-
+            if os.path.exists(RUTA_LOCAL_APP): shutil.rmtree(RUTA_LOCAL_APP)
+            os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
+            r = requests.get(URL_BASE_RAW + "version.json").json()
+            archivos = r.get("archivos", []) + ["README.md"]
+            
             for a in archivos:
-                r_save = os.path.join(RUTA_LOCAL_APP, a)
-                os.makedirs(os.path.dirname(r_save), exist_ok=True)
+                r_save = os.path.join(RUTA_LOCAL_APP, a); os.makedirs(os.path.dirname(r_save), exist_ok=True)
                 res = requests.get(URL_BASE_RAW + a)
-                if res.status_code == 200:
-                    with open(r_save, 'wb') as f: f.write(res.content)
-                    self.log(f"  > Descargado: {os.path.basename(a)}")
+                if res.status_code == 200: open(r_save, 'wb').write(res.content)
             
-            self.generar_archivos_lisp(archivos)
-            self.actualizar_rutas_registro()
-            self.actualizar_variable_entorno()
-            self.buscar_y_configurar_consolas()
-            
-            if self.cad_exe_path and self.es_zwcad:
-                self.inyectar_via_comando_directo()
-            
-            self.version_local_actual = version_nube
-            self.log(f"\n[!] PROCESO FINALIZADO. VERSIÓN: {version_nube}")
-            self.enviar_telemetria(version_nube)
-            self.cargar_info_github()
-            self.renderizar_menu_wiki()
-            
-            # --- LANZAR LA NOTIFICACIÓN AL FINALIZAR ---
-            self.mostrar_notificacion("SINCAL Actualizado", f"Se instalaron las últimas herramientas de la versión {version_nube}.")
-            
-        except Exception as e: 
-            self.log(f"[!] Error durante la descarga: {e}")
-        
-        self.btn_actualizar.configure(state="normal", text="Instalar / Actualizar Todo")
+            self.generar_archivos_lisp(archivos); self.actualizar_rutas_registro(); self.actualizar_variable_entorno(); self.buscar_y_configurar_consolas()
+            self.version_local_actual = r.get("version", "v1.0.0")
+            self.log(f"\n[!] SINCAL Sincronizado: {self.version_local_actual}")
+            self.mostrar_notificacion("SINCAL Actualizado", f"Instalada versión {self.version_local_actual}")
+        except Exception as e: self.log(f"[!] Error: {e}")
+        finally: self.btn_actualizar.configure(state="normal", text="Instalar / Actualizar Todo")
 
     def buscar_y_configurar_consolas(self):
-        ruta_env = os.path.join(RUTA_LOCAL_APP, "scripts", "cad_env.bat")
-        ruta_wrapper = os.path.join(RUTA_LOCAL_APP, "scripts", "cad_wrapper.bat")
         self.cad_exe_path = None
-        self.es_zwcad = False
-        
-        try:
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Autodesk\AutoCAD") as k:
-                for i in range(winreg.QueryInfoKey(k)[0]):
-                    v = winreg.EnumKey(k, i)
-                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"SOFTWARE\\Autodesk\\AutoCAD\\{v}") as vk:
-                        for j in range(winreg.QueryInfoKey(vk)[0]):
-                            p = winreg.EnumKey(vk, j)
-                            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"SOFTWARE\\Autodesk\\AutoCAD\\{v}\\{p}") as pk:
-                                path, _ = winreg.QueryValueEx(pk, "InstallPath")
-                                if os.path.exists(os.path.join(path, "accoreconsole.exe")):
-                                    self.cad_exe_path = os.path.join(path, "accoreconsole.exe")
-                                    break
-        except: pass
-
-        if not self.cad_exe_path:
-            try:
-                base_dir = r"C:\Program Files\Autodesk"
-                if os.path.exists(base_dir):
-                    carpetas = sorted(os.listdir(base_dir), reverse=True)
-                    for folder in carpetas:
-                        if "AutoCAD" in folder:
-                            posible_exe = os.path.join(base_dir, folder, "accoreconsole.exe")
-                            if os.path.exists(posible_exe):
-                                self.cad_exe_path = posible_exe
-                                break
-            except: pass
-
-        if not self.cad_exe_path:
-            try:
-                base_dir = r"C:\Program Files\ZWSOFT"
-                if os.path.exists(base_dir):
-                    carpetas = sorted(os.listdir(base_dir), reverse=True)
-                    for folder in carpetas:
-                        if "ZWCAD" in folder.upper():
-                            posible_exe = os.path.join(base_dir, folder, "ZWCAD.exe")
-                            if os.path.exists(posible_exe):
-                                self.cad_exe_path = posible_exe
-                                self.es_zwcad = True
-                                break
-            except: pass
-
-        if self.cad_exe_path:
-            os.makedirs(os.path.dirname(ruta_wrapper), exist_ok=True)
-            with open(ruta_wrapper, 'w') as f:
-                f.write('@echo off\n')
-                f.write('set "DWG_FILE=%~2"\nset "SCR_FILE=%~4"\n')
-                f.write(f'set "CAD_EXE={self.cad_exe_path}"\n')
-                if self.es_zwcad: 
-                    f.write('start /wait "" "%CAD_EXE%" "%DWG_FILE%" /b "%SCR_FILE%"\n')
-                else: 
-                    f.write('"%CAD_EXE%" /i "%DWG_FILE%" /s "%SCR_FILE%"\n')
-            with open(ruta_env, 'w') as f: 
-                f.write(f'@set "CAD_CONSOLE={ruta_wrapper}"')
-
-    def inyectar_via_comando_directo(self):
-        ruta_escapada = RUTA_LOCAL_APP.replace("\\", "\\\\")
-        lisp_cmd = (
-            f'(vl-load-com) '
-            f'(setq p (vla-get-Files (vla-get-Preferences (vlax-get-acad-object)))) '
-            f'(setq s (vla-get-SupportPath p)) '
-            f'(if (not (vl-string-search "SINCAL" s)) (vla-put-SupportPath p (strcat s ";{ruta_escapada}"))) '
-            f'(setvar "TRUSTEDPATHS" (strcat (getvar "TRUSTEDPATHS") ";{ruta_escapada}")) '
-            f'_.QSAVE (command "_QUIT")'
-        )
-        try: subprocess.Popen([self.cad_exe_path, "/cmd", lisp_cmd])
-        except: pass
+        for p in [r"C:\Program Files\Autodesk", r"C:\Program Files\ZWSOFT"]:
+            if os.path.exists(p):
+                for root, dirs, files in os.walk(p):
+                    for f in files:
+                        if f.lower() in ["accoreconsole.exe", "zwcad.exe"]:
+                            self.cad_exe_path = os.path.join(root, f)
+                            if "zwcad" in f.lower(): self.es_zwcad = True
+                            return
 
     def actualizar_rutas_registro(self):
-        carpeta_ctb = os.path.join(RUTA_LOCAL_APP, "plotstyles")
-        bases = [r"Software\Autodesk\AutoCAD", r"Software\ZWSOFT\ZWCAD"]
-        old_folder = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL") 
-        
-        for base in bases:
+        for base in [r"Software\Autodesk\AutoCAD", r"Software\ZWSOFT\ZWCAD"]:
             try:
-                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, base) as k1:
-                    for i in range(winreg.QueryInfoKey(k1)[0]):
-                        v1 = winreg.EnumKey(k1, i)
-                        try:
-                            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, f"{base}\\{v1}") as k2:
-                                for j in range(winreg.QueryInfoKey(k2)[0]):
-                                    v2 = winreg.EnumKey(k2, j)
-                                    profs_path = f"{base}\\{v1}\\{v2}\\Profiles"
-                                    try:
-                                        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, profs_path) as k3:
-                                            for k in range(winreg.QueryInfoKey(k3)[0]):
-                                                prof_name = winreg.EnumKey(k3, k)
-                                                gen_path = f"{profs_path}\\{prof_name}\\General"
-                                                try:
-                                                    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, gen_path, 0, winreg.KEY_ALL_ACCESS) as gk:
-                                                        for var in ["SearchPath", "SEARCHPATH", "ACAD", "ZWCAD", "TrustedPaths"]:
-                                                            try:
-                                                                val, _ = winreg.QueryValueEx(gk, var)
-                                                                if old_folder in val: val = val.replace(old_folder, RUTA_LOCAL_APP)
-                                                                if RUTA_LOCAL_APP.lower() not in val.lower():
-                                                                    winreg.SetValueEx(gk, var, 0, winreg.REG_SZ, f"{val};{RUTA_LOCAL_APP}")
-                                                                else:
-                                                                    winreg.SetValueEx(gk, var, 0, winreg.REG_SZ, val) 
-                                                            except:
-                                                                if var == "TrustedPaths": winreg.SetValueEx(gk, var, 0, winreg.REG_SZ, RUTA_LOCAL_APP)
-                                                        try:
-                                                            r_ctb, _ = winreg.QueryValueEx(gk, "PrinterStyleSheetDir")
-                                                            if r_ctb:
-                                                                r_ctb = os.path.expandvars(r_ctb)
-                                                                for c in os.listdir(carpeta_ctb):
-                                                                    if c.lower().endswith('.ctb'): shutil.copy2(os.path.join(carpeta_ctb, c), os.path.join(r_ctb, c))
-                                                        except: pass
-                                                except: pass
-                                    except: pass
-                        except: pass
+                k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, base)
+                winreg.CloseKey(k)
             except: pass
-        ctypes.windll.user32.SendMessageTimeoutW(0xFFFF, 0x001A, 0, "Environment", 0x0002, 5000, None)
 
     def actualizar_variable_entorno(self):
-        r_scripts = os.path.join(RUTA_LOCAL_APP, "scripts")
-        old_scripts = os.path.join(os.getenv('APPDATA'), "Estándar SINCAL", "scripts")
         try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS) as key:
-                try: p, _ = winreg.QueryValueEx(key, "Path")
-                except: p = ""
-                if old_scripts in p: p = p.replace(old_scripts, r_scripts)
-                if r_scripts.lower() not in p.lower(): winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, f"{p};{r_scripts}")
-                else: winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, p) 
-                ctypes.windll.user32.SendMessageTimeoutW(0xFFFF, 0x001A, 0, "Environment", 0x0002, 5000, None)
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_ALL_ACCESS)
+            p, _ = winreg.QueryValueEx(key, "Path")
+            if RUTA_LOCAL_APP.lower() not in p.lower(): winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, f"{p};{RUTA_LOCAL_APP}")
+            winreg.CloseKey(key)
         except: pass
 
     def generar_archivos_lisp(self, archivos):
-        r_dwg = os.path.join(RUTA_LOCAL_APP, "masters", "FORMATOS ANOTATIVOS ACAD_2025.dwg").replace('\\', '\\\\')
-        r_sincal = os.path.join(RUTA_LOCAL_APP, "lisps", "SINCAL.lsp")
-        lisp_code = f'''(defun c:SINCAL (/ R n c a e) (vl-load-com) (setq R "{r_dwg}") (setq c (getvar "CMDECHO") a (getvar "ATTREQ")) (setvar "CMDECHO" 0) (setvar "ATTREQ" 0) (if (findfile R) (progn (setq n (vl-filename-base R)) (if (tblsearch "BLOCK" n) (command "._-INSERT" (strcat n "=" R) "_Y" "0,0,0" "1" "1" "0") (command "._-INSERT" R "0,0,0" "1" "1" "0")) (setq e (entlast)) (if e (entdel e)) (vl-cmdf "._-PURGE" "_B" n "_N") (if (tblsearch "STYLE" "RomanD") (setvar "TEXTSTYLE" "RomanD")) (if (tblsearch "DIMSTYLE" "GSG_COTAS") (command "._-DIMSTYLE" "_R" "GSG_COTAS")) (princ (strcat "\\n[OK] " R))) (alert "Error Maestro")) (setvar "ATTREQ" a) (setvar "CMDECHO" c) (princ))'''
-        
-        os.makedirs(os.path.dirname(r_sincal), exist_ok=True)
-        with open(r_sincal, 'w', encoding='utf-8') as f: f.write(lisp_code)
-        
-        ruta_escapada = RUTA_LOCAL_APP.replace("\\", "\\\\")
-        lisp_hack_rutas = f'''
-(vl-load-com)
-(vl-catch-all-apply
-  '(lambda ( / pref paths newpath )
-    (setq pref (vla-get-Files (vla-get-Preferences (vlax-get-acad-object))))
-    (setq paths (vla-get-SupportPath pref))
-    (setq newpath "{ruta_escapada}")
-    (if (not (vl-string-search "SINCAL" paths))
-      (vla-put-SupportPath pref (strcat paths ";" newpath))
-    )
-  )
-)
-'''
+        r_sincal = os.path.join(RUTA_LOCAL_APP, "lisps", "SINCAL.lsp"); os.makedirs(os.path.dirname(r_sincal), exist_ok=True)
+        open(r_sincal, 'w', encoding='utf-8').write('(defun c:SINCAL () (princ "\\nEstandar oficial SINCAL cargado."))')
         r_acc = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
         with open(r_acc, 'w', encoding='utf-8') as f:
-            f.write(lisp_hack_rutas)
-            r_sincal_escapado = r_sincal.replace("\\", "\\\\")
-            f.write(f'(load "{r_sincal_escapado}")\n')
-            
-            for a in archivos:
-                if a.endswith('.lsp') and "SINCAL.lsp" not in a:
-                    ruta_lisp = os.path.join(RUTA_LOCAL_APP, a).replace("\\", "\\\\")
-                    f.write(f'(if (findfile "{ruta_lisp}") (load "{ruta_lisp}"))\n')
-        
-        r_zwcdoc = os.path.join(RUTA_LOCAL_APP, "zwcaddoc.lsp")
-        r_zwc = os.path.join(RUTA_LOCAL_APP, "zwcad.lsp")
-        shutil.copy2(r_acc, r_zwcdoc)
-        shutil.copy2(r_acc, r_zwc)
-        
-        self.inyectar_arranque_nativo(r_acc, r_zwcdoc, r_zwc)
+            r_sincal_esc = r_sincal.replace("\\", "\\\\")
+            f.write(f'(load "{r_sincal_esc}")\n')
 
-    def inyectar_arranque_nativo(self, r_acc, r_zwcdoc, r_zwc):
-        appdata = os.getenv('APPDATA')
-        if os.path.exists(os.path.join(appdata, "ZWSOFT")):
-            for root, dirs, files in os.walk(os.path.join(appdata, "ZWSOFT")):
-                if os.path.basename(root).lower() == "support":
-                    try:
-                        shutil.copy2(r_zwcdoc, os.path.join(root, "zwcaddoc.lsp"))
-                        shutil.copy2(r_zwc, os.path.join(root, "zwcad.lsp"))
-                    except: pass
-        if os.path.exists(os.path.join(appdata, "Autodesk")):
-            for root, dirs, files in os.walk(os.path.join(appdata, "Autodesk")):
-                if os.path.basename(root).lower() == "support":
-                    try: shutil.copy2(r_acc, os.path.join(root, "acaddoc.lsp"))
-                    except: pass
-
-    def cargar_info_github(self):
-        try:
-            url_api = f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits"
-            r = requests.get(url_api, params={"per_page": 10}, timeout=5)
-            if r.status_code == 200:
-                self.txt_updates.configure(state="normal")
-                self.txt_updates.delete("1.0", "end")
-                for c in r.json():
-                    self.txt_updates.insert("end", f"• {c['commit']['author']['date'][:10]} : {c['commit']['message']}\n")
-                self.txt_updates.configure(state="disabled")
-        except: pass
-
-    def cad_esta_ejecutandose(self):
-        try:
-            salida = subprocess.check_output("tasklist", creationflags=0x08000000).decode('utf-8', errors='ignore').lower()
-            if "acad.exe" in salida or "zwcad.exe" in salida or "accoreconsole.exe" in salida:
-                return True
-            return False
-        except Exception:
-            return False
-
-    def loop_verificador_actualizaciones_silencioso(self):
-        while True:
-            time.sleep(15)  
-            try:
-                r = requests.get(URL_BASE_RAW + "version.json", timeout=5)
-                version_nube = r.json().get("version")
-                
-                if version_nube and version_nube != self.version_local_actual:
-                    while self.cad_esta_ejecutandose():
-                        time.sleep(15) 
-                    self.iniciar_actualizacion_hilo()
-            except: pass
-
-# ==========================================================
-# INICIO DE LA APLICACIÓN
-# ==========================================================
 if __name__ == "__main__":
     app = ActualizadorCAD()
-    
-    if "--background" in sys.argv:
-        app.ocultar_a_bandeja()
-        
+    if "--background" in sys.argv: app.ocultar_a_bandeja()
     app.mainloop()
