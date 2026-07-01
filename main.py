@@ -322,10 +322,14 @@ class ActualizadorCAD(ctk.CTk):
                     
                     ;; --- DIBUJO U-BAR SUPERIOR (12m MAX, TRASLAPE DERECHA) ---
                     (setq len_u_top (+ (* 2.0 {l_gancho}) (- cx_r cx_l)))
-                    (setq pbi_t (list cx_l (- cy_t {l_gancho})))
-                    (setq pti_t (list cx_l cy_t))
-                    (setq ptd_t (list cx_r cy_t))
-                    (setq pbd_t (list cx_r (- cy_t {l_gancho})))
+                    
+                    ;; NUEVO: Forzamos el Y a la tangente INFERIOR de los círculos
+                    (setq cy_t_estricto (- cy_t {phi_sup}))
+
+                    (setq pbi_t (list cx_l (- cy_t_estricto {l_gancho})))
+                    (setq pti_t (list cx_l cy_t_estricto))
+                    (setq ptd_t (list cx_r cy_t_estricto))
+                    (setq pbd_t (list cx_r (- cy_t_estricto {l_gancho})))
                     
                     (setvar "FILLETRAD" rad_t)
                     (if (<= len_u_top 12.0)
@@ -334,15 +338,16 @@ class ActualizadorCAD(ctk.CTk):
                         (command "._fillet" "P" (entlast))
                       )
                       (progn
-                        ;; Barra 1: Arranca desde Derecha
+                        ;; Barra 1: Arranca desde Derecha (bajó a la tangente inferior)
                         (setq x_split_t (- cx_r (- 12.0 {l_gancho})))
-                        (setq pt_s1_t (list x_split_t cy_t))
+                        (setq pt_s1_t (list x_split_t cy_t_estricto))
                         (command "._pline" "_NON" pbd_t "_NON" ptd_t "_NON" pt_s1_t "")
                         (command "._fillet" "P" (entlast))
-                        ;; Barra 2: Traslape hacia izquierda (desfasada abajo)
-                        (setq pt_s2_start_t (list (+ x_split_t {t_lap_sup}) (- cy_t {phi_sup})))
-                        (setq pti_t_dn (list cx_l (- cy_t {phi_sup})))
-                        (setq pbi_t_dn (list cx_l (- cy_t {phi_sup} {l_gancho})))
+                        
+                        ;; Barra 2: Traslape hacia izquierda (estrictamente colineal, SIN DESFASE)
+                        (setq pt_s2_start_t (list (+ x_split_t {t_lap_sup}) cy_t_estricto))
+                        (setq pti_t_dn (list cx_l cy_t_estricto))
+                        (setq pbi_t_dn (list cx_l (- cy_t_estricto {l_gancho})))
                         (command "._pline" "_NON" pt_s2_start_t "_NON" pti_t_dn "_NON" pbi_t_dn "")
                         (command "._fillet" "P" (entlast))
                       )
