@@ -292,7 +292,7 @@ class ActualizadorCAD(ctk.CTk):
                     (draw-circles-hatch (list arr_xl arr_y_start 0.0) (list arr_xl arr_y_end 0.0) {esp_lat} {phi_lat})
                     (draw-circles-hatch (list arr_xr arr_y_start 0.0) (list arr_xr arr_y_end 0.0) {esp_lat} {phi_lat})
                     
-                    ;; --- DIBUJO U-BAR INFERIOR (12m MAX, TRASLAPE IZQUIERDA) ---
+                    ;; --- DIBUJO U-BAR INFERIOR (12m MAX, TRASLAPE DERECHA) ---
                     (setq len_u_bot (+ (* 2.0 {l_gancho}) (- cx_r cx_l)))
                     (setq pti_b (list cx_l (+ cy_b {l_gancho})))
                     (setq pbi_b (list cx_l cy_b))
@@ -306,16 +306,15 @@ class ActualizadorCAD(ctk.CTk):
                         (command "._fillet" "P" (entlast))
                       )
                       (progn
-                        ;; Barra 1: Arranca desde Izquierda
+                        ;; Barra 1: Arranca desde Izquierda por la tangente inferior (cy_b)
                         (setq x_split_b (+ cx_l (- 12.0 {l_gancho})))
                         (setq pt_s1_b (list x_split_b cy_b))
                         (command "._pline" "_NON" pti_b "_NON" pbi_b "_NON" pt_s1_b "")
                         (command "._fillet" "P" (entlast))
-                        ;; Barra 2: Traslape
-                        (setq pt_s2_start (list (- x_split_b {t_lap_inf}) (+ cy_b {phi_inf})))
-                        (setq pbd_b_up (list cx_r (+ cy_b {phi_inf})))
-                        (setq ptd_b_up (list cx_r (+ cy_b {phi_inf} {l_gancho})))
-                        (command "._pline" "_NON" pt_s2_start "_NON" pbd_b_up "_NON" ptd_b_up "")
+                        
+                        ;; Barra 2: Traslape estrictamente colineal, comparte cy_b
+                        (setq pt_s2_start_b (list (- x_split_b {t_lap_inf}) cy_b))
+                        (command "._pline" "_NON" pt_s2_start_b "_NON" pbd_b "_NON" ptd_b "")
                         (command "._fillet" "P" (entlast))
                       )
                     )
@@ -357,7 +356,126 @@ class ActualizadorCAD(ctk.CTk):
               )) 
               {lisp_safe_footer}
             )"""
-            
+
+        elif tipo_vista == "SEC_A":
+            lisp_code = f"""(defun c:SINCAL-DIBUJAR (/ p1 p2 X_left X_right Y_bot Y_top cx_l cx_r cy_b cy_t rad_b rad_t arr_x_start arr_x_end arr_y_start arr_y_end y_bot_perim y_top_perim x_left_perim x_right_perim pti_b pbi_b pbd_b ptd_b len_u_bot x_split_b pt_s2_start_b pbi_t pti_t ptd_t pbd_t len_u_top x_split_t pt_s1_t pt_s2_start_t pti_t_dn pbi_t_dn draw-circles-hatch old_att old_fillet c_ent)
+              {lisp_safe_header}
+              
+              ;; Función interna para dibujar círculos + Hatch
+              (defun draw-circles-hatch (pt1 pt2 esp phi_m / dist ang current_dist pto c_ent)
+                (setq dist (distance pt1 pt2) ang (angle pt1 pt2) current_dist 0.0)
+                (if (> dist 0)
+                  (progn
+                    (while (<= current_dist dist)
+                      (setq pto (polar pt1 ang current_dist))
+                      (command "._circle" "_NON" pto (/ phi_m 2.0))
+                      (setq c_ent (entlast))
+                      (command "._-hatch" "_P" "ANSI31" "1.6" "0" "_S" c_ent "" "")
+                      (setq current_dist (+ current_dist esp))
+                    )
+                    (if (> (- dist (- current_dist esp)) 0.001)
+                      (progn
+                        (command "._circle" "_NON" pt2 (/ phi_m 2.0))
+                        (setq c_ent (entlast))
+                        (command "._-hatch" "_P" "ANSI31" "1.6" "0" "_S" c_ent "" "")
+                      )
+                    )
+                  )
+                )
+              )
+
+              (setq p1 (getpoint "\\n[SINCAL] Clic esquina INFERIOR-IZQUIERDA (Zapata): "))
+              (if p1 (progn
+                (setq p2 (getcorner p1 "\\n[SINCAL] Clic esquina SUPERIOR-DERECHA (Zapata): "))
+                (if p2 (progn
+                    (setq X_left (min (car p1) (car p2)) X_right (max (car p1) (car p2)))
+                    (setq Y_bot (min (cadr p1) (cadr p2)) Y_top (max (cadr p1) (cadr p2)))
+                    
+                    ;; 1. Coordenadas de los CENTROS de los círculos (Fierros longitudinales)
+                    (setq cy_b (+ Y_bot {r_inf} (/ {phi_inf} 2.0)))
+                    (setq cy_t (- Y_top {r_sup} (/ {phi_sup} 2.0)))
+                    (setq cx_l (+ X_left {r_lat} (/ {phi_lat} 2.0)))
+                    (setq cx_r (- X_right {r_lat} (/ {phi_lat} 2.0)))
+                    
+                    (setq rad_b (* 3.0 {phi_inf}))
+                    (setq rad_t (* 3.0 {phi_sup}))
+                    
+                    ;; 2. DIBUJO DE CÍRCULOS (Mallas longitudinales)
+                    (setq arr_x_start (+ cx_l rad_b))
+                    (setq arr_x_end (- cx_r rad_b))
+                    
+                    (draw-circles-hatch (list arr_x_start cy_b 0.0) (list arr_x_end cy_b 0.0) {esp_inf} {phi_inf}) ;; Inferiores
+                    (draw-circles-hatch (list arr_x_start cy_t 0.0) (list arr_x_end cy_t 0.0) {esp_sup} {phi_sup}) ;; Superiores
+                    
+                    (setq arr_y_start (+ cy_b rad_b))
+                    (setq arr_y_end (- cy_t rad_t))
+                    (draw-circles-hatch (list cx_l arr_y_start 0.0) (list cx_l arr_y_end 0.0) {esp_lat} {phi_lat}) ;; Laterales Izq
+                    (draw-circles-hatch (list cx_r arr_y_start 0.0) (list cx_r arr_y_end 0.0) {esp_lat} {phi_lat}) ;; Laterales Der
+                    
+                    ;; 3. CÁLCULO ESTRICTO DE TANGENCIAS (Ejes para polilíneas perimetrales)
+                    (setq y_bot_perim (+ cy_b (/ {phi_inf} 2.0))) ;; Tangente superior de círculos inferiores
+                    (setq y_top_perim (+ cy_t (/ {phi_sup} 2.0))) ;; Tangente superior de círculos superiores
+                    (setq x_left_perim (- cx_l (/ {phi_lat} 2.0))) ;; Tangente izquierda
+                    (setq x_right_perim (+ cx_r (/ {phi_lat} 2.0))) ;; Tangente derecha
+                    
+                    ;; 4. DIBUJO U-BAR INFERIOR (Con traslape colineal hacia la derecha)
+                    (setq len_u_bot (+ (* 2.0 {l_gancho}) (- x_right_perim x_left_perim)))
+                    (setq pti_b (list x_left_perim (+ y_bot_perim {l_gancho})))
+                    (setq pbi_b (list x_left_perim y_bot_perim))
+                    (setq pbd_b (list x_right_perim y_bot_perim))
+                    (setq ptd_b (list x_right_perim (+ y_bot_perim {l_gancho})))
+                    
+                    (setvar "FILLETRAD" rad_b)
+                    (if (<= len_u_bot 12.0)
+                      (progn
+                        (command "._pline" "_NON" pti_b "_NON" pbi_b "_NON" pbd_b "_NON" ptd_b "")
+                        (command "._fillet" "P" (entlast))
+                      )
+                      (progn
+                        ;; Barra 1: Izquierda
+                        (setq x_split_b (+ x_left_perim (- 12.0 {l_gancho})))
+                        (command "._pline" "_NON" pti_b "_NON" pbi_b "_NON" (list x_split_b y_bot_perim) "")
+                        (command "._fillet" "P" (entlast))
+                        
+                        ;; Barra 2: Traslape
+                        (setq pt_s2_start_b (list (- x_split_b {t_lap_inf}) y_bot_perim))
+                        (command "._pline" "_NON" pt_s2_start_b "_NON" pbd_b "_NON" ptd_b "")
+                        (command "._fillet" "P" (entlast))
+                      )
+                    )
+                    
+                    ;; 5. DIBUJO U-BAR SUPERIOR (Con traslape colineal hacia la izquierda)
+                    (setq len_u_top (+ (* 2.0 {l_gancho}) (- x_right_perim x_left_perim)))
+                    (setq pbi_t (list x_left_perim (- y_top_perim {l_gancho})))
+                    (setq pti_t (list x_left_perim y_top_perim))
+                    (setq ptd_t (list x_right_perim y_top_perim))
+                    (setq pbd_t (list x_right_perim (- y_top_perim {l_gancho})))
+                    
+                    (setvar "FILLETRAD" rad_t)
+                    (if (<= len_u_top 12.0)
+                      (progn
+                        (command "._pline" "_NON" pbi_t "_NON" pti_t "_NON" ptd_t "_NON" pbd_t "")
+                        (command "._fillet" "P" (entlast))
+                      )
+                      (progn
+                        ;; Barra 1: Derecha
+                        (setq x_split_t (- x_right_perim (- 12.0 {l_gancho})))
+                        (command "._pline" "_NON" pbd_t "_NON" ptd_t "_NON" (list x_split_t y_top_perim) "")
+                        (command "._fillet" "P" (entlast))
+                        
+                        ;; Barra 2: Traslape
+                        (setq pt_s2_start_t (list (+ x_split_t {t_lap_sup}) y_top_perim))
+                        (command "._pline" "_NON" pt_s2_start_t "_NON" pti_t "_NON" pbi_t "")
+                        (command "._fillet" "P" (entlast))
+                      )
+                    )
+                    
+                    (princ "\\n[SINCAL] Sección A-A (Zapata) calculada e inyectada.")
+                ))
+              ))
+              {lisp_safe_footer}
+            )"""
+
         else: 
             lisp_code = f'(defun c:SINCAL-DIBUJAR () {lisp_safe_header} (princ "\\n[SINCAL] Lógica para {tipo_vista} en desarrollo...") {lisp_safe_footer})'
 
