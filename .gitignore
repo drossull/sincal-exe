@@ -1,0 +1,22 @@
+# ==========================================
+# IGNORAR ARCHIVOS AUTOGENERADOS Y PESADOS
+# ==========================================
+
+# 1. Carpetas de compilación de PyInstaller e Inno Setup
+build/
+dist/
+installer_output/
+
+# 2. Archivos ejecutables y empaquetados
+*.exe
+*.spec
+
+# 3. Archivos temporales de caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 4. Archivos de sistema operativo (Basura de Windows)
+Thumbs.db
+desktop.ini

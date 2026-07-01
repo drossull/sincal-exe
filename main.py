@@ -579,14 +579,27 @@ class ActualizadorCAD(ctk.CTk):
 
     def motor_actualizacion(self):
         try:
-            # 1. DESTRUCCIÓN TOTAL (Nuke & Pave): Borra la carpeta local y todo su contenido
-            if os.path.exists(RUTA_LOCAL_APP): 
-                shutil.rmtree(RUTA_LOCAL_APP)
+            # Detecta el nombre exacto del ejecutable actual (ej: SINCAL.exe)
+            nombre_exe_actual = os.path.basename(sys.executable).lower()
             
-            # 2. Reconstrucción desde cero
+            if os.path.exists(RUTA_LOCAL_APP):
+                for elemento in os.listdir(RUTA_LOCAL_APP):
+                    ruta_elemento = os.path.join(RUTA_LOCAL_APP, elemento)
+                    
+                    # SALVAVIDAS: Protege el programa actual y el desinstalador de Inno Setup
+                    if elemento.lower() == nombre_exe_actual or elemento.lower().startswith("unins"):
+                        continue
+                    
+                    try:
+                        if os.path.isdir(ruta_elemento):
+                            shutil.rmtree(ruta_elemento)
+                        else:
+                            os.remove(ruta_elemento)
+                    except Exception:
+                        pass
+            
             os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
             
-            # 3. Descarga de la nueva versión (La Fuente de la Verdad)
             r = requests.get(URL_BASE_RAW + "version.json").json()
             archivos = r.get("archivos", []) + ["README.md"]
             
@@ -598,7 +611,6 @@ class ActualizadorCAD(ctk.CTk):
                     with open(r_save, 'wb') as f:
                         f.write(res.content)
             
-            # 4. Post-procesamiento
             self.generar_archivos_lisp(archivos)
             self.actualizar_rutas_registro()
             self.actualizar_variable_entorno()
