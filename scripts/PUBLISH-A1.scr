@@ -1,0 +1,94 @@
+(vl-load-com)
+(setvar "FILEDIA" 0)
+(setvar "CMDDIA" 0)
+(setvar "BACKGROUNDPLOT" 0)
+(setvar "EXPERT" 5)
+
+;; 1. Obtener documento puenteando la falta de interfaz grafica
+(setq doc (vla-get-Document (vlax-ename->vla-object (namedobjdict))))
+(setq layouts (vla-get-Layouts doc))
+
+;; 2. Deteccion del Software (AutoCAD vs ZWCAD)
+(setq rrp (vl-catch-all-apply 'getvar '("ROAMABLEROOTPREFIX")))
+(setq isZWCAD (if (vl-catch-all-error-p rrp) nil (vl-string-search "ZWCAD" (strcase rrp))))
+
+(if isZWCAD
+  (progn
+    (setq plotterName "ZWCAD PDF(High Quality Print).pc5")
+    (setq paperName "ISO_full_bleed_A1_(841.00_x_594.00_MM)") 
+  )
+  (progn
+    (setq plotterName "AutoCAD PDF (High Quality Print).pc3")
+    (setq paperName "ISO_full_bleed_A1_(841.00_x_594.00_MM)")
+  )
+)
+
+;; 3. Registrar Transparencia
+(if (not (tblsearch "APPID" "PLOTTRANSPARENCY"))
+  (regapp "PLOTTRANSPARENCY")
+)
+
+;; 4. Inyectar configuracion directa a los Layouts
+(vlax-for layout layouts
+  (setq layoutName (vla-get-Name layout))
+  
+  (if (/= (strcase layoutName) "MODEL")
+    (progn
+      ;; Impresora y Papel
+      (vl-catch-all-apply 'vlax-put-property (list layout 'ConfigName plotterName))
+      (vl-catch-all-apply 'vlax-put-property (list layout 'CanonicalMediaName paperName))
+      
+      ;; Plumilla SINCAL
+      (vl-catch-all-apply 'vlax-put-property (list layout 'StyleSheet "SINCAL_A1 (2025).ctb"))
+      
+      ;; Area y Escala (5 = acLayout, 16 = ac1_1)
+      (vl-catch-all-apply 'vla-put-PlotType (list layout 5))
+      (vl-catch-all-apply 'vla-put-UseStandardScale (list layout :vlax-true))
+      (vl-catch-all-apply 'vla-put-StandardScale (list layout 16))
+      
+      ;; Opciones de Trazado Regulares
+      (vl-catch-all-apply 'vla-put-PlotWithLineweights (list layout :vlax-true))  
+      (vl-catch-all-apply 'vla-put-PlotWithPlotStyles (list layout :vlax-true))   
+      (vl-catch-all-apply 'vla-put-PlotViewportsFirst (list layout :vlax-false))  
+      (vl-catch-all-apply 'vla-put-PlotRotation (list layout 0))
+
+      ;; Calidad Custom a 300 DPI
+      (vl-catch-all-apply 'vlax-put-property (list layout 'ShadePlotResolutionLevel 5))
+      (vl-catch-all-apply 'vlax-put-property (list layout 'ShadePlotCustomDPI 300))
+      
+      ;; Inyeccion de Transparencia XDATA
+      (vl-catch-all-apply
+        (function
+          (lambda ()
+            (setq xType (vlax-make-safearray 2 '(0 . 1)))
+            (vlax-safearray-fill xType '(1001 1071))
+            (setq xData (vlax-make-safearray 12 '(0 . 1)))
+            (vlax-safearray-fill xData (list (vlax-make-variant "PLOTTRANSPARENCY") (vlax-make-variant 1)))
+            
+            (vla-SetXdata layout xType xData)
+          )
+        )
+      )
+    )
+  )
+)
+
+;; 5. Publicacion masiva de los Layouts a PDF
+(setq lays nil)
+(foreach x (dictsearch (namedobjdict) "ACAD_LAYOUT") 
+  (if (and (= (car x) 3) (/= (strcase (cdr x)) "MODEL")) 
+    (setq lays (cons (cdr x) lays))
+  )
+)
+(foreach lay lays 
+  (setq outPath (strcat (getvar "DWGPREFIX") (vl-filename-base (getvar "DWGNAME")) ".pdf")) 
+  (command "_.-PLOT" "_N" lay "" "" outPath "_N" "_Y")
+)
+
+;; 6. Limpieza y Guardado
+(setvar "EXPERT" 0)
+(setvar "DYNMODE" 3)
+(setvar "WIPEOUTFRAME" 0)
+(vl-cmdf "_.QSAVE")
+(princ)
+_.QUIT

@@ -9,7 +9,7 @@ if ($dwgFiles.Count -eq 0) {
 
 $appDataPath = [Environment]::GetFolderPath("ApplicationData")
 $wrapperPath = Join-Path $appDataPath "Estandar SINCAL\cad_wrapper.bat"
-$scrPath = Join-Path $appDataPath "Estandar SINCAL\scripts\PUBLISH.scr"
+$scrPath = Join-Path $appDataPath "Estandar SINCAL\scripts\PUBLISH-A1.scr"
 
 if (-not (Test-Path $wrapperPath)) {
     Write-Host "[ERROR] Consola CAD no detectada. Abre SINCAL y presiona 'Instalar / Actualizar Todo'." -ForegroundColor Red
@@ -17,19 +17,22 @@ if (-not (Test-Path $wrapperPath)) {
 }
 
 if (-not (Test-Path $scrPath)) {
-    Write-Host "[ERROR] Archivo PUBLISH.scr no encontrado en AppData." -ForegroundColor Red
+    Write-Host "[ERROR] Archivo PUBLISH-A1.scr no encontrado en AppData." -ForegroundColor Red
     exit
 }
 
-Write-Host "---------------------------------------------------" -ForegroundColor Cyan
-Write-Host "Publicación masiva de PDF" -ForegroundColor Cyan
-Write-Host "---------------------------------------------------" -ForegroundColor Cyan
+Write-Host "===================================================" -ForegroundColor Cyan
+Write-Host "  CONFIGURACION DE PAGINA A1 + EXPORTACION A PDF" -ForegroundColor Cyan
+Write-Host "===================================================" -ForegroundColor Cyan
+
+Write-Host "`nSe encontraron $($dwgFiles.Count) planos. Iniciando procesamiento unificado...`n" -ForegroundColor Green
 
 foreach ($file in $dwgFiles) {
-    Write-Host "Publicando PDF de: $($file.Name)" -ForegroundColor Green
+    Write-Host "> Procesando y Exportando: $($file.Name)" -ForegroundColor White
     
     $argList = "/i `"$($file.FullName)`" /s `"$scrPath`""
     Start-Process -FilePath $wrapperPath -ArgumentList $argList -Wait -NoNewWindow
 }
 
-Write-Host "`n¡Proceso finalizado!" -ForegroundColor Cyan
+Write-Host "`n[OK] Tarea finalizada exitosamente." -ForegroundColor Cyan
+Pause
