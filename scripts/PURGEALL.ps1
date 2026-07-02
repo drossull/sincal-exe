@@ -7,12 +7,12 @@ if ($dwgFiles.Count -eq 0) {
     exit
 }
 
-# Leer la ruta del wrapper de la misma carpeta donde está instalado el script
-$PSScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-$wrapperPath = Join-Path $PSScriptRoot "cad_wrapper.bat"
+# Leer la ruta del wrapper desde la bóveda central de SINCAL en AppData
+$appDataPath = [Environment]::GetFolderPath("ApplicationData")
+$wrapperPath = Join-Path $appDataPath "Estandar SINCAL\cad_wrapper.bat"
 
 if (-not (Test-Path $wrapperPath)) {
-    Write-Host "[ERROR] Consola CAD no detectada. Actualiza SINCAL.exe." -ForegroundColor Red
+    Write-Host "[ERROR] Consola CAD no detectada. Abre SINCAL y dale a 'Instalar / Actualizar Todo'." -ForegroundColor Red
     exit
 }
 
