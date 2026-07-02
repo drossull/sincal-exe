@@ -757,6 +757,17 @@ class ActualizadorCAD(ctk.CTk):
                         if f.lower() in ["accoreconsole.exe", "zwcad.exe"]:
                             self.cad_exe_path = os.path.join(root, f)
                             if "zwcad" in f.lower(): self.es_zwcad = True
+                            
+                            # --- NUEVA CONEXIÓN: Crear el cad_wrapper.bat para PowerShell ---
+                            ruta_wrapper = os.path.join(RUTA_LOCAL_APP, "cad_wrapper.bat")
+                            try:
+                                with open(ruta_wrapper, 'w', encoding='utf-8') as wf:
+                                    # Genera un bat que recibe los comandos (/i, /s) y se los pasa a la consola CAD oculta (%*)
+                                    wf.write(f'@echo off\n"{self.cad_exe_path}" %*\n')
+                            except Exception as e:
+                                self.log(f"[X] Error creando wrapper CAD: {e}")
+                            # ----------------------------------------------------------------
+                            
                             return
 
     def actualizar_rutas_registro(self):
