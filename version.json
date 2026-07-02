@@ -1,5 +1,5 @@
 {
-  "version": "v26.1.9",
+  "version": "v26.2.0",
   "archivos": [
     "lisps/BV.lsp",
     "lisps/SINCAL.lsp",
@@ -30,8 +30,7 @@
     "scripts/DL2.ps1",
     "scripts/PAGESETUP-A1.bat",
     "scripts/PAGESETUP-A1.ps1",
-    "scripts/PUBLISH.bat",
-    "scripts/PUBLISH.ps1",
+    "scripts/PUBLISH-A1.ps1",
     "scripts/PURGEALL.bat",
     "scripts/PURGEALL.ps1",
     "scripts/RC-CAPAS.bat",
@@ -42,7 +41,7 @@
     "scripts/CORRELATE.scr",
     "scripts/DL2.scr",
     "scripts/PAGESETUP-A1.scr",
-    "scripts/PUBLISH.scr",
+    "scripts/PUBLISH-A1.scr",
     "scripts/PURGEALL.scr",
     "scripts/RC-CAPAS.scr",
     "scripts/ZE.scr",
