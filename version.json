@@ -1,5 +1,5 @@
 {
-  "version": "v26.2.0",
+  "version": "v26.2.1",
   "archivos": [
     "lisps/BV.lsp",
     "lisps/SINCAL.lsp",
@@ -31,6 +31,7 @@
     "scripts/PAGESETUP-A1.bat",
     "scripts/PAGESETUP-A1.ps1",
     "scripts/PUBLISH-A1.ps1",
+    "scripts/PUBLISH-A1.bat",
     "scripts/PURGEALL.bat",
     "scripts/PURGEALL.ps1",
     "scripts/RC-CAPAS.bat",
