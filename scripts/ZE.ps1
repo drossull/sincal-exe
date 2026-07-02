@@ -7,17 +7,17 @@ if ($dwgFiles.Count -eq 0) {
     exit
 }
 
-$PSScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-$wrapperPath = Join-Path $PSScriptRoot "cad_wrapper.bat"
-$scrPath = Join-Path $PSScriptRoot "ZE.scr"
+$appDataPath = [Environment]::GetFolderPath("ApplicationData")
+$wrapperPath = Join-Path $appDataPath "Estandar SINCAL\cad_wrapper.bat"
+$scrPath = Join-Path $appDataPath "Estandar SINCAL\scripts\ZE.scr"
 
 if (-not (Test-Path $wrapperPath)) {
-    Write-Host "[ERROR] Consola CAD no detectada. Actualiza SINCAL.exe." -ForegroundColor Red
+    Write-Host "[ERROR] Consola CAD no detectada. Abre SINCAL y presiona 'Instalar / Actualizar Todo'." -ForegroundColor Red
     exit
 }
 
 if (-not (Test-Path $scrPath)) {
-    Write-Host "[ERROR] Archivo ZE.scr no encontrado." -ForegroundColor Red
+    Write-Host "[ERROR] Archivo ZE.scr no encontrado en AppData." -ForegroundColor Red
     exit
 }
 
