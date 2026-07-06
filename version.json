@@ -1,5 +1,5 @@
 {
-  "version": "v26.2.5",
+  "version": "v26.2.6",
   "archivos": [
     "lisps/BV.lsp",
     "lisps/SINCAL.lsp",
@@ -10,6 +10,7 @@
     "lisps/P0.lsp",
     "lisps/PND.lsp",
     "lisps/CEVIADA.lsp",
+    "lisps/EXTRIMOUT.lsp",
     "lisps/RMLAY.lsp",
     "lisps/ST0.lsp",
     "lisps/ZE.lsp",
