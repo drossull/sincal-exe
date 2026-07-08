@@ -3,7 +3,7 @@
   (vl-load-com)
 
   ;; =========================================================================
-  ;; 1. Funci√≥n de manejo de errores (para garantizar que las variables se restauran)
+  ;; 1. FunciÛn de manejo de errores (para garantizar que las variables se restauran)
   ;; =========================================================================
   (defun *error* (msg)
     (if oldCmd (setvar "CMDECHO" oldCmd))
@@ -17,24 +17,24 @@
   )
 
   ;; =========================================================================
-  ;; 2. Preparaci√≥n y Guardado de variables actuales
+  ;; 2. PreparaciÛn y Guardado de variables actuales
   ;; =========================================================================
   (command "_.UNDO" "_Begin")
   (setq oldCmd (getvar "CMDECHO"))
   (setq oldHlt (getvar "HIGHLIGHT"))
   (setvar "CMDECHO" 0)
-  ;; Forzamos la restauraci√≥n de HIGHLIGHT a 1 justo al inicio por si ya ven√≠a desactivado.
+  ;; Forzamos la restauraciÛn de HIGHLIGHT a 1 justo al inicio por si ya venÌa desactivado.
   (setvar "HIGHLIGHT" 1)
-  (setq currentTab (getvar "CTAB")) ; Guardamos la pesta√±a actual (Model/Layout)
+  (setq currentTab (getvar "CTAB")) ; Guardamos la pestaÒa actual (Model/Layout)
 
-  ;; Asegurar que Express Tools est√© cargado
+  ;; Asegurar que Express Tools estÈ cargado
   (if (not acet-dxf) (vl-catch-all-apply 'load '("acetutil.fas")))
   (if (not etrim) (load "extrim.lsp"))
 
   ;; =========================================================================
-  ;; 3. L√≥gica Principal
+  ;; 3. LÛgica Principal
   ;; =========================================================================
-  (setq ent (car (entsel "\nSelecciona el c√≠rculo que servir√° de l√≠mite: ")))
+  (setq ent (car (entsel "\nSelecciona el cÌrculo que servir· de lÌmite: ")))
 
   (if ent
     (progn
@@ -49,25 +49,25 @@
           ;; 3A. ZOOM al objeto para asegurar que AutoCAD vea todo lo necesario
           (command "_.ZOOM" "_Object" ent "")
 
-          ;; 3B. Cortar las l√≠neas que cruzan el c√≠rculo (EXTRIM cl√°sico)
+          ;; 3B. Cortar las lÌneas que cruzan el cÌrculo (EXTRIM cl·sico)
           ;; Calculamos un punto afuera lejano.
           (setq ptOutside (polar center 0.0 (* radius 10.0)))
           (etrim ent ptOutside)
 
-          ;; 3C. Crear un pol√≠gono virtual de 128 lados para aproximar el c√≠rculo
+          ;; 3C. Crear un polÌgono virtual de 128 lados para aproximar el cÌrculo
           (setq numPts 128 ang 0.0 step (/ (* pi 2.0) numPts) pts nil)
           (repeat numPts
             (setq pts (cons (polar center ang radius) pts))
             (setq ang (+ ang step))
           )
 
-          ;; 3D. ESCANEO GEOGR√ÅFICO:
+          ;; 3D. ESCANEO GEOGR¡FICO:
           ;; Seleccionamos todo en el espacio actual.
           (setq ssAll (ssget "X" (list (cons 410 currentTab))))
-          ;; Seleccionamos lo que est√° DENTRO o TOCA el c√≠rculo (Crossing Polygon).
+          ;; Seleccionamos lo que est· DENTRO o TOCA el cÌrculo (Crossing Polygon).
           (setq ssKeep (ssget "_CP" pts (list (cons 410 currentTab))))
 
-          ;; 3E. BORRADO SEGURO: Borrar lo que no est√° dentro del c√≠rculo.
+          ;; 3E. BORRADO SEGURO: Borrar lo que no est· dentro del cÌrculo.
           (if ssAll
             (progn
               (setq i 0)
@@ -75,7 +75,7 @@
                 (setq obj (ssname ssAll i))
                 ;; Si la entidad actual NO pertenece al grupo protegido (ssKeep), se borra.
                 (if (and ssKeep (not (ssmemb obj ssKeep)))
-                  ;; Protecci√≥n para no borrar el c√≠rculo l√≠mite en s√≠ mismo
+                  ;; ProtecciÛn para no borrar el cÌrculo lÌmite en sÌ mismo
                   (if (not (equal obj ent))
                     (entdel obj)
                   )
@@ -86,17 +86,17 @@
           )
 
           (command "_.ZOOM" "_Previous")
-          (princ "\n¬°Recorte, limpieza exterior profunda y borrado completados con √©xito!")
+          (princ "\n°Recorte, limpieza exterior profunda y borrado completados con Èxito!")
         )
-        (princ "\nError: El objeto seleccionado no es un c√≠rculo.")
+        (princ "\nError: El objeto seleccionado no es un cÌrculo.")
       )
     )
-    (princ "\nNo se seleccion√≥ ning√∫n objeto.")
+    (princ "\nNo se seleccionÛ ning˙n objeto.")
   )
 
   ;; =========================================================================
-  ;; 4. Limpieza final y Restauraci√≥n
+  ;; 4. Limpieza final y RestauraciÛn
   ;; =========================================================================
-  (*error* nil) ; Llama a la funci√≥n error para restaurar variables limpia
+  (*error* nil) ; Llama a la funciÛn error para restaurar variables limpia
   (princ)
 )

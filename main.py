@@ -801,8 +801,9 @@ class ActualizadorCAD(ctk.CTk):
                     ruta_lisp = os.path.join(RUTA_LOCAL_APP, a)
                     ruta_lisp_esc = ruta_lisp.replace("\\", "\\\\")
                     
-                    # Inyectamos la línea de carga en el acaddoc
-                    f.write(f'(load "{ruta_lisp_esc}")\n')
+                    # Inyectamos la línea de carga SEGURA en el acaddoc
+                    # Si falla, imprimirá un mensaje en rojo pero seguirá cargando los demás
+                    f.write(f'(load "{ruta_lisp_esc}" "\\n[X] SINCAL: Fallo al cargar {os.path.basename(a)}")\n')
 
 if __name__ == "__main__":
     app = ActualizadorCAD()
