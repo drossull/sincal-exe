@@ -1,19 +1,43 @@
-(defun c:VRAP ( / p1 p2 pCentro escala layoutElegido )
+(defun c:VRAP ( / p1 p2 pCentro escala layoutElegido vpEnt vpObj scaleFactor get-scale-factor )
   (vl-load-com)
+
+  ;; Funci√≥n interna para buscar el factor de zoom matem√°tico en el diccionario de AutoCAD
+  (defun get-scale-factor ( scaleName / dict factor item obj pUnits dUnits )
+    (setq factor nil)
+    (if (setq dict (dictsearch (namedobjdict) "ACAD_SCALES"))
+      (foreach item dict
+        (if (= (car item) 350)
+          (progn
+            (setq obj (entget (cdr item)))
+            (if (= (strcase (cdr (assoc 300 obj))) (strcase scaleName))
+              (progn
+                (setq pUnits (cdr (assoc 140 obj)))
+                (setq dUnits (cdr (assoc 143 obj)))
+                (if (and pUnits dUnits (> dUnits 0.0))
+                  ;; Convertimos a float para asegurar precisi√≥n con decimales
+                  (setq factor (/ (float pUnits) (float dUnits)))
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    factor
+  )
 
   ;; 1. Verificar que estamos en el espacio Modelo
   (if (/= (getvar "CTAB") "Model")
     (progn
-      (alert "Por favor, ejecuta el comando VRAP desde la pestaÒa 'Model'.")
+      (alert "Por favor, ejecuta el comando VRAP desde la pesta√±a 'Model'.")
       (exit)
     )
   )
 
-  ;; 2. Seleccionar el ·rea en el Modelo y calcular su centro
-  (setq p1 (getpoint "\nSelecciona la primera esquina del rect·ngulo de selecciÛn: "))
+  ;; 2. Seleccionar el √°rea en el Modelo y calcular su centro
+  (setq p1 (getpoint "\nSelecciona la primera esquina del rect√°ngulo de selecci√≥n: "))
   (setq p2 (getcorner p1 "\nSelecciona la esquina contraria: "))
   
-  ;; Calcular el punto medio (centro) de la selecciÛn
   (setq pCentro (list 
                   (/ (+ (car p1) (car p2)) 2.0)
                   (/ (+ (cadr p1) (cadr p2)) 2.0)
@@ -21,43 +45,58 @@
                 )
   )
 
-  ;; 3. Solicitar la escala
+  ;; 3. Solicitar la escala (la letra 't' permite escribir espacios)
   (setq escala (getstring t "\nIngresa el nombre de la escala (ej. 1:250 m): "))
 
-  ;; 4. Cambiar al ˙nico layout existente
+  ;; 4. Cambiar al √∫nico layout existente
   (setq layoutElegido (car (layoutlist)))
   (if layoutElegido
     (progn
       (setvar "CTAB" layoutElegido)
       
-      ;; 5. Cambiar a la capa "Viewport layer" si existe
+      ;; 5. Cambiar a la capa "Viewport layer"
       (if (tblsearch "LAYER" "Viewport layer")
         (setvar "CLAYER" "Viewport layer")
-        (princ "\nNota: La capa 'Viewport layer' no se encontrÛ, usando la actual.")
+        (princ "\nNota: La capa 'Viewport layer' no se encontr√≥, usando la actual.")
       )
 
-      ;; 6. Crear el Viewport de 300x100 mm centrado en (0,0)
+      ;; 6. Crear el Viewport de 300x100 mm centrado en la coordenada (0,0) del Layout
       (command "_.MVIEW" '(-150.0 -50.0 0.0) '(150.0 50.0 0.0))
       
-      ;; 7. Entrar al Viewport
+      ;; Capturar el Viewport reci√©n creado para manipular sus propiedades directamente
+      (setq vpEnt (entlast))
+      (setq vpObj (vlax-ename->vla-object vpEnt))
+
+      ;; 7. Entrar al Viewport y fijar el centro exacto
       (command "_.MSPACE")
-      
-      ;; 8. Centrar la vista en las coordenadas seleccionadas
       (command "_.ZOOM" "_C" pCentro "")
       
-      ;; 9. Aplicar la escala exacta buscando en tu lista de escalas (nativas o personalizadas)
-      (if (vl-catch-all-error-p (vl-catch-all-apply 'setvar (list "CANNOSCALE" escala)))
-        (princ (strcat "\nADVERTENCIA: La escala '" escala "' no existe. El viewport quedÛ centrado pero sin escala."))
-        (princ (strcat "\nEscala " escala " aplicada correctamente."))
-      )
+      ;; Actualizar la escala anotativa interna
+      (vl-catch-all-apply 'setvar (list "CANNOSCALE" escala))
       
-      ;; 10. Volver al espacio Papel y bloquear el viewport
+      ;; 8. Salir al Layout (Espacio Papel) para aplicar el zoom de forma segura
       (command "_.PSPACE")
-      (command "_.MVIEW" "_L" "_ON" "_L") ;; Bloquea el ˙ltimo viewport creado
       
-      (princ "\n°Comando VRAP finalizado con Èxito!")
+      ;; 9. Buscar el factor de escala real y forzar el tama√±o en el Viewport
+      (setq scaleFactor (get-scale-factor escala))
+      
+      (if scaleFactor
+        (progn
+          ;; Forzar f√≠sicamente el acercamiento/zoom del Viewport
+          (vla-put-CustomScale vpObj scaleFactor)
+          
+          ;; Bloquear el Viewport para que la escala no se pierda al hacer doble clic
+          (vla-put-DisplayLocked vpObj :vlax-true)
+          
+          (princ (strcat "\n¬°√âxito! Escala '" escala "' aplicada correctamente al zoom y Viewport bloqueado."))
+        )
+        (progn
+          ;; Si te equivocas tipeando, te avisa en lugar de lanzar error
+          (princ (strcat "\nADVERTENCIA: La escala '" escala "' no se encontr√≥ en tu lista. El centro est√° listo pero la escala no se ajust√≥."))
+        )
+      )
     )
-    (alert "No se encontrÛ ninguna pestaÒa de Layout en este dibujo.")
+    (alert "No se encontr√≥ ninguna pesta√±a de Layout en este dibujo.")
   )
   (princ)
 )
