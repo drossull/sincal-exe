@@ -731,8 +731,14 @@ class ActualizadorCAD(ctk.CTk):
                 os.makedirs(os.path.dirname(r_save), exist_ok=True)
                 res = requests.get(URL_BASE_RAW + a)
                 if res.status_code == 200: 
+                    contenido = res.content
+                    
+                    # Si el archivo es un LISP y trae la firma invisible UTF-8 BOM, se la extirpamos
+                    if a.lower().endswith('.lsp') and contenido.startswith(b'\xef\xbb\xbf'):
+                        contenido = contenido[3:]
+                        
                     with open(r_save, 'wb') as f:
-                        f.write(res.content)
+                        f.write(contenido)
             
             self.generar_archivos_lisp(archivos)
             self.actualizar_rutas_registro()
