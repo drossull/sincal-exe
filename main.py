@@ -786,15 +786,23 @@ class ActualizadorCAD(ctk.CTk):
         except: pass
 
     def generar_archivos_lisp(self, archivos):
-        # 1. Definimos las rutas
-        r_sincal = os.path.join(RUTA_LOCAL_APP, "lisps", "SINCAL.lsp")
-        os.makedirs(os.path.dirname(r_sincal), exist_ok=True)
-        
-        # 2. Creamos SOLO el puente de arranque (acaddoc.lsp)
+        # 1. Definimos la ruta del puente de arranque (acaddoc.lsp)
         r_acc = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
+        
+        # 2. Escribimos el archivo abriéndolo en modo escritura ('w')
         with open(r_acc, 'w', encoding='utf-8') as f:
-            r_sincal_esc = r_sincal.replace("\\", "\\\\")
-            f.write(f'(load "{r_sincal_esc}")\n')
+            
+            # 3. Iteramos dinámicamente sobre TODOS los archivos descargados
+            for a in archivos:
+                # Filtramos para que solo intente cargar archivos .lsp y evite cargarse a sí mismo
+                if a.lower().endswith('.lsp') and os.path.basename(a).lower() != "acaddoc.lsp":
+                    
+                    # Construimos la ruta segura para AutoLISP
+                    ruta_lisp = os.path.join(RUTA_LOCAL_APP, a)
+                    ruta_lisp_esc = ruta_lisp.replace("\\", "\\\\")
+                    
+                    # Inyectamos la línea de carga en el acaddoc
+                    f.write(f'(load "{ruta_lisp_esc}")\n')
 
 if __name__ == "__main__":
     app = ActualizadorCAD()
