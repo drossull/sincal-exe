@@ -727,18 +727,17 @@ class ActualizadorCAD(ctk.CTk):
             archivos = r.get("archivos", []) + ["README.md"]
             
             for a in archivos:
-                r_save = os.path.join(RUTA_LOCAL_APP, a)
+                r_save = os.path.normpath(os.path.join(RUTA_LOCAL_APP, a))
                 os.makedirs(os.path.dirname(r_save), exist_ok=True)
                 res = requests.get(URL_BASE_RAW + a)
-                if res.status_code == 200: 
-                    contenido = res.content
-                    
-                    # Si el archivo es un LISP y trae la firma invisible UTF-8 BOM, se la extirpamos
-                    if a.lower().endswith('.lsp') and contenido.startswith(b'\xef\xbb\xbf'):
-                        contenido = contenido[3:]
-                        
-                    with open(r_save, 'wb') as f:
-                        f.write(contenido)
+                if res.status_code == 200:
+                    # Si es LISP, forzamos la lectura limpia como texto para matar cualquier formato corrupto (BOM/UTF-16)
+                    if a.lower().endswith('.lsp'):
+                        with open(r_save, 'w', encoding='utf-8', errors='ignore') as f:
+                            f.write(res.text)
+                    else:
+                        with open(r_save, 'wb') as f:
+                            f.write(res.content)
             
             self.generar_archivos_lisp(archivos)
             self.actualizar_rutas_registro()
@@ -792,24 +791,20 @@ class ActualizadorCAD(ctk.CTk):
         except: pass
 
     def generar_archivos_lisp(self, archivos):
-        # 1. Definimos la ruta del puente de arranque (acaddoc.lsp)
         r_acc = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
-        
-        # 2. Escribimos el archivo abriéndolo en modo escritura ('w')
         with open(r_acc, 'w', encoding='utf-8') as f:
-            
-            # 3. Iteramos dinámicamente sobre TODOS los archivos descargados
             for a in archivos:
-                # Filtramos para que solo intente cargar archivos .lsp y evite cargarse a sí mismo
                 if a.lower().endswith('.lsp') and os.path.basename(a).lower() != "acaddoc.lsp":
                     
-                    # Construimos la ruta segura para AutoLISP
-                    ruta_lisp = os.path.join(RUTA_LOCAL_APP, a)
-                    ruta_lisp_esc = ruta_lisp.replace("\\", "\\\\")
+                    # Convertimos la ruta a estándar puro de LISP (slashes frontales)
+                    ruta_lisp = os.path.normpath(os.path.join(RUTA_LOCAL_APP, a)).replace("\\", "/")
+                    nombre = os.path.basename(a)
                     
-                    # Inyectamos la línea de carga SEGURA en el acaddoc
-                    # Si falla, imprimirá un mensaje en rojo pero seguirá cargando los demás
-                    f.write(f'(load "{ruta_lisp_esc}" "\\n[X] SINCAL: Fallo al cargar {os.path.basename(a)}")\n')
+                    # Inyectamos el comando load envuelto en un princ para forzar la respuesta visual
+                    f.write(f'(princ (load "{ruta_lisp}" "\\n[X] SINCAL: Fallo al cargar {nombre}"))\n')
+            
+            # Mensaje de éxito al final para asegurar que leyó todo el acaddoc.lsp
+            f.write('(princ "\\n[OK] SINCAL: Todos los LISPs procesados correctamente.")\n(princ)\n')
 
 if __name__ == "__main__":
     app = ActualizadorCAD()
