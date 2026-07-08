@@ -1,30 +1,5 @@
-(defun c:VRAP ( / p1 p2 pCentro escala layoutElegido vpEnt vpObj scaleFactor get-scale-factor )
+(defun c:VRAP ( / p1 p2 pCentro dict item scaleList dcl_file file dcl_id chosenScale dcl_status layoutElegido )
   (vl-load-com)
-
-  ;; Función interna para buscar el factor de zoom matemático en el diccionario de AutoCAD
-  (defun get-scale-factor ( scaleName / dict factor item obj pUnits dUnits )
-    (setq factor nil)
-    (if (setq dict (dictsearch (namedobjdict) "ACAD_SCALES"))
-      (foreach item dict
-        (if (= (car item) 350)
-          (progn
-            (setq obj (entget (cdr item)))
-            (if (= (strcase (cdr (assoc 300 obj))) (strcase scaleName))
-              (progn
-                (setq pUnits (cdr (assoc 140 obj)))
-                (setq dUnits (cdr (assoc 143 obj)))
-                (if (and pUnits dUnits (> dUnits 0.0))
-                  ;; Convertimos a float para asegurar precisión con decimales
-                  (setq factor (/ (float pUnits) (float dUnits)))
-                )
-              )
-            )
-          )
-        )
-      )
-    )
-    factor
-  )
 
   ;; 1. Verificar que estamos en el espacio Modelo
   (if (/= (getvar "CTAB") "Model")
@@ -45,56 +20,87 @@
                 )
   )
 
-  ;; 3. Solicitar la escala (la letra 't' permite escribir espacios)
-  (setq escala (getstring t "\nIngresa el nombre de la escala (ej. 1:250 m): "))
+  ;; 3. Obtener la lista de TODAS las escalas del dibujo
+  (setq scaleList (list))
+  (if (setq dict (dictsearch (namedobjdict) "ACAD_SCALES"))
+    (foreach item dict
+      (if (= (car item) 350)
+        (setq scaleList (append scaleList (list (cdr (assoc 300 (entget (cdr item)))))))
+      )
+    )
+  )
 
-  ;; 4. Cambiar al único layout existente
+  ;; 4. Crear una ventana de diálogo (DCL) temporal para el menú desplegable
+  (setq dcl_file (vl-filename-mktemp "escalas.dcl"))
+  (setq file (open dcl_file "w"))
+  (write-line "EscalasVRAP : dialog { label = \"Escala del Viewport\"; " file)
+  (write-line "  : text { label = \"Selecciona la escala para el plano:\"; } " file)
+  (write-line "  : popup_list { key = \"lista_escalas\"; width = 40; } " file)
+  (write-line "  ok_cancel; " file)
+  (write-line "} " file)
+  (close file)
+
+  ;; Cargar la ventana de diálogo
+  (setq dcl_id (load_dialog dcl_file))
+  (if (not (new_dialog "EscalasVRAP" dcl_id))
+    (progn
+      (alert "Error al cargar la interfaz de escalas.")
+      (exit)
+    )
+  )
+
+  ;; Llenar el menú desplegable con la lista de escalas
+  (start_list "lista_escalas")
+  (mapcar 'add_list scaleList)
+  (end_list)
+
+  ;; Establecer el primer valor por defecto
+  (set_tile "lista_escalas" "0")
+  (setq chosenScale (nth 0 scaleList))
+
+  ;; Acciones al seleccionar y aceptar
+  (action_tile "lista_escalas" "(setq chosenScale (nth (atoi $value) scaleList))")
+  (action_tile "accept" "(done_dialog 1)")
+  (action_tile "cancel" "(done_dialog 0)")
+
+  ;; Mostrar diálogo y capturar respuesta
+  (setq dcl_status (start_dialog))
+  (unload_dialog dcl_id)
+  (vl-file-delete dcl_file)
+
+  ;; Si el usuario presiona Cancelar, salir del comando
+  (if (= dcl_status 0)
+    (progn (princ "\nComando VRAP cancelado.") (exit))
+  )
+
+  ;; 5. Cambiar al único layout existente
   (setq layoutElegido (car (layoutlist)))
   (if layoutElegido
     (progn
       (setvar "CTAB" layoutElegido)
       
-      ;; 5. Cambiar a la capa "Viewport layer"
+      ;; 6. Cambiar a la capa "Viewport layer"
       (if (tblsearch "LAYER" "Viewport layer")
         (setvar "CLAYER" "Viewport layer")
-        (princ "\nNota: La capa 'Viewport layer' no se encontró, usando la actual.")
       )
 
-      ;; 6. Crear el Viewport de 300x100 mm centrado en la coordenada (0,0) del Layout
+      ;; 7. Crear el Viewport de 300x100 mm centrado en la coordenada (0,0)
       (command "_.MVIEW" '(-150.0 -50.0 0.0) '(150.0 50.0 0.0))
       
-      ;; Capturar el Viewport recién creado para manipular sus propiedades directamente
-      (setq vpEnt (entlast))
-      (setq vpObj (vlax-ename->vla-object vpEnt))
-
-      ;; 7. Entrar al Viewport y fijar el centro exacto
+      ;; 8. Entrar al Viewport (ESTE ES EL PASO CLAVE PARA LA ESCALA)
       (command "_.MSPACE")
+      
+      ;; Centrar el dibujo en las coordenadas capturadas
       (command "_.ZOOM" "_C" pCentro "")
       
-      ;; Actualizar la escala anotativa interna
-      (vl-catch-all-apply 'setvar (list "CANNOSCALE" escala))
+      ;; 9. Aplicar la escala DESDE ADENTRO del viewport (Sincroniza zoom y anotación)
+      (command "_.CANNOSCALE" chosenScale)
       
-      ;; 8. Salir al Layout (Espacio Papel) para aplicar el zoom de forma segura
+      ;; 10. Salir al Layout (Espacio Papel) y bloquear el viewport
       (command "_.PSPACE")
+      (command "_.MVIEW" "_L" "_ON" "_L") ;; Bloquea el último viewport seleccionado
       
-      ;; 9. Buscar el factor de escala real y forzar el tamaño en el Viewport
-      (setq scaleFactor (get-scale-factor escala))
-      
-      (if scaleFactor
-        (progn
-          ;; Forzar físicamente el acercamiento/zoom del Viewport
-          (vla-put-CustomScale vpObj scaleFactor)
-          
-          ;; Bloquear el Viewport para que la escala no se pierda al hacer doble clic
-          (vla-put-DisplayLocked vpObj :vlax-true)
-          
-          (princ (strcat "\n¡Éxito! Escala '" escala "' aplicada correctamente al zoom y Viewport bloqueado."))
-        )
-        (progn
-          ;; Si te equivocas tipeando, te avisa en lugar de lanzar error
-          (princ (strcat "\nADVERTENCIA: La escala '" escala "' no se encontró en tu lista. El centro está listo pero la escala no se ajustó."))
-        )
-      )
+      (princ (strcat "\n¡Éxito! Viewport creado con escala " chosenScale " y bloqueado."))
     )
     (alert "No se encontró ninguna pestaña de Layout en este dibujo.")
   )
