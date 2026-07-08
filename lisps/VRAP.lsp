@@ -20,33 +20,33 @@
                 )
   )
 
-  ;; 3. LECTURA PROFUNDA DE ESCALAS (Extrae Nombre Real y Valor Matemático)
+  ;; 3. LECTURA PROFUNDA DE ESCALAS (Corregido el código DXF 141)
   (setq scaleList nil)
   (setq scaleDataList nil)
   (if (setq dict (dictsearch (namedobjdict) "ACAD_SCALES"))
     (foreach item dict
-      ;; 350 es el código que apunta a la entidad física de la escala, nunca falla.
       (if (and item (listp item) (= (car item) 350))
         (if (setq scEntData (entget (cdr item)))
           (progn
             (setq scNameItem (assoc 300 scEntData))
             (setq pUnitsItem (assoc 140 scEntData))
-            (setq dUnitsItem (assoc 143 scEntData))
+            (setq dUnitsItem (assoc 141 scEntData)) ;; ¡AQUÍ ESTABA EL ERROR! Era 141, no 143.
+            
             (if (and scNameItem pUnitsItem dUnitsItem)
               (progn
                 (setq scName (cdr scNameItem))
                 (setq pUnits (cdr pUnitsItem))
                 (setq dUnits (cdr dUnitsItem))
-                ;; Verificar que los datos existan y no sea una escala corrupta
+                
                 (if (and (numberp pUnits) (numberp dUnits) (> dUnits 0.0) scName (not (equal scName "")))
                   (progn
                     ;; Calcular el factor exacto de acercamiento
                     (setq factor (/ (float pUnits) (float dUnits)))
-                    ;; Evitar escalas duplicadas fantasma en la lista
+                    
+                    ;; Evitar duplicados en la lista
                     (if (not (member scName scaleList))
                       (progn
                         (setq scaleList (cons scName scaleList))
-                        ;; Guardamos el nombre y su valor matemático juntos
                         (setq scaleDataList (cons (cons scName factor) scaleDataList))
                       )
                     )
@@ -131,7 +131,7 @@
       ;; Salir al espacio papel
       (command "_.PSPACE")
       
-      ;; INYECTAR EL ZOOM FÍSICO (El fix definitivo)
+      ;; INYECTAR EL ZOOM FÍSICO REAL (Ahora sí leerá la escala elegida)
       (setq chosenFactor (cdr (assoc chosenScale scaleDataList)))
       (if chosenFactor
         (vl-catch-all-apply 'vla-put-CustomScale (list vpObj chosenFactor))
