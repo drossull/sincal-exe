@@ -1,10 +1,11 @@
 {
-  "version": "v26.2.6",
+  "version": "v26.2.7",
   "archivos": [
     "lisps/BV.lsp",
     "lisps/SINCAL.lsp",
     "lisps/DL2.lsp",
     "lisps/CPOL.lsp",
+    "lisps/VRAP.lsp",
     "lisps/MC.lsp",
     "lisps/MPEND.lsp",
     "lisps/P0.lsp",
