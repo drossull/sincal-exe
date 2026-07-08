@@ -776,11 +776,58 @@ class ActualizadorCAD(ctk.CTk):
                             return
 
     def actualizar_rutas_registro(self):
-        for base in [r"Software\Autodesk\AutoCAD", r"Software\ZWSOFT\ZWCAD"]:
+        """Inyecta la bóveda SINCAL en la prioridad 1 de AutoCAD/ZWCAD y neutraliza fantasmas"""
+        
+        # --- 1. CAZAFANTASMAS: Neutralizar acaddoc.lsp antiguos ---
+        appdata = os.getenv('APPDATA')
+        for carpeta_cad in ["Autodesk", "ZWSOFT"]:
+            base = os.path.join(appdata, carpeta_cad)
+            if os.path.exists(base):
+                for root, dirs, files in os.walk(base):
+                    for file in files:
+                        if file.lower() == "acaddoc.lsp":
+                            ruta_fantasma = os.path.join(root, file)
+                            # Verificamos que no esté intentando borrar nuestro propio archivo en la bóveda
+                            if RUTA_LOCAL_APP.lower() not in ruta_fantasma.lower():
+                                try:
+                                    os.rename(ruta_fantasma, ruta_fantasma + ".bak")
+                                    self.log(f"[*] Fantasma neutralizado en: {os.path.basename(root)}")
+                                except: pass
+
+        # --- 2. INYECTOR DE REGISTRO: Forzar prioridad 1 en AutoCAD/ZWCAD ---
+        def inyectar_ruta_recursivo(ruta_reg):
             try:
-                k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, base)
-                winreg.CloseKey(k)
-            except: pass
+                llave = winreg.OpenKey(winreg.HKEY_CURRENT_USER, ruta_reg, 0, winreg.KEY_ALL_ACCESS)
+                
+                # Si encontramos la carpeta "General" del perfil, modificamos las rutas de soporte
+                if ruta_reg.endswith("General"):
+                    for nombre_valor in ["ACAD", "ZWCAD", "SRCHPATH"]:
+                        try:
+                            valor_actual, tipo = winreg.QueryValueEx(llave, nombre_valor)
+                            if RUTA_LOCAL_APP.lower() not in valor_actual.lower():
+                                # Inyectamos nuestra bóveda de primera (Separada por punto y coma)
+                                nuevo_valor = f"{RUTA_LOCAL_APP};{valor_actual}"
+                                winreg.SetValueEx(llave, nombre_valor, 0, tipo, nuevo_valor)
+                                self.log(f"[*] SINCAL inyectado en prioridad máxima del CAD.")
+                        except OSError:
+                            pass
+
+                # Exploración profunda en todas las subcarpetas del registro
+                i = 0
+                while True:
+                    try:
+                        sub_llave = winreg.EnumKey(llave, i)
+                        inyectar_ruta_recursivo(f"{ruta_reg}\\{sub_llave}")
+                        i += 1
+                    except OSError:
+                        break
+                winreg.CloseKey(llave)
+            except Exception:
+                pass
+
+        # Disparamos la inyección en las dos marcas de software
+        inyectar_ruta_recursivo(r"Software\Autodesk\AutoCAD")
+        inyectar_ruta_recursivo(r"Software\ZWSOFT\ZWCAD")
 
     def actualizar_variable_entorno(self):
         try:
