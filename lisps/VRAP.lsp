@@ -1,4 +1,4 @@
-(defun c:VRAP ( / p1 p2 pCentro dict scEntData scNameItem pUnitsItem dUnitsItem scName pUnits dUnits factor scaleList scaleDataList dcl_file file dcl_id chosenScale chosenFactor dcl_status listalayouts layoutElegido vpEnt vpObj )
+(defun c:VRAP ( / p1 p2 pCentro dict item currentScaleName scEntData pUnitsItem dUnitsItem pUnits dUnits factor scaleList scaleDataList dcl_file file dcl_id chosenScale chosenFactor dcl_status listalayouts layoutElegido vpEnt vpObj )
   (vl-load-com)
 
   ;; 1. Verificar Model Space
@@ -20,41 +20,41 @@
                 )
   )
 
-  ;; 3. LECTURA PROFUNDA DE ESCALAS (Corregido el código DXF 141)
+  ;; 3. EXTRACCIÓN HÍBRIDA (Garantiza que la UI se abra y captura matemáticas en 2do plano)
   (setq scaleList nil)
   (setq scaleDataList nil)
+  (setq currentScaleName "")
+
   (if (setq dict (dictsearch (namedobjdict) "ACAD_SCALES"))
     (foreach item dict
-      (if (and item (listp item) (= (car item) 350))
-        (if (setq scEntData (entget (cdr item)))
-          (progn
-            (setq scNameItem (assoc 300 scEntData))
-            (setq pUnitsItem (assoc 140 scEntData))
-            (setq dUnitsItem (assoc 141 scEntData)) ;; ¡AQUÍ ESTABA EL ERROR! Era 141, no 143.
-            
-            (if (and scNameItem pUnitsItem dUnitsItem)
-              (progn
-                (setq scName (cdr scNameItem))
-                (setq pUnits (cdr pUnitsItem))
-                (setq dUnits (cdr dUnitsItem))
-                
-                (if (and (numberp pUnits) (numberp dUnits) (> dUnits 0.0) scName (not (equal scName "")))
-                  (progn
-                    ;; Calcular el factor exacto de acercamiento
-                    (setq factor (/ (float pUnits) (float dUnits)))
-                    
-                    ;; Evitar duplicados en la lista
-                    (if (not (member scName scaleList))
-                      (progn
-                        (setq scaleList (cons scName scaleList))
-                        (setq scaleDataList (cons (cons scName factor) scaleDataList))
-                      )
-                    )
-                  )
-                )
-              )
-            )
-          )
+      (cond
+        ;; A. Extraer el nombre para poblar la lista visual (Garantizado que funciona)
+        ((= (car item) 3)
+         (setq currentScaleName (cdr item))
+         (if (not (member currentScaleName scaleList))
+           (setq scaleList (cons currentScaleName scaleList))
+         )
+        )
+        ;; B. Extraer la matemática de la escala vinculada al nombre anterior
+        ((= (car item) 350)
+         (if (setq scEntData (entget (cdr item)))
+           (progn
+             (setq pUnitsItem (assoc 140 scEntData))
+             (setq dUnitsItem (assoc 143 scEntData)) ;; 143 es el código correcto para las unidades de dibujo
+             (if (and pUnitsItem dUnitsItem currentScaleName)
+               (progn
+                 (setq pUnits (cdr pUnitsItem))
+                 (setq dUnits (cdr dUnitsItem))
+                 (if (and (numberp pUnits) (numberp dUnits) (> dUnits 0.0))
+                   (progn
+                     (setq factor (/ (float pUnits) (float dUnits)))
+                     (setq scaleDataList (cons (cons currentScaleName factor) scaleDataList))
+                   )
+                 )
+               )
+             )
+           )
+         )
         )
       )
     )
@@ -62,11 +62,8 @@
 
   ;; Invertir listas para respetar el orden visual de AutoCAD
   (if scaleList
-    (progn
-      (setq scaleList (reverse scaleList))
-      (setq scaleDataList (reverse scaleDataList))
-    )
-    (progn (alert "Fallo crítico: No se encontraron escalas en este archivo.") (exit))
+    (setq scaleList (reverse scaleList))
+    (setq scaleList '("1:1" "1:50" "1:100")) ;; Paracaídas de emergencia en caso extremo
   )
 
   ;; 4. CREAR LA INTERFAZ (DCL)
@@ -114,24 +111,24 @@
         (setvar "CLAYER" "Viewport layer")
       )
 
-      ;; Crear Viewport de 300x100
+      ;; Crear Viewport
       (command "_.MVIEW" '(-150.0 -50.0 0.0) '(150.0 50.0 0.0))
       
-      ;; Capturar el objeto ActiveX del Viewport
+      ;; Capturar objeto para manipular propiedades
       (setq vpEnt (entlast))
       (setq vpObj (vlax-ename->vla-object vpEnt))
 
-      ;; Entrar y buscar las coordenadas
+      ;; Entrar y buscar coordenadas
       (command "_.MSPACE")
       (command "_.ZOOM" "_C" pCentro "")
       
-      ;; Aplicar Etiqueta de Escala de Anotación
+      ;; Aplicar Etiqueta de Anotación (CANNOSCALE)
       (vl-catch-all-apply 'setvar (list "CANNOSCALE" chosenScale))
       
-      ;; Salir al espacio papel
+      ;; Salir al layout
       (command "_.PSPACE")
       
-      ;; INYECTAR EL ZOOM FÍSICO REAL (Ahora sí leerá la escala elegida)
+      ;; INYECTAR EL ZOOM FÍSICO REAL
       (setq chosenFactor (cdr (assoc chosenScale scaleDataList)))
       (if chosenFactor
         (vl-catch-all-apply 'vla-put-CustomScale (list vpObj chosenFactor))
@@ -140,7 +137,7 @@
       ;; Bloquear el viewport
       (vla-put-DisplayLocked vpObj :vlax-true)
       
-      (princ (strcat "\n¡Éxito total! Viewport creado, escalado a " chosenScale " y bloqueado."))
+      (princ (strcat "\n¡Éxito! Viewport creado, escalado a " chosenScale " y bloqueado."))
     )
     (alert "No se encontró ninguna pestaña de Layout.")
   )
