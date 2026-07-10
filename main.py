@@ -81,7 +81,6 @@ class ActualizadorCAD(ctk.CTk):
         self.tab_main = self.tabview.add("Sincronizador")
         self.tab_renombrado = self.tabview.add("Renombrado Avanzado")
         self.tab_armaduras = self.tabview.add("Módulo Estructural")
-        self.tab_docs = self.tabview.add("Documentación")
         
         # SOLUCIÓN: Agregamos la pestaña al tabview maestro, no al tab_main
         tab_ubicacion_frame = self.tabview.add("Ubicación") 

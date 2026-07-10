@@ -69,6 +69,24 @@ class TabUbicacion(ctk.CTkFrame):
         self.combo_mapas.grid(row=2, column=1, columnspan=3, sticky="w", padx=10, pady=(25, 10))
         if not self.datos_mapas: self.combo_mapas.configure(state="disabled")
 
+        # --- NUEVO: C. Controles de Micro-Ajuste Manual ---
+        ctk.CTkLabel(frame_main, text="3. Micro-Ajuste en Píxeles (Opcional):", font=fuente_normal, text_color="#007FFF").grid(row=3, column=0, sticky="w", padx=20, pady=(15, 5))
+
+        frame_ajustes = ctk.CTkFrame(frame_main, fg_color="transparent")
+        frame_ajustes.grid(row=4, column=0, columnspan=4, sticky="w", padx=20, pady=(0, 20))
+
+        # Ajuste X (Este / Oeste)
+        ctk.CTkLabel(frame_ajustes, text="Este (+) / Oeste (-):", font=fuente_normal).pack(side="left", padx=(0, 10))
+        self.ent_ajuste_x = ctk.CTkEntry(frame_ajustes, font=fuente_normal, width=60, corner_radius=0)
+        self.ent_ajuste_x.pack(side="left", padx=(0, 30))
+        self.ent_ajuste_x.insert(0, "0")
+
+        # Ajuste Y (Sur / Norte) -> Recordar que en imágenes +Y es hacia abajo (Sur)
+        ctk.CTkLabel(frame_ajustes, text="Sur (+) / Norte (-):", font=fuente_normal).pack(side="left", padx=(0, 10))
+        self.ent_ajuste_y = ctk.CTkEntry(frame_ajustes, font=fuente_normal, width=60, corner_radius=0)
+        self.ent_ajuste_y.pack(side="left", padx=(0, 20))
+        self.ent_ajuste_y.insert(0, "0")
+
         # --- 3. Botón de Acción ---
         self.btn_generar_croquis = ctk.CTkButton(self, text="🗺️ GENERAR CROQUIS DE UBICACIÓN", font=fuente_subtitulo, fg_color="#007FFF", hover_color="#0066CC", text_color="#FFFFFF", corner_radius=0, height=45, command=self.generar_croquis_png)
         self.btn_generar_croquis.pack(fill="x", padx=20, pady=(10, 20))
@@ -151,32 +169,37 @@ class TabUbicacion(ctk.CTkFrame):
             return # El usuario canceló el guardado
 
         try:
+            # 1. Extracción de datos del JSON
             lat1_geo, lon1_geo = datos_calibracion["pt1_geo"]
             x1_px, y1_px = datos_calibracion["pt1_pixel"]
             lat2_geo, lon2_geo = datos_calibracion["pt2_geo"]
             x2_px, y2_px = datos_calibracion["pt2_pixel"]
 
+            # 2. Capturar el Micro-Ajuste de la Interfaz GUI
+            try:
+                gui_ajuste_x = float(self.ent_ajuste_x.get())
+                gui_ajuste_y = float(self.ent_ajuste_y.get())
+            except ValueError:
+                gui_ajuste_x = 0
+                gui_ajuste_y = 0
+
+            # 3. Sumar el ajuste del JSON + el ajuste manual de la interfaz
+            ajuste_x = datos_calibracion.get("ajuste_x", 0) + gui_ajuste_x
+            ajuste_y = datos_calibracion.get("ajuste_y", 0) + gui_ajuste_y
+
             lat_target, lon_target = self.estructuras_gps[nombre_sel]
 
-            # --- MOTOR MATEMÁTICO MEJORADO (Proyección Pseudo-Mercator) ---
-            # El eje X (Longitud) se mantiene lineal porque los meridianos son paralelos en el mapa
+            # 4. Motor de Interpolación Lineal + Ajuste Total
             escala_x = (x2_px - x1_px) / (lon2_geo - lon1_geo)
-            x_final = x1_px + (lon_target - lon1_geo) * escala_x
+            x_final = x1_px + (lon_target - lon1_geo) * escala_x + ajuste_x
 
-            # El eje Y (Latitud) usa la proyección trigonométrica para evitar el desfase
-            def lat_to_mercator(lat):
-                return math.log(math.tan(math.pi / 4 + math.radians(lat) / 2))
+            escala_y = (y2_px - y1_px) / (lat2_geo - lat1_geo)
+            y_final = y1_px + (lat_target - lat1_geo) * escala_y + ajuste_y
 
-            mer1 = lat_to_mercator(lat1_geo)
-            mer2 = lat_to_mercator(lat2_geo)
-            mer_target = lat_to_mercator(lat_target)
-
-            escala_y = (y2_px - y1_px) / (mer2 - mer1)
-            y_final = y1_px + (mer_target - mer1) * escala_y
-
-            # --- DIBUJO ---
+            # 5. Dibujo
             with Image.open(ruta_mapa_base) as img:
                 img_rgba = img.convert("RGB")
+                from PIL import ImageDraw # Asegurarnos que está importado localmente si falla arriba
                 draw = ImageDraw.Draw(img_rgba)
 
                 r = 15
