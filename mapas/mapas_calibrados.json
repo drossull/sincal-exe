@@ -61,8 +61,8 @@
     "pt1_pixel": [1978, 1578],
     "pt2_geo": [-33.0, -70.0],
     "pt2_pixel": [4126, 4043],
-    "ajuste_x": 0,
-    "ajuste_y": 0
+    "ajuste_x": 30,
+    "ajuste_y": 30
   },
   "Región del Biobío": {
     "archivo": "Region_del_Biobio.png",
