@@ -18,6 +18,7 @@ from pystray import MenuItem as item
 from PIL import Image
 from modulos.tab_armaduras import TabArmaduras
 from modulos.tab_ubicacion import TabUbicacion
+from modulos.tab_docs import TabDocs
 
 def ruta_recurso(relative_path):
     """Obtiene la ruta absoluta al recurso, funciona para dev y para PyInstaller"""
@@ -90,7 +91,9 @@ class ActualizadorCAD(ctk.CTk):
         self.setup_tab_sincronizador()
         self.setup_tab_renombrado()
         self.setup_tab_armaduras()
-        self.setup_tab_docs()
+        self.tab_docs = self.tabview.add("Documentación")
+        self.vista_docs = TabDocs(self.tab_docs, parent_app=self, fg_color="transparent")
+        self.vista_docs.pack(fill="both", expand=True)
 
         # Redirige el botón "X" de Windows a nuestra función de la bandeja
         self.protocol("WM_DELETE_WINDOW", self.ocultar_a_bandeja)
@@ -320,25 +323,6 @@ class ActualizadorCAD(ctk.CTk):
         finally:
             self.btn_enviar_cmd.configure(state="normal", text="Ejecutar"); self.btn_cancelar_cmd.configure(state="disabled", text="Cancelar")
             pythoncom.CoUninitialize()
-
-    def setup_tab_docs(self):
-        m = ctk.CTkFrame(self.tab_docs, fg_color="transparent"); m.pack(fill="both", expand=True, padx=10, pady=10)
-        self.menu_container = ctk.CTkFrame(m, width=220, fg_color="transparent"); self.menu_container.pack(side="left", fill="y")
-        ctk.CTkFrame(m, width=1, fg_color="#555555").pack(side="left", fill="y", padx=15)
-        c_cont = ctk.CTkFrame(m, fg_color="transparent"); c_cont.pack(side="right", fill="both", expand=True)
-        self.lbl_wiki_title = ctk.CTkLabel(c_cont, text="Seleccione un tema", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO); self.lbl_wiki_title.pack(anchor="w", padx=20, pady=(10, 0))
-        self.txt_wiki_content = ctk.CTkTextbox(c_cont, font=FUENTE_NORMAL, fg_color="transparent", text_color=COLOR_TEXTO, wrap="word", border_width=0); self.txt_wiki_content.pack(fill="both", expand=True, padx=20, pady=10)
-        
-        for t, cmd in [("README", self.mostrar_readme), ("INICIO AUTOMÁTICO", self.mostrar_comandos_lisp), ("COMANDOS LISP", self.mostrar_comandos_lisp), ("PROCESAMIENTO MASIVO", self.mostrar_procesamiento_lote)]:
-            lbl = ctk.CTkLabel(self.menu_container, text=t, font=FUENTE_MENU, text_color=COLOR_TEXTO, cursor="hand2"); lbl.pack(fill="x", pady=8, padx=10)
-            lbl.bind("<Button-1>", lambda e, c=cmd: c())
-
-    def mostrar_texto_wiki(self, t, c):
-        self.lbl_wiki_title.configure(text=t.upper()); self.txt_wiki_content.configure(state="normal"); self.txt_wiki_content.delete("1.0", "end"); self.txt_wiki_content.insert("0.0", c); self.txt_wiki_content.configure(state="disabled")
-
-    def mostrar_readme(self): r = os.path.join(RUTA_LOCAL_APP, "README.md"); self.mostrar_texto_wiki("README", open(r, 'r', encoding='utf-8').read() if os.path.exists(r) else "No disponible.")
-    def mostrar_comandos_lisp(self): self.mostrar_texto_wiki("Comandos", "Diccionario de comandos LISP.")
-    def mostrar_procesamiento_lote(self): self.mostrar_texto_wiki("Lotes", "Scripts masivos por PowerShell corporativo.")
 
     def log(self, m): self.consola.configure(state="normal"); self.consola.insert("end", m + "\n"); self.consola.see("end"); self.consola.configure(state="disabled")
     def abrir_carpeta_local(self): os.startfile(RUTA_LOCAL_APP) if os.path.exists(RUTA_LOCAL_APP) else None
