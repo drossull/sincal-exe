@@ -1,11 +1,10 @@
 {
-  "version": "v26.3.6",
+  "version": "v26.3.8",
   "archivos": [
     "lisps/BV.lsp",
     "lisps/SINCAL.lsp",
     "lisps/DL2.lsp",
     "lisps/CPOL.lsp",
-    "lisps/VRAP.lsp",
     "lisps/MC.lsp",
     "lisps/MPEND.lsp",
     "lisps/P0.lsp",
@@ -49,6 +48,19 @@
     "scripts/RC-CAPAS.scr",
     "scripts/ZE.scr",
     "plotstyles/SINCAL_A1 (2025).ctb",
-    "tutoriales.json"
+    "tutoriales.json",
+    "mapas/mapas_calibrados.json",
+    "mapas/Region_de_Aysen.png",
+    "mapas/Region_de_Coquimbo.png",
+    "mapas/Region_de_la_Araucania.png",
+    "mapas/Region_de_los_Lagos.png",
+    "mapas/Region_de_los_Rios.png",
+    "mapas/Region_de_Magallanes.png",
+    "mapas/Region_de_Nuble.png",
+    "mapas/Region_de_OHiggins.png",
+    "mapas/Region_de_Valparaiso.png",
+    "mapas/Region_del_Biobio.png",
+    "mapas/Region_del_Maule.png",
+    "mapas/Region_Metropolitana.png"
   ]
 }

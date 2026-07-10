@@ -1,0 +1,86 @@
+{
+  "Región de Aysén": {
+    "archivo": "Region_de_Aysen.png",
+    "pt1_geo": [0, 0],
+    "pt1_pixel": [0, 0],
+    "pt2_geo": [0, 0],
+    "pt2_pixel": [0, 0]
+  },
+  "Región de Coquimbo": {
+    "archivo": "Region_de_Coquimbo.png",
+    "pt1_geo": [0, 0],
+    "pt1_pixel": [0, 0],
+    "pt2_geo": [0, 0],
+    "pt2_pixel": [0, 0]
+  },
+  "Región de La Araucanía": {
+    "archivo": "Region_de_la_Araucania.png",
+    "pt1_geo": [0, 0],
+    "pt1_pixel": [0, 0],
+    "pt2_geo": [0, 0],
+    "pt2_pixel": [0, 0]
+  },
+  "Región de Los Lagos": {
+    "archivo": "Region_de_los_Lagos.png",
+    "pt1_geo": [0, 0],
+    "pt1_pixel": [0, 0],
+    "pt2_geo": [0, 0],
+    "pt2_pixel": [0, 0]
+  },
+  "Región de Los Ríos": {
+    "archivo": "Region_de_los_Rios.png",
+    "pt1_geo": [0, 0],
+    "pt1_pixel": [0, 0],
+    "pt2_geo": [0, 0],
+    "pt2_pixel": [0, 0]
+  },
+  "Región de Magallanes": {
+    "archivo": "Region_de_Magallanes.png",
+    "pt1_geo": [0, 0],
+    "pt1_pixel": [0, 0],
+    "pt2_geo": [0, 0],
+    "pt2_pixel": [0, 0]
+  },
+  "Región de Ñuble": {
+    "archivo": "Region_de_Nuble.png",
+    "pt1_geo": [0, 0],
+    "pt1_pixel": [0, 0],
+    "pt2_geo": [0, 0],
+    "pt2_pixel": [0, 0]
+  },
+  "Región de O'Higgins": {
+    "archivo": "Region_de_OHiggins.png",
+    "pt1_geo": [0, 0],
+    "pt1_pixel": [0, 0],
+    "pt2_geo": [0, 0],
+    "pt2_pixel": [0, 0]
+  },
+  "Región de Valparaíso": {
+    "archivo": "Region_de_Valparaiso.png",
+    "pt1_geo": [-32.0, -71.0],
+    "pt1_pixel": [1978, 1578],
+    "pt2_geo": [-33.0, -70.0],
+    "pt2_pixel": [4126, 4043]
+  },
+  "Región del Biobío": {
+    "archivo": "Region_del_Biobio.png",
+    "pt1_geo": [0, 0],
+    "pt1_pixel": [0, 0],
+    "pt2_geo": [0, 0],
+    "pt2_pixel": [0, 0]
+  },
+  "Región del Maule": {
+    "archivo": "Region_del_Maule.png",
+    "pt1_geo": [0, 0],
+    "pt1_pixel": [0, 0],
+    "pt2_geo": [0, 0],
+    "pt2_pixel": [0, 0]
+  },
+  "Región Metropolitana": {
+    "archivo": "Region_Metropolitana.png",
+    "pt1_geo": [0, 0],
+    "pt1_pixel": [0, 0],
+    "pt2_geo": [0, 0],
+    "pt2_pixel": [0, 0]
+  }
+}
