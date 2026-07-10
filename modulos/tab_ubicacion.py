@@ -1,6 +1,7 @@
 import os
 import zipfile
 import json
+import math
 import xml.etree.ElementTree as ET
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
@@ -130,32 +131,50 @@ class TabUbicacion(ctk.CTkFrame):
             return messagebox.showerror("Error", "Seleccione un mapa válido calibrado.")
 
         datos_calibracion = self.datos_mapas[mapa_sel]
-        
-        # BUSCA LA IMAGEN EN LA CARPETA 'mapas'
         ruta_mapa_base = os.path.join(RUTA_LOCAL_APP, "mapas", datos_calibracion["archivo"])
 
         if not os.path.exists(ruta_mapa_base):
-            return messagebox.showerror("Archivo Faltante", f"No se encontró la imagen base:\\n{ruta_mapa_base}\\nAsegúrate de sincronizar la aplicación.")
+            return messagebox.showerror("Archivo Faltante", f"No se encontró la imagen base:\n{ruta_mapa_base}\nAsegúrate de sincronizar la aplicación.")
+
+        # --- SELECCIÓN DE RUTA DE GUARDADO ---
+        nombre_limpio = "".join(c for c in nombre_sel if c.isalnum() or c in (' ', '_', '-')).rstrip()
+        nombre_sugerido = f"Ubicacion_{nombre_limpio}.png"
+        
+        ruta_salida = filedialog.asksaveasfilename(
+            title="Guardar Croquis de Ubicación",
+            initialfile=nombre_sugerido,
+            defaultextension=".png",
+            filetypes=[("PNG Image", "*.png"), ("All Files", "*.*")]
+        )
+        
+        if not ruta_salida: 
+            return # El usuario canceló el guardado
 
         try:
-            # 1. Extracción de datos del JSON
             lat1_geo, lon1_geo = datos_calibracion["pt1_geo"]
             x1_px, y1_px = datos_calibracion["pt1_pixel"]
-            
             lat2_geo, lon2_geo = datos_calibracion["pt2_geo"]
             x2_px, y2_px = datos_calibracion["pt2_pixel"]
 
-            # 2. Coordenadas objetivo
             lat_target, lon_target = self.estructuras_gps[nombre_sel]
 
-            # 3. Motor de Interpolación
+            # --- MOTOR MATEMÁTICO MEJORADO (Proyección Pseudo-Mercator) ---
+            # El eje X (Longitud) se mantiene lineal porque los meridianos son paralelos en el mapa
             escala_x = (x2_px - x1_px) / (lon2_geo - lon1_geo)
             x_final = x1_px + (lon_target - lon1_geo) * escala_x
 
-            escala_y = (y2_px - y1_px) / (lat2_geo - lat1_geo)
-            y_final = y1_px + (lat_target - lat1_geo) * escala_y
+            # El eje Y (Latitud) usa la proyección trigonométrica para evitar el desfase
+            def lat_to_mercator(lat):
+                return math.log(math.tan(math.pi / 4 + math.radians(lat) / 2))
 
-            # 4. Dibujo
+            mer1 = lat_to_mercator(lat1_geo)
+            mer2 = lat_to_mercator(lat2_geo)
+            mer_target = lat_to_mercator(lat_target)
+
+            escala_y = (y2_px - y1_px) / (mer2 - mer1)
+            y_final = y1_px + (mer_target - mer1) * escala_y
+
+            # --- DIBUJO ---
             with Image.open(ruta_mapa_base) as img:
                 img_rgba = img.convert("RGB")
                 draw = ImageDraw.Draw(img_rgba)
@@ -168,11 +187,9 @@ class TabUbicacion(ctk.CTkFrame):
                 bbox_in = [x_final - r_in, y_final - r_in, x_final + r_in, y_final + r_in]
                 draw.ellipse(bbox_in, fill=(255, 0, 0)) 
 
-                nombre_limpio = "".join(c for c in nombre_sel if c.isalnum() or c in (' ', '_', '-')).rstrip()
-                ruta_salida = os.path.join(RUTA_LOCAL_APP, f"Ubicacion_{nombre_limpio}.png")
                 img_rgba.save(ruta_salida, "PNG")
 
-            messagebox.showinfo("Éxito", f"¡Croquis generado!\n\nRuta: {ruta_salida}")
+            messagebox.showinfo("Éxito", f"¡Croquis guardado correctamente en:\n{ruta_salida}")
             
         except Exception as e:
             messagebox.showerror("Error", f"Fallo al procesar imagen:\n{e}")
