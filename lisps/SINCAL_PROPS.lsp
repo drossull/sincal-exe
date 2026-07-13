@@ -46,7 +46,13 @@
       (SINCAL:SetProp prop input)
     )
   )
-  (princ "\n[SINCAL] Propiedades del plano actualizadas correctamente.")
+  
+  ;; --- PROTOCOLO SINCAL (BLINDAJE DE DATOS) ---
+  (command "_.UPDATEFIELD" "_All" "")       ; Actualiza los textos/viñetas visualmente
+  (setvar "USERI1" (getvar "USERI1"))       ; Truco DBMOD: Ensuciar el archivo en la RAM
+  (command "_.QSAVE")                       ; Forzar el guardado en disco
+  
+  (princ "\n[SINCAL] Propiedades actualizadas y plano guardado correctamente de forma segura.")
   (princ)
 )
 
@@ -104,7 +110,13 @@
       (SINCAL:SetProp prop input)
     )
   )
-  (princ "\n[SINCAL] Configuracion de plano finalizada. Recuerde regenerar (RE) para actualizar los textos.")
+  
+  ;; --- PROTOCOLO SINCAL (BLINDAJE DE DATOS) ---
+  (command "_.UPDATEFIELD" "_All" "")       ; Actualiza los textos/viñetas visualmente
+  (setvar "USERI1" (getvar "USERI1"))       ; Truco DBMOD: Ensuciar el archivo en la RAM
+  (command "_.QSAVE")                       ; Forzar el guardado en disco
+  
+  (princ "\n[SINCAL] Configuracion de plano finalizada y guardada en disco.")
   (princ)
 )
 
@@ -137,7 +149,12 @@
   (foreach item dict
     (vla-AddCustomInfo props (cadr item) (cddr item))
   )
-  (princ "\n[SINCAL] ¡Duplicados eliminados! Ya puedes abrir DWGPROPS sin errores.")
+  
+  ;; --- PROTOCOLO SINCAL (BLINDAJE DE DATOS) ---
+  (setvar "USERI1" (getvar "USERI1"))
+  (command "_.QSAVE")
+  
+  (princ "\n[SINCAL] ¡Duplicados eliminados y archivo guardado! Ya puedes usar CUSTOM-PROPS sin errores.")
   (princ)
 )
 
