@@ -356,20 +356,38 @@ class ActualizadorCAD(ctk.CTk):
             os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
             
             r = requests.get(URL_BASE_RAW + "version.json").json()
-            archivos = r.get("archivos", []) + ["README.md"]
+            # Ahora le decimos que descargue ambos archivos de texto
+            archivos = r.get("archivos", []) + ["README.md", "TUTORIAL.md"]
+            total_archivos = len(archivos)
+            spinner = ['|', '/', '-', '\\']
             
-            for a in archivos:
+            # Imprimimos la línea base que será animada
+            self.consola.configure(state="normal")
+            self.consola.insert("end", "[|] Iniciando descarga...\n")
+            self.consola.configure(state="disabled")
+            
+            for idx, a in enumerate(archivos):
                 r_save = os.path.normpath(os.path.join(RUTA_LOCAL_APP, a))
                 os.makedirs(os.path.dirname(r_save), exist_ok=True)
                 res = requests.get(URL_BASE_RAW + a)
                 if res.status_code == 200:
-                    # Si es LISP, forzamos la lectura limpia como texto para matar cualquier formato corrupto (BOM/UTF-16)
                     if a.lower().endswith('.lsp'):
                         with open(r_save, 'w', encoding='utf-8', errors='ignore') as f:
                             f.write(res.text)
                     else:
                         with open(r_save, 'wb') as f:
                             f.write(res.content)
+                
+                # --- ANIMACIÓN Y PORCENTAJE ---
+                porcentaje = int(((idx + 1) / total_archivos) * 100)
+                simbolo = spinner[idx % 4]
+                
+                self.consola.configure(state="normal")
+                # Borramos la última línea y la reemplazamos con la animada
+                self.consola.delete("end-2l", "end-1c")
+                self.consola.insert("end", f"[{simbolo}] Actualizando SINCAL... {porcentaje}% ({idx+1}/{total_archivos})\n")
+                self.consola.see("end")
+                self.consola.configure(state="disabled")
             
             self.generar_archivos_lisp(archivos)
             self.actualizar_rutas_registro()
