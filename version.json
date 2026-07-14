@@ -1,8 +1,9 @@
 {
-  "version": "v26.3.9",
+  "version": "v26.4.0",
   "archivos": [
     "lisps/BV.lsp",
     "lisps/SINCAL.lsp",
+    "lisps/SINCAL_ESCALAS.lsp",
     "lisps/DL2.lsp",
     "lisps/CPOL.lsp",
     "lisps/MC.lsp",
