@@ -1,5 +1,5 @@
 {
-  "version": "v26.4.0",
+  "version": "v26.4.1",
   "archivos": [
     "lisps/BV.lsp",
     "lisps/SINCAL.lsp",
@@ -19,9 +19,7 @@
     "lisps/SETUP-A1.lsp",
     "lisps/PURGEALL.lsp",
     "lisps/SINCAL_PROPS.lsp",
-    "startup/MisColores.lsp",
-    "startup/AutoCrearPropiedad.lsp",
-    "startup/AUTO-DYNMODE.lsp",
+    "startup/SINCAL_STARTUP.lsp",
     "masters/FORMATOS ANOTATIVOS ACAD_2025.dwg",
     "scripts/AUDIT.bat",
     "scripts/AUDIT.ps1",

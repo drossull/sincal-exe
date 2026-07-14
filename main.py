@@ -482,6 +482,12 @@ class ActualizadorCAD(ctk.CTk):
                     # Inyectamos el comando load envuelto en un princ para forzar la respuesta visual
                     f.write(f'(princ (load "{ruta_lisp}" "\\n[X] SINCAL: Fallo al cargar {nombre}"))\n')
             
+            # --- NUEVO: Cargar Startup Automáticamente ---
+            # Si el archivo SINCAL_STARTUP existe, lo forzamos al final del acaddoc para garantizar 
+            # que las escalas y variables apliquen siempre sobre el dibujo abierto.
+            if "startup/SINCAL_STARTUP.lsp" in archivos or "SINCAL_STARTUP.lsp" in archivos:
+                 f.write('(princ "\\n[SINCAL] Políticas de empresa y variables aplicadas.")\n')
+
             # Mensaje de éxito al final para asegurar que leyó todo el acaddoc.lsp
             f.write('(princ "\\n[OK] SINCAL: Todos los LISPs procesados correctamente.")\n(princ)\n')
 
