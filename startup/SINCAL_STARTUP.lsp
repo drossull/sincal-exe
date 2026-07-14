@@ -60,16 +60,38 @@
 )
 
 ;;; =========================================================================
-;;; 3. INYECCIÓN DE ESCALAS EN METROS (Anti-duplicación)
+;;; 3. INYECCIÓN DE ESCALAS EN METROS (Anti-Bug "Is Referenced")
 ;;; =========================================================================
-(defun SINCAL:GenerarEscalas (/ SINCAL:CrearEscala listaEscalas origCmdEcho)
-  ;; Apagamos el eco para que la consola no se llene de texto
+(defun SINCAL:GenerarEscalas (/ SINCAL:ExisteEscala SINCAL:CrearEscala listaEscalas origCmdEcho)
   (setq origCmdEcho (getvar "CMDECHO"))
   (setvar "CMDECHO" 0)
 
+  ;; 3.1 Función interna para leer la base de datos silenciosamente
+  (defun SINCAL:ExisteEscala (nombre / dict exists entdata)
+    (setq exists nil)
+    (if (setq dict (dictsearch (namedobjdict) "ACAD_SCALELIST"))
+      (foreach item dict
+        (if (and (= (car item) 350) (not exists))
+          (progn
+            (setq entdata (entget (cdr item)))
+            (if (= (strcase (cdr (assoc 300 entdata))) (strcase nombre))
+              (setq exists T)
+            )
+          )
+        )
+      )
+    )
+    exists
+  )
+
+  ;; 3.2 Función interna para crear o redefinir sin borrar
   (defun SINCAL:CrearEscala (nombre proporcion)
-    (vl-catch-all-apply 'vl-cmdf (list "_.-SCALELISTEDIT" "_Delete" nombre "_Exit"))
-    (vl-cmdf "_.-SCALELISTEDIT" "_Add" nombre proporcion "_Exit")
+    (if (SINCAL:ExisteEscala nombre)
+      ;; Si ya existe (y quizás está en uso), la redefinimos confirmando con "_Y"
+      (vl-catch-all-apply 'vl-cmdf (list "_.-SCALELISTEDIT" "_Add" nombre "_Y" proporcion "_Exit"))
+      ;; Si es nueva, la creamos directamente
+      (vl-catch-all-apply 'vl-cmdf (list "_.-SCALELISTEDIT" "_Add" nombre proporcion "_Exit"))
+    )
   )
 
   (setq listaEscalas
@@ -92,6 +114,10 @@
     (SINCAL:CrearEscala (car esc) (cdr esc))
   )
   
+  ;; Forzamos la limpieza de la barra de comandos por seguridad
+  (command) 
+  (command)
+
   (setvar "CMDECHO" origCmdEcho)
   (princ "\n[SINCAL] Escalas oficiales (m) calibradas.")
 )
