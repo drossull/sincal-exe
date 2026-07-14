@@ -1,10 +1,11 @@
 {
-  "version": "v26.4.1",
+  "version": "v26.4.2",
   "archivos": [
     "lisps/BV.lsp",
     "lisps/SINCAL.lsp",
     "lisps/SINCAL_ESCALAS.lsp",
     "lisps/DL2.lsp",
+    "lisps/DIMEL.lsp",
     "lisps/CPOL.lsp",
     "lisps/MC.lsp",
     "lisps/MPEND.lsp",

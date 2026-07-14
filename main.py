@@ -475,14 +475,14 @@ class ActualizadorCAD(ctk.CTk):
     def actualizar_rutas_registro(self):
         """Inyecta la bóveda SINCAL en la prioridad 1 de AutoCAD/ZWCAD y neutraliza fantasmas"""
         
-        # --- 1. CAZAFANTASMAS: Neutralizar acaddoc.lsp antiguos ---
+        # --- 1. CAZAFANTASMAS: Neutralizar acaddoc/zwcaddoc antiguos ---
         appdata = os.getenv('APPDATA')
         for carpeta_cad in ["Autodesk", "ZWSOFT"]:
             base = os.path.join(appdata, carpeta_cad)
             if os.path.exists(base):
                 for root, dirs, files in os.walk(base):
                     for file in files:
-                        if file.lower() == "acaddoc.lsp":
+                        if file.lower() in ["acaddoc.lsp", "zwcaddoc.lsp"]:
                             ruta_fantasma = os.path.join(root, file)
                             # Verificamos que no esté intentando borrar nuestro propio archivo en la bóveda
                             if RUTA_LOCAL_APP.lower() not in ruta_fantasma.lower():
@@ -491,23 +491,22 @@ class ActualizadorCAD(ctk.CTk):
                                     self.log(f"[*] Fantasma neutralizado en: {os.path.basename(root)}")
                                 except: pass
 
-        # --- 2. INYECTOR DE REGISTRO: Forzar prioridad 1 en AutoCAD/ZWCAD ---
+        # --- 2. INYECTOR DE REGISTRO UNIVERSAL ---
         def inyectar_ruta_recursivo(ruta_reg):
             try:
                 llave = winreg.OpenKey(winreg.HKEY_CURRENT_USER, ruta_reg, 0, winreg.KEY_ALL_ACCESS)
                 
-                # Si encontramos la carpeta "General" del perfil, modificamos las rutas de soporte
-                if ruta_reg.endswith("General"):
-                    for nombre_valor in ["ACAD", "ZWCAD", "SRCHPATH"]:
-                        try:
-                            valor_actual, tipo = winreg.QueryValueEx(llave, nombre_valor)
-                            if RUTA_LOCAL_APP.lower() not in valor_actual.lower():
-                                # Inyectamos nuestra bóveda de primera (Separada por punto y coma)
-                                nuevo_valor = f"{RUTA_LOCAL_APP};{valor_actual}"
-                                winreg.SetValueEx(llave, nombre_valor, 0, tipo, nuevo_valor)
-                                self.log(f"[*] SINCAL inyectado en prioridad máxima del CAD.")
-                        except OSError:
-                            pass
+                # Buscamos directamente las variables maestras sin importar en qué subcarpeta estén
+                for nombre_valor in ["ACAD", "ZWCAD", "ZWCADSEARCHPATH", "SRCHPATH", "TRUSTEDPATHS"]:
+                    try:
+                        valor_actual, tipo = winreg.QueryValueEx(llave, nombre_valor)
+                        if RUTA_LOCAL_APP.lower() not in valor_actual.lower():
+                            # Inyectamos nuestra bóveda de primera (Separada por punto y coma)
+                            nuevo_valor = f"{RUTA_LOCAL_APP};{valor_actual}"
+                            winreg.SetValueEx(llave, nombre_valor, 0, tipo, nuevo_valor)
+                            self.log(f"[*] SINCAL inyectado en registro: {nombre_valor}")
+                    except OSError:
+                        pass
 
                 # Exploración profunda en todas las subcarpetas del registro
                 i = 0
