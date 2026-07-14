@@ -300,27 +300,71 @@ class ActualizadorCAD(ctk.CTk):
     def _hilo_comando_en_vivo(self, comando):
         pythoncom.CoInitialize()
         try:
-            app = None
-            for s in ["ZWCAD.Application", "AutoCAD.Application", "AutoCAD.Application.25"]:
-                try: app = win32com.client.GetActiveObject(s); break
-                except: pass
-            if not app: return self.log("\n[X] Error: No se detecta CAD abierto como Administrador.")
-            docs = app.Documents
-            if docs.Count == 0: return self.log(" [!] No hay ningún plano abierto.")
+            # 1. Armamos la lista masiva de versiones (15 a 35)
+            prog_ids = ["ZWCAD.Application", "AutoCAD.Application"]
+            for i in range(15, 36):
+                prog_ids.append(f"ZWCAD.Application.{i}")
+                prog_ids.append(f"AutoCAD.Application.{i}")
+                
+            apps_encontradas = []
             
-            for i in range(docs.Count):
+            # 2. Recolectamos TODOS los programas CAD que estén abiertos
+            for s in prog_ids:
+                try: 
+                    app = win32com.client.GetActiveObject(s)
+                    if app: apps_encontradas.append(app)
+                except: pass
+                
+            if not apps_encontradas: 
+                return self.log("\n[X] Error: No se detecta CAD abierto. (Recuerda abrirlo como Administrador).")
+                
+            # Memoria para no repetir el comando en la misma pestaña si el ID de versión se cruza
+            docs_procesados = set()
+            ejecuciones = 0
+            
+            # 3. Disparamos a las pestañas de TODOS los programas encontrados
+            for app in apps_encontradas:
                 if self.cancelar_comando_vivo: break
                 try:
-                    doc = docs.Item(i)
-                    if app.ActiveDocument.Name != doc.Name: app.ActiveDocument = doc; time.sleep(0.2)
-                    try: doc.SendCommand("\x03\x03")
-                    except: pass
-                    doc.SendCommand(comando)
-                    self.log(f"  > Aplicado en: {doc.Name}")
-                except Exception as e: self.log(f"  > [X] Error pestaña: {e}")
-        except Exception as e: self.log(f"\n[X] Fallo COM: {e}")
+                    docs = app.Documents
+                    for i in range(docs.Count):
+                        if self.cancelar_comando_vivo: break
+                        try:
+                            doc = docs.Item(i)
+                            
+                            # Identificador único del plano (Ruta + Nombre)
+                            doc_id = f"{doc.FullName}_{doc.Name}"
+                            
+                            # Si ya procesamos esta pestaña, saltamos a la siguiente
+                            if doc_id in docs_procesados:
+                                continue
+                                
+                            docs_procesados.add(doc_id)
+                            
+                            # Activamos la pestaña y enviamos el comando
+                            if app.ActiveDocument.Name != doc.Name: 
+                                app.ActiveDocument = doc
+                                time.sleep(0.2)
+                                
+                            try: doc.SendCommand("\x03\x03") # Cancelamos comandos previos (ESC ESC)
+                            except: pass
+                            
+                            doc.SendCommand(comando)
+                            self.log(f"  > Aplicado en: {doc.Name}")
+                            ejecuciones += 1
+                        except Exception as e: 
+                            self.log(f"  > [X] Error pestaña: {e}")
+                except:
+                    pass # Falla silenciosa si la aplicación no responde (ej. si el usuario la cerró de golpe)
+                    
+            if ejecuciones == 0:
+                self.log(" [!] No hay planos abiertos en los programas detectados.")
+                
+        except Exception as e: 
+            self.log(f"\n[X] Fallo COM: {e}")
         finally:
-            self.btn_enviar_cmd.configure(state="normal", text="Ejecutar"); self.btn_cancelar_cmd.configure(state="disabled", text="Cancelar")
+            self.btn_enviar_cmd.configure(state="normal", text="Ejecutar")
+            self.btn_cancelar_cmd.configure(state="disabled", text="Cancelar")
             pythoncom.CoUninitialize()
 
     def log(self, m): self.consola.configure(state="normal"); self.consola.insert("end", m + "\n"); self.consola.see("end"); self.consola.configure(state="disabled")
