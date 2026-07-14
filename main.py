@@ -369,7 +369,10 @@ class ActualizadorCAD(ctk.CTk):
 
     def log(self, m): self.consola.configure(state="normal"); self.consola.insert("end", m + "\n"); self.consola.see("end"); self.consola.configure(state="disabled")
     def abrir_carpeta_local(self): os.startfile(RUTA_LOCAL_APP) if os.path.exists(RUTA_LOCAL_APP) else None
-    def forzar_path_manual(self): self.actualizar_variable_entorno(); self.log("[!] PATH reparado de fondo.")
+    def forzar_path_manual(self): 
+        self.actualizar_rutas_registro()
+        self.actualizar_variable_entorno()
+        self.log("[!] PATH y Registro CAD reparados.")
 
     def iniciar_actualizacion_hilo(self):
         self.btn_actualizar.configure(state="disabled", text="Sincronizando...")
@@ -532,26 +535,30 @@ class ActualizadorCAD(ctk.CTk):
         except: pass
 
     def generar_archivos_lisp(self, archivos):
-        r_acc = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
-        with open(r_acc, 'w', encoding='utf-8') as f:
-            for a in archivos:
-                if a.lower().endswith('.lsp') and os.path.basename(a).lower() != "acaddoc.lsp":
-                    
-                    # Convertimos la ruta a estándar puro de LISP (slashes frontales)
-                    ruta_lisp = os.path.normpath(os.path.join(RUTA_LOCAL_APP, a)).replace("\\", "/")
-                    nombre = os.path.basename(a)
-                    
-                    # Inyectamos el comando load envuelto en un princ para forzar la respuesta visual
-                    f.write(f'(princ (load "{ruta_lisp}" "\\n[X] SINCAL: Fallo al cargar {nombre}"))\n')
-            
-            # --- NUEVO: Cargar Startup Automáticamente ---
-            # Si el archivo SINCAL_STARTUP existe, lo forzamos al final del acaddoc para garantizar 
-            # que las escalas y variables apliquen siempre sobre el dibujo abierto.
-            if "startup/SINCAL_STARTUP.lsp" in archivos or "SINCAL_STARTUP.lsp" in archivos:
-                 f.write('(princ "\\n[SINCAL] Políticas de empresa y variables aplicadas.")\n')
+        contenido_arranque = ""
+        
+        for a in archivos:
+            if a.lower().endswith('.lsp') and os.path.basename(a).lower() not in ["acaddoc.lsp", "zwcaddoc.lsp"]:
+                # Convertimos la ruta a estándar puro de LISP (slashes frontales)
+                ruta_lisp = os.path.normpath(os.path.join(RUTA_LOCAL_APP, a)).replace("\\", "/")
+                nombre = os.path.basename(a)
+                contenido_arranque += f'(princ (load "{ruta_lisp}" "\\n[X] SINCAL: Fallo al cargar {nombre}"))\n'
+        
+        # --- Cargar Startup Automáticamente ---
+        if "startup/SINCAL_STARTUP.lsp" in archivos or "SINCAL_STARTUP.lsp" in archivos:
+             contenido_arranque += '(princ "\\n[SINCAL] Políticas de empresa y variables aplicadas.")\n'
 
-            # Mensaje de éxito al final para asegurar que leyó todo el acaddoc.lsp
-            f.write('(princ "\\n[OK] SINCAL: Todos los LISPs procesados correctamente.")\n(princ)\n')
+        contenido_arranque += '(princ "\\n[OK] SINCAL: Todos los LISPs procesados correctamente.")\n(princ)\n'
+
+        # --- GUARDAR PARA AMBOS PROGRAMAS ---
+        r_acad = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
+        r_zwcad = os.path.join(RUTA_LOCAL_APP, "zwcaddoc.lsp")
+        
+        with open(r_acad, 'w', encoding='utf-8') as f:
+            f.write(contenido_arranque)
+            
+        with open(r_zwcad, 'w', encoding='utf-8') as f:
+            f.write(contenido_arranque)
 
 if __name__ == "__main__":
     app = ActualizadorCAD()
