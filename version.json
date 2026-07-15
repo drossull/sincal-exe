@@ -1,8 +1,9 @@
 {
-  "version": "v27.0.7",
+  "version": "v27.0.8",
   "archivos": [
     "core_sincal.py",
     "lisps/BV.lsp",
+    "lisps/VRAP.lsp",
     "lisps/SINCAL.lsp",
     "lisps/SINCAL_ESCALAS.lsp",
     "lisps/DL2.lsp",
