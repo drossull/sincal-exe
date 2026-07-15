@@ -167,29 +167,36 @@ class ActualizadorCAD(ctk.CTk):
                 self.txt_updates.configure(state="normal")
                 self.txt_updates.delete("1.0", "end")
                 
-                # Diccionario para meses en español
                 meses = {"01":"Ene", "02":"Feb", "03":"Mar", "04":"Abr", "05":"May", "06":"Jun", 
                          "07":"Jul", "08":"Ago", "09":"Sep", "10":"Oct", "11":"Nov", "12":"Dic"}
                 
                 for c in r.json():
-                    # 1. Fecha y Hora (Transformando UTC a hora local de Chile: UTC-4)
-                    raw_date = c['commit']['author']['date'] # Ej: "2026-07-15T13:30:00Z"
+                    # 1. Fecha y Hora local
+                    raw_date = c['commit']['author']['date'] 
                     dt_utc = datetime.strptime(raw_date, "%Y-%m-%dT%H:%M:%SZ")
-                    dt_local = dt_utc - timedelta(hours=4) # Ajuste horario
+                    dt_local = dt_utc - timedelta(hours=4)
                     
                     mes_str = meses[dt_local.strftime("%m")]
                     fecha_formateada = f"{dt_local.strftime('%d')} {mes_str} {dt_local.strftime('%y %H:%M')}"
                     
-                    # 2. Versión: Usamos los primeros 7 caracteres del SHA del commit
-                    version_sha = c['sha'][:7]
+                    # 2. VIAJE EN EL TIEMPO: Leer el version.json de ese commit exacto
+                    sha_completo = c['sha']
+                    version_mostrar = sha_completo[:7] # Respaldo por si el json no existía en ese commit antiguo
+                    try:
+                        # Buscamos el archivo en la URL histórica usando el SHA
+                        url_hist = f"https://raw.githubusercontent.com/{USUARIO_GITHUB}/{REPO_GITHUB}/{sha_completo}/version.json"
+                        r_json = requests.get(url_hist, timeout=3)
+                        if r_json.status_code == 200:
+                            version_mostrar = r_json.json().get("version", version_mostrar)
+                    except:
+                        pass
                     
-                    # 3. Formatear el Mensaje (Summary + Description)
+                    # 3. Formatear el Mensaje
                     mensaje = c['commit']['message'].strip()
-                    # Aplanamos los saltos de línea reemplazándolos con " + "
                     mensaje = mensaje.replace("\r\n", " + ").replace("\n\n", " + ").replace("\n", " + ")
                     
-                    # Ensamblar la línea y mostrarla
-                    linea = f"• ({version_sha}) / {fecha_formateada} / {mensaje}\n"
+                    # Ensamblar la línea final
+                    linea = f"• ({version_mostrar}) / {fecha_formateada} / {mensaje}\n"
                     self.txt_updates.insert("end", linea)
                     
                 self.txt_updates.configure(state="disabled")
