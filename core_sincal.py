@@ -177,14 +177,49 @@ class ActualizadorCAD(ctk.CTk):
         except: return False
 
     def loop_verificador_actualizaciones_silencioso(self):
+        # Revisión súper rápida cada 30 segundos
         while True:
-            time.sleep(3600)
+            time.sleep(30)
             try:
                 r = requests.get(URL_BASE_RAW + "version.json", timeout=5)
-                if r.json().get("version") != self.version_local_actual:
-                    while self.cad_esta_ejecutandose(): time.sleep(300)
-                    self.iniciar_actualizacion_hilo()
+                nueva_version = r.json().get("version")
+                if nueva_version != self.version_local_actual:
+                    
+                    # 1. Rescatamos la descripción del último commit en GitHub
+                    desc_commit = "Mejoras generales y corrección de errores."
+                    try:
+                        r_commit = requests.get(f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits", params={"per_page": 1}, timeout=5)
+                        if r_commit.status_code == 200:
+                            desc_commit = r_commit.json()[0]['commit']['message']
+                    except: pass
+                    
+                    # 2. Llamamos al pop-up de forma segura en el hilo principal de la interfaz
+                    self.after(0, lambda: self.mostrar_popup_actualizacion(nueva_version, desc_commit))
+                    
+                    # 3. Detenemos este loop para que no le salgan 100 pop-ups seguidos
+                    break 
             except: pass
+
+    def mostrar_popup_actualizacion(self, nueva_version, desc_commit):
+        # Forzar la ventana principal al frente si estaba minimizada o en la bandeja
+        self.deiconify()
+        self.focus_force()
+        
+        # Armar el mensaje
+        msg = f"Versión detectada: {nueva_version}\n\nNovedades:\n{desc_commit}\n\n¿Deseas instalar esta actualización ahora?"
+        
+        # Lanzar el Pop-Up
+        if messagebox.askyesno("¡Actualización SINCAL Disponible!", msg):
+            # Verificamos si tiene el CAD abierto para proteger la inyección
+            if self.cad_esta_ejecutandose():
+                messagebox.showwarning(
+                    "Software CAD en uso", 
+                    "Para que los cambios se apliquen correctamente, por favor cierra ZWCAD o AutoCAD y luego presiona 'Instalar / Actualizar Todo' en esta ventana."
+                )
+            else:
+                self.iniciar_actualizacion_hilo()
+        else:
+            self.log(f"[!] Actualización a {nueva_version} pospuesta por el usuario.")
 
     def setup_tab_sincronizador(self):
         lbl_titulo = ctk.CTkLabel(self.tab_main, text="ESTÁNDAR SINCAL", font=FUENTE_TITULO, text_color=COLOR_TITULO); lbl_titulo.pack(pady=10)
