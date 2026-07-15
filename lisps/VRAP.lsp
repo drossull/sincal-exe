@@ -1,125 +1,93 @@
 ;;; =========================================================================
-;;; COMANDO: VRAP (Versión Multiselección Centrada)
-;;; Selecciona múltiples recuadros en el Model y los envía al Layout
-;;; generándolos como viewports centrados y escalados automáticamente.
+;;; COMANDO: VRAP (Versión Tamaño Fijo en Layout)
+;;; 1. Selecciona múltiples áreas en el Model.
+;;; 2. Pide dibujar UN rectángulo en el Layout.
+;;; 3. Genera todos los viewports con ese tamaño exacto en cascada.
 ;;; =========================================================================
-(defun c:VRAP (/ pt1 pt2 lst_areas idx area pA pB dx dy lim_min lim_max 
-                    paper_w paper_h max_vp_w max_vp_h scale_factor vp_w vp_h 
-                    offset ctr vp_p1 vp_p2 origOsmode origCmdecho)
+(defun c:VRAP (/ pt1 pt2 lst_areas idx area pA pB vp_p1 vp_p2 offset paper_p1 paper_p2 origOsmode origCmdecho)
   (vl-load-com)
   
   (setq origOsmode (getvar "OSMODE"))
   (setq origCmdecho (getvar "CMDECHO"))
   (setvar "CMDECHO" 0)
 
-  ;; 1. Forzar ir al Model Space para iniciar la selección masiva
+  ;; 1. Forzar ir al Model Space
   (if (= (getvar "TILEMODE") 0)
     (setvar "TILEMODE" 1)
   )
 
   (princ "\n--- MÓDULO SINCAL: MULTI-SELECCIÓN EN MODEL ---")
-  (princ "\nSeleccione las ventanas de los detalles. Al finalizar, presione ENTER sin seleccionar nada.")
+  (princ "\nSeleccione los recuadros de los detalles. Al finalizar, presione ENTER o Espacio en blanco.")
   
   (setq lst_areas nil)
   (setq pt1 T)
 
-  ;; 2. Bucle de captura en Model Space
+  ;; 2. Bucle de captura de coordenadas en el Model
   (while pt1
-    (setq pt1 (getpoint (strcat "\n[" (itoa (1+ (length lst_areas))) "] Esquina de recuadro (o ENTER para procesar): ")))
+    (setq pt1 (getpoint (strcat "\n[" (itoa (1+ (length lst_areas))) "] Esquina del recuadro (o ENTER para ir al Layout): ")))
     (if pt1
       (progn
         (setq pt2 (getcorner pt1 " -> Esquina opuesta: "))
         (if pt2
           (progn
-            ;; Guardamos la pareja de puntos en nuestra lista
             (setq lst_areas (cons (list pt1 pt2) lst_areas))
-            (princ (strcat "\n[SINCAL] Detalle " (itoa (length lst_areas)) " registrado con éxito."))
+            (princ (strcat "\n[SINCAL] Detalle " (itoa (length lst_areas)) " registrado."))
           )
-          (setq pt1 nil) ; Si cancela el segundo punto, detenemos
+          (setq pt1 nil) ; Detener si se cancela
         )
       )
     )
   )
 
-  ;; 3. Procesamiento masivo en el Layout
+  ;; 3. Viaje al Layout y Definición de Tamaño Físico
   (if (and lst_areas (> (length lst_areas) 0))
     (progn
-      ;; Volteamos la lista para que se creen en el mismo orden en que se seleccionaron
       (setq lst_areas (reverse lst_areas))
       
-      ;; Cambiar al Layout activo
       (setvar "TILEMODE" 0)
-      
-      ;; Forzar estar en el Paper Space puro (no dentro de otro viewport)
       (command "_.PSPACE")
       
-      (setq idx 0)
-      (setvar "OSMODE" 0) ; Apagamos snaps para que no se alteren las coordenadas en papel
+      (princ "\n--- SINCAL: CREACIÓN EN EL LAYOUT ---")
+      (setq vp_p1 (getpoint "\nEspecifique la PRIMERA esquina del tamaño de sus Viewports: "))
+      
+      (if vp_p1
+        (setq vp_p2 (getcorner vp_p1 "\nEspecifique la ESQUINA OPUESTA (Define el tamaño para todos): "))
+      )
 
-      (foreach area lst_areas
-        (setq pA (car area))
-        (setq pB (cadr area))
-        
-        ;; Medidas del recuadro del Model
-        (setq dx (abs (- (car pB) (car pA))))
-        (setq dy (abs (- (cadr pB) (cadr pA))))
-        
-        (if (and (> dx 0) (> dy 0))
-          (progn
-            ;; Obtener límites de la lámina actual (Paper Space)
-            (setq lim_min (getvar "LIMMIN")
-                  lim_max (getvar "LIMMAX")
-                  paper_w (- (car lim_max) (car lim_min))
-                  paper_h (- (cadr lim_max) (cadr lim_min))
-            )
+      (if (and vp_p1 vp_p2)
+        (progn
+          (setvar "OSMODE" 0)
+          (setq idx 0)
+          
+          ;; 4. Bucle generador de Viewports
+          (foreach area lst_areas
+            (setq pA (car area))
+            (setq pB (cadr area))
             
-            ;; Fallback por si los límites no están inicializados
-            (if (or (<= paper_w 1.0) (<= paper_h 1.0))
-              (setq max_vp_w 200.0 max_vp_h 150.0)
-              (setq max_vp_w (* paper_w 0.40) ; Ajustamos al 40% del ancho de la lámina
-                    max_vp_h (* paper_h 0.40) ; Ajustamos al 40% del alto de la lámina
-              )
-            )
+            ;; Desfase de cascada (15 unidades en X y -15 en Y por cada viewport adicional)
+            (setq offset (* idx 15.0))
+            (setq paper_p1 (list (+ (car vp_p1) offset) (- (cadr vp_p1) offset) 0.0))
+            (setq paper_p2 (list (+ (car vp_p2) offset) (- (cadr vp_p2) offset) 0.0))
             
-            ;; Factor de escala para que el Viewport mantenga la proporción del Model
-            (setq scale_factor (min (/ max_vp_w dx) (/ max_vp_h dy))
-                  vp_w (* dx scale_factor)
-                  vp_h (* dy scale_factor)
-            )
+            ;; Crea el viewport físico
+            (command "_.MVIEW" "_non" paper_p1 "_non" paper_p2)
             
-            ;; Aplicamos desfase diagonal (cascada de 10mm) para que no se tapen perfectamente
-            (setq offset (* idx 10.0))
-            
-            ;; Centro geométrico de la lámina + desfase
-            (setq ctr (list (+ (* 0.5 (+ (car lim_min) (car lim_max))) offset)
-                            (+ (* 0.5 (+ (cadr lim_min) (cadr lim_max))) offset)
-                            0.0)
-            )
-            
-            ;; Coordenadas finales de las esquinas del Viewport en papel
-            (setq vp_p1 (list (- (car ctr) (* 0.5 vp_w)) (- (cadr ctr) (* 0.5 vp_h)) 0.0)
-                  vp_p2 (list (+ (car ctr) (* 0.5 vp_w)) (+ (cadr ctr) (* 0.5 vp_h)) 0.0)
-            )
-            
-            ;; Crear Viewport en el Layout
-            (command "_.MVIEW" "_non" vp_p1 "_non" vp_p2)
-            
-            ;; Entrar al Viewport recién creado, encuadrar el detalle y salir
+            ;; Entra, hace Zoom Window forzado y sale
             (command "_.MSPACE")
             (command "_.ZOOM" "_W" "_non" pA "_non" pB)
             (command "_.PSPACE")
             
             (setq idx (1+ idx))
           )
+          (princ (strcat "\n[SINCAL] ¡Éxito! Se generaron " (itoa idx) " viewports del mismo tamaño."))
         )
+        (princ "\n[!] Operación cancelada: No se definió el tamaño del Viewport.")
       )
-      
-      (princ (strcat "\n[SINCAL] Proceso terminado. Se enviaron " (itoa idx) " viewports centrados al Layout."))
     )
-    (princ "\n[!] No se seleccionó ningún área para enviar.")
+    (princ "\n[!] No se seleccionó ningún área en el Model.")
   )
 
-  ;; 4. Restaurar el entorno original del usuario
+  ;; 5. Restaurar variables
   (setvar "OSMODE" origOsmode)
   (setvar "CMDECHO" origCmdecho)
   (princ)
