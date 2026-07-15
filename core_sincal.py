@@ -266,22 +266,6 @@ class ActualizadorCAD(ctk.CTk):
         
         self.consola = ctk.CTkTextbox(self.tab_main, width=850, height=180, font=FUENTE_CONSOLA, fg_color="#1E1E1E", text_color=COLOR_TEXTO, state="disabled"); self.consola.pack(pady=10)
         
-        self.frame_live = ctk.CTkFrame(self.tab_main, fg_color="#1E1E1E", border_width=1, border_color="#444444", corner_radius=0)
-        self.frame_live.pack(fill="x", padx=40, pady=(10, 10))
-        top_live_frame = ctk.CTkFrame(self.frame_live, fg_color="transparent")
-        top_live_frame.pack(fill="x", padx=15, pady=(15, 5))
-        ctk.CTkLabel(top_live_frame, text="Comandos en vivo:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(side="left")
-        
-        bot_live_frame = ctk.CTkFrame(self.frame_live, fg_color="transparent")
-        bot_live_frame.pack(fill="x", padx=15, pady=(0, 15))
-        self.entrada_comando = ctk.CTkEntry(bot_live_frame, font=FUENTE_NORMAL, width=300, placeholder_text="Ej: ZE, _QSAVE", corner_radius=0)
-        self.entrada_comando.pack(side="left", padx=(0, 10))
-        
-        self.btn_enviar_cmd = ctk.CTkButton(bot_live_frame, text="Ejecutar", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_ACENTO, corner_radius=0, hover_color="#444444", text_color=COLOR_TEXTO, width=80, command=self.enviar_comando_en_vivo)
-        self.btn_enviar_cmd.pack(side="left", padx=(0, 10))
-        self.btn_cancelar_cmd = ctk.CTkButton(bot_live_frame, text="Cancelar", font=FUENTE_NORMAL, fg_color="#D9534F", hover_color="#C9302C", width=80, corner_radius=0, state="disabled", command=self.detener_comando_en_vivo)
-        self.btn_cancelar_cmd.pack(side="left")
-
         self.frame_updates = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         self.frame_updates.pack(fill="x", padx=40, pady=5)
         ctk.CTkLabel(self.frame_updates, text="Historial de cambios", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(anchor="w")
@@ -369,6 +353,28 @@ class ActualizadorCAD(ctk.CTk):
         # Textbox que actúa como terminal
         self.consola_scripts = ctk.CTkTextbox(bottom_frame, height=120, font=FUENTE_CONSOLA, fg_color="#000000", text_color="#00FF00", state="disabled", corner_radius=0)
         self.consola_scripts.pack(fill="x", padx=15, pady=(5, 15))
+
+    # --- SECCIÓN 4: COMANDOS EN VIVO (MUDADO DESDE SINCRONIZADOR) ---
+        self.frame_live = ctk.CTkFrame(self.tab_renombrado, fg_color="#1E1E1E", border_width=1, border_color="#444444", corner_radius=0)
+        self.frame_live.pack(fill="x", padx=20, pady=(0, 15))
+        
+        top_live_frame = ctk.CTkFrame(self.frame_live, fg_color="transparent")
+        top_live_frame.pack(fill="x", padx=15, pady=(10, 5))
+        
+        # Le pusimos "4." para mantener el orden numérico de la pestaña
+        ctk.CTkLabel(top_live_frame, text="4. Comandos en vivo (Ejecutar en planos actualmente abiertos):", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(side="left")
+        
+        bot_live_frame = ctk.CTkFrame(self.frame_live, fg_color="transparent")
+        bot_live_frame.pack(fill="x", padx=15, pady=(0, 15))
+        
+        self.entrada_comando = ctk.CTkEntry(bot_live_frame, font=FUENTE_NORMAL, width=300, placeholder_text="Ej: ZE, _QSAVE", corner_radius=0)
+        self.entrada_comando.pack(side="left", padx=(0, 10))
+        
+        self.btn_enviar_cmd = ctk.CTkButton(bot_live_frame, text="Ejecutar", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_ACENTO, corner_radius=0, hover_color="#444444", text_color=COLOR_TEXTO, width=80, command=self.enviar_comando_en_vivo)
+        self.btn_enviar_cmd.pack(side="left", padx=(0, 10))
+        
+        self.btn_cancelar_cmd = ctk.CTkButton(bot_live_frame, text="Cancelar", font=FUENTE_NORMAL, fg_color="#D9534F", hover_color="#C9302C", width=80, corner_radius=0, state="disabled", command=self.detener_comando_en_vivo)
+        self.btn_cancelar_cmd.pack(side="left")
 
     def log_r(self, m):
         self.log_rename.configure(state="normal"); self.log_rename.insert("end", m + "\n"); self.log_rename.see("end"); self.log_rename.configure(state="disabled")
