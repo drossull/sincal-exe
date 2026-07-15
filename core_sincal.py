@@ -19,6 +19,7 @@ from PIL import Image
 from modulos.tab_armaduras import TabArmaduras
 from modulos.tab_ubicacion import TabUbicacion
 from modulos.tab_docs import TabDocs
+from datetime import datetime, timedelta
 
 def ruta_recurso(relative_path):
     """Obtiene la ruta absoluta al recurso, funciona para dev y para PyInstaller"""
@@ -163,10 +164,37 @@ class ActualizadorCAD(ctk.CTk):
         try:
             r = requests.get(f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits", params={"per_page": 10}, timeout=5)
             if r.status_code == 200:
-                self.txt_updates.configure(state="normal"); self.txt_updates.delete("1.0", "end")
-                for c in r.json(): self.txt_updates.insert("end", f"• {c['commit']['author']['date'][:10]} : {c['commit']['message']}\n")
+                self.txt_updates.configure(state="normal")
+                self.txt_updates.delete("1.0", "end")
+                
+                # Diccionario para meses en español
+                meses = {"01":"Ene", "02":"Feb", "03":"Mar", "04":"Abr", "05":"May", "06":"Jun", 
+                         "07":"Jul", "08":"Ago", "09":"Sep", "10":"Oct", "11":"Nov", "12":"Dic"}
+                
+                for c in r.json():
+                    # 1. Fecha y Hora (Transformando UTC a hora local de Chile: UTC-4)
+                    raw_date = c['commit']['author']['date'] # Ej: "2026-07-15T13:30:00Z"
+                    dt_utc = datetime.strptime(raw_date, "%Y-%m-%dT%H:%M:%SZ")
+                    dt_local = dt_utc - timedelta(hours=4) # Ajuste horario
+                    
+                    mes_str = meses[dt_local.strftime("%m")]
+                    fecha_formateada = f"{dt_local.strftime('%d')} {mes_str} {dt_local.strftime('%y %H:%M')}"
+                    
+                    # 2. Versión: Usamos los primeros 7 caracteres del SHA del commit
+                    version_sha = c['sha'][:7]
+                    
+                    # 3. Formatear el Mensaje (Summary + Description)
+                    mensaje = c['commit']['message'].strip()
+                    # Aplanamos los saltos de línea reemplazándolos con " + "
+                    mensaje = mensaje.replace("\r\n", " + ").replace("\n\n", " + ").replace("\n", " + ")
+                    
+                    # Ensamblar la línea y mostrarla
+                    linea = f"• ({version_sha}) / {fecha_formateada} / {mensaje}\n"
+                    self.txt_updates.insert("end", linea)
+                    
                 self.txt_updates.configure(state="disabled")
-        except: pass
+        except Exception as e: 
+            pass
     
     def cad_esta_ejecutandose(self):
         try:
