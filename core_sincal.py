@@ -212,27 +212,37 @@ class ActualizadorCAD(ctk.CTk):
         except: return False
 
     def loop_verificador_actualizaciones_silencioso(self):
-        # Revisión súper rápida cada 30 segundos
+        import time
+        version_notificada = None # Memoria para no bombardearte con el mismo pop-up
+        
         while True:
             time.sleep(30)
             try:
-                r = requests.get(URL_BASE_RAW + "version.json", timeout=5)
+                # 1. DESTRUCTOR DE CACHÉ: Obligamos a GitHub a darnos el archivo en vivo
+                timestamp = str(time.time())
+                url_fresca = f"{URL_BASE_RAW}version.json?t={timestamp}"
+                
+                r = requests.get(url_fresca, timeout=5)
                 nueva_version = r.json().get("version")
-                if nueva_version != self.version_local_actual:
+                
+                # 2. Si la versión es nueva Y no te hemos avisado ya de esta misma versión...
+                if nueva_version != self.version_local_actual and nueva_version != version_notificada:
                     
-                    # 1. Rescatamos la descripción del último commit en GitHub
                     desc_commit = "Mejoras generales y corrección de errores."
                     try:
-                        r_commit = requests.get(f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits", params={"per_page": 1}, timeout=5)
+                        # También aplicamos el truco del caché a la API
+                        url_api = f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits"
+                        r_commit = requests.get(url_api, params={"per_page": 1, "t": timestamp}, timeout=5)
                         if r_commit.status_code == 200:
                             desc_commit = r_commit.json()[0]['commit']['message']
                     except: pass
                     
-                    # 2. Llamamos al pop-up de forma segura en el hilo principal de la interfaz
-                    self.after(0, lambda: self.mostrar_popup_actualizacion(nueva_version, desc_commit))
+                    # Registramos que ya avisamos para no repetir el pop-up cada 30 segundos
+                    version_notificada = nueva_version 
                     
-                    # 3. Detenemos este loop para que no le salgan 100 pop-ups seguidos
-                    break 
+                    # Lanzamos el aviso
+                    self.after(0, lambda v=nueva_version, d=desc_commit: self.mostrar_popup_actualizacion(v, d))
+                    
             except: pass
 
     def mostrar_popup_actualizacion(self, nueva_version, desc_commit):
