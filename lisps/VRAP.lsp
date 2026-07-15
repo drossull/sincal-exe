@@ -1,23 +1,23 @@
 ;;; =========================================================================
-;;; COMANDO: VRAP (Versión Tamaño Fijo en Layout)
-;;; 1. Selecciona múltiples áreas en el Model.
-;;; 2. Pide dibujar UN rectángulo en el Layout.
-;;; 3. Genera todos los viewports con ese tamaño exacto en cascada.
+;;; COMANDO: VRAP (Versión Viewports de Tamaños Independientes)
+;;; 1. Selecciona múltiples áreas en el Model de manera secuencial.
+;;; 2. En el Layout, pide especificar el tamaño y ubicación de cada Viewport
+;;;    uno por uno, en el mismo orden de selección.
 ;;; =========================================================================
-(defun c:VRAP (/ pt1 pt2 lst_areas idx area pA pB vp_p1 vp_p2 offset paper_p1 paper_p2 origOsmode origCmdecho)
+(defun c:VRAP (/ pt1 pt2 lst_areas idx area pA pB vp_p1 vp_p2 origOsmode origCmdecho)
   (vl-load-com)
   
   (setq origOsmode (getvar "OSMODE"))
   (setq origCmdecho (getvar "CMDECHO"))
   (setvar "CMDECHO" 0)
 
-  ;; 1. Forzar ir al Model Space
+  ;; 1. Forzar ir al Model Space para iniciar la selección
   (if (= (getvar "TILEMODE") 0)
     (setvar "TILEMODE" 1)
   )
 
   (princ "\n--- MÓDULO SINCAL: MULTI-SELECCIÓN EN MODEL ---")
-  (princ "\nSeleccione los recuadros de los detalles. Al finalizar, presione ENTER o Espacio en blanco.")
+  (princ "\nSeleccione los recuadros de los detalles. Al finalizar, presione ENTER o Espacio.")
   
   (setq lst_areas nil)
   (setq pt1 T)
@@ -39,55 +39,56 @@
     )
   )
 
-  ;; 3. Viaje al Layout y Definición de Tamaño Físico
+  ;; 3. Viaje al Layout y creación secuencial personalizada
   (if (and lst_areas (> (length lst_areas) 0))
     (progn
+      ;; Volteamos la lista para procesar en el mismo orden de selección
       (setq lst_areas (reverse lst_areas))
       
       (setvar "TILEMODE" 0)
       (command "_.PSPACE")
       
-      (princ "\n--- SINCAL: CREACIÓN EN EL LAYOUT ---")
-      (setq vp_p1 (getpoint "\nEspecifique la PRIMERA esquina del tamaño de sus Viewports: "))
+      (princ "\n--- SINCAL: CREACIÓN PERSONALIZADA EN EL LAYOUT ---")
+      (setq idx 1)
       
-      (if vp_p1
-        (setq vp_p2 (getcorner vp_p1 "\nEspecifique la ESQUINA OPUESTA (Define el tamaño para todos): "))
-      )
-
-      (if (and vp_p1 vp_p2)
-        (progn
-          (setvar "OSMODE" 0)
-          (setq idx 0)
-          
-          ;; 4. Bucle generador de Viewports
-          (foreach area lst_areas
-            (setq pA (car area))
-            (setq pB (cadr area))
-            
-            ;; Desfase de cascada (15 unidades en X y -15 en Y por cada viewport adicional)
-            (setq offset (* idx 15.0))
-            (setq paper_p1 (list (+ (car vp_p1) offset) (- (cadr vp_p1) offset) 0.0))
-            (setq paper_p2 (list (+ (car vp_p2) offset) (- (cadr vp_p2) offset) 0.0))
-            
-            ;; Crea el viewport físico
-            (command "_.MVIEW" "_non" paper_p1 "_non" paper_p2)
-            
-            ;; Entra, hace Zoom Window forzado y sale
-            (command "_.MSPACE")
-            (command "_.ZOOM" "_W" "_non" pA "_non" pB)
-            (command "_.PSPACE")
-            
-            (setq idx (1+ idx))
+      (foreach area lst_areas
+        (setq pA (car area))
+        (setq pB (cadr area))
+        
+        ;; Activamos tus referencias (Snaps) para que puedas apoyarte en el Layout
+        (setvar "OSMODE" origOsmode)
+        
+        (setq vp_p1 (getpoint (strcat "\n[Detalle " (itoa idx) "] Especifique PRIMERA esquina de este Viewport en la lámina: ")))
+        (if vp_p1
+          (progn
+            (setq vp_p2 (getcorner vp_p1 " -> Especifique ESQUINA OPUESTA: "))
+            (if vp_p2
+              (progn
+                ;; Apagamos snaps temporalmente para realizar el Zoom Window de precisión sin interferencias
+                (setvar "OSMODE" 0)
+                
+                ;; Crear viewport físico
+                (command "_.MVIEW" "_non" vp_p1 "_non" vp_p2)
+                
+                ;; Entrar al viewport, encuadrar el detalle exacto del model y salir
+                (command "_.MSPACE")
+                (command "_.ZOOM" "_W" "_non" pA "_non" pB)
+                (command "_.PSPACE")
+                
+                (setq idx (1+ idx))
+              )
+              (princ "\n[!] Operación omitida: Falta definir la esquina opuesta.")
+            )
           )
-          (princ (strcat "\n[SINCAL] ¡Éxito! Se generaron " (itoa idx) " viewports del mismo tamaño."))
+          (princ "\n[!] Operación omitida: Detalle cancelado por el usuario.")
         )
-        (princ "\n[!] Operación cancelada: No se definió el tamaño del Viewport.")
       )
+      (princ (strcat "\n[SINCAL] ¡Éxito! Se generaron " (itoa (1- idx)) " viewports independientes con sus medidas exactas."))
     )
     (princ "\n[!] No se seleccionó ningún área en el Model.")
   )
 
-  ;; 5. Restaurar variables
+  ;; 4. Restaurar variables originales del usuario
   (setvar "OSMODE" origOsmode)
   (setvar "CMDECHO" origCmdecho)
   (princ)
