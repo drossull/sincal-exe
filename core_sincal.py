@@ -319,19 +319,78 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkButton(h2_frame, text="Aplicar Revisión", font=FUENTE_NORMAL, corner_radius=0, fg_color="transparent", border_width=1, border_color=COLOR_TITULO, text_color=COLOR_TITULO, hover_color="#444444", command=self.aplicar_revision_adv).pack(pady=15, padx=15, fill="x")
         self.log_rename = ctk.CTkTextbox(right_frame, height=120, font=FUENTE_CONSOLA, fg_color="#1E1E1E", state="disabled", corner_radius=0); self.log_rename.pack(fill="both", expand=True, pady=(0, 10))
 
+        # --- NUEVA SECCIÓN: CONSOLA DE AUTOMATIZACIÓN (POWERSHELL Y CONVERSIÓN) ---
+        bottom_frame = ctk.CTkFrame(self.tab_renombrado, fg_color="#1E1E1E", corner_radius=0, border_width=1, border_color="#444444")
+        bottom_frame.pack(fill="x", padx=20, pady=(0, 15))
+        
+        ctk.CTkLabel(bottom_frame, text="3. Consola de Automatización y Conversión:", font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(anchor="w", padx=15, pady=(10, 0))
+        
+        # Filas para organizar los botones
+        btn_row1 = ctk.CTkFrame(bottom_frame, fg_color="transparent")
+        btn_row1.pack(fill="x", padx=15, pady=2)
+        
+        btn_row2 = ctk.CTkFrame(bottom_frame, fg_color="transparent")
+        btn_row2.pack(fill="x", padx=15, pady=2)
+
+        btn_row3 = ctk.CTkFrame(bottom_frame, fg_color="transparent")
+        btn_row3.pack(fill="x", padx=15, pady=(2, 5))
+
+        def cmd_ps(nombre_script):
+            ruta = os.path.join(RUTA_LOCAL_APP, "scripts", f"{nombre_script}.ps1")
+            return f"& '{ruta}'"
+
+        # --- FILA 1: Limpieza y Vistas ---
+        ctk.CTkButton(btn_row1, text="▶ Auditar", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", corner_radius=0, width=100,
+                      command=lambda: self.lanzar_script(cmd_ps("AUDIT"))).pack(side="left", padx=(0, 10))
+                      
+        ctk.CTkButton(btn_row1, text="▶ Purgar", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", corner_radius=0, width=100,
+                      command=lambda: self.lanzar_script(cmd_ps("PURGEALL"))).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(btn_row1, text="▶ Encuadrar vista", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", corner_radius=0, width=140,
+                      command=lambda: self.lanzar_script(cmd_ps("ZE"))).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(btn_row1, text="▶ Eliminar Layout2", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", corner_radius=0, width=140,
+                      command=lambda: self.lanzar_script(cmd_ps("DL2"))).pack(side="left", padx=(0, 10))
+
+        # --- FILA 2: Impresión y Bloqueos ---
+        ctk.CTkButton(btn_row2, text="▶ Bloquear Viewports", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", corner_radius=0, width=150,
+                      command=lambda: self.lanzar_script(cmd_ps("BV"))).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(btn_row2, text="▶ Configurar en A1", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", corner_radius=0, width=140,
+                      command=lambda: self.lanzar_script(cmd_ps("PAGESETUP-A1"))).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(btn_row2, text="▶ Ploteo A1", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", corner_radius=0, width=100,
+                      command=lambda: self.lanzar_script(cmd_ps("PUBLISH-A1"))).pack(side="left", padx=(0, 10))
+
+        # --- FILA 3: Conversión ---
+        ctk.CTkButton(btn_row3, text="🔄 Convertir DXF a DWG", font=FUENTE_NORMAL, fg_color="#005BBF", hover_color="#004A9E", corner_radius=0, width=200,
+                      command=self.convertir_dxf_a_dwg).pack(side="left", padx=(0, 10))
+
+        # Textbox que actúa como terminal
+        self.consola_scripts = ctk.CTkTextbox(bottom_frame, height=120, font=FUENTE_CONSOLA, fg_color="#000000", text_color="#00FF00", state="disabled", corner_radius=0)
+        self.consola_scripts.pack(fill="x", padx=15, pady=(5, 15))
+
     def log_r(self, m):
         self.log_rename.configure(state="normal"); self.log_rename.insert("end", m + "\n"); self.log_rename.see("end"); self.log_rename.configure(state="disabled")
 
     def cargar_archivos_renombrado(self):
-        c = filedialog.askdirectory(title="Seleccionar carpeta con planos DWG")
+        c = filedialog.askdirectory(title="Seleccionar carpeta con planos DWG o DXF")
         if not c: return
-        self.ruta_renombre = c; self.lbl_ruta_adv.configure(text=f"Ruta: {c}", text_color=COLOR_TEXTO)
+        self.ruta_renombre = c
+        self.lbl_ruta_adv.configure(text=f"Ruta: {c}", text_color=COLOR_TEXTO)
+        self.refrescar_lista_archivos()
+
+    def refrescar_lista_archivos(self):
         for w in self.scroll_archivos.winfo_children(): w.destroy()
         self.checkboxes_archivos = []
-        arcs = [f for f in os.listdir(self.ruta_renombre) if f.lower().endswith('.dwg')]
+        # AHORA LEE TANTO DWG COMO DXF
+        arcs = [f for f in os.listdir(self.ruta_renombre) if f.lower().endswith(('.dwg', '.dxf'))]
         for arc in arcs:
-            cb = ctk.CTkCheckBox(self.scroll_archivos, text=arc, font=FUENTE_NORMAL, text_color=COLOR_TEXTO, fg_color=COLOR_ACENTO, hover_color="#005BBF"); cb.pack(anchor="w", pady=5, padx=5); cb.select(); self.checkboxes_archivos.append(cb)
-        self.log_r(f"[*] {len(arcs)} archivos cargados.")
+            cb = ctk.CTkCheckBox(self.scroll_archivos, text=arc, font=FUENTE_NORMAL, text_color=COLOR_TEXTO, fg_color=COLOR_ACENTO, hover_color="#005BBF")
+            cb.pack(anchor="w", pady=5, padx=5)
+            cb.select()
+            self.checkboxes_archivos.append(cb)
+        self.log_r(f"[*] {len(arcs)} archivos cargados en memoria.")
 
     def marcar_todos(self): [cb.select() for cb in self.checkboxes_archivos]
     def desmarcar_todos(self): [cb.deselect() for cb in self.checkboxes_archivos]
@@ -361,6 +420,126 @@ class ActualizadorCAD(ctk.CTk):
                     try: os.rename(os.path.join(self.ruta_renombre, old), os.path.join(self.ruta_renombre, new)); cb.configure(text=new); cont += 1
                     except Exception as e: self.log_r(f"[X] Error: {e}")
         self.log_r(f"[OK] {cont} revisiones actualizadas.")
+
+    def lanzar_script(self, comando_ps):
+        # 1. Validar si cargaron carpeta
+        if not getattr(self, 'ruta_renombre', None):
+            return messagebox.showwarning("Sin ruta", "Por favor, carga una carpeta DWG primero en el paso 1.")
+            
+        # 2. Validar que el CAD esté cerrado
+        if self.cad_esta_ejecutandose():
+            return messagebox.showwarning(
+                "CAD en Uso", 
+                "Por favor, cierra AutoCAD o ZWCAD completamente antes de ejecutar rutinas masivas.\n\nEsto evita que los archivos estén bloqueados por el programa."
+            )
+
+        # 3. Limpiar consola y lanzar hilo
+        self.consola_scripts.configure(state="normal")
+        self.consola_scripts.delete("1.0", "end")
+        self.consola_scripts.configure(state="disabled")
+        
+        threading.Thread(target=self._hilo_script, args=(comando_ps,), daemon=True).start()
+
+    def _hilo_script(self, comando_ps):
+        self.log_script(f"> Directorio Activo: {self.ruta_renombre}\n> Comando: {comando_ps}\n" + "-"*60 + "\n")
+        
+        # Ensamblamos la orden para PowerShell
+        comando = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", comando_ps]
+        
+        try:
+            # Popen nos permite capturar el texto en vivo y define el CWD (Current Working Directory)
+            proceso = subprocess.Popen(
+                comando,
+                cwd=self.ruta_renombre, # <--- La Magia: Abre CMD/PS exactamente en esa carpeta
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            
+            # Leemos la salida en tiempo real
+            for linea in iter(proceso.stdout.readline, ''):
+                self.log_script(linea)
+                
+            proceso.stdout.close()
+            proceso.wait()
+            self.log_script(f"\n[OK] Script finalizado (Código de salida: {proceso.returncode})\n")
+            
+        except Exception as e:
+            self.log_script(f"\n[X] Fallo crítico al lanzar PowerShell:\n{e}\n")
+
+    def convertir_dxf_a_dwg(self):
+        if not getattr(self, 'ruta_renombre', None):
+            return messagebox.showwarning("Sin ruta", "Por favor, carga una carpeta primero en el Paso 1.")
+
+        # Filtramos solo los archivos que sean DXF y que estén seleccionados
+        dxfs = [cb.cget("text") for cb in self.checkboxes_archivos if cb.get() == 1 and cb.cget("text").lower().endswith('.dxf')]
+
+        if not dxfs:
+            return messagebox.showinfo("Nada que convertir", "No hay archivos DXF marcados en la lista.")
+
+        if self.cad_esta_ejecutandose():
+            return messagebox.showwarning("CAD en Uso", "Por favor cierra AutoCAD/ZWCAD para que la conversión se haga en segundo plano sin interrupciones.")
+
+        self.consola_scripts.configure(state="normal")
+        self.consola_scripts.delete("1.0", "end")
+        self.consola_scripts.configure(state="disabled")
+
+        threading.Thread(target=self._hilo_convertir_dxf, args=(dxfs,), daemon=True).start()
+
+    def _hilo_convertir_dxf(self, dxfs):
+        self.log_script(f"[*] Encendiendo motor CAD en segundo plano...\n[*] Se convertirán {len(dxfs)} archivos.\n" + "-"*60 + "\n")
+        import pythoncom
+        pythoncom.CoInitialize()
+        try:
+            app = None
+            for motor in ["ZWCAD.Application", "AutoCAD.Application"]:
+                try:
+                    app = win32com.client.DispatchEx(motor)
+                    break
+                except: pass
+
+            if not app:
+                return self.log_script("[X] No se pudo iniciar ni ZWCAD ni AutoCAD en segundo plano.\n")
+
+            # Intentar ocultar la ventana para que trabaje silenciosamente
+            try: app.Visible = False
+            except: pass
+            
+            for f in dxfs:
+                ruta_dxf = os.path.join(self.ruta_renombre, f)
+                ruta_dwg = os.path.join(self.ruta_renombre, f[:-4] + ".dwg")
+                
+                self.log_script(f"> Convirtiendo: {f} ... ")
+                try:
+                    doc = app.Documents.Open(ruta_dxf)
+                    # 64 equivale al formato ac2018_dwg (Estándar de la industria)
+                    try: doc.SaveAs(ruta_dwg, 64)
+                    except: doc.SaveAs(ruta_dwg) # Fallback seguro
+                    
+                    doc.Close(False)
+                    self.log_script("OK\n")
+                except Exception as e:
+                    self.log_script(f"Error ({str(e)})\n")
+                    
+            try: app.Quit()
+            except: pass
+            
+            self.log_script("\n[!] Conversión finalizada. Actualizando lista...\n")
+            
+            # Refrescar la lista automáticamente para que los nuevos DWG aparezcan arriba
+            self.after(1000, self.refrescar_lista_archivos)
+            
+        except Exception as e:
+            self.log_script(f"\n[X] Error fatal de COM: {e}\n")
+        finally:
+            pythoncom.CoUninitialize()
+
+    def log_script(self, texto):
+        self.consola_scripts.configure(state="normal")
+        self.consola_scripts.insert("end", texto)
+        self.consola_scripts.see("end")
+        self.consola_scripts.configure(state="disabled")
 
     def detener_comando_en_vivo(self):
         self.cancelar_comando_vivo = True; self.btn_cancelar_cmd.configure(state="disabled", text="Deteniendo...")
