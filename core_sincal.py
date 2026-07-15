@@ -78,19 +78,24 @@ class ActualizadorCAD(ctk.CTk):
         self.tabview.pack(padx=20, pady=10)
         self.tabview._segmented_button.configure(font=FUENTE_NORMAL)
 
-        self.tab_main = self.tabview.add("Sincronizador")
-        self.tab_renombrado = self.tabview.add("Renombrado Avanzado")
-        self.tab_armaduras = self.tabview.add("Módulo Estructural")
+        # --- CREACIÓN DE PESTAÑAS (ORDENADAS Y CON SEPARADOR VISUAL) ---
+        self.tab_main = self.tabview.add("Sincronizador / ")
         
-        # SOLUCIÓN: Agregamos la pestaña al tabview maestro, no al tab_main
-        tab_ubicacion_frame = self.tabview.add("Ubicación") 
+        tab_ubicacion_frame = self.tabview.add("Ubicación / ") 
         self.tab_ubicacion = TabUbicacion(tab_ubicacion_frame, parent_app=self)
         self.tab_ubicacion.pack(expand=True, fill="both")
 
+        self.tab_armaduras = self.tabview.add("Módulo Estructural / ")
+        
+        self.tab_renombrado = self.tabview.add("Procesamiento Masivo / ")
+        
+        self.tab_docs = self.tabview.add("Documentación")
+
+        # --- INICIALIZACIÓN DEL CONTENIDO ---
         self.setup_tab_sincronizador()
         self.setup_tab_renombrado()
         self.setup_tab_armaduras()
-        self.tab_docs = self.tabview.add("Documentación")
+        
         self.vista_docs = TabDocs(self.tab_docs, parent_app=self, fg_color="transparent")
         self.vista_docs.pack(fill="both", expand=True)
 

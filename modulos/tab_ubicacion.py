@@ -214,5 +214,9 @@ class TabUbicacion(ctk.CTkFrame):
 
             messagebox.showinfo("Éxito", f"¡Croquis guardado correctamente en:\n{ruta_salida}")
             
+            # NUEVO: Abrir la carpeta contenedora automáticamente
+            import os
+            os.startfile(os.path.dirname(ruta_salida))
+
         except Exception as e:
-            messagebox.showerror("Error", f"Fallo al procesar imagen:\n{e}")
+            messagebox.showerror("Error", f"Fallo al generar el croquis:\n{str(e)}")
