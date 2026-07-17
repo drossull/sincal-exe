@@ -119,7 +119,9 @@ class TabUbicacion(ctk.CTkFrame):
         self.btn_generar_croquis.pack(fill="x", padx=20, pady=(10, 20))
 
     def cargar_kmz(self):
+        # AÑADIDO: parent=self para que el buscador de archivos no se esconda
         ruta_kmz = filedialog.askopenfilename(
+            parent=self,
             title="Seleccionar Archivo KMZ de Google Earth", filetypes=[("Google Earth KMZ", "*.kmz")])
         if not ruta_kmz:
             return
@@ -158,9 +160,10 @@ class TabUbicacion(ctk.CTkFrame):
                     text=f"KMZ: {os.path.basename(ruta_kmz)}", text_color="#007FFF")
             else:
                 messagebox.showwarning(
-                    "KMZ Vacío", "No se encontraron puntos en el KMZ.")
+                    "KMZ Vacío", "No se encontraron puntos en el KMZ.", parent=self)
         except Exception as e:
-            messagebox.showerror("Error KMZ", f"Fallo al procesar:\\n{e}")
+            messagebox.showerror(
+                "Error KMZ", f"Fallo al procesar:\n{e}", parent=self)
 
     def actualizar_coordenadas_ui(self, nombre_seleccionado):
         if nombre_seleccionado in self.estructuras_gps:
@@ -178,24 +181,26 @@ class TabUbicacion(ctk.CTkFrame):
         nombre_sel = self.combo_estructuras.get()
         mapa_sel = self.combo_mapas.get()
 
+        # AÑADIDO: parent=self a todos los messagebox para forzarlos al frente
         if nombre_sel not in self.estructuras_gps:
-            return messagebox.showerror("Error", "Seleccione un enlace válido.")
+            return messagebox.showerror("Error", "Seleccione un enlace válido desde el KMZ.", parent=self)
         if mapa_sel not in self.datos_mapas:
-            return messagebox.showerror("Error", "Seleccione un mapa válido calibrado.")
+            return messagebox.showerror("Error", "Seleccione un Mapa Base válido de la lista desplegable.", parent=self)
 
         datos_calibracion = self.datos_mapas[mapa_sel]
         ruta_mapa_base = os.path.join(
             RUTA_LOCAL_APP, "mapas", datos_calibracion["archivo"])
 
         if not os.path.exists(ruta_mapa_base):
-            return messagebox.showerror("Archivo Faltante", f"No se encontró la imagen base:\n{ruta_mapa_base}\nAsegúrate de sincronizar la aplicación.")
+            return messagebox.showerror("Archivo Faltante", f"No se encontró la imagen base:\n{ruta_mapa_base}\nAsegúrate de subir el mapa a GitHub y sincronizar.", parent=self)
 
-        # --- SELECCIÓN DE RUTA DE GUARDADO ---
         nombre_limpio = "".join(
             c for c in nombre_sel if c.isalnum() or c in (' ', '_', '-')).rstrip()
         nombre_sugerido = f"Ubicacion_{nombre_limpio}.png"
 
+        # AÑADIDO: parent=self para que la ventana de guardado no se quede trabada atrás
         ruta_salida = filedialog.asksaveasfilename(
+            parent=self,
             title="Guardar Croquis de Ubicación",
             initialfile=nombre_sugerido,
             defaultextension=".png",
@@ -203,16 +208,14 @@ class TabUbicacion(ctk.CTkFrame):
         )
 
         if not ruta_salida:
-            return  # El usuario canceló el guardado
+            return
 
         try:
-            # 1. Extracción de datos del JSON
             lat1_geo, lon1_geo = datos_calibracion["pt1_geo"]
             x1_px, y1_px = datos_calibracion["pt1_pixel"]
             lat2_geo, lon2_geo = datos_calibracion["pt2_geo"]
             x2_px, y2_px = datos_calibracion["pt2_pixel"]
 
-            # 2. Capturar el Micro-Ajuste de la Interfaz GUI
             try:
                 gui_ajuste_x = float(self.ent_ajuste_x.get())
                 gui_ajuste_y = float(self.ent_ajuste_y.get())
@@ -220,23 +223,20 @@ class TabUbicacion(ctk.CTkFrame):
                 gui_ajuste_x = 0
                 gui_ajuste_y = 0
 
-            # 3. Sumar el ajuste del JSON + el ajuste manual de la interfaz
             ajuste_x = datos_calibracion.get("ajuste_x", 0) + gui_ajuste_x
             ajuste_y = datos_calibracion.get("ajuste_y", 0) + gui_ajuste_y
 
             lat_target, lon_target = self.estructuras_gps[nombre_sel]
 
-            # 4. Motor de Interpolación Lineal + Ajuste Total
             escala_x = (x2_px - x1_px) / (lon2_geo - lon1_geo)
             x_final = x1_px + (lon_target - lon1_geo) * escala_x + ajuste_x
 
             escala_y = (y2_px - y1_px) / (lat2_geo - lat1_geo)
             y_final = y1_px + (lat_target - lat1_geo) * escala_y + ajuste_y
 
-            # 5. Dibujo
             with Image.open(ruta_mapa_base) as img:
                 img_rgba = img.convert("RGB")
-                from PIL import ImageDraw  # Asegurarnos que está importado localmente si falla arriba
+                from PIL import ImageDraw
                 draw = ImageDraw.Draw(img_rgba)
 
                 r = 15
@@ -251,12 +251,11 @@ class TabUbicacion(ctk.CTkFrame):
                 img_rgba.save(ruta_salida, "PNG")
 
             messagebox.showinfo(
-                "Éxito", f"¡Croquis guardado correctamente en:\n{ruta_salida}")
+                "Éxito", f"¡Croquis guardado correctamente en:\n{ruta_salida}", parent=self)
 
-            # NUEVO: Abrir la carpeta contenedora automáticamente
             import os
             os.startfile(os.path.dirname(ruta_salida))
 
         except Exception as e:
             messagebox.showerror(
-                "Error", f"Fallo al generar el croquis:\n{str(e)}")
+                "Error", f"Fallo al generar el croquis:\n{str(e)}", parent=self)
