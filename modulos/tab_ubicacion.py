@@ -183,7 +183,7 @@ class TabUbicacion(ctk.CTkFrame):
 
     def generar_croquis_png(self):
         try:
-            # Ventana madre absoluta
+            # Ventana madre absoluta para que los pop-ups no se oculten
             ventana_principal = self.winfo_toplevel()
 
             nombre_sel = self.combo_estructuras.get()
@@ -248,7 +248,7 @@ class TabUbicacion(ctk.CTkFrame):
 
             with Image.open(ruta_mapa_base) as img:
                 img_rgba = img.convert("RGB")
-                # Se eliminó el "import ImageDraw" redundante aquí también
+                from PIL import ImageDraw
                 draw = ImageDraw.Draw(img_rgba)
 
                 r = 15
@@ -265,11 +265,10 @@ class TabUbicacion(ctk.CTkFrame):
             messagebox.showinfo(
                 "Éxito", f"¡Croquis guardado correctamente en:\n{ruta_salida}", parent=ventana_principal)
 
-            # ELIMINADO EL "import os" QUE CAUSABA EL CONFLICTO. Solo llamamos directo a os.startfile:
+            # Uso limpio de la variable global os:
             os.startfile(os.path.dirname(ruta_salida))
 
         except Exception as e:
-            # Enviamos el error a la consola negra virtual para dejar rastro
             try:
                 self.parent_app.log(
                     f"[X] Error crítico en módulo croquis: {str(e)}")
