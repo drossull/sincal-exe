@@ -118,6 +118,12 @@ class ActualizadorCAD(ctk.CTk):
             self.tab_docs, parent_app=self, fg_color="transparent")
         self.vista_docs.pack(fill="both", expand=True)
 
+        # --- CONSOLA FLOTANTE GLOBAL ---
+        self.historial_logs = []
+        self.btn_consola = ctk.CTkButton(self, text="💻 Consola", font=FUENTE_NORMAL, width=90, fg_color="#333333",
+                                         hover_color="#555555", border_width=1, border_color="#444444", corner_radius=5, command=self.mostrar_ventana_log)
+        self.btn_consola.place(relx=0.97, rely=0.03, anchor="ne")
+
         # Redirige el botón "X" de Windows a nuestra función de la bandeja
         self.protocol("WM_DELETE_WINDOW", self.ocultar_a_bandeja)
 
@@ -480,12 +486,6 @@ class ActualizadorCAD(ctk.CTk):
                                               fg_color="#000000", text_color="#00FF00", state="disabled", corner_radius=0)
         self.consola_scripts.pack(fill="x", padx=15, pady=(5, 15))
 
-    def log_r(self, m):
-        self.log_rename.configure(state="normal")
-        self.log_rename.insert("end", m + "\n")
-        self.log_rename.see("end")
-        self.log_rename.configure(state="disabled")
-
     def cargar_archivos_renombrado(self):
         c = filedialog.askdirectory(
             title="Seleccionar carpeta con planos DWG o DXF")
@@ -665,12 +665,6 @@ class ActualizadorCAD(ctk.CTk):
         finally:
             pythoncom.CoUninitialize()
 
-    def log_script(self, texto):
-        self.consola_scripts.configure(state="normal")
-        self.consola_scripts.insert("end", texto)
-        self.consola_scripts.see("end")
-        self.consola_scripts.configure(state="disabled")
-
     def detener_comando_en_vivo(self):
         self.cancelar_comando_vivo = True
         self.btn_cancelar_cmd.configure(state="disabled", text="Deteniendo...")
@@ -764,9 +758,6 @@ class ActualizadorCAD(ctk.CTk):
             self.btn_cancelar_cmd.configure(state="disabled", text="Cancelar")
             pythoncom.CoUninitialize()
 
-    def log(self, m): self.consola.configure(state="normal"); self.consola.insert(
-        "end", m + "\n"); self.consola.see("end"); self.consola.configure(state="disabled")
-
     def abrir_carpeta_local(self): os.startfile(
         RUTA_LOCAL_APP) if os.path.exists(RUTA_LOCAL_APP) else None
 
@@ -844,6 +835,7 @@ class ActualizadorCAD(ctk.CTk):
             self.generar_archivos_lisp(archivos)
             self.actualizar_rutas_registro()
             self.actualizar_variable_entorno()
+            self.registrar_menu_contextual()  # <--- INYECCIÓN MENÚ CONTEXTUAL AÑADIDA
             self.buscar_y_configurar_consolas()
 
             self.version_local_actual = r.get("version", "v1.0.0")
@@ -954,6 +946,54 @@ class ActualizadorCAD(ctk.CTk):
         except:
             pass
 
+    def registrar_menu_contextual(self):
+        """Inyecta SINCAL en el menú de clic derecho de Windows para carpetas"""
+        try:
+            import winreg
+            # Obtenemos la ruta exacta de tu SINCAL.exe
+            exe_path = sys.executable
+
+            # Ruta en el registro para el clic derecho SOBRE una carpeta
+            ruta_llave = r"Directory\shell\SINCAL_Plotear"
+
+            # 1. Creamos la llave principal
+            llave = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, ruta_llave)
+
+            # 2. Nombre a mostrar en el menú (Aquí pones lo que quieras que lea el usuario)
+            winreg.SetValue(llave, "", winreg.REG_SZ, "Plotear con SINCAL")
+
+            # 3. Asignar el ícono (Usamos el mismo ícono que tu .exe)
+            winreg.SetValueEx(llave, "Icon", 0, winreg.REG_SZ, f'"{exe_path}"')
+
+            # 4. Crear la sub-llave que le dice a Windows qué ejecutar al hacer clic
+            llave_comando = winreg.CreateKey(llave, "command")
+
+            # El "%1" captura la ruta de la carpeta a la que le hiciste clic
+            comando_ejecucion = f'"{exe_path}" --plotear "%1"'
+            winreg.SetValue(llave_comando, "",
+                            winreg.REG_SZ, comando_ejecucion)
+
+            winreg.CloseKey(llave_comando)
+            winreg.CloseKey(llave)
+
+            # Opcional: También agregarlo cuando haces clic en el fondo vacío de una carpeta
+            ruta_llave_fondo = r"Directory\Background\shell\SINCAL_Plotear"
+            llave_fondo = winreg.CreateKey(
+                winreg.HKEY_CLASSES_ROOT, ruta_llave_fondo)
+            winreg.SetValue(llave_fondo, "", winreg.REG_SZ,
+                            "Plotear con SINCAL")
+            winreg.SetValueEx(llave_fondo, "Icon", 0,
+                              winreg.REG_SZ, f'"{exe_path}"')
+            llave_comando_fondo = winreg.CreateKey(llave_fondo, "command")
+            comando_fondo = f'"{exe_path}" --plotear "%V"'
+            winreg.SetValue(llave_comando_fondo, "",
+                            winreg.REG_SZ, comando_fondo)
+            winreg.CloseKey(llave_comando_fondo)
+            winreg.CloseKey(llave_fondo)
+
+        except Exception as e:
+            pass  # Falla silenciosa si el antivirus bloquea la escritura
+
     def generar_archivos_lisp(self, archivos):
         contenido_arranque = ""
 
@@ -980,6 +1020,61 @@ class ActualizadorCAD(ctk.CTk):
 
         with open(r_zwcad, 'w', encoding='utf-8') as f:
             f.write(contenido_arranque)
+
+    # ==========================================================
+    # SISTEMA DE LOGS Y CONSOLA FLOTANTE
+    # ==========================================================
+    def log(self, m):
+        self.consola.configure(state="normal")
+        self.consola.insert("end", m + "\n")
+        self.consola.see("end")
+        self.consola.configure(state="disabled")
+        self.escribir_en_consola_global(m)
+
+    def log_r(self, m):
+        self.log_rename.configure(state="normal")
+        self.log_rename.insert("end", m + "\n")
+        self.log_rename.see("end")
+        self.log_rename.configure(state="disabled")
+        self.escribir_en_consola_global("[PROCESAMIENTO MASIVO] " + m)
+
+    def log_script(self, texto):
+        self.consola_scripts.configure(state="normal")
+        self.consola_scripts.insert("end", texto)
+        self.consola_scripts.see("end")
+        self.consola_scripts.configure(state="disabled")
+        self.escribir_en_consola_global(texto.strip('\n'))
+
+    def escribir_en_consola_global(self, m):
+        self.historial_logs.append(m)
+        if hasattr(self, 'ventana_log') and self.ventana_log.winfo_exists():
+            self.txt_log_global.configure(state="normal")
+            self.txt_log_global.insert("end", m + "\n")
+            self.txt_log_global.see("end")
+            self.txt_log_global.configure(state="disabled")
+
+    def mostrar_ventana_log(self):
+        # Si la ventana ya está abierta, la traemos al frente
+        if hasattr(self, 'ventana_log') and self.ventana_log.winfo_exists():
+            self.ventana_log.focus()
+            return
+
+        self.ventana_log = ctk.CTkToplevel(self)
+        self.ventana_log.title("Consola de Diagnóstico - SINCAL")
+        self.ventana_log.geometry("750x450")
+        # Hace que la ventana flote por encima de SINCAL
+        self.ventana_log.transient(self)
+
+        self.txt_log_global = ctk.CTkTextbox(
+            self.ventana_log, font=FUENTE_CONSOLA, fg_color="#000000", text_color="#00FF00", corner_radius=0)
+        self.txt_log_global.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Al abrir, volcamos todo el historial guardado en la memoria
+        self.txt_log_global.configure(state="normal")
+        self.txt_log_global.insert(
+            "end", "\n".join(self.historial_logs) + "\n")
+        self.txt_log_global.see("end")
+        self.txt_log_global.configure(state="disabled")
 
 
 def arrancar():

@@ -119,9 +119,11 @@ class TabUbicacion(ctk.CTkFrame):
         self.btn_generar_croquis.pack(fill="x", padx=20, pady=(10, 20))
 
     def cargar_kmz(self):
-        # AÑADIDO: parent=self para que el buscador de archivos no se esconda
+        # Obtenemos la ventana madre real para evitar crasheos silenciosos de Tkinter
+        ventana_principal = self.winfo_toplevel()
+
         ruta_kmz = filedialog.askopenfilename(
-            parent=self,
+            parent=ventana_principal,
             title="Seleccionar Archivo KMZ de Google Earth", filetypes=[("Google Earth KMZ", "*.kmz")])
         if not ruta_kmz:
             return
@@ -160,57 +162,67 @@ class TabUbicacion(ctk.CTkFrame):
                     text=f"KMZ: {os.path.basename(ruta_kmz)}", text_color="#007FFF")
             else:
                 messagebox.showwarning(
-                    "KMZ Vacío", "No se encontraron puntos en el KMZ.", parent=self)
+                    "KMZ Vacío", "No se encontraron puntos en el KMZ.", parent=ventana_principal)
         except Exception as e:
+            # Enviamos el error a la consola principal de SINCAL por seguridad
+            try:
+                self.parent_app.log(f"[X] Error en KMZ: {str(e)}")
+            except:
+                pass
             messagebox.showerror(
-                "Error KMZ", f"Fallo al procesar:\n{e}", parent=self)
+                "Error KMZ", f"Fallo al procesar:\n{e}", parent=ventana_principal)
 
     def actualizar_coordenadas_ui(self, nombre_seleccionado):
         if nombre_seleccionado in self.estructuras_gps:
-            # 1. Actualiza los textos de la UI con las coordenadas exactas
             lat, lon = self.estructuras_gps[nombre_seleccionado]
             self.lbl_lat_val.configure(text=f"{lat:.6f}°")
             self.lbl_lon_val.configure(text=f"{lon:.6f}°")
 
-            # 2. Resetea amablemente el menú para que elijas la región
-            # (No fuerza ninguna opción matemática, tú decides)
             if self.datos_mapas:
                 self.combo_mapas.set("Seleccione Mapa Base...")
 
     def generar_croquis_png(self):
-        nombre_sel = self.combo_estructuras.get()
-        mapa_sel = self.combo_mapas.get()
-
-        # AÑADIDO: parent=self a todos los messagebox para forzarlos al frente
-        if nombre_sel not in self.estructuras_gps:
-            return messagebox.showerror("Error", "Seleccione un enlace válido desde el KMZ.", parent=self)
-        if mapa_sel not in self.datos_mapas:
-            return messagebox.showerror("Error", "Seleccione un Mapa Base válido de la lista desplegable.", parent=self)
-
-        datos_calibracion = self.datos_mapas[mapa_sel]
-        ruta_mapa_base = os.path.join(
-            RUTA_LOCAL_APP, "mapas", datos_calibracion["archivo"])
-
-        if not os.path.exists(ruta_mapa_base):
-            return messagebox.showerror("Archivo Faltante", f"No se encontró la imagen base:\n{ruta_mapa_base}\nAsegúrate de subir el mapa a GitHub y sincronizar.", parent=self)
-
-        nombre_limpio = "".join(
-            c for c in nombre_sel if c.isalnum() or c in (' ', '_', '-')).rstrip()
-        nombre_sugerido = f"Ubicacion_{nombre_limpio}.png"
-
-        # AÑADIDO: parent=self para que la ventana de guardado no se quede trabada atrás
-        ruta_salida = filedialog.asksaveasfilename(
-            parent=self,
-            title="Guardar Croquis de Ubicación",
-            initialfile=nombre_sugerido,
-            defaultextension=".png",
-            filetypes=[("PNG Image", "*.png"), ("All Files", "*.*")]
-        )
-
-        if not ruta_salida:
-            return
-
         try:
+            # Ventana madre absoluta
+            ventana_principal = self.winfo_toplevel()
+
+            nombre_sel = self.combo_estructuras.get()
+            mapa_sel = self.combo_mapas.get()
+
+            if nombre_sel not in self.estructuras_gps:
+                messagebox.showerror(
+                    "Error", "Seleccione un enlace válido desde el KMZ.", parent=ventana_principal)
+                return
+
+            if mapa_sel not in self.datos_mapas:
+                messagebox.showerror(
+                    "Error", "Seleccione un Mapa Base válido de la lista desplegable.", parent=ventana_principal)
+                return
+
+            datos_calibracion = self.datos_mapas[mapa_sel]
+            ruta_mapa_base = os.path.join(
+                RUTA_LOCAL_APP, "mapas", datos_calibracion["archivo"])
+
+            if not os.path.exists(ruta_mapa_base):
+                messagebox.showerror(
+                    "Archivo Faltante", f"No se encontró la imagen base:\n{ruta_mapa_base}\nAsegúrate de subir el mapa a GitHub y sincronizar.", parent=ventana_principal)
+                return
+
+            nombre_limpio = "".join(
+                c for c in nombre_sel if c.isalnum() or c in (' ', '_', '-')).rstrip()
+            nombre_sugerido = f"Ubicacion_{nombre_limpio}.png"
+
+            ruta_salida = filedialog.asksaveasfilename(
+                parent=ventana_principal,
+                title="Guardar Croquis de Ubicación",
+                initialfile=nombre_sugerido,
+                defaultextension=".png",
+                filetypes=[("PNG Image", "*.png"), ("All Files", "*.*")]
+            )
+
+            if not ruta_salida:
+                return
+
             lat1_geo, lon1_geo = datos_calibracion["pt1_geo"]
             x1_px, y1_px = datos_calibracion["pt1_pixel"]
             lat2_geo, lon2_geo = datos_calibracion["pt2_geo"]
@@ -251,11 +263,19 @@ class TabUbicacion(ctk.CTkFrame):
                 img_rgba.save(ruta_salida, "PNG")
 
             messagebox.showinfo(
-                "Éxito", f"¡Croquis guardado correctamente en:\n{ruta_salida}", parent=self)
+                "Éxito", f"¡Croquis guardado correctamente en:\n{ruta_salida}", parent=ventana_principal)
 
             import os
             os.startfile(os.path.dirname(ruta_salida))
 
         except Exception as e:
+            # Enviamos el error a la consola negra virtual para dejar rastro
+            try:
+                self.parent_app.log(
+                    f"[X] Error crítico en módulo croquis: {str(e)}")
+            except:
+                pass
+
+            ventana = self.winfo_toplevel()
             messagebox.showerror(
-                "Error", f"Fallo al generar el croquis:\n{str(e)}", parent=self)
+                "Error Faltante", f"Ocurrió un error inesperado al procesar:\n{str(e)}", parent=ventana)
