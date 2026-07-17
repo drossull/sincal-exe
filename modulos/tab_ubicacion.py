@@ -248,7 +248,7 @@ class TabUbicacion(ctk.CTkFrame):
 
             with Image.open(ruta_mapa_base) as img:
                 img_rgba = img.convert("RGB")
-                from PIL import ImageDraw
+                # Se eliminó el "import ImageDraw" redundante aquí también
                 draw = ImageDraw.Draw(img_rgba)
 
                 r = 15
@@ -265,7 +265,7 @@ class TabUbicacion(ctk.CTkFrame):
             messagebox.showinfo(
                 "Éxito", f"¡Croquis guardado correctamente en:\n{ruta_salida}", parent=ventana_principal)
 
-            import os
+            # ELIMINADO EL "import os" QUE CAUSABA EL CONFLICTO. Solo llamamos directo a os.startfile:
             os.startfile(os.path.dirname(ruta_salida))
 
         except Exception as e:
@@ -278,4 +278,4 @@ class TabUbicacion(ctk.CTkFrame):
 
             ventana = self.winfo_toplevel()
             messagebox.showerror(
-                "Error Faltante", f"Ocurrió un error inesperado al procesar:\n{str(e)}", parent=ventana)
+                "Error", f"Ocurrió un error inesperado al procesar:\n{str(e)}", parent=ventana)

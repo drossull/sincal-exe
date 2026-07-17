@@ -1,5 +1,5 @@
 {
-  "version": "v27.1.1",
+  "version": "v27.1.2",
   "archivos": [
     "core_sincal.py",
     "lisps/BV.lsp",
