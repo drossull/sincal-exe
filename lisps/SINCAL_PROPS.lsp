@@ -31,16 +31,16 @@
 
 ;;; =========================================================================
 ;;; COMANDO 1: CUSTOM-PROPS 
-;;; Pregunta y permite editar las 13 propiedades en el archivo actual
+;;; Pregunta y permite editar las propiedades (Incluye DM, excluye Coordenadas)
 ;;; =========================================================================
 (defun c:CUSTOM-PROPS (/ listaProps val input)
+  ;; Se omiten las coordenadas para no tener que tipearlas a mano.
   (setq listaProps 
-    '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Sector" "Tramo" "Revision" "Comentario-rev" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos" "Nombre_Plano")
+    '("Region" "Provincia" "Comuna" "Sector" "Tramo" "Nombre_Estructura" "DM_Inicio" "DM_Fin" "Dibujante" "Fecha_Inf" "Fecha_Rev" "Revision" "Comentario-rev" "No_total_planos" "Nombre_Plano")
   )
   (princ "\n--- EDITOR DE PROPIEDADES SINCAL ---")
   (foreach prop listaProps
     (setq val (SINCAL:GetProp prop))
-    ;; 'getstring T' permite escribir frases con espacios
     (setq input (getstring T (strcat "\nIngrese " prop " <" val ">: ")))
     (if (/= input "")
       (SINCAL:SetProp prop input)
@@ -48,9 +48,9 @@
   )
   
   ;; --- PROTOCOLO SINCAL (BLINDAJE DE DATOS) ---
-  (command "_.UPDATEFIELD" "_All" "")       ; Actualiza los textos/viñetas visualmente
-  (setvar "USERI1" (getvar "USERI1"))       ; Truco DBMOD: Ensuciar el archivo en la RAM
-  (command "_.QSAVE")                       ; Forzar el guardado en disco
+  (command "_.UPDATEFIELD" "_All" "")       
+  (setvar "USERI1" (getvar "USERI1"))       
+  (command "_.QSAVE")                       
   
   (princ "\n[SINCAL] Propiedades actualizadas y plano guardado correctamente de forma segura.")
   (princ)
@@ -58,15 +58,13 @@
 
 ;;; =========================================================================
 ;;; COMANDO 2: COPY-PROPS 
-;;; Copia las 12 propiedades generales a la memoria de Windows
+;;; Copia TODAS las propiedades (incluyendo las coordenadas extraidas)
 ;;; =========================================================================
 (defun c:COPY-PROPS (/ propsToCopy val regPath)
-  ;; Ruta en el registro para que sobreviva entre pestañas
   (setq regPath "HKEY_CURRENT_USER\\Software\\SINCAL\\CopiedProps")
   
-  ;; Copia las 12 que se repiten en todo el proyecto
   (setq propsToCopy 
-    '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Sector" "Tramo" "Revision" "Comentario-rev" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos")
+    '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Sector" "Tramo" "Revision" "Comentario-rev" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos" "DM_Inicio" "DM_Fin" "Coordenada_Este_Inicio" "Coordenada_Norte_Inicio" "Coordenada_Este_Fin" "Coordenada_Norte_Fin")
   )
   
   (foreach prop propsToCopy
@@ -79,29 +77,24 @@
 
 ;;; =========================================================================
 ;;; COMANDO 3: PASTE-PROPS 
-;;; Pega las 12 propiedades generales y pregunta solo por el Nombre del Plano
+;;; Pega silenciosamente y pregunta SOLO por el Nombre del Plano
 ;;; =========================================================================
 (defun c:PASTE-PROPS (/ regPath propsToPaste propsToAsk val input)
   (setq regPath "HKEY_CURRENT_USER\\Software\\SINCAL\\CopiedProps")
   
-  ;; 12 propiedades maestras
-  (setq propsToPaste '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Sector" "Tramo" "Revision" "Comentario-rev" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos"))
-  
-  ;; 1 propiedad variable por plano
+  (setq propsToPaste '("Nombre_Estructura" "Region" "Provincia" "Comuna" "Sector" "Tramo" "Revision" "Comentario-rev" "Dibujante" "Fecha_Rev" "Fecha_Inf" "No_total_planos" "DM_Inicio" "DM_Fin" "Coordenada_Este_Inicio" "Coordenada_Norte_Inicio" "Coordenada_Este_Fin" "Coordenada_Norte_Fin"))
   (setq propsToAsk '("Nombre_Plano"))
 
   (princ "\n--- PEGANDO PROPIEDADES DE PROYECTO ---")
   
-  ;; 1. Pegar silenciosamente las copiadas
   (foreach prop propsToPaste
     (setq val (vl-registry-read regPath prop))
     (if val
       (SINCAL:SetProp prop val)
     )
   )
-  (princ (strcat "\n[SINCAL] " (itoa (length propsToPaste)) " propiedades generales aplicadas."))
+  (princ (strcat "\n[SINCAL] " (itoa (length propsToPaste)) " propiedades generales (incluyendo coordenadas) aplicadas."))
 
-  ;; 2. Preguntar al usuario por la específica 
   (princ "\n--- COMPLETE LA PROPIEDAD ESPECIFICA ---")
   (foreach prop propsToAsk
     (setq val (SINCAL:GetProp prop))
@@ -111,10 +104,9 @@
     )
   )
   
-  ;; --- PROTOCOLO SINCAL (BLINDAJE DE DATOS) ---
-  (command "_.UPDATEFIELD" "_All" "")       ; Actualiza los textos/viñetas visualmente
-  (setvar "USERI1" (getvar "USERI1"))       ; Truco DBMOD: Ensuciar el archivo en la RAM
-  (command "_.QSAVE")                       ; Forzar el guardado en disco
+  (command "_.UPDATEFIELD" "_All" "")       
+  (setvar "USERI1" (getvar "USERI1"))       
+  (command "_.QSAVE")                       
   
   (princ "\n[SINCAL] Configuracion de plano finalizada y guardada en disco.")
   (princ)
@@ -122,7 +114,6 @@
 
 ;;; =========================================================================
 ;;; COMANDO 4: REPARAR-PROPS 
-;;; Limpia las propiedades duplicadas generadas por el bug de ZWCAD
 ;;; =========================================================================
 (defun c:REPARAR-PROPS (/ acadObj doc props num i k v dict)
   (vl-load-com)
@@ -131,7 +122,6 @@
   (setq num (vla-NumCustomInfo props))
   (setq i 0 dict nil)
   
-  ;; Rescatar las propiedades sin repetir
   (while (< i num)
     (vla-GetCustomByIndex props i 'k 'v)
     (if (not (assoc (strcase k) dict))
@@ -140,22 +130,81 @@
     (setq i (1+ i))
   )
   
-  ;; Borrar TODO el registro corrupto
   (while (> (vla-NumCustomInfo props) 0)
     (vl-catch-all-apply 'vla-RemoveCustomByIndex (list props 0))
   )
   
-  ;; Inyectarlas de nuevo limpias
   (foreach item dict
     (vla-AddCustomInfo props (cadr item) (cddr item))
   )
   
-  ;; --- PROTOCOLO SINCAL (BLINDAJE DE DATOS) ---
   (setvar "USERI1" (getvar "USERI1"))
   (command "_.QSAVE")
   
-  (princ "\n[SINCAL] ¡Duplicados eliminados y archivo guardado! Ya puedes usar CUSTOM-PROPS sin errores.")
+  (princ "\n[SINCAL] ¡Duplicados eliminados y archivo guardado!")
   (princ)
+)
+
+;;; =========================================================================
+;;; FUNCION MAESTRA PARA EXTRAER COORDENADAS (USADA POR C-INICIO Y C-FIN)
+;;; =========================================================================
+(defun SINCAL:ExtraerCoordBloc (mapeo mensaje / ss blkObj atts attTag attVal propName procesados)
+  (vl-load-com)
+  (princ (strcat "\n" mensaje))
+  
+  (setq ss (ssget "_+.:E:S" '((0 . "INSERT") (66 . 1)))) 
+  
+  (if ss
+    (progn
+      (setq blkObj (vlax-ename->vla-object (ssname ss 0)))
+      (setq atts (vlax-invoke blkObj 'GetAttributes))
+      (setq procesados 0)
+      
+      (foreach att atts
+        (setq attTag (strcase (vla-get-TagString att)))
+        (setq attVal (vla-get-TextString att))
+        (if (setq propName (cdr (assoc attTag mapeo)))
+          (progn
+            (SINCAL:SetProp propName attVal)
+            (princ (strcat "\n[OK] Transferido: " propName " -> " attVal))
+            (setq procesados (1+ procesados))
+          )
+        )
+      )
+      
+      (if (> procesados 0)
+        (progn
+          (command "_.UPDATEFIELD" "_All" "")
+          (setvar "USERI1" (getvar "USERI1"))
+          (command "_.QSAVE")
+          (princ "\n[SINCAL] Coordenadas inyectadas al archivo exitosamente.")
+        )
+        (princ "\n[!] El bloque no tiene los atributos requeridos (Revise los Tags).")
+      )
+    )
+    (princ "\n[X] No seleccionó un bloque válido.")
+  )
+  (princ)
+)
+
+;;; =========================================================================
+;;; COMANDO 5: C-INICIO (Extrae tags ESTE-IN y NORTE-IN)
+;;; =========================================================================
+(defun c:C-INICIO ()
+  (SINCAL:ExtraerCoordBloc 
+    '(("ESTE-IN" . "Coordenada_Este_Inicio") ("NORTE-IN" . "Coordenada_Norte_Inicio"))
+    "Seleccione el bloque con las coordenadas de INICIO: "
+  )
+)
+
+;;; =========================================================================
+;;; COMANDO 6: C-FIN (Extrae tags ESTE-FIN y NORTE-FIN)
+;;; =========================================================================
+(defun c:C-FIN ()
+  (SINCAL:ExtraerCoordBloc 
+    '(("ESTE-FIN" . "Coordenada_Este_Fin") ("NORTE-FIN" . "Coordenada_Norte_Fin"))
+    "Seleccione el bloque con las coordenadas de FIN: "
+  )
 )
 
 ;;; FIN DEL CODIGO

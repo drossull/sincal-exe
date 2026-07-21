@@ -14,49 +14,83 @@
 (princ "\n[SINCAL] Variables blindadas (MIRRTEXT, FIELDEVAL, DYNMODE).")
 
 ;;; =========================================================================
-;;; 2. INYECCIÓN DE PROPIEDADES CUSTOM (Filtro Anti-Bug ZWCAD)
+;;; 2. INYECCIÓN Y ORDENAMIENTO DE PROPIEDADES CUSTOM (Macro a Micro)
 ;;; =========================================================================
-(defun SINCAL:AutoCrearPropiedad (/ acadObj doc props listaProps propName propVal num i k v exists)
+(defun SINCAL:AutoCrearPropiedad (/ acadObj doc props listaProps num i k v existingProps propName propDefault existingData valToAdd)
   (setq acadObj (vlax-get-acad-object))
   (setq doc (vlax-get-property acadObj 'ActiveDocument))
   (setq props (vlax-get-property doc 'SummaryInfo))
 
+  ;; A. ORDEN JERÁRQUICO MAESTRO (Macro a Micro)
   (setq listaProps
     '(
-      ("Nombre_Estructura" . "Ingrese nombre estructura")
-      ("Region"            . "Ingrese region")
-      ("Provincia"         . "Ingrese provincia")
-      ("Comuna"            . "Ingrese comuna")
-      ("Sector"            . "Ingrese sector")
-      ("Tramo"             . "Ingrese tramo")
-      ("Revision"          . "REV")
-      ("Comentario-rev"    . "Ingrese comentario revision")
-      ("Dibujante"         . "DIBUJANTE")
-      ("Fecha_Rev"         . "F_REV")
-      ("Fecha_Inf"         . "F_INF")
-      ("No_total_planos"   . "Ingrese numero total de planos")
-      ("Nombre_Plano"      . "Ingrese nombre plano")
+      ("Region"                  . "Ingrese region")
+      ("Provincia"               . "Ingrese provincia")
+      ("Comuna"                  . "Ingrese comuna")
+      ("Sector"                  . "Ingrese sector")
+      ("Tramo"                   . "Ingrese tramo")
+      ("Nombre_Estructura"       . "Ingrese nombre estructura")
+      ("DM_Inicio"               . "Ingrese DM inicio")
+      ("DM_Fin"                  . "Ingrese DM fin")
+      ("Coordenada_Este_Inicio"  . "Ingrese Este inicio")
+      ("Coordenada_Norte_Inicio" . "Ingrese Norte inicio")
+      ("Coordenada_Este_Fin"     . "Ingrese Este fin")
+      ("Coordenada_Norte_Fin"    . "Ingrese Norte fin")
+      ("Dibujante"               . "DIBUJANTE")
+      ("Fecha_Inf"               . "F_INF")
+      ("Fecha_Rev"               . "F_REV")
+      ("Revision"                . "REV")
+      ("Comentario-rev"          . "Ingrese comentario revision")
+      ("No_total_planos"         . "Ingrese numero total de planos")
+      ("Nombre_Plano"            . "Ingrese nombre plano")
      )
   )
 
+  ;; B. RESPALDAR DATOS EXISTENTES EN RAM
+  (setq existingProps nil)
+  (setq num (vla-NumCustomInfo props))
+  (setq i 0)
+  (while (< i num)
+    (vla-GetCustomByIndex props i 'k 'v)
+    ;; Guardamos como: ("CLAVE_MAYUSCULA" "ClaveOriginal" . "Valor")
+    (if (not (assoc (strcase k) existingProps))
+      (setq existingProps (append existingProps (list (cons (strcase k) (cons k v)))))
+    )
+    (setq i (1+ i))
+  )
+
+  ;; C. LIMPIAR EL LIENZO (Evita duplicados y desorden)
+  (while (> (vla-NumCustomInfo props) 0)
+    (vl-catch-all-apply 'vla-RemoveCustomByIndex (list props 0))
+  )
+
+  ;; D. INYECTAR PROPIEDADES EN EL ORDEN MAESTRO
   (foreach prop listaProps
     (setq propName (car prop))
-    (setq propVal (cdr prop))
-    (setq exists nil)
-    (setq num (vla-NumCustomInfo props))
-    (setq i 0)
+    (setq propDefault (cdr prop))
     
-    (while (< i num)
-      (vla-GetCustomByIndex props i 'k 'v)
-      (if (= (strcase k) (strcase propName)) (setq exists T))
-      (setq i (1+ i))
+    ;; Buscar si el archivo ya tenía esta propiedad (Sin importar mayúsculas)
+    (setq existingData (assoc (strcase propName) existingProps))
+    
+    (if existingData
+      (progn
+        (setq valToAdd (cddr existingData)) ;; Rescatar valor antiguo
+        ;; Eliminar de la lista de respaldo para que no se duplique luego
+        (setq existingProps (vl-remove existingData existingProps))
+      )
+      ;; Si es nueva, poner valor por defecto
+      (setq valToAdd propDefault)
     )
-
-    (if (not exists)
-      (vl-catch-all-apply 'vla-AddCustomInfo (list props propName propVal))
-    )
+    
+    (vl-catch-all-apply 'vla-AddCustomInfo (list props propName valToAdd))
   )
-  (princ "\n[SINCAL] Diccionario de propiedades verificado.")
+
+  ;; E. REINYECTAR PROPIEDADES HUÉRFANAS (Otras que el usuario haya creado a mano)
+  (foreach remaining existingProps
+    (vl-catch-all-apply 'vla-AddCustomInfo (list props (cadr remaining) (cddr remaining)))
+  )
+
+  (princ "\n[SINCAL] Diccionario de propiedades jerarquizado y verificado.")
 )
 
 ;;; =========================================================================
@@ -66,7 +100,6 @@
   (setq origCmdEcho (getvar "CMDECHO"))
   (setvar "CMDECHO" 0)
 
-  ;; 3.1 Función interna para leer la base de datos silenciosamente
   (defun SINCAL:ExisteEscala (nombre / dict exists entdata)
     (setq exists nil)
     (if (setq dict (dictsearch (namedobjdict) "ACAD_SCALELIST"))
@@ -84,12 +117,9 @@
     exists
   )
 
-  ;; 3.2 Función interna para crear o redefinir sin borrar
   (defun SINCAL:CrearEscala (nombre proporcion)
     (if (SINCAL:ExisteEscala nombre)
-      ;; Si ya existe (y quizás está en uso), la redefinimos confirmando con "_Y"
       (vl-catch-all-apply 'vl-cmdf (list "_.-SCALELISTEDIT" "_Add" nombre "_Y" proporcion "_Exit"))
-      ;; Si es nueva, la creamos directamente
       (vl-catch-all-apply 'vl-cmdf (list "_.-SCALELISTEDIT" "_Add" nombre proporcion "_Exit"))
     )
   )
@@ -114,7 +144,6 @@
     (SINCAL:CrearEscala (car esc) (cdr esc))
   )
   
-  ;; Forzamos la limpieza de la barra de comandos por seguridad
   (command) 
   (command)
 
