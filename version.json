@@ -1,5 +1,5 @@
 {
-  "version": "v27.1.7",
+  "version": "v27.1.8",
   "archivos": [
     "core_sincal.py",
     "modulos/tab_ubicacion.py",
@@ -66,6 +66,7 @@
     "mapas/Region_de_Valparaiso.png",
     "mapas/Region_del_Biobio.png",
     "mapas/Region_del_Maule.png",
-    "mapas/Region_Metropolitana.png"
+    "mapas/Region_Metropolitana.png",
+    "mapas/ayuda_travesano.png"
   ]
 }
