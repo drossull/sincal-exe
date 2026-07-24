@@ -37,7 +37,8 @@ class TabArmaduras(ctk.CTkFrame):
         # =========================================================
         # TABVIEW MAESTRO (Elementos Estructurales)
         # =========================================================
-        self.tab_maestro = ctk.CTkTabview(self, width=800, height=520, fg_color="transparent", segmented_button_selected_color="#007FFF")
+        self.tab_maestro = ctk.CTkTabview(
+            self, width=800, height=520, fg_color="transparent", segmented_button_selected_color="#007FFF")
         self.tab_maestro.pack(padx=20, pady=5, fill="both", expand=True)
         self.tab_maestro._segmented_button.configure(font=fuente_normal)
 
@@ -47,7 +48,8 @@ class TabArmaduras(ctk.CTkFrame):
         # =========================================================
         # CONTENIDO: 1. ESTRIBOS
         # =========================================================
-        self.tab_estribo = ctk.CTkTabview(tab_estribos, fg_color="#1E1E1E", segmented_button_selected_color="#005BBF")
+        self.tab_estribo = ctk.CTkTabview(
+            tab_estribos, fg_color="#1E1E1E", segmented_button_selected_color="#005BBF")
         self.tab_estribo.pack(fill="both", expand=True)
         self.tab_estribo._segmented_button.configure(font=fuente_normal)
 
@@ -59,64 +61,92 @@ class TabArmaduras(ctk.CTkFrame):
         ctk.CTkLabel(tab_zap, text="I. DIMENSIONES GENERALES (cm):", font=fuente_subtitulo, text_color="#007FFF").grid(
             row=0, column=0, columnspan=2, sticky="w", padx=10, pady=(10, 0))
 
-        ctk.CTkLabel(tab_zap, text="Largo:", font=fuente_normal).grid(row=1, column=0, sticky="w", padx=10, pady=5)
-        self.ent_z_largo = ctk.CTkEntry(tab_zap, font=fuente_normal, width=80, corner_radius=0)
+        ctk.CTkLabel(tab_zap, text="Largo:", font=fuente_normal).grid(
+            row=1, column=0, sticky="w", padx=10, pady=5)
+        self.ent_z_largo = ctk.CTkEntry(
+            tab_zap, font=fuente_normal, width=80, corner_radius=0)
         self.ent_z_largo.grid(row=1, column=1, padx=5, pady=5)
 
-        ctk.CTkLabel(tab_zap, text="Ancho:", font=fuente_normal).grid(row=1, column=2, sticky="w", padx=10, pady=5)
-        self.ent_z_ancho = ctk.CTkEntry(tab_zap, font=fuente_normal, width=80, corner_radius=0)
+        ctk.CTkLabel(tab_zap, text="Ancho:", font=fuente_normal).grid(
+            row=1, column=2, sticky="w", padx=10, pady=5)
+        self.ent_z_ancho = ctk.CTkEntry(
+            tab_zap, font=fuente_normal, width=80, corner_radius=0)
         self.ent_z_ancho.grid(row=1, column=3, padx=5, pady=5)
 
-        ctk.CTkLabel(tab_zap, text="Alto:", font=fuente_normal).grid(row=1, column=4, sticky="w", padx=10, pady=5)
-        self.ent_z_alto = ctk.CTkEntry(tab_zap, font=fuente_normal, width=80, corner_radius=0)
+        ctk.CTkLabel(tab_zap, text="Alto:", font=fuente_normal).grid(
+            row=1, column=4, sticky="w", padx=10, pady=5)
+        self.ent_z_alto = ctk.CTkEntry(
+            tab_zap, font=fuente_normal, width=80, corner_radius=0)
         self.ent_z_alto.grid(row=1, column=5, padx=5, pady=5)
 
         # II. RECUBRIMIENTOS (Estribos)
         ctk.CTkLabel(tab_zap, text="II. RECUBRIMIENTOS (cm):", font=fuente_subtitulo, text_color="#007FFF").grid(
             row=2, column=0, columnspan=2, sticky="w", padx=10, pady=(15, 0))
 
-        ctk.CTkLabel(tab_zap, text="Cara inferior:", font=fuente_normal).grid(row=3, column=0, sticky="w", padx=10, pady=5)
-        self.ent_rec_inf = ctk.CTkEntry(tab_zap, font=fuente_normal, width=80, corner_radius=0)
+        ctk.CTkLabel(tab_zap, text="Cara inferior:", font=fuente_normal).grid(
+            row=3, column=0, sticky="w", padx=10, pady=5)
+        self.ent_rec_inf = ctk.CTkEntry(
+            tab_zap, font=fuente_normal, width=80, corner_radius=0)
         self.ent_rec_inf.grid(row=3, column=1, padx=5, pady=5)
 
-        ctk.CTkLabel(tab_zap, text="Cara superior:", font=fuente_normal).grid(row=3, column=2, sticky="w", padx=10, pady=5)
-        self.ent_rec_sup = ctk.CTkEntry(tab_zap, font=fuente_normal, width=80, corner_radius=0)
+        ctk.CTkLabel(tab_zap, text="Cara superior:", font=fuente_normal).grid(
+            row=3, column=2, sticky="w", padx=10, pady=5)
+        self.ent_rec_sup = ctk.CTkEntry(
+            tab_zap, font=fuente_normal, width=80, corner_radius=0)
         self.ent_rec_sup.grid(row=3, column=3, padx=5, pady=5)
 
-        ctk.CTkLabel(tab_zap, text="Caras laterales:", font=fuente_normal).grid(row=3, column=4, sticky="w", padx=10, pady=5)
-        self.ent_rec_lat = ctk.CTkEntry(tab_zap, font=fuente_normal, width=80, corner_radius=0)
+        ctk.CTkLabel(tab_zap, text="Caras laterales:", font=fuente_normal).grid(
+            row=3, column=4, sticky="w", padx=10, pady=5)
+        self.ent_rec_lat = ctk.CTkEntry(
+            tab_zap, font=fuente_normal, width=80, corner_radius=0)
         self.ent_rec_lat.grid(row=3, column=5, padx=5, pady=5)
 
         # III. ARMADURA (Estribos)
         ctk.CTkLabel(tab_zap, text="III. ARMADURA:", font=fuente_subtitulo, text_color="#007FFF").grid(
             row=4, column=0, sticky="w", padx=10, pady=(15, 0))
 
-        ctk.CTkLabel(tab_zap, text="Malla inferior:", font=fuente_normal).grid(row=5, column=0, sticky="w", padx=10, pady=5)
-        ctk.CTkLabel(tab_zap, text="Ø (mm):", font=fuente_normal).grid(row=5, column=1, sticky="e", padx=5, pady=5)
-        self.ent_phi_inf = ctk.CTkEntry(tab_zap, font=fuente_normal, width=60, corner_radius=0)
+        ctk.CTkLabel(tab_zap, text="Malla inferior:", font=fuente_normal).grid(
+            row=5, column=0, sticky="w", padx=10, pady=5)
+        ctk.CTkLabel(tab_zap, text="Ø (mm):", font=fuente_normal).grid(
+            row=5, column=1, sticky="e", padx=5, pady=5)
+        self.ent_phi_inf = ctk.CTkEntry(
+            tab_zap, font=fuente_normal, width=60, corner_radius=0)
         self.ent_phi_inf.grid(row=5, column=2, sticky="w", padx=5, pady=5)
-        ctk.CTkLabel(tab_zap, text="@ (cm):", font=fuente_normal).grid(row=5, column=3, sticky="e", padx=5, pady=5)
-        self.ent_espac_inf = ctk.CTkEntry(tab_zap, font=fuente_normal, width=60, corner_radius=0)
+        ctk.CTkLabel(tab_zap, text="@ (cm):", font=fuente_normal).grid(row=5,
+                                                                       column=3, sticky="e", padx=5, pady=5)
+        self.ent_espac_inf = ctk.CTkEntry(
+            tab_zap, font=fuente_normal, width=60, corner_radius=0)
         self.ent_espac_inf.grid(row=5, column=4, sticky="w", padx=5, pady=5)
 
-        ctk.CTkLabel(tab_zap, text="Malla superior:", font=fuente_normal).grid(row=6, column=0, sticky="w", padx=10, pady=5)
-        ctk.CTkLabel(tab_zap, text="Ø (mm):", font=fuente_normal).grid(row=6, column=1, sticky="e", padx=5, pady=5)
-        self.ent_phi_sup = ctk.CTkEntry(tab_zap, font=fuente_normal, width=60, corner_radius=0)
+        ctk.CTkLabel(tab_zap, text="Malla superior:", font=fuente_normal).grid(
+            row=6, column=0, sticky="w", padx=10, pady=5)
+        ctk.CTkLabel(tab_zap, text="Ø (mm):", font=fuente_normal).grid(
+            row=6, column=1, sticky="e", padx=5, pady=5)
+        self.ent_phi_sup = ctk.CTkEntry(
+            tab_zap, font=fuente_normal, width=60, corner_radius=0)
         self.ent_phi_sup.grid(row=6, column=2, sticky="w", padx=5, pady=5)
-        ctk.CTkLabel(tab_zap, text="@ (cm):", font=fuente_normal).grid(row=6, column=3, sticky="e", padx=5, pady=5)
-        self.ent_espac_sup = ctk.CTkEntry(tab_zap, font=fuente_normal, width=60, corner_radius=0)
+        ctk.CTkLabel(tab_zap, text="@ (cm):", font=fuente_normal).grid(row=6,
+                                                                       column=3, sticky="e", padx=5, pady=5)
+        self.ent_espac_sup = ctk.CTkEntry(
+            tab_zap, font=fuente_normal, width=60, corner_radius=0)
         self.ent_espac_sup.grid(row=6, column=4, sticky="w", padx=5, pady=5)
 
-        ctk.CTkLabel(tab_zap, text="Laterales:", font=fuente_normal).grid(row=7, column=0, sticky="w", padx=10, pady=5)
-        ctk.CTkLabel(tab_zap, text="Ø (mm):", font=fuente_normal).grid(row=7, column=1, sticky="e", padx=5, pady=5)
-        self.ent_phi_lat = ctk.CTkEntry(tab_zap, font=fuente_normal, width=60, corner_radius=0)
+        ctk.CTkLabel(tab_zap, text="Laterales:", font=fuente_normal).grid(
+            row=7, column=0, sticky="w", padx=10, pady=5)
+        ctk.CTkLabel(tab_zap, text="Ø (mm):", font=fuente_normal).grid(
+            row=7, column=1, sticky="e", padx=5, pady=5)
+        self.ent_phi_lat = ctk.CTkEntry(
+            tab_zap, font=fuente_normal, width=60, corner_radius=0)
         self.ent_phi_lat.grid(row=7, column=2, sticky="w", padx=5, pady=5)
-        ctk.CTkLabel(tab_zap, text="@ (cm):", font=fuente_normal).grid(row=7, column=3, sticky="e", padx=5, pady=5)
-        self.ent_espac_lat = ctk.CTkEntry(tab_zap, font=fuente_normal, width=60, corner_radius=0)
+        ctk.CTkLabel(tab_zap, text="@ (cm):", font=fuente_normal).grid(row=7,
+                                                                       column=3, sticky="e", padx=5, pady=5)
+        self.ent_espac_lat = ctk.CTkEntry(
+            tab_zap, font=fuente_normal, width=60, corner_radius=0)
         self.ent_espac_lat.grid(row=7, column=4, sticky="w", padx=5, pady=5)
 
         for ent, val in [(self.ent_z_largo, "750"), (self.ent_z_ancho, "1159.6"), (self.ent_z_alto, "150"),
-                         (self.ent_rec_inf, "7.5"), (self.ent_rec_sup, "5"), (self.ent_rec_lat, "5"),
+                         (self.ent_rec_inf, "7.5"), (self.ent_rec_sup,
+                                                     "5"), (self.ent_rec_lat, "5"),
                          (self.ent_phi_inf, "22"), (self.ent_espac_inf, "15"),
                          (self.ent_phi_sup, "22"), (self.ent_espac_sup, "15"),
                          (self.ent_phi_lat, "16"), (self.ent_espac_lat, "20")]:
@@ -124,8 +154,9 @@ class TabArmaduras(ctk.CTkFrame):
 
         # GENERACIÓN DE VISTAS Y DESPIECES (Integrado en pestaña de Zapata)
         frame_vistas = ctk.CTkFrame(tab_zap, fg_color="transparent")
-        frame_vistas.grid(row=8, column=0, columnspan=6, sticky="ew", pady=(20, 0))
-        
+        frame_vistas.grid(row=8, column=0, columnspan=6,
+                          sticky="ew", pady=(20, 0))
+
         ctk.CTkLabel(frame_vistas, text="GENERACIÓN DE VISTAS Y DESPIECES:",
                      font=fuente_subtitulo, text_color="#FFBF00").pack(anchor="w", pady=(0, 10))
 
@@ -149,55 +180,71 @@ class TabArmaduras(ctk.CTkFrame):
                                   command=lambda v=vista: self.generar_despiece_cad(v))
             btn_d.pack(side="left", padx=(2, 0))
 
-
         # =========================================================
         # CONTENIDO: 2. TRAVESAÑOS
         # =========================================================
-        self.tab_sub_travesanos = ctk.CTkTabview(tab_travesanos, fg_color="#1E1E1E", segmented_button_selected_color="#005BBF")
+        self.tab_sub_travesanos = ctk.CTkTabview(
+            tab_travesanos, fg_color="#1E1E1E", segmented_button_selected_color="#005BBF")
         self.tab_sub_travesanos.pack(fill="both", expand=True)
         self.tab_sub_travesanos._segmented_button.configure(font=fuente_normal)
-        
-        tab_trav_main = self.tab_sub_travesanos.add("Configuración y Generación")
+
+        tab_trav_main = self.tab_sub_travesanos.add(
+            "Configuración y Generación")
 
         # --- I. PARÁMETROS GLOBALES ---
         frame_params = ctk.CTkFrame(tab_trav_main, fg_color="transparent")
         frame_params.pack(fill="x", padx=10, pady=10)
 
         # Título y Botón de Ayuda en la misma fila
-        ctk.CTkLabel(frame_params, text="I. PARÁMETROS GLOBALES:", font=fuente_subtitulo, text_color="#007FFF").grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 10))
-        
-        btn_ayuda = ctk.CTkButton(frame_params, text="❓ Abrir ayuda", font=fuente_normal, width=100, fg_color="#333333", hover_color="#555555", corner_radius=0, border_width=1, border_color="#555555", command=self.mostrar_ayuda_travesano)
-        btn_ayuda.grid(row=0, column=4, columnspan=2, sticky="e", padx=5, pady=(0, 10))
+        ctk.CTkLabel(frame_params, text="I. PARÁMETROS GLOBALES:", font=fuente_subtitulo,
+                     text_color="#007FFF").grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 10))
+
+        btn_ayuda = ctk.CTkButton(frame_params, text="❓ Abrir ayuda", font=fuente_normal, width=100, fg_color="#333333",
+                                  hover_color="#555555", corner_radius=0, border_width=1, border_color="#555555", command=self.mostrar_ayuda_travesano)
+        btn_ayuda.grid(row=0, column=4, columnspan=2,
+                       sticky="e", padx=5, pady=(0, 10))
 
         # Fila 1: Recubrimiento, Espesor, Esviaje
-        ctk.CTkLabel(frame_params, text="Recubrimiento general (cm):", font=fuente_normal).grid(row=1, column=0, sticky="w", padx=5, pady=5)
-        self.ent_t_rec = ctk.CTkEntry(frame_params, font=fuente_normal, width=60, corner_radius=0)
+        ctk.CTkLabel(frame_params, text="Recubrimiento general (cm):", font=fuente_normal).grid(
+            row=1, column=0, sticky="w", padx=5, pady=5)
+        self.ent_t_rec = ctk.CTkEntry(
+            frame_params, font=fuente_normal, width=60, corner_radius=0)
         self.ent_t_rec.grid(row=1, column=1, padx=5, pady=5)
         self.ent_t_rec.insert(0, "2.5")
 
-        ctk.CTkLabel(frame_params, text="Espesor del travesaño (cm):", font=fuente_normal).grid(row=1, column=2, sticky="w", padx=20, pady=5)
-        self.ent_t_espesor = ctk.CTkEntry(frame_params, font=fuente_normal, width=60, corner_radius=0)
+        ctk.CTkLabel(frame_params, text="Espesor del travesaño (cm):", font=fuente_normal).grid(
+            row=1, column=2, sticky="w", padx=20, pady=5)
+        self.ent_t_espesor = ctk.CTkEntry(
+            frame_params, font=fuente_normal, width=60, corner_radius=0)
         self.ent_t_espesor.grid(row=1, column=3, padx=5, pady=5)
         self.ent_t_espesor.insert(0, "25")
 
-        ctk.CTkLabel(frame_params, text="Ángulo de esviaje (°):", font=fuente_normal).grid(row=1, column=4, sticky="w", padx=20, pady=5)
-        self.ent_t_esviaje = ctk.CTkEntry(frame_params, font=fuente_normal, width=60, corner_radius=0)
+        ctk.CTkLabel(frame_params, text="Ángulo de esviaje (°):", font=fuente_normal).grid(
+            row=1, column=4, sticky="w", padx=20, pady=5)
+        self.ent_t_esviaje = ctk.CTkEntry(
+            frame_params, font=fuente_normal, width=60, corner_radius=0)
         self.ent_t_esviaje.grid(row=1, column=5, padx=5, pady=5)
         self.ent_t_esviaje.insert(0, "0")
 
         # Fila 2: Diámetros (Externos, Horizontales, Estribos)
-        ctk.CTkLabel(frame_params, text="Ø Fierros externos (mm):", font=fuente_normal).grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        self.ent_t_phi_ext = ctk.CTkEntry(frame_params, font=fuente_normal, width=60, corner_radius=0)
+        ctk.CTkLabel(frame_params, text="Ø Fierros externos (mm):", font=fuente_normal).grid(
+            row=2, column=0, sticky="w", padx=5, pady=5)
+        self.ent_t_phi_ext = ctk.CTkEntry(
+            frame_params, font=fuente_normal, width=60, corner_radius=0)
         self.ent_t_phi_ext.grid(row=2, column=1, padx=5, pady=5)
         self.ent_t_phi_ext.insert(0, "22")
 
-        ctk.CTkLabel(frame_params, text="Ø Fierros horizontales (mm):", font=fuente_normal).grid(row=2, column=2, sticky="w", padx=20, pady=5)
-        self.ent_t_phi_horiz = ctk.CTkEntry(frame_params, font=fuente_normal, width=60, corner_radius=0)
+        ctk.CTkLabel(frame_params, text="Ø Fierros horizontales (mm):", font=fuente_normal).grid(
+            row=2, column=2, sticky="w", padx=20, pady=5)
+        self.ent_t_phi_horiz = ctk.CTkEntry(
+            frame_params, font=fuente_normal, width=60, corner_radius=0)
         self.ent_t_phi_horiz.grid(row=2, column=3, padx=5, pady=5)
         self.ent_t_phi_horiz.insert(0, "12")
 
-        ctk.CTkLabel(frame_params, text="Ø Estribos (mm):", font=fuente_normal).grid(row=2, column=4, sticky="w", padx=20, pady=5)
-        self.ent_t_phi_estr = ctk.CTkEntry(frame_params, font=fuente_normal, width=60, corner_radius=0)
+        ctk.CTkLabel(frame_params, text="Ø Estribos (mm):", font=fuente_normal).grid(
+            row=2, column=4, sticky="w", padx=20, pady=5)
+        self.ent_t_phi_estr = ctk.CTkEntry(
+            frame_params, font=fuente_normal, width=60, corner_radius=0)
         self.ent_t_phi_estr.grid(row=2, column=5, padx=5, pady=5)
         self.ent_t_phi_estr.insert(0, "12")
 
@@ -205,20 +252,25 @@ class TabArmaduras(ctk.CTkFrame):
         frame_botones_t = ctk.CTkFrame(tab_trav_main, fg_color="transparent")
         frame_botones_t.pack(fill="x", padx=10, pady=15)
 
-        ctk.CTkLabel(frame_botones_t, text="II. SELECCIÓN DE CUADRANTE (AutoCAD):", font=fuente_subtitulo, text_color="#007FFF").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+        ctk.CTkLabel(frame_botones_t, text="II. SELECCIÓN DE CUADRANTE (AutoCAD):", font=fuente_subtitulo,
+                     text_color="#007FFF").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
 
-        btn_ext_izq = ctk.CTkButton(frame_botones_t, text="1. Extremo Izquierdo", font=fuente_normal, fg_color="#444444", hover_color="#007FFF", corner_radius=0, command=lambda: self.generar_travesano_cad("EXT_IZQ"))
+        btn_ext_izq = ctk.CTkButton(frame_botones_t, text="1. Extremo Izquierdo", font=fuente_normal, fg_color="#444444",
+                                    hover_color="#007FFF", corner_radius=0, command=lambda: self.generar_travesano_cad("EXT_IZQ"))
         btn_ext_izq.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
 
-        btn_ext_der = ctk.CTkButton(frame_botones_t, text="2. Extremo Derecho", font=fuente_normal, fg_color="#444444", hover_color="#007FFF", corner_radius=0, command=lambda: self.generar_travesano_cad("EXT_DER"))
+        btn_ext_der = ctk.CTkButton(frame_botones_t, text="2. Extremo Derecho", font=fuente_normal, fg_color="#444444",
+                                    hover_color="#007FFF", corner_radius=0, command=lambda: self.generar_travesano_cad("EXT_DER"))
         btn_ext_der.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
 
-        btn_tope = ctk.CTkButton(frame_botones_t, text="3. Cuadrante sobre Tope", font=fuente_normal, fg_color="#444444", hover_color="#007FFF", corner_radius=0, command=lambda: self.generar_travesano_cad("INT_TOPE"))
+        btn_tope = ctk.CTkButton(frame_botones_t, text="3. Cuadrante sobre Tope", font=fuente_normal, fg_color="#444444",
+                                 hover_color="#007FFF", corner_radius=0, command=lambda: self.generar_travesano_cad("INT_TOPE"))
         btn_tope.grid(row=2, column=0, padx=5, pady=5, sticky="ew")
 
-        btn_macizo = ctk.CTkButton(frame_botones_t, text="4. Cuadrante Macizo", font=fuente_normal, fg_color="#444444", hover_color="#007FFF", corner_radius=0, command=lambda: self.generar_travesano_cad("INT_MACIZO"))
+        btn_macizo = ctk.CTkButton(frame_botones_t, text="4. Cuadrante Macizo", font=fuente_normal, fg_color="#444444",
+                                   hover_color="#007FFF", corner_radius=0, command=lambda: self.generar_travesano_cad("INT_MACIZO"))
         btn_macizo.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
-        
+
         frame_botones_t.grid_columnconfigure(0, weight=1)
         frame_botones_t.grid_columnconfigure(1, weight=1)
 
@@ -229,27 +281,32 @@ class TabArmaduras(ctk.CTkFrame):
         visor = ctk.CTkToplevel(self)
         visor.title("SINCAL - Ayuda Cuadrantes de Travesaño")
         visor.geometry("900x350")
-        visor.transient(self) # Mantiene la ventana por encima del programa principal
-        
+        # Mantiene la ventana por encima del programa principal
+        visor.transient(self)
+
         # Primero busca la imagen en la bóveda descargada de la nube (APPDATA)
         ruta_img = os.path.join(RUTA_LOCAL_APP, "mapas", "ayuda_travesano.png")
-        
+
         # Fallback de seguridad: si estás probando el código desde VSCode (Modo desarrollador)
         if not os.path.exists(ruta_img):
             base_dir = os.path.dirname(os.path.dirname(__file__))
-            ruta_img = os.path.abspath(os.path.join(base_dir, "mapas", "ayuda_travesano.png"))
+            ruta_img = os.path.abspath(os.path.join(
+                base_dir, "mapas", "ayuda_travesano.png"))
 
         if os.path.exists(ruta_img):
             try:
                 img = Image.open(ruta_img)
                 # Renderizamos la imagen manteniendo la proporción original
-                ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(850, 300))
+                ctk_img = ctk.CTkImage(
+                    light_image=img, dark_image=img, size=(850, 300))
                 lbl_img = ctk.CTkLabel(visor, image=ctk_img, text="")
                 lbl_img.pack(fill="both", expand=True, padx=10, pady=10)
             except Exception as e:
-                ctk.CTkLabel(visor, text=f"Error cargando imagen:\n{e}").pack(pady=20)
+                ctk.CTkLabel(
+                    visor, text=f"Error cargando imagen:\n{e}").pack(pady=20)
         else:
-            ctk.CTkLabel(visor, text=f"No se encontró la imagen de ayuda en:\n{ruta_img}\n\nPor favor, guarda el DXF como 'ayuda_travesano.png' en la carpeta 'mapas'.").pack(pady=20)
+            ctk.CTkLabel(
+                visor, text=f"No se encontró la imagen de ayuda en:\n{ruta_img}\n\nPor favor, guarda el DXF como 'ayuda_travesano.png' en la carpeta 'mapas'.").pack(pady=20)
 
     # =========================================================
     # FUNCIONES DE EJECUCIÓN (AutoCAD)
@@ -265,26 +322,97 @@ class TabArmaduras(ctk.CTkFrame):
         except ValueError:
             return messagebox.showerror("Error", "Por favor, ingresa solo valores numéricos válidos en los parámetros del travesaño.")
 
-        ruta_temp = os.path.join(RUTA_LOCAL_APP, f"Travesano_{tipo_cuadrante}.lsp")
+        ruta_temp = os.path.join(
+            RUTA_LOCAL_APP, f"Travesano_{tipo_cuadrante}.lsp")
         ruta_lisp = ruta_temp.replace("\\", "\\\\")
-        
-        lisp_code = f"""(defun c:SINCAL-TRAVESANO (/ ent entData)
+
+        lisp_code = f"""(defun c:SINCAL-TRAVESANO (/ ent obj old_osnap recub_m offset_obj bbox minPt maxPt x_min y_min x_max y_max y_current ray_start ray_end ray_obj int_pts p1_x p2_x p_izq p_der)
+          (vl-load-com)
           (setvar "CMDECHO" 0)
-          (princ "\\n[SINCAL] Cuadrante: {tipo_cuadrante} | Espesor: {espesor}cm | Esviaje: {esviaje} | Rec: {recub}cm | Ext: %%c{phi_ext} | Horiz: %%c{phi_horiz} | Estribos: %%c{phi_estr}")
+          (setq old_osnap (getvar "OSMODE"))
+          (setvar "OSMODE" 0)
+          
+          ;; 1. Crear layers si no existen
+          (if (not (tblsearch "LAYER" "FIERROS_MAGENTA")) (command "._layer" "_M" "FIERROS_MAGENTA" "_C" "6" "" ""))
+          (if (not (tblsearch "LAYER" "JAULA_TEMP")) (command "._layer" "_M" "JAULA_TEMP" "_C" "8" "_P" "N" "" ""))
+          
+          (princ "\\n[SINCAL] Procesando Cuadrante: {tipo_cuadrante}...")
           (setq ent (car (entsel "\\nSeleccione la polilinea cerrada del cuadrante: ")))
+          
           (if ent
             (progn
-              (setq entData (entget ent))
-              (if (= (cdr (assoc 0 entData)) "LWPOLYLINE")
-                (if (= (logand (cdr (assoc 70 entData)) 1) 1)
-                  (princ "\\n[OK] Polilinea cerrada detectada. El motor de rayos se ejecutara aqui.")
-                  (alert "Error: La polilinea seleccionada no esta cerrada.\\n\\nPor favor, asegurese de usar un poligono cerrado o genere uno nuevo con el comando BOUNDARY (CONTORNO).")
+              (setq obj (vlax-ename->vla-object ent))
+              ;; Convertir recubrimiento de cm a metros (ej: 2.5 cm -> 0.025 m)
+              (setq recub_m (/ {recub} 100.0))
+              
+              ;; 2. Generar Jaula Interna (Offset)
+              ;; Nota: AutoLISP requiere probar el offset positivo y negativo para saber cual va hacia adentro. 
+              ;; Asumiremos que la polilinea esta dibujada en sentido antihorario.
+              (setq offset_obj (car (vlax-safearray->list (vlax-variant-value (vla-offset obj recub_m)))))
+              (vla-put-Layer offset_obj "JAULA_TEMP")
+              
+              ;; 3. Obtener Bounding Box de la Jaula
+              (vla-GetBoundingBox offset_obj 'minPt 'maxPt)
+              (setq minPt (vlax-safearray->list minPt))
+              (setq maxPt (vlax-safearray->list maxPt))
+              
+              (setq x_min (car minPt) y_min (cadr minPt))
+              (setq x_max (car maxPt) y_max (cadr maxPt))
+              
+              ;; 4. LOGICA PARA EXTREMO IZQUIERDO (Magentas)
+              (if (= "{tipo_cuadrante}" "EXT_IZQ")
+                (progn
+                  (setvar "CLAYER" "FIERROS_MAGENTA")
+                  ;; Empezamos en Y minimo (fondo de la jaula)
+                  (setq y_current y_min)
+                  
+                  ;; Ciclo: Subir cada 20cm (0.20m) hasta llegar al tope
+                  (while (<= y_current y_max)
+                    ;; Crear un rayo horizontal temporal que atraviesa todo
+                    (setq ray_start (list (- x_min 2.0) y_current 0.0))
+                    (setq ray_end (list (+ x_max 2.0) y_current 0.0))
+                    
+                    ;; Dibujar linea temporal (rayo)
+                    (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                    
+                    ;; Buscar intersecciones entre el rayo y la jaula
+                    (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                    
+                    ;; Si encuentra al menos 2 puntos (entrada y salida)
+                    (if (and int_pts (>= (length int_pts) 6))
+                      (progn
+                        (setq p1_x (car int_pts))
+                        (setq p2_x (nth 3 int_pts))
+                        
+                        ;; Ordenar para saber cual es la izquierda y cual la derecha
+                        (if (< p1_x p2_x)
+                          (setq p_izq (list p1_x y_current) p_der (list p2_x y_current))
+                          (setq p_izq (list p2_x y_current) p_der (list p1_x y_current))
+                        )
+                        
+                        ;; DIBUJO DEL FIERRO MAGENTA:
+                        ;; Empieza en la izquierda, va hasta el alma (x_max) y se le suman 80cm (0.80m) de traslape
+                        (setq p_traslape (list (+ x_max 0.80) y_current))
+                        
+                        ;; Generar polilinea (Aqui luego agregaremos el gancho de 90 grados)
+                        (command "._pline" "_NON" p_izq "_NON" p_traslape "")
+                      )
+                    )
+                    ;; Borrar rayo temporal
+                    (vla-delete ray_obj)
+                    
+                    ;; Subir 20 cm
+                    (setq y_current (+ y_current 0.20))
+                  )
+                  (princ "\\n[OK] Fierros horizontales inyectados.")
                 )
-                (princ "\\n[X] El objeto seleccionado no es una polilinea.")
               )
+              
+              ;; (Opcional) Borrar la jaula si no queremos verla
+              ;; (vla-delete offset_obj)
             )
-            (princ "\\n[X] No se selecciono ningun objeto.")
           )
+          (setvar "OSMODE" old_osnap)
           (princ)
         )"""
 
@@ -297,10 +425,14 @@ class TabArmaduras(ctk.CTkFrame):
 
     def generar_vista_cad(self, tipo_vista):
         try:
-            r_inf, r_sup, r_lat = float(self.ent_rec_inf.get()) / 100.0, float(self.ent_rec_sup.get()) / 100.0, float(self.ent_rec_lat.get()) / 100.0
-            phi_inf, esp_inf = float(self.ent_phi_inf.get()) / 1000.0, float(self.ent_espac_inf.get()) / 100.0
-            phi_sup, esp_sup = float(self.ent_phi_sup.get()) / 1000.0, float(self.ent_espac_sup.get()) / 100.0
-            phi_lat, esp_lat = float(self.ent_phi_lat.get()) / 1000.0, float(self.ent_espac_lat.get()) / 100.0
+            r_inf, r_sup, r_lat = float(self.ent_rec_inf.get()) / 100.0, float(
+                self.ent_rec_sup.get()) / 100.0, float(self.ent_rec_lat.get()) / 100.0
+            phi_inf, esp_inf = float(self.ent_phi_inf.get(
+            )) / 1000.0, float(self.ent_espac_inf.get()) / 100.0
+            phi_sup, esp_sup = float(self.ent_phi_sup.get(
+            )) / 1000.0, float(self.ent_espac_sup.get()) / 100.0
+            phi_lat, esp_lat = float(self.ent_phi_lat.get(
+            )) / 1000.0, float(self.ent_espac_lat.get()) / 100.0
 
             traslapes = {12: 0.80, 16: 1.10, 18: 1.20, 22: 1.50,
                          25: 1.70, 28: 1.90, 32: 2.20, 36: 2.50}
@@ -310,7 +442,8 @@ class TabArmaduras(ctk.CTkFrame):
             return messagebox.showerror("Error", "Entradas numéricas inválidas.")
 
         try:
-            ruta_temp = os.path.join(RUTA_LOCAL_APP, f"Estribo_{tipo_vista}.lsp")
+            ruta_temp = os.path.join(
+                RUTA_LOCAL_APP, f"Estribo_{tipo_vista}.lsp")
 
             lisp_safe_header = f"""(setvar "CMDECHO" 0) (setq old_att (getvar "ATTREQ") old_fillet (getvar "FILLETRAD")) (setvar "ATTREQ" 0)
               (if (not (tblsearch "LAYER" "FIERROS")) (command "._layer" "_M" "FIERROS" "_C" "5" "" "") (command "._layer" "_T" "FIERROS" "_ON" "FIERROS" "_S" "FIERROS" "" "._layer" "_C" "5" "FIERROS" ""))"""
