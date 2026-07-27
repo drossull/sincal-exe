@@ -326,7 +326,11 @@ class TabArmaduras(ctk.CTkFrame):
             RUTA_LOCAL_APP, f"Travesano_{tipo_cuadrante}.lsp")
         ruta_lisp = ruta_temp.replace("\\", "\\\\")
 
-        lisp_code = f"""(defun c:SINCAL-TRAVESANO (/ ent obj old_osnap recub_m offset_obj coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k lowest_four lowest_by_x right_bot)
+        # SOLO PROCESAMOS EXT_IZQ POR AHORA PARA VALIDAR REGLAS. EL RESTO LANZARÁ ALERTA.
+        if tipo_cuadrante not in ["EXT_IZQ", "EXT_DER"]:
+            lisp_code = f"""(defun c:SINCAL-TRAVESANO () (alert "Modulo de Cuadrante Intermedio en desarrollo.") (princ))"""
+        else:
+            lisp_code = f"""(defun c:SINCAL-TRAVESANO (/ ent obj old_osnap recub_m offset_obj coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k lowest_four lowest_by_x right_bot)
               (vl-load-com)
               (setvar "CMDECHO" 0)
               (setq old_osnap (getvar "OSMODE"))
@@ -485,7 +489,7 @@ class TabArmaduras(ctk.CTkFrame):
                           )
 
                           ;; ========================================================
-                          ;; ALGORITMO EXTREMO DERECHO (Corregido V4, V8, V10-V9 y 1.00m)
+                          ;; ALGORITMO EXTREMO DERECHO (Corregido V4, V8, V10-V9 y Estribos G2)
                           ;; ========================================================
                           ((= "{tipo_cuadrante}" "EXT_DER")
                             (setq pts_by_x (vl-sort pts '(lambda (a b) (< (car a) (car b)))))
@@ -565,7 +569,7 @@ class TabArmaduras(ctk.CTkFrame):
                               (setq y_curr (- y_curr 0.20))
                             )
                             
-                            ;; 4. VERDES (Grupo 1) - Intactos
+                            ;; 4. VERDES G1 (Top Flat, Derecha a Izquierda)
                             (setq x_curr (- (car v1) 0.20))
                             (while (> x_curr (car v2))
                               (setq ray_start (list x_curr (+ y_ext 1.0) 0.0))
@@ -587,8 +591,8 @@ class TabArmaduras(ctk.CTkFrame):
                               (setq x_curr (- x_curr 0.20))
                             )
                             
-                            ;; 5. VERDES (Grupo 2) - Intactos
-                            (setq x_curr (car v3))
+                            ;; 5. VERDES G2 (Inner Step, de V2 hacia V4)
+                            (setq x_curr (car v2))
                             (while (>= x_curr (car v4))
                               (setq ray_start (list x_curr (+ (cadr v4) 1.0) 0.0))
                               (setq ray_end (list x_curr (- (cadr v8) 1.0) 0.0))
