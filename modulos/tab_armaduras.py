@@ -591,9 +591,9 @@ class TabArmaduras(ctk.CTkFrame):
                               (setq x_curr (- x_curr 0.20))
                             )
                             
-                            ;; 5. VERDES G2 (Inner Step, de V2 hacia V4)
-                            (setq x_curr (car v2))
-                            (while (>= x_curr (car v4))
+                            ;; 5. VERDES G2 (Inner Step, de V3 hacia V2 en X+)
+                            (setq x_curr (car v3))
+                            (while (<= x_curr (car v2))
                               (setq ray_start (list x_curr (+ (cadr v4) 1.0) 0.0))
                               (setq ray_end (list x_curr (- (cadr v8) 1.0) 0.0))
                               (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
@@ -610,7 +610,7 @@ class TabArmaduras(ctk.CTkFrame):
                                 )
                               )
                               (vla-delete ray_obj)
-                              (setq x_curr (- x_curr 0.20))
+                              (setq x_curr (+ x_curr 0.20))
                             )
                             
                             (vla-delete offset_obj)
