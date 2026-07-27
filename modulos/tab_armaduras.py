@@ -326,11 +326,7 @@ class TabArmaduras(ctk.CTkFrame):
             RUTA_LOCAL_APP, f"Travesano_{tipo_cuadrante}.lsp")
         ruta_lisp = ruta_temp.replace("\\", "\\\\")
 
-        # SOLO PROCESAMOS EXT_IZQ POR AHORA PARA VALIDAR REGLAS. EL RESTO LANZARÁ ALERTA.
-        if tipo_cuadrante not in ["EXT_IZQ", "EXT_DER"]:
-            lisp_code = f"""(defun c:SINCAL-TRAVESANO () (alert "Modulo de Cuadrante Intermedio en desarrollo.") (princ))"""
-        else:
-            lisp_code = f"""(defun c:SINCAL-TRAVESANO (/ ent obj old_osnap recub_m offset_obj coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x min_y k max_x lowest_four lowest_by_x right_bot)
+        lisp_code = f"""(defun c:SINCAL-TRAVESANO (/ ent obj old_osnap recub_m offset_obj coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k lowest_four lowest_by_x right_bot)
               (vl-load-com)
               (setvar "CMDECHO" 0)
               (setq old_osnap (getvar "OSMODE"))
@@ -371,32 +367,27 @@ class TabArmaduras(ctk.CTkFrame):
                       (if (= (length pts) 10)
                         (cond
                           ;; ========================================================
-                          ;; ALGORITMO EXTREMO IZQUIERDO (V1 a V10 Original)
+                          ;; ALGORITMO EXTREMO IZQUIERDO (Original Exacto + Magentas extendidas a 1.00m)
                           ;; ========================================================
                           ((= "{tipo_cuadrante}" "EXT_IZQ")
-                            ;; Ordenar por X de izquierda a derecha
                             (setq pts_by_x (vl-sort pts '(lambda (a b) (< (car a) (car b)))))
                             (setq left_pts (list (nth 0 pts_by_x) (nth 1 pts_by_x)))
                             (setq right_pts (list (nth 8 pts_by_x) (nth 9 pts_by_x)))
                             (setq mid_pts (list (nth 2 pts_by_x) (nth 3 pts_by_x) (nth 4 pts_by_x) (nth 5 pts_by_x) (nth 6 pts_by_x) (nth 7 pts_by_x)))
                             
-                            ;; Separar V1 y V2 (V1 esta mas arriba en Y)
                             (if (> (cadr (car left_pts)) (cadr (cadr left_pts)))
                               (setq v1 (car left_pts) v2 (cadr left_pts))
                               (setq v1 (cadr left_pts) v2 (car left_pts)))
                               
-                            ;; Separar V8 y V7 (V8 esta mas arriba en Y)
                             (if (> (cadr (car right_pts)) (cadr (cadr right_pts)))
                               (setq v8 (car right_pts) v7 (cadr right_pts))
                               (setq v8 (cadr right_pts) v7 (car right_pts)))
                               
-                            ;; Ordenar los 6 medios por Y (de abajo hacia arriba)
                             (setq mid_by_y (vl-sort mid_pts '(lambda (a b) (< (cadr a) (cadr b)))))
                             (setq lowest_two (list (nth 0 mid_by_y) (nth 1 mid_by_y)))
                             (setq highest_two (list (nth 4 mid_by_y) (nth 5 mid_by_y)))
                             (setq middle_two (list (nth 2 mid_by_y) (nth 3 mid_by_y)))
                             
-                            ;; Separar (V4, V5), (V10, V9) y (V3, V6) por X (menor a mayor)
                             (if (< (car (car lowest_two)) (car (cadr lowest_two)))
                               (setq v4 (car lowest_two) v5 (cadr lowest_two))
                               (setq v4 (cadr lowest_two) v5 (car lowest_two)))
@@ -409,14 +400,8 @@ class TabArmaduras(ctk.CTkFrame):
                               (setq v3 (car middle_two) v6 (cadr middle_two))
                               (setq v3 (cadr middle_two) v6 (car middle_two)))
 
-                            ;; ========================================================
-                            ;; INYECCIÓN DE REGLAS ESTRUCTURALES
-                            ;; ========================================================
-                            
-                            ;; Cota Y Maxima (+18cm sobre la cubierta)
                             (setq y_ext (+ (cadr v1) 0.18))
                             
-                            ;; 1. LINEA 1 (Roja Exterior Izquierda)
                             (setq dx (- (car v3) (car v2)))
                             (setq dy (- (cadr v3) (cadr v2)))
                             (if (not (zerop dy))
@@ -428,12 +413,10 @@ class TabArmaduras(ctk.CTkFrame):
                               )
                             )
                             
-                            ;; 2. LINEA 2 (Roja Exterior Derecha)
                             (command "._pline" "_NON" v8 "_NON" v7 "_NON" v6 "_NON" v5 "_NON" v4 "_NON" (list (car v4) y_ext) "")
                             (command "._chprop" (entlast) "" "_C" "1" "")
                             
-                            ;; 3. MAGENTAS (Horizontales espaciados 20cm en Y hacia abajo)
-                            (setq y_curr (cadr v8)) ;; Empezamos EXACTAMENTE en V8
+                            (setq y_curr (cadr v8))
                             (while (>= y_curr (cadr v7))
                               (setq ray_start (list (- (car v2) 2.0) y_curr 0.0))
                               (setq ray_end (list (+ (car v8) 2.0) y_curr 0.0))
@@ -441,21 +424,20 @@ class TabArmaduras(ctk.CTkFrame):
                               (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
                               (if int_pts
                                 (progn
-                                  ;; Rescatamos la interseccion que esta mas a la izquierda
                                   (setq min_x (car int_pts) k 3)
                                   (while (< k (length int_pts))
                                     (setq min_x (min min_x (nth k int_pts)))
                                     (setq k (+ k 3))
                                   )
+                                  ;; CORRECCION: Extension horizontal de 1.00m
                                   (command "._pline" "_NON" (list min_x y_curr) "_NON" (list (+ (car v8) 1.00) y_curr) "")
                                   (command "._chprop" (entlast) "" "_C" "6" "")
                                 )
                               )
                               (vla-delete ray_obj)
-                              (setq y_curr (- y_curr 0.20)) ;; Bajamos 20 cm
+                              (setq y_curr (- y_curr 0.20))
                             )
                             
-                            ;; 4. VERDES (Estribos Grupo 1 - Espaciados 20cm en X de izq a der)
                             (setq x_curr (+ (car v1) 0.20))
                             (while (< x_curr (car v3))
                               (setq ray_start (list x_curr (+ y_ext 1.0) 0.0))
@@ -464,7 +446,6 @@ class TabArmaduras(ctk.CTkFrame):
                               (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
                               (if int_pts
                                 (progn
-                                  ;; Buscamos la interseccion mas profunda (fondo de la jaula)
                                   (setq min_y (cadr int_pts) k 4)
                                   (while (< k (length int_pts))
                                     (setq min_y (min min_y (nth k int_pts)))
@@ -478,8 +459,7 @@ class TabArmaduras(ctk.CTkFrame):
                               (setq x_curr (+ x_curr 0.20))
                             )
                             
-                            ;; 5. VERDES (Estribos Grupo 2 - Espaciados 20cm en X de der a izq)
-                            (setq x_curr (car v9)) ;; Empezamos EXACTAMENTE en V9
+                            (setq x_curr (car v9))
                             (while (>= x_curr (car v10))
                               (setq ray_start (list x_curr (+ (cadr v8) 1.0) 0.0))
                               (setq ray_end (list x_curr (- (cadr v4) 1.0) 0.0))
@@ -487,7 +467,6 @@ class TabArmaduras(ctk.CTkFrame):
                               (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
                               (if int_pts
                                 (progn
-                                  ;; Buscamos la interseccion mas profunda
                                   (setq min_y (cadr int_pts) k 4)
                                   (while (< k (length int_pts))
                                     (setq min_y (min min_y (nth k int_pts)))
@@ -498,16 +477,15 @@ class TabArmaduras(ctk.CTkFrame):
                                 )
                               )
                               (vla-delete ray_obj)
-                              (setq x_curr (- x_curr 0.20)) ;; Avanzamos hacia la izquierda
+                              (setq x_curr (- x_curr 0.20))
                             )
                             
-                            ;; Ocultar y limpiar Jaula virtual
                             (vla-delete offset_obj)
-                            (princ "\\n[OK] Enfierradura inyectada y auditada (Extremo Izquierdo).")
+                            (princ "\\n[OK] Enfierradura inyectada (Extremo Izquierdo).")
                           )
 
                           ;; ========================================================
-                          ;; ALGORITMO EXTREMO DERECHO (Nuevo)
+                          ;; ALGORITMO EXTREMO DERECHO (Corregido V4, V8, V10-V9 y 1.00m)
                           ;; ========================================================
                           ((= "{tipo_cuadrante}" "EXT_DER")
                             (setq pts_by_x (vl-sort pts '(lambda (a b) (< (car a) (car b)))))
@@ -548,7 +526,7 @@ class TabArmaduras(ctk.CTkFrame):
 
                             (setq y_ext (+ (cadr v1) 0.18))
                             
-                            ;; 1. LINEA 1 (Exterior Derecha, Proyectando de V10 a V9)
+                            ;; 1. LINEA 1 (Exterior Derecha: Sigue Pendiente V10-V9 exacto)
                             (setq dx (- (car v9) (car v10)))
                             (setq dy (- (cadr v9) (cadr v10)))
                             (if (not (zerop dy))
@@ -560,11 +538,11 @@ class TabArmaduras(ctk.CTkFrame):
                               )
                             )
                             
-                            ;; 2. LINEA 2 (Alma y Fondo, Nace en V4 y Sube al final)
+                            ;; 2. LINEA 2 (Alma y Fondo: Empieza en V4 EXACTO, no salta V8, sube a Losa)
                             (command "._pline" "_NON" v4 "_NON" v5 "_NON" v6 "_NON" v7 "_NON" v8 "_NON" (list (car v8) y_ext) "")
                             (command "._chprop" (entlast) "" "_C" "1" "")
                             
-                            ;; 3. MAGENTAS (Hacia la Izquierda, partiendo en altura V4)
+                            ;; 3. MAGENTAS (Horizontales espaciados 20cm en Y hacia abajo, desde Y=V4)
                             (setq y_curr (cadr v4))
                             (while (>= y_curr (cadr v5))
                               (setq ray_start (list (+ (car v1) 2.0) y_curr 0.0))
@@ -578,6 +556,7 @@ class TabArmaduras(ctk.CTkFrame):
                                     (setq max_x (max max_x (nth k int_pts)))
                                     (setq k (+ k 3))
                                   )
+                                  ;; CORRECCION: Extension horizontal de 1.00m hacia la izquierda desde V4
                                   (command "._pline" "_NON" (list (- (car v4) 1.00) y_curr) "_NON" (list max_x y_curr) "")
                                   (command "._chprop" (entlast) "" "_C" "6" "")
                                 )
@@ -586,7 +565,7 @@ class TabArmaduras(ctk.CTkFrame):
                               (setq y_curr (- y_curr 0.20))
                             )
                             
-                            ;; 4. VERDES G1 (Top Flat, de V1 hacia V2)
+                            ;; 4. VERDES (Grupo 1) - Intactos
                             (setq x_curr (- (car v1) 0.20))
                             (while (> x_curr (car v2))
                               (setq ray_start (list x_curr (+ y_ext 1.0) 0.0))
@@ -608,7 +587,7 @@ class TabArmaduras(ctk.CTkFrame):
                               (setq x_curr (- x_curr 0.20))
                             )
                             
-                            ;; 5. VERDES G2 (Inner Step, de V3 hacia V4)
+                            ;; 5. VERDES (Grupo 2) - Intactos
                             (setq x_curr (car v3))
                             (while (>= x_curr (car v4))
                               (setq ray_start (list x_curr (+ (cadr v4) 1.0) 0.0))
@@ -633,6 +612,8 @@ class TabArmaduras(ctk.CTkFrame):
                             (vla-delete offset_obj)
                             (princ "\\n[OK] Enfierradura inyectada y auditada (Extremo Derecho).")
                           )
+                          
+                          (t (alert "Modulo de Cuadrante Intermedio en desarrollo."))
                         )
                         (alert "Fallo de Topologia: La polilinea debe tener exactamente 10 vertices para este cuadrante.\\nUse BOUNDARY o revise su dibujo.")
                       )
