@@ -1,12 +1,9 @@
 {
-  "version": "v27.1.10",
+  "version": "v27.1.11",
   "archivos": [
     "core_sincal.py",
     "modulos/tab_ubicacion.py",
     "modulos/tab_armaduras.py",
-    "modulos/estructural/__init__.py",
-    "modulos/estructural/mod_estribos.py",
-    "modulos/estructural/mod_travesanos.py",
     "modulos/tab_docs.py",
     "lisps/BV.lsp",
     "lisps/VRAP.lsp",
