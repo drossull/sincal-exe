@@ -152,7 +152,7 @@ class TabArmaduras(ctk.CTkFrame):
                          (self.ent_phi_lat, "16"), (self.ent_espac_lat, "20")]:
             ent.insert(0, val)
 
-        # GENERACIÓN DE VISTAS Y DESPIECES (Integrado en pestaña de Zapata)
+        # GENERACIÓN DE VISTAS Y DESPIECES
         frame_vistas = ctk.CTkFrame(tab_zap, fg_color="transparent")
         frame_vistas.grid(row=8, column=0, columnspan=6,
                           sticky="ew", pady=(20, 0))
@@ -195,7 +195,6 @@ class TabArmaduras(ctk.CTkFrame):
         frame_params = ctk.CTkFrame(tab_trav_main, fg_color="transparent")
         frame_params.pack(fill="x", padx=10, pady=10)
 
-        # Título y Botón de Ayuda en la misma fila
         ctk.CTkLabel(frame_params, text="I. PARÁMETROS GLOBALES:", font=fuente_subtitulo,
                      text_color="#007FFF").grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 10))
 
@@ -204,7 +203,6 @@ class TabArmaduras(ctk.CTkFrame):
         btn_ayuda.grid(row=0, column=4, columnspan=2,
                        sticky="e", padx=5, pady=(0, 10))
 
-        # Fila 1: Recubrimiento, Espesor, Esviaje
         ctk.CTkLabel(frame_params, text="Recubrimiento general (cm):", font=fuente_normal).grid(
             row=1, column=0, sticky="w", padx=5, pady=5)
         self.ent_t_rec = ctk.CTkEntry(
@@ -226,7 +224,6 @@ class TabArmaduras(ctk.CTkFrame):
         self.ent_t_esviaje.grid(row=1, column=5, padx=5, pady=5)
         self.ent_t_esviaje.insert(0, "0")
 
-        # Fila 2: Diámetros (Externos, Horizontales, Estribos)
         ctk.CTkLabel(frame_params, text="Ø Fierros externos (mm):", font=fuente_normal).grid(
             row=2, column=0, sticky="w", padx=5, pady=5)
         self.ent_t_phi_ext = ctk.CTkEntry(
@@ -248,7 +245,6 @@ class TabArmaduras(ctk.CTkFrame):
         self.ent_t_phi_estr.grid(row=2, column=5, padx=5, pady=5)
         self.ent_t_phi_estr.insert(0, "12")
 
-        # Fila 3: Largo de fierros en Cuadrante Viga
         ctk.CTkLabel(frame_params, text="Largo fierros viga (cm):", font=fuente_normal).grid(
             row=3, column=0, sticky="w", padx=5, pady=5)
         self.ent_viga_largo = ctk.CTkEntry(
@@ -336,7 +332,7 @@ class TabArmaduras(ctk.CTkFrame):
             RUTA_LOCAL_APP, f"Travesano_{tipo_cuadrante}.lsp")
         ruta_lisp = ruta_temp.replace("\\", "\\\\")
 
-        lisp_code = f"""(defun c:SINCAL-TRAVESANO (/ ent obj old_osnap recub_m offset_obj offset_res coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k lowest_four lowest_by_x right_bot pts_by_y pair1 pair2 pair3 pair4 pair5 pair6 bot4 y_max_L y_max_R raw_len rnd_len ext x_start x_end dist_sacado num_spaces step_sacado i_sac m_top ang_top perp_top x1_off y1_off m_horiz offset y_L y_R y_limit pt_start pt_end real_y_L real_y_R dx_67 dy_67 m_cyan_L y_mid_L x_start_L y_start_L dx_1011 dy_1011 m_cyan_R y_mid_R x_end_R y_end_R x_mid len_viga half_l y_min pad_g3 m_slope offset_h)
+        lisp_code = f"""(defun c:SINCAL-TRAVESANO (/ ent obj old_osnap recub_m offset_obj offset_res coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k lowest_four lowest_by_x right_bot pts_by_y pair1 pair2 pair3 pair4 pair5 pair6 bot4 y_max_L y_max_R raw_len rnd_len ext x_start x_end dist_sacado num_spaces step_sacado i_sac m_top ang_top perp_top x1_off y1_off m_horiz offset_h y_L y_R y_limit pt_start pt_end real_y_L real_y_R dx_67 dy_67 m_cyan_L y_mid_L x_start_L y_start_L dx_1011 dy_1011 m_cyan_R y_mid_R x_end_R y_end_R x_mid len_viga half_l y_min pad_g3)
           (vl-load-com)
           (setvar "CMDECHO" 0)
           (setq old_osnap (getvar "OSMODE"))
@@ -753,17 +749,18 @@ class TabArmaduras(ctk.CTkFrame):
                             (setq i_sac (1+ i_sac))
                           )
 
-                          (setq m_horiz (/ (- (cadr v14) (cadr v2)) (- (car v14) (car v2))))
-                          (command "._pline" "_NON" v2 "_NON" v14 "")
+                          ;; GRUPO 1 GRISES HORIZONTALES (Con Pendiente, CORREGIDO DE V3 A V14)
+                          (setq m_horiz (/ (- (cadr v14) (cadr v3)) (- (car v14) (car v3))))
+                          (command "._pline" "_NON" v3 "_NON" v14 "")
                           (command "._chprop" (entlast) "" "_C" "8" "")
                           
-                          (setq offset 0.20)
-                          (setq y_L (- (cadr v2) offset))
-                          (setq y_R (- (cadr v14) offset))
+                          (setq offset_h 0.20)
+                          (setq y_L (- (cadr v3) offset_h))
+                          (setq y_R (- (cadr v14) offset_h))
                           (setq y_limit (+ (max (cadr v8) (cadr v9)) 0.20))
                           
                           (while (>= (min y_L y_R) y_limit)
-                            (setq ray_start (list (- (car v2) 1.0) (- y_L (* m_horiz 1.0)) 0.0))
+                            (setq ray_start (list (- (car v3) 1.0) (- y_L (* m_horiz 1.0)) 0.0))
                             (setq ray_end (list (+ (car v14) 1.0) (+ y_R (* m_horiz 1.0)) 0.0))
                             (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
                             (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
@@ -775,16 +772,16 @@ class TabArmaduras(ctk.CTkFrame):
                                   (setq max_x (max max_x (nth k int_pts)))
                                   (setq k (+ k 3))
                                 )
-                                (setq real_y_L (+ y_L (* m_horiz (- min_x (car v2)))))
-                                (setq real_y_R (+ y_L (* m_horiz (- max_x (car v2)))))
+                                (setq real_y_L (+ y_L (* m_horiz (- min_x (car v3)))))
+                                (setq real_y_R (+ y_L (* m_horiz (- max_x (car v3)))))
                                 (command "._pline" "_NON" (list min_x real_y_L) "_NON" (list max_x real_y_R) "")
                                 (command "._chprop" (entlast) "" "_C" "8" "")
                               )
                             )
                             (vla-delete ray_obj)
-                            (setq offset (+ offset 0.20))
-                            (setq y_L (- (cadr v2) offset))
-                            (setq y_R (- (cadr v14) offset))
+                            (setq offset_h (+ offset_h 0.20))
+                            (setq y_L (- (cadr v3) offset_h))
+                            (setq y_R (- (cadr v14) offset_h))
                           )
 
                           (setq dx_67 (- (car v7) (car v6)))
