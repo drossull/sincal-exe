@@ -245,7 +245,7 @@ class TabArmaduras(ctk.CTkFrame):
         self.ent_t_phi_estr.grid(row=2, column=5, padx=5, pady=5)
         self.ent_t_phi_estr.insert(0, "12")
 
-        ctk.CTkLabel(frame_params, text="Largo fierros viga (cm):", font=fuente_normal).grid(
+        ctk.CTkLabel(frame_params, text="Longitud fierros viga (cm):", font=fuente_normal).grid(
             row=3, column=0, sticky="w", padx=5, pady=5)
         self.ent_viga_largo = ctk.CTkEntry(
             frame_params, font=fuente_normal, width=60, corner_radius=0)
@@ -277,7 +277,8 @@ class TabArmaduras(ctk.CTkFrame):
 
         btn_viga = ctk.CTkButton(frame_botones_t, text="5. Cuadrante Viga", font=fuente_normal, fg_color="#444444",
                                  hover_color="#FFBF00", text_color="#1E1E1E", corner_radius=0, command=lambda: self.generar_travesano_cad("INT_VIGA"))
-        btn_viga.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
+        btn_viga.grid(row=3, column=0, columnspan=2,
+                      padx=5, pady=5, sticky="ew")
 
         frame_botones_t.grid_columnconfigure(0, weight=1)
         frame_botones_t.grid_columnconfigure(1, weight=1)
@@ -748,7 +749,7 @@ class TabArmaduras(ctk.CTkFrame):
                             (setq i_sac (1+ i_sac))
                           )
 
-                          ;; GRUPO 1 GRISES HORIZONTALES (Con Pendiente, CORREGIDO)
+                          ;; GRUPO 1 GRISES HORIZONTALES (Con Pendiente)
                           (setq m_horiz (/ (- (cadr v14) (cadr v3)) (- (car v14) (car v3))))
                           (command "._pline" "_NON" v3 "_NON" v14 "")
                           (command "._chprop" (entlast) "" "_C" "8" "")
@@ -961,7 +962,7 @@ class TabArmaduras(ctk.CTkFrame):
                           (setq half_l (/ len_viga 2.0))
                           
                           (setq y_curr (cadr v1))
-                          (setq y_min (cadr v3))
+                          (setq y_min (+ (cadr v3) 0.10))
                           
                           (while (>= y_curr y_min)
                             (command "._pline" "_NON" (list (- x_mid half_l) y_curr) "_NON" (list (+ x_mid half_l) y_curr) "")
@@ -1423,16 +1424,34 @@ class TabArmaduras(ctk.CTkFrame):
         try:
             with open(ruta, 'r', encoding='utf-8') as f:
                 datos = json.load(f)
+
             e_data = datos.get("estribos", {})
-            for ent, key in [(self.ent_z_largo, "dado_muro_frontal_largo_entrada"), (self.ent_z_ancho, "dado_muro_frontal_ancho_entrada"), (self.ent_z_alto, "dado_muro_frontal_espesor_entrada")]:
-                ent.delete(0, 'end')
-                ent.insert(0, str(e_data.get(key, 0) / 10.0))
+            for ent, key in [(self.ent_z_largo, "dado_muro_frontal_largo_entrada"),
+                             (self.ent_z_ancho, "dado_muro_frontal_ancho_entrada"),
+                             (self.ent_z_alto, "dado_muro_frontal_espesor_entrada")]:
+                if key in e_data:
+                    ent.delete(0, 'end')
+                    ent.insert(0, str(e_data.get(key, 0) / 10.0))
+
+            if "elementos_comunes" in datos and "travesanos" in datos["elementos_comunes"]:
+                espesor_mm = datos["elementos_comunes"]["travesanos"].get(
+                    "espesor_travesano")
+                if espesor_mm is not None:
+                    self.ent_t_espesor.delete(0, 'end')
+                    self.ent_t_espesor.insert(0, str(espesor_mm / 10.0))
+
+            if "parametros_generales" in datos:
+                esviaje = datos["parametros_generales"].get(
+                    "angulo_esviaje_puente")
+                if esviaje is not None:
+                    self.ent_t_esviaje.delete(0, 'end')
+                    self.ent_t_esviaje.insert(0, str(esviaje))
 
             nombre_archivo = os.path.basename(ruta)
             self.lbl_json_status.configure(
                 text=f"Archivo: {nombre_archivo}", text_color="#007FFF")
             self.parent_app.log_r(f"[*] JSON cargado: {nombre_archivo}")
             messagebox.showinfo(
-                "BIM", "Datos mapeados exitosamente en centímetros.")
+                "BIM", "Datos mapeados exitosamente en centímetros y grados.")
         except Exception as e:
             messagebox.showerror("Error JSON", f"Fallo al leer archivo:\n{e}")
