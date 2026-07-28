@@ -277,8 +277,7 @@ class TabArmaduras(ctk.CTkFrame):
 
         btn_viga = ctk.CTkButton(frame_botones_t, text="5. Cuadrante Viga", font=fuente_normal, fg_color="#444444",
                                  hover_color="#FFBF00", text_color="#1E1E1E", corner_radius=0, command=lambda: self.generar_travesano_cad("INT_VIGA"))
-        btn_viga.grid(row=3, column=0, columnspan=2,
-                      padx=5, pady=5, sticky="ew")
+        btn_viga.grid(row=3, column=0, columnspan=2, padx=5, pady=5, sticky="ew")
 
         frame_botones_t.grid_columnconfigure(0, weight=1)
         frame_botones_t.grid_columnconfigure(1, weight=1)
@@ -749,7 +748,7 @@ class TabArmaduras(ctk.CTkFrame):
                             (setq i_sac (1+ i_sac))
                           )
 
-                          ;; GRUPO 1 GRISES HORIZONTALES (Con Pendiente, CORREGIDO DE V3 A V14)
+                          ;; GRUPO 1 GRISES HORIZONTALES (Con Pendiente, CORREGIDO)
                           (setq m_horiz (/ (- (cadr v14) (cadr v3)) (- (car v14) (car v3))))
                           (command "._pline" "_NON" v3 "_NON" v14 "")
                           (command "._chprop" (entlast) "" "_C" "8" "")
@@ -962,7 +961,7 @@ class TabArmaduras(ctk.CTkFrame):
                           (setq half_l (/ len_viga 2.0))
                           
                           (setq y_curr (cadr v1))
-                          (setq y_min (+ (cadr v3) 0.10))
+                          (setq y_min (cadr v3))
                           
                           (while (>= y_curr y_min)
                             (command "._pline" "_NON" (list (- x_mid half_l) y_curr) "_NON" (list (+ x_mid half_l) y_curr) "")
