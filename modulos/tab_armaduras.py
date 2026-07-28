@@ -259,26 +259,44 @@ class TabArmaduras(ctk.CTkFrame):
         ctk.CTkLabel(frame_botones_t, text="II. SELECCIÓN DE CUADRANTE (AutoCAD):", font=fuente_subtitulo,
                      text_color="#007FFF").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
 
-        btn_ext_izq = ctk.CTkButton(frame_botones_t, text="1. Extremo Izquierdo", font=fuente_normal, fg_color="#444444",
-                                    hover_color="#007FFF", corner_radius=0, command=lambda: self.generar_travesano_cad("EXT_IZQ"))
-        btn_ext_izq.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
+        # Helper para dibujar el par de botones (Gen + Despiece)
+        def crear_btn_cuadrante(parent, texto, comando_gen, comando_desp, fila, col, colspan=1, is_viga=False):
+            frm = ctk.CTkFrame(parent, fg_color="transparent")
+            frm.grid(row=fila, column=col, columnspan=colspan,
+                     padx=5, pady=5, sticky="ew")
 
-        btn_ext_der = ctk.CTkButton(frame_botones_t, text="2. Extremo Derecho", font=fuente_normal, fg_color="#444444",
-                                    hover_color="#007FFF", corner_radius=0, command=lambda: self.generar_travesano_cad("EXT_DER"))
-        btn_ext_der.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+            hover_c = "#FFBF00" if is_viga else "#007FFF"
+            text_c = "#1E1E1E" if is_viga else "#DCE4EE"
 
-        btn_tope = ctk.CTkButton(frame_botones_t, text="3. Cuadrante sobre Tope", font=fuente_normal, fg_color="#444444",
-                                 hover_color="#007FFF", corner_radius=0, command=lambda: self.generar_travesano_cad("INT_TOPE"))
-        btn_tope.grid(row=2, column=0, padx=5, pady=5, sticky="ew")
+            btn_gen = ctk.CTkButton(frm, text=texto, font=fuente_normal, fg_color="#444444",
+                                    hover_color=hover_c, text_color=text_c, corner_radius=0, command=comando_gen)
+            btn_gen.pack(side="left", expand=True, fill="x")
 
-        btn_macizo = ctk.CTkButton(frame_botones_t, text="4. Cuadrante Macizo", font=fuente_normal, fg_color="#444444",
-                                   hover_color="#007FFF", corner_radius=0, command=lambda: self.generar_travesano_cad("INT_MACIZO"))
-        btn_macizo.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+            btn_desp = ctk.CTkButton(frm, text="D", font=fuente_subtitulo, corner_radius=0, width=30,
+                                     fg_color="#007FFF", hover_color="#0066CC", text_color="#FFFFFF",
+                                     command=comando_desp)
+            btn_desp.pack(side="right", padx=(2, 0))
+            return frm
 
-        btn_viga = ctk.CTkButton(frame_botones_t, text="5. Cuadrante Viga", font=fuente_normal, fg_color="#444444",
-                                 hover_color="#FFBF00", text_color="#1E1E1E", corner_radius=0, command=lambda: self.generar_travesano_cad("INT_VIGA"))
-        btn_viga.grid(row=3, column=0, columnspan=2,
-                      padx=5, pady=5, sticky="ew")
+        crear_btn_cuadrante(frame_botones_t, "1. Extremo Izquierdo",
+                            lambda: self.generar_travesano_cad("EXT_IZQ"),
+                            lambda: self.generar_despiece_travesano_cad("EXT_IZQ"), 1, 0)
+
+        crear_btn_cuadrante(frame_botones_t, "2. Extremo Derecho",
+                            lambda: self.generar_travesano_cad("EXT_DER"),
+                            lambda: self.generar_despiece_travesano_cad("EXT_DER"), 1, 1)
+
+        crear_btn_cuadrante(frame_botones_t, "3. Cuadrante sobre Tope",
+                            lambda: self.generar_travesano_cad("INT_TOPE"),
+                            lambda: self.generar_despiece_travesano_cad("INT_TOPE"), 2, 0)
+
+        crear_btn_cuadrante(frame_botones_t, "4. Cuadrante Macizo",
+                            lambda: self.generar_travesano_cad("INT_MACIZO"),
+                            lambda: self.generar_despiece_travesano_cad("INT_MACIZO"), 2, 1)
+
+        crear_btn_cuadrante(frame_botones_t, "5. Cuadrante Viga",
+                            lambda: self.generar_travesano_cad("INT_VIGA"),
+                            lambda: self.generar_despiece_travesano_cad("INT_VIGA"), 3, 0, colspan=2, is_viga=True)
 
         frame_botones_t.grid_columnconfigure(0, weight=1)
         frame_botones_t.grid_columnconfigure(1, weight=1)
@@ -346,6 +364,7 @@ class TabArmaduras(ctk.CTkFrame):
           
           (if ent
             (progn
+              (setq *SINCAL_LAST_TRAV_ENT* ent) ;; <- Guardado silencioso para el despiece
               (setq obj (vlax-ename->vla-object ent))
               (if (= (vla-get-Closed obj) :vlax-true)
                 (progn
@@ -749,7 +768,7 @@ class TabArmaduras(ctk.CTkFrame):
                             (setq i_sac (1+ i_sac))
                           )
 
-                          ;; GRUPO 1 GRISES HORIZONTALES (Con Pendiente)
+                          ;; GRUPO 1 GRISES HORIZONTALES (Con Pendiente, CORREGIDO DE V3 A V14)
                           (setq m_horiz (/ (- (cadr v14) (cadr v3)) (- (car v14) (car v3))))
                           (command "._pline" "_NON" v3 "_NON" v14 "")
                           (command "._chprop" (entlast) "" "_C" "8" "")
@@ -962,7 +981,7 @@ class TabArmaduras(ctk.CTkFrame):
                           (setq half_l (/ len_viga 2.0))
                           
                           (setq y_curr (cadr v1))
-                          (setq y_min (+ (cadr v3) 0.10))
+                          (setq y_min (cadr v3))
                           
                           (while (>= y_curr y_min)
                             (command "._pline" "_NON" (list (- x_mid half_l) y_curr) "_NON" (list (+ x_mid half_l) y_curr) "")
@@ -1415,6 +1434,307 @@ class TabArmaduras(ctk.CTkFrame):
         ruta_lisp = ruta_temp.replace("\\", "\\\\")
         threading.Thread(target=self.parent_app._hilo_comando_en_vivo, args=(
             f'(load "{ruta_lisp}") (c:SINCAL-DESPIECE)\n',), daemon=True).start()
+
+    def generar_despiece_travesano_cad(self, tipo_cuadrante):
+        try:
+            recub = float(self.ent_t_rec.get())
+            espesor = float(self.ent_t_espesor.get())
+            phi_ext = int(self.ent_t_phi_ext.get())
+            phi_horiz = int(self.ent_t_phi_horiz.get())
+            phi_estr = int(self.ent_t_phi_estr.get())
+        except ValueError:
+            return messagebox.showerror("Error", "Entradas numéricas inválidas.")
+
+        ruta_temp = os.path.join(
+            RUTA_LOCAL_APP, f"Despiece_Trav_{tipo_cuadrante}.lsp")
+
+        lisp_code = f"""(defun c:SINCAL-DESPIECE-TRAV (/ ent obj old_osnap recub_m offset_obj offset_res coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k ins_pt ins_x ins_y shift_x shift_y pts1 pts2 L1 L2 w_estr g1_min_h g1_max_h g1_qty first_x_g1 last_x_g1 g2_min_l g2_max_l g2_qty g3_min_h g3_max_h g3_qty first_x_g3 last_x_g3 h len_line L3_min L3_max L4_min L4_max L5_min L5_max h_avg l_avg txt_height m_top ang_top perp_top x1_off y1_off pt_dim_g1 pt_dim_g3)
+          (vl-load-com)
+          (setvar "CMDECHO" 0)
+          (setq old_osnap (getvar "OSMODE"))
+          (setvar "OSMODE" 0)
+          
+          (if (and (boundp '*SINCAL_LAST_TRAV_ENT*) (entget *SINCAL_LAST_TRAV_ENT*))
+            (setq ent *SINCAL_LAST_TRAV_ENT*)
+            (setq ent (car (entsel "\\n[SINCAL] Seleccione la polilinea del cuadrante: ")))
+          )
+          
+          (if (not ent)
+            (progn (alert "No hay polilinea seleccionada ni en memoria.") (exit))
+          )
+          
+          (if (not (tblsearch "DIMSTYLE" "GSG_COTAS"))
+            (alert "Estilo GSG_COTAS no encontrado, asegurese de tenerlo en su plantilla.")
+            (command "._-dimstyle" "_R" "GSG_COTAS")
+          )
+          
+          (setq obj (vlax-ename->vla-object ent))
+          (setq recub_m (/ {recub} 100.0))
+          
+          (setq offset_res (vl-catch-all-apply 'vla-offset (list obj (- recub_m))))
+          (if (not (vl-catch-all-error-p offset_res))
+            (setq offset_obj (car (vlax-safearray->list (vlax-variant-value offset_res))))
+            (progn
+              (setq offset_res (vl-catch-all-apply 'vla-offset (list obj recub_m)))
+              (if (not (vl-catch-all-error-p offset_res))
+                (setq offset_obj (car (vlax-safearray->list (vlax-variant-value offset_res))))
+              )
+            )
+          )
+          
+          (if offset_obj
+            (progn
+              (if (> (vla-get-Area offset_obj) (vla-get-Area obj))
+                (progn
+                  (vla-delete offset_obj)
+                  (setq offset_obj (car (vlax-safearray->list (vlax-variant-value (vla-offset obj recub_m)))))
+                )
+              )
+              
+              (setq coords (vlax-safearray->list (vlax-variant-value (vla-get-Coordinates offset_obj))))
+              (setq pts nil i 0)
+              (while (< i (length coords))
+                (setq pts (append pts (list (list (nth i coords) (nth (1+ i) coords)))))
+                (setq i (+ i 2))
+              )
+              
+              (if (and (= "{tipo_cuadrante}" "EXT_IZQ") (= (length pts) 10))
+                (progn
+                  (setq pts_by_x (vl-sort pts '(lambda (a b) (< (car a) (car b)))))
+                  (setq left_pts (list (nth 0 pts_by_x) (nth 1 pts_by_x)))
+                  (setq right_pts (list (nth 8 pts_by_x) (nth 9 pts_by_x)))
+                  (setq mid_pts (list (nth 2 pts_by_x) (nth 3 pts_by_x) (nth 4 pts_by_x) (nth 5 pts_by_x) (nth 6 pts_by_x) (nth 7 pts_by_x)))
+                  
+                  (if (> (cadr (car left_pts)) (cadr (cadr left_pts)))
+                    (setq v1 (car left_pts) v2 (cadr left_pts))
+                    (setq v1 (cadr left_pts) v2 (car left_pts)))
+                    
+                  (if (> (cadr (car right_pts)) (cadr (cadr right_pts)))
+                    (setq v8 (car right_pts) v7 (cadr right_pts))
+                    (setq v8 (cadr right_pts) v7 (car right_pts)))
+                    
+                  (setq mid_by_y (vl-sort mid_pts '(lambda (a b) (< (cadr a) (cadr b)))))
+                  (setq lowest_two (list (nth 0 mid_by_y) (nth 1 mid_by_y)))
+                  (setq highest_two (list (nth 4 mid_by_y) (nth 5 mid_by_y)))
+                  (setq middle_two (list (nth 2 mid_by_y) (nth 3 mid_by_y)))
+                  
+                  (if (< (car (car lowest_two)) (car (cadr lowest_two)))
+                    (setq v4 (car lowest_two) v5 (cadr lowest_two))
+                    (setq v4 (cadr lowest_two) v5 (car lowest_two)))
+                    
+                  (if (< (car (car highest_two)) (car (cadr highest_two)))
+                    (setq v10 (car highest_two) v9 (cadr highest_two))
+                    (setq v10 (cadr highest_two) v9 (car highest_two)))
+                    
+                  (if (< (car (car middle_two)) (car (cadr middle_two)))
+                    (setq v3 (car middle_two) v6 (cadr middle_two))
+                    (setq v3 (cadr middle_two) v6 (car middle_two)))
+
+                  (setq m_top (/ (- (cadr v10) (cadr v1)) (- (car v10) (car v1))))
+                  (setq ang_top (atan m_top))
+                  (setq perp_top (+ ang_top (/ pi 2.0)))
+                  (setq x1_off (+ (car v1) (* 0.18 (cos perp_top))))
+                  (setq y1_off (+ (cadr v1) (* 0.18 (sin perp_top))))
+                  (defun get-y-losa (x_target / ) (+ y1_off (* m_top (- x_target x1_off))))
+
+                  (setq y_ext (get-y-losa (car v1)))
+                  
+                  (setq dx (- (car v3) (car v2)))
+                  (setq dy (- (cadr v3) (cadr v2)))
+                  (setq t_val (/ (- (cadr v4) (cadr v3)) dy))
+                  (setq x_end (+ (car v3) (* t_val dx)))
+                  
+                  ;;; ACUMULAR G1
+                  (setq g1_min_h 9999.0 g1_max_h -9999.0 g1_qty 0)
+                  (setq first_x_g1 nil last_x_g1 nil)
+                  (setq x_curr (+ (car v1) 0.20))
+                  (while (< x_curr (car v3))
+                    (if (not first_x_g1) (setq first_x_g1 x_curr))
+                    (setq last_x_g1 x_curr)
+                    (setq ray_start (list x_curr (+ (get-y-losa x_curr) 1.0) 0.0))
+                    (setq ray_end (list x_curr (- (cadr v4) 1.0) 0.0))
+                    (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                    (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                    (if int_pts
+                      (progn
+                        (setq min_y (cadr int_pts) k 4)
+                        (while (< k (length int_pts))
+                          (setq min_y (min min_y (nth k int_pts)))
+                          (setq k (+ k 3))
+                        )
+                        (setq h (- (get-y-losa x_curr) min_y))
+                        (setq g1_min_h (min g1_min_h h) g1_max_h (max g1_max_h h))
+                        (setq g1_qty (1+ g1_qty))
+                      )
+                    )
+                    (vla-delete ray_obj)
+                    (setq x_curr (+ x_curr 0.20))
+                  )
+                  
+                  ;;; ACUMULAR G3 (Estribos bajo viga a la derecha)
+                  (setq g3_min_h 9999.0 g3_max_h -9999.0 g3_qty 0)
+                  (setq first_x_g3 nil last_x_g3 nil)
+                  (setq x_curr (car v9))
+                  (while (>= x_curr (car v10))
+                    (if (not first_x_g3) (setq first_x_g3 x_curr))
+                    (setq last_x_g3 x_curr)
+                    (setq ray_start (list x_curr (+ (cadr v8) 1.0) 0.0))
+                    (setq ray_end (list x_curr (- (cadr v4) 1.0) 0.0))
+                    (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                    (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                    (if int_pts
+                      (progn
+                        (setq min_y (cadr int_pts) k 4)
+                        (while (< k (length int_pts))
+                          (setq min_y (min min_y (nth k int_pts)))
+                          (setq k (+ k 3))
+                        )
+                        (setq h (- (cadr v8) min_y))
+                        (setq g3_min_h (min g3_min_h h) g3_max_h (max g3_max_h h))
+                        (setq g3_qty (1+ g3_qty))
+                      )
+                    )
+                    (vla-delete ray_obj)
+                    (setq x_curr (- x_curr 0.20))
+                  )
+
+                  ;;; ACUMULAR G2 (Magentas)
+                  (setq g2_min_l 9999.0 g2_max_l -9999.0 g2_qty 0)
+                  (setq y_curr (cadr v8))
+                  (while (>= y_curr (cadr v7))
+                    (setq ray_start (list (- (car v2) 2.0) y_curr 0.0))
+                    (setq ray_end (list (+ (car v8) 2.0) y_curr 0.0))
+                    (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                    (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                    (if int_pts
+                      (progn
+                        (setq min_x (car int_pts) k 3)
+                        (while (< k (length int_pts))
+                          (setq min_x (min min_x (nth k int_pts)))
+                          (setq k (+ k 3))
+                        )
+                        (setq len_line (- (+ (car v8) 1.00) min_x))
+                        (setq g2_min_l (min g2_min_l len_line) g2_max_l (max g2_max_l len_line))
+                        (setq g2_qty (1+ g2_qty))
+                      )
+                    )
+                    (vla-delete ray_obj)
+                    (setq y_curr (- y_curr 0.20))
+                  )
+                  
+                  (vla-delete offset_obj)
+
+                  ;;; DIBUJAR COTAS EN PLANO A Y_MAX + 0.15m PARA ALINEARLAS
+                  (setvar "OSMODE" 0)
+                  (if (> g1_qty 0)
+                    (progn
+                      (setq pt_dim_g1 (list (/ (+ first_x_g1 last_x_g1) 2.0) (+ y_ext 0.15)))
+                      (command "_.DIMALIGNED" "_NON" (list first_x_g1 y_ext) "_NON" (list last_x_g1 y_ext) "_T" (strcat "%%c" (itoa {phi_estr}) " @20") "_NON" pt_dim_g1)
+                    )
+                  )
+                  (if (> g3_qty 0)
+                    (progn
+                      (setq pt_dim_g3 (list (/ (+ first_x_g3 last_x_g3) 2.0) (+ y_ext 0.15)))
+                      (command "_.DIMALIGNED" "_NON" (list last_x_g3 y_ext) "_NON" (list first_x_g3 y_ext) "_T" (strcat "%%c" (itoa {phi_estr}) " @20") "_NON" pt_dim_g3)
+                    )
+                  )
+
+                  ;;; SOLICITAR PUNTO DE INSERCIÓN DEL DESPIECE
+                  (setvar "OSMODE" old_osnap)
+                  (setq ins_pt (getpoint "\\n[SINCAL] Clic para insertar tabla de despiece: "))
+                  (setvar "OSMODE" 0)
+                  
+                  (if ins_pt
+                    (progn
+                      (defun draw-text (pt_txt txt_str align)
+                        (setq txt_height (cdr (assoc 40 (tblsearch "STYLE" (getvar "TEXTSTYLE")))))
+                        (if (= txt_height 0.0)
+                          (command "._TEXT" "_J" align "_NON" pt_txt "0.20" "0" txt_str)
+                          (command "._TEXT" "_J" align "_NON" pt_txt "0" txt_str)
+                        )
+                        (command "._chprop" (entlast) "" "_C" "3" "")
+                      )
+
+                      (setq ins_x (car ins_pt) ins_y (cadr ins_pt))
+                      
+                      ;; 1. Rojo 1
+                      (setq shift_x (- ins_x (car v1)) shift_y (- ins_y y_ext))
+                      (setq pts1 (list
+                        (list (+ (car v1) shift_x) (+ y_ext shift_y))
+                        (list (+ (car v1) shift_x) (+ (cadr v1) shift_y))
+                        (list (+ (car v2) shift_x) (+ (cadr v2) shift_y))
+                        (list (+ (car v3) shift_x) (+ (cadr v3) shift_y))
+                        (list (+ x_end shift_x) (+ (cadr v4) shift_y))
+                      ))
+                      (command "._pline") (foreach p pts1 (command "_NON" p)) (command "")
+                      (command "._chprop" (entlast) "" "_C" "1" "")
+                      (setq L1 (+ (- y_ext (cadr v1)) (distance v1 v2) (distance v2 v3) (distance v3 (list x_end (cadr v4)))))
+                      (draw-text (list (+ ins_x 0.5) (- ins_y 1.0)) (strcat "(1) 2 %%c" (itoa {phi_ext}) " L= " (rtos L1 2 2)) "_TL")
+
+                      ;; 2. Rojo 2
+                      (setq ins_y (- ins_y 3.0))
+                      (setq shift_x (- ins_x (car v8)) shift_y (- ins_y (cadr v8)))
+                      (setq pts2 (list
+                        (list (+ (car v8) shift_x) (+ (cadr v8) shift_y))
+                        (list (+ (car v7) shift_x) (+ (cadr v7) shift_y))
+                        (list (+ (car v6) shift_x) (+ (cadr v6) shift_y))
+                        (list (+ (car v5) shift_x) (+ (cadr v5) shift_y))
+                        (list (+ (car v4) shift_x) (+ (cadr v4) shift_y))
+                        (list (+ (car v4) shift_x) (+ (get-y-losa (car v4)) shift_y))
+                      ))
+                      (command "._pline") (foreach p pts2 (command "_NON" p)) (command "")
+                      (command "._chprop" (entlast) "" "_C" "1" "")
+                      (setq L2 (+ (distance v8 v7) (distance v7 v6) (distance v6 v5) (distance v5 v4) (- (get-y-losa (car v4)) (cadr v4))))
+                      (draw-text (list (+ ins_x 0.5) (- ins_y 1.0)) (strcat "(2) 2 %%c" (itoa {phi_ext}) " L= " (rtos L2 2 2)) "_TL")
+
+                      ;; 3. Estribos G1
+                      (setq ins_y (- ins_y 3.0))
+                      (setq w_estr (- (/ {espesor} 100.0) (* 2 recub_m)))
+                      (setq h_avg (/ (+ g1_min_h g1_max_h) 2.0))
+                      (command "._pline" "_NON" (list ins_x ins_y) "_NON" (list (+ ins_x w_estr) ins_y) "_NON" (list (+ ins_x w_estr) (- ins_y h_avg)) "_NON" (list ins_x (- ins_y h_avg)) "_C")
+                      (command "._chprop" (entlast) "" "_C" "3" "")
+                      (setq L3_min (+ (* 2 w_estr) (* 2 g1_min_h) 0.30))
+                      (setq L3_max (+ (* 2 w_estr) (* 2 g1_max_h) 0.30))
+                      (draw-text (list (+ ins_x 0.5) (- ins_y h_avg 0.5)) (strcat "(3) " (itoa g1_qty) " %%c" (itoa {phi_estr}) " @20 L= VAR. " (rtos L3_min 2 2) " - " (rtos L3_max 2 2)) "_TL")
+
+                      ;; 4. Magentas
+                      (setq ins_y (- ins_y 3.0))
+                      (setq l_avg (/ (+ g2_min_l g2_max_l) 2.0))
+                      (command "._pline" "_NON" (list ins_x (- ins_y 0.15)) "_NON" (list ins_x ins_y) "_NON" (list (+ ins_x l_avg) ins_y) "_NON" (list (+ ins_x l_avg) (- ins_y 0.15)) "")
+                      (command "._chprop" (entlast) "" "_C" "6" "")
+                      (setq L4_min (+ g2_min_l 0.30))
+                      (setq L4_max (+ g2_max_l 0.30))
+                      (draw-text (list (+ ins_x 0.5) (- ins_y 0.5)) (strcat "(4) " (itoa (* g2_qty 2)) " %%c" (itoa {phi_horiz}) " @20 L= VAR. " (rtos L4_min 2 2) " - " (rtos L4_max 2 2)) "_TL")
+
+                      ;; 5. Estribos G3 (Derecha)
+                      (setq ins_y (- ins_y 3.0))
+                      (setq h_avg (/ (+ g3_min_h g3_max_h) 2.0))
+                      (command "._pline" "_NON" (list ins_x ins_y) "_NON" (list (+ ins_x w_estr) ins_y) "_NON" (list (+ ins_x w_estr) (- ins_y h_avg)) "_NON" (list ins_x (- ins_y h_avg)) "_C")
+                      (command "._chprop" (entlast) "" "_C" "3" "")
+                      (setq L5_min (+ (* 2 w_estr) (* 2 g3_min_h) 0.30))
+                      (setq L5_max (+ (* 2 w_estr) (* 2 g3_max_h) 0.30))
+                      (draw-text (list (+ ins_x 0.5) (- ins_y h_avg 0.5)) (strcat "(5) " (itoa g3_qty) " %%c" (itoa {phi_estr}) " @20 L= VAR. " (rtos L5_min 2 2) " - " (rtos L5_max 2 2)) "_TL")
+                      
+                      (princ "\\n[OK] Despiece generado exitosamente.")
+                    )
+                    (princ "\\n[X] Operacion cancelada por el usuario.")
+                  )
+                )
+                (alert "El cuadrante seleccionado o en memoria no coincide con EXT_IZQ.")
+              )
+            )
+          )
+          (setvar "OSMODE" old_osnap)
+          (princ)
+        )"""
+
+        with open(ruta_temp, 'w', encoding='utf-8') as f:
+            f.write(lisp_code)
+
+        self.parent_app.cancelar_comando_vivo = False
+        ruta_lisp = ruta_temp.replace("\\", "\\\\")
+        threading.Thread(target=self.parent_app._hilo_comando_en_vivo, args=(
+            f'(load "{ruta_lisp}") (c:SINCAL-DESPIECE-TRAV)\n',), daemon=True).start()
 
     def cargar_json_bim(self):
         ruta = filedialog.askopenfilename(
