@@ -307,9 +307,6 @@ class TabArmaduras(ctk.CTkFrame):
         frame_botones_t.grid_columnconfigure(0, weight=1)
         frame_botones_t.grid_columnconfigure(1, weight=1)
 
-    # =========================================================
-    # FUNCIONES INTERACTIVAS (Visores)
-    # =========================================================
     def mostrar_ayuda_travesano(self):
         visor = ctk.CTkToplevel(self)
         visor.title("SINCAL - Ayuda Cuadrantes de Travesaño")
@@ -337,9 +334,6 @@ class TabArmaduras(ctk.CTkFrame):
             ctk.CTkLabel(
                 visor, text=f"No se encontró la imagen de ayuda en:\n{ruta_img}\n\nPor favor, guarda el DXF como 'ayuda_travesano.png' en la carpeta 'mapas'.").pack(pady=20)
 
-    # =========================================================
-    # FUNCIONES DE EJECUCIÓN (AutoCAD)
-    # =========================================================
     def generar_travesano_cad(self, tipo_cuadrante):
         try:
             recub = float(self.ent_t_rec.get())
@@ -372,7 +366,7 @@ class TabArmaduras(ctk.CTkFrame):
           
           (if ent
             (progn
-              (setq *SINCAL_LAST_TRAV_ENT* ent) ;; <- Guardado silencioso para el despiece
+              (setq *SINCAL_TRAV_HANDLE* (cdr (assoc 5 (entget ent)))) ;; Guarda el ID persistente de la polilinea
               (setq obj (vlax-ename->vla-object ent))
               (if (= (vla-get-Closed obj) :vlax-true)
                 (progn
@@ -687,7 +681,7 @@ class TabArmaduras(ctk.CTkFrame):
                           )
                           
                           (vla-delete offset_obj)
-                          (princ "\\n[OK] Enfierradura inyectada y acotada (Extremo Derecho).")
+                          (princ "\\n[OK] Enfierradura inyectada y auditada (Extremo Derecho).")
                         )
 
                         ;; ========================================================
@@ -1106,13 +1100,16 @@ class TabArmaduras(ctk.CTkFrame):
           (setq old_osnap (getvar "OSMODE"))
           (setvar "OSMODE" 0)
           
-          (if (and (boundp '*SINCAL_LAST_TRAV_ENT*) (entget *SINCAL_LAST_TRAV_ENT*))
-            (setq ent *SINCAL_LAST_TRAV_ENT*)
-            (setq ent (car (entsel "\\n[SINCAL] Seleccione la polilinea del cuadrante: ")))
+          (setq ent nil)
+          (if (boundp '*SINCAL_TRAV_HANDLE*)
+            (setq ent (handent *SINCAL_TRAV_HANDLE*))
           )
           
-          (if (not ent)
-            (progn (alert "No hay polilinea en memoria.") (exit))
+          (if (or (not ent) (not (entget ent)))
+            (progn 
+              (alert "Error: No se encontro el cuadrante en memoria.\\n\\nPor favor, genera el cuadrante haciendo clic en su boton principal (1, 2, 3, 4 o 5) y luego, inmediatamente, presiona el boton 'D'.")
+              (exit)
+            )
           )
           
           (if (not (tblsearch "DIMSTYLE" "GSG_ARM-COTAS"))
@@ -1687,7 +1684,7 @@ class TabArmaduras(ctk.CTkFrame):
                   )
                 )
 
-                (t (alert "La polilinea en memoria no coincide con el cuadrante seleccionado."))
+                (t (alert "Error: El cuadrante en memoria no coincide o fue borrado. Por favor vuelve a hacer clic en Generar cuadrante antes de pedir el despiece."))
               )
             )
             (alert "Fallo interno al procesar el recubrimiento de la polilinea.")
