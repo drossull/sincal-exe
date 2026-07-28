@@ -591,8 +591,8 @@ class TabArmaduras(ctk.CTkFrame):
                               (setq x_curr (- x_curr 0.20))
                             )
                             
-                            ;; 5. VERDES G2 (Inner Step, de V3 hacia V2 en X+)
-                            (setq x_curr (car v3))
+                            ;; 5. VERDES G2 (Inner Step, de V4 hacia V2 en X+) - CORREGIDO PUNTO Y MAXIMO
+                            (setq x_curr (car v4))
                             (while (<= x_curr (car v2))
                               (setq ray_start (list x_curr (+ (cadr v4) 1.0) 0.0))
                               (setq ray_end (list x_curr (- (cadr v8) 1.0) 0.0))
