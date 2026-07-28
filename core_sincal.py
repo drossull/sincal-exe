@@ -123,19 +123,17 @@ class ActualizadorCAD(ctk.CTk):
                                          hover_color="#555555", border_width=1, border_color="#444444", corner_radius=5, command=self.mostrar_ventana_log)
         self.btn_consola.place(relx=0.97, rely=0.03, anchor="ne")
 
-        # Redirige el botón "X" de Windows a nuestra función de la bandeja
         self.protocol("WM_DELETE_WINDOW", self.ocultar_a_bandeja)
 
         if getattr(sys, 'frozen', False):
             self.configurar_inicio_con_windows()
         threading.Thread(target=self.cargar_info_github, daemon=True).start()
-        # NOTA: El Thread del verificador automático ha sido borrado para no molestar.
 
     # ==========================================================
     # LÓGICA DE WINDOWS (SYSTEM TRAY / AUTOSTART)
     # ==========================================================
     def ocultar_a_bandeja(self):
-        self.withdraw()  # Oculta la ventana principal
+        self.withdraw()
         try:
             ruta_logo = ruta_recurso('logo.ico')
             icono = Image.open(ruta_logo).convert("RGBA")
@@ -266,7 +264,6 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkButton(botones_sec_frame, text="Reparar / Forzar PATH", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_TITULO,
                       corner_radius=0, text_color=COLOR_TITULO, hover_color="#444444", command=self.forzar_path_manual).pack(side="left", padx=10)
 
-        # NUEVO BOTÓN MANUAL DE ACTUALIZACIÓN
         self.btn_verificar_update = ctk.CTkButton(botones_sec_frame, text="Verificar nueva actualización", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color="#00FF00",
                                                   corner_radius=0, text_color="#00FF00", hover_color="#444444", command=self.verificar_actualizacion_manual)
         self.btn_verificar_update.pack(side="left", padx=10)
@@ -714,6 +711,19 @@ class ActualizadorCAD(ctk.CTk):
         self.actualizar_variable_entorno()
         self.log("[!] PATH y Registro CAD reparados.")
 
+    def reiniciar_aplicacion(self):
+        """Mata el hilo de la bandeja, purga la RAM de Python y reinicia SINCAL limpio."""
+        try:
+            if hasattr(self, 'icono_bandeja'):
+                self.icono_bandeja.stop()
+        except:
+            pass
+
+        # Filtramos la etiqueta background en caso de que se haya lanzado manualmente
+        argumentos = [arg for arg in sys.argv if arg != "--background"]
+        subprocess.Popen([sys.executable] + argumentos[1:])
+        os._exit(0)
+
     def iniciar_actualizacion_hilo(self):
         self.btn_actualizar.configure(
             state="disabled", text="Sincronizando...")
@@ -783,9 +793,12 @@ class ActualizadorCAD(ctk.CTk):
             self.mostrar_notificacion(
                 "SINCAL Actualizado", f"Instalada versión {self.version_local_actual}")
 
+            self.log(
+                "\n[!] Aplicando cambios... Reiniciando SINCAL en 3 segundos.")
+            self.after(3000, self.reiniciar_aplicacion)
+
         except Exception as e:
             self.log(f"[!] Error crítico en actualización: {e}")
-        finally:
             self.btn_actualizar.configure(
                 state="normal", text="Instalar / Actualizar Todo")
 
