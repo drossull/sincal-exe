@@ -268,38 +268,39 @@ class TabArmaduras(ctk.CTkFrame):
 
         def crear_btn_cuadrante(parent, texto, comando_gen, comando_desp, fila, col, colspan=1, is_viga=False):
             frm = ctk.CTkFrame(parent, fg_color="transparent")
-            frm.grid(row=fila, column=col, columnspan=colspan, padx=5, pady=5, sticky="ew")
-            
+            frm.grid(row=fila, column=col, columnspan=colspan,
+                     padx=5, pady=5, sticky="ew")
+
             hover_c = "#FFBF00" if is_viga else "#007FFF"
             text_c = "#1E1E1E" if is_viga else "#DCE4EE"
-            
+
             btn_gen = ctk.CTkButton(frm, text=texto, font=fuente_normal, fg_color="#444444",
                                     hover_color=hover_c, text_color=text_c, corner_radius=0, command=comando_gen)
             btn_gen.pack(side="left", expand=True, fill="x")
-            
+
             btn_desp = ctk.CTkButton(frm, text="D", font=fuente_subtitulo, corner_radius=0, width=30,
-                                  fg_color="#007FFF", hover_color="#0066CC", text_color="#FFFFFF",
-                                  command=comando_desp)
+                                     fg_color="#007FFF", hover_color="#0066CC", text_color="#FFFFFF",
+                                     command=comando_desp)
             btn_desp.pack(side="right", padx=(2, 0))
             return frm
 
-        crear_btn_cuadrante(frame_botones_t, "1. Extremo Izquierdo", 
+        crear_btn_cuadrante(frame_botones_t, "1. Extremo Izquierdo",
                             lambda: self.generar_travesano_cad("EXT_IZQ"),
                             lambda: self.generar_despiece_travesano_cad("EXT_IZQ"), 1, 0)
-        
-        crear_btn_cuadrante(frame_botones_t, "2. Extremo Derecho", 
+
+        crear_btn_cuadrante(frame_botones_t, "2. Extremo Derecho",
                             lambda: self.generar_travesano_cad("EXT_DER"),
                             lambda: self.generar_despiece_travesano_cad("EXT_DER"), 1, 1)
 
-        crear_btn_cuadrante(frame_botones_t, "3. Cuadrante sobre Tope", 
+        crear_btn_cuadrante(frame_botones_t, "3. Cuadrante sobre Tope",
                             lambda: self.generar_travesano_cad("INT_TOPE"),
                             lambda: self.generar_despiece_travesano_cad("INT_TOPE"), 2, 0)
 
-        crear_btn_cuadrante(frame_botones_t, "4. Cuadrante Macizo", 
+        crear_btn_cuadrante(frame_botones_t, "4. Cuadrante Macizo",
                             lambda: self.generar_travesano_cad("INT_MACIZO"),
                             lambda: self.generar_despiece_travesano_cad("INT_MACIZO"), 2, 1)
 
-        crear_btn_cuadrante(frame_botones_t, "5. Cuadrante Viga", 
+        crear_btn_cuadrante(frame_botones_t, "5. Cuadrante Viga",
                             lambda: self.generar_travesano_cad("INT_VIGA"),
                             lambda: self.generar_despiece_travesano_cad("INT_VIGA"), 3, 0, colspan=2, is_viga=True)
 
@@ -686,7 +687,7 @@ class TabArmaduras(ctk.CTkFrame):
                           )
                           
                           (vla-delete offset_obj)
-                          (princ "\\n[OK] Enfierradura inyectada y auditada (Extremo Derecho).")
+                          (princ "\\n[OK] Enfierradura inyectada y acotada (Extremo Derecho).")
                         )
 
                         ;; ========================================================
@@ -1096,8 +1097,9 @@ class TabArmaduras(ctk.CTkFrame):
         except ValueError:
             return messagebox.showerror("Error", "Entradas numéricas inválidas.")
 
-        ruta_temp = os.path.join(RUTA_LOCAL_APP, f"Despiece_Trav_{tipo_cuadrante}.lsp")
-        
+        ruta_temp = os.path.join(
+            RUTA_LOCAL_APP, f"Despiece_Trav_{tipo_cuadrante}.lsp")
+
         lisp_code = f"""(defun c:SINCAL-DESPIECE-TRAV (/ ent obj old_osnap recub_m offset_obj offset_res coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k ins_pt ins_x ins_y shift_x shift_y pts1 pts2 L1 L2 w_estr g1_min_h g1_max_h g1_qty first_x_g1 last_x_g1 g2_min_l g2_max_l g2_qty g3_min_h g3_max_h g3_qty first_x_g3 last_x_g3 h len_line L3_min L3_max L4_min L4_max L5_min L5_max h_avg l_avg txt_height m_top ang_top perp_top x1_off y1_off pts_by_y pair1 pair2 pair3 pair4 pair5 pair6 bot4 dist_sacado num_spaces step_sacado pad_g3 i_sac m_horiz offset_h y_L y_R y_limit real_y_L real_y_R m_cyan_L y_mid_L x_start_L y_start_L m_cyan_R y_mid_R x_end_R y_end_R len_viga half_l x_mid y_min ang_hk_L ang_hk_R l_min l_max spa hk1 hk2 rad text_str p_dim_w p_dim_h p_dim_hk g_gri_min_l g_gri_max_l g_gri_qty len_cyan_L len_cyan_R g_qty)
           (vl-load-com)
           (setvar "CMDECHO" 0)
@@ -1161,6 +1163,7 @@ class TabArmaduras(ctk.CTkFrame):
 
           (defun draw-stirrup (ins_p w h phi_m phi_val mark qty l_mi l_ma spa / pA pB pC pD hkA hkB rad text_str L_min L_max)
             (setq rad (* 3.0 phi_m))
+            (setvar "FILLETRAD" rad)
             (setq pA (list (car ins_p) (+ (cadr ins_p) h)))
             (setq pB (list (car ins_p) (cadr ins_p)))
             (setq pC (list (+ (car ins_p) w) (cadr ins_p)))
@@ -1168,6 +1171,7 @@ class TabArmaduras(ctk.CTkFrame):
             (setq hkA (polar pA (deg2rad 315) 0.15))
             (setq hkB (polar pD (deg2rad 225) 0.15))
             (command "._pline" "_NON" hkA "_NON" pA "_NON" pB "_NON" pC "_NON" pD "_NON" hkB "")
+            (command "._fillet" "P" (entlast))
             (command "._chprop" (entlast) "" "_C" "5" "")
             
             (setq L_min (* (+ (* 2.0 w) (* 2.0 l_mi) 0.30) 100.0))
@@ -1185,18 +1189,18 @@ class TabArmaduras(ctk.CTkFrame):
             (command "_.DIMALIGNED" "_NON" pA "_NON" hkA "_T" "15" "_NON" (polar pA (deg2rad 135) 0.15))
           )
 
-          (defun draw-l-bar (ins_p l_bar hk_len ang_hk phi_m phi_val mark qty l_mi l_ma spa is_right / pA pB pC rad text_str L_min L_max)
+          (defun draw-l-bar (ins_p l_bar hk_len ang_deg phi_m phi_val mark qty l_mi l_ma spa is_right / pA pB pC rad text_str L_min L_max)
             (setvar "FILLETRAD" (* 3.0 phi_m))
             (if is_right
               (progn
                 (setq pA (list (car ins_p) (cadr ins_p)))
                 (setq pB (list (+ (car ins_p) l_bar) (cadr ins_p)))
-                (setq pC (polar pB ang_hk hk_len))
+                (setq pC (polar pB (deg2rad (+ 90 ang_deg)) hk_len))
               )
               (progn
                 (setq pB (list (car ins_p) (cadr ins_p)))
                 (setq pC (list (+ (car ins_p) l_bar) (cadr ins_p)))
-                (setq pA (polar pB ang_hk hk_len))
+                (setq pA (polar pB (deg2rad (- 90 ang_deg)) hk_len))
               )
             )
             (command "._pline" "_NON" pA "_NON" pB "_NON" pC "")
@@ -1212,7 +1216,7 @@ class TabArmaduras(ctk.CTkFrame):
               (command "_.DIMALIGNED" "_NON" (if is_right pA pB) "_NON" (if is_right pB pC) "_T" (rtos (* l_mi 100) 2 0) "_NON" (list (+ (car ins_p) (/ l_bar 2.0)) (+ (cadr ins_p) 0.2)))
               (command "_.DIMALIGNED" "_NON" (if is_right pA pB) "_NON" (if is_right pB pC) "_T" (strcat "VAR. " (rtos (* l_mi 100) 2 0) "-" (rtos (* l_ma 100) 2 0)) "_NON" (list (+ (car ins_p) (/ l_bar 2.0)) (+ (cadr ins_p) 0.2)))
             )
-            (command "_.DIMALIGNED" "_NON" (if is_right pB pA) "_NON" (if is_right pC pB) "_T" (rtos (* hk_len 100) 2 0) "_NON" (polar (if is_right pB pA) (+ ang_hk (/ pi 2.0)) 0.2))
+            (command "_.DIMALIGNED" "_NON" (if is_right pB pA) "_NON" (if is_right pC pB) "_T" (rtos (* hk_len 100) 2 0) "_NON" (polar (if is_right pB pA) (+ (deg2rad (+ 90 ang_deg)) (/ pi 2.0)) 0.2))
           )
 
           (defun draw-str-bar (ins_p l_bar phi_m phi_val mark qty l_mi l_ma spa / pA pB text_str L_min L_max)
@@ -1221,8 +1225,13 @@ class TabArmaduras(ctk.CTkFrame):
             (command "._chprop" (entlast) "" "_C" "5" "")
             (setq L_min (* l_mi 100.0) L_max (* l_ma 100.0))
             (if (= l_mi l_ma)
-              (setq text_str (strcat "(" mark ") " (itoa qty) " %%c" (itoa phi_val) " @" (rtos (* spa 100) 2 0) " L= " (rtos L_min 2 0)))
+              (setq text_str (strcat "(" mark ") " (itoa qty) " %%c" (itoa phi_val) " L= " (rtos L_min 2 0)))
               (setq text_str (strcat "(" mark ") " (itoa qty) " %%c" (itoa phi_val) " @" (rtos (* spa 100) 2 0) " L= VAR. " (rtos L_min 2 0) " - " (rtos L_max 2 0)))
+            )
+            (if (> spa 0.0)
+              (if (= l_mi l_ma)
+                (setq text_str (strcat "(" mark ") " (itoa qty) " %%c" (itoa phi_val) " @" (rtos (* spa 100) 2 0) " L= " (rtos L_min 2 0)))
+              )
             )
             (draw-text (list (+ (car ins_p) (/ l_bar 2.0)) (- (cadr ins_p) 1.0)) text_str "_TC")
             (if (= l_mi l_ma)
@@ -1330,7 +1339,7 @@ class TabArmaduras(ctk.CTkFrame):
                       (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g1_min_h g1_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "3" (* g1_qty {cant_trav}) g1_min_h g1_max_h 0.20)
                       
                       (setq ins_y (- ins_y (+ (/ (+ g1_min_h g1_max_h) 2.0) 3.0)))
-                      (draw-l-bar (list ins_x ins_y 0.0) (/ (+ g2_min_l g2_max_l) 2.0) w_estr (deg2rad (+ 90 {esviaje})) (/ {phi_horiz} 1000.0) {phi_horiz} "4" (* (* g2_qty 2) {cant_trav}) g2_min_l g2_max_l 0.20 nil)
+                      (draw-l-bar (list ins_x ins_y 0.0) (/ (+ g2_min_l g2_max_l) 2.0) w_estr {esviaje} (/ {phi_horiz} 1000.0) {phi_horiz} "4" (* (* g2_qty 2) {cant_trav}) g2_min_l g2_max_l 0.20 nil)
                       
                       (setq ins_y (- ins_y 4.0))
                       (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g3_min_h g3_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "5" (* g3_qty {cant_trav}) g3_min_h g3_max_h 0.20)
@@ -1422,7 +1431,7 @@ class TabArmaduras(ctk.CTkFrame):
                       (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g1_min_h g1_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "3" (* g1_qty {cant_trav}) g1_min_h g1_max_h 0.20)
                       
                       (setq ins_y (- ins_y (+ (/ (+ g1_min_h g1_max_h) 2.0) 3.0)))
-                      (draw-l-bar (list ins_x ins_y 0.0) (/ (+ g2_min_l g2_max_l) 2.0) w_estr (deg2rad (+ 90 {esviaje})) (/ {phi_horiz} 1000.0) {phi_horiz} "4" (* (* g2_qty 2) {cant_trav}) g2_min_l g2_max_l 0.20 t)
+                      (draw-l-bar (list ins_x ins_y 0.0) (/ (+ g2_min_l g2_max_l) 2.0) w_estr {esviaje} (/ {phi_horiz} 1000.0) {phi_horiz} "4" (* (* g2_qty 2) {cant_trav}) g2_min_l g2_max_l 0.20 t)
                       
                       (setq ins_y (- ins_y 4.0))
                       (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g3_min_h g3_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "5" (* g3_qty {cant_trav}) g3_min_h g3_max_h 0.20)
@@ -1536,20 +1545,27 @@ class TabArmaduras(ctk.CTkFrame):
                       (setq ins_y (- ins_y 4.0))
                       (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g1_min_h g1_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "4" (* g1_qty {cant_trav}) g1_min_h g1_max_h 0.20)
                       
-                      (setq ins_y (- ins_y (+ (/ (+ g1_min_h g1_max_h) 2.0) 3.0)))
+                      (setq ins_y (- ins_y (+ (/ (+ g2_min_h g2_max_h) 2.0) 3.0)))
                       (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g2_min_h g2_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "5" (* g2_qty {cant_trav}) g2_min_h g2_max_h 0.20)
                       
-                      (setq ins_y (- ins_y (+ (/ (+ g2_min_h g2_max_h) 2.0) 3.0)))
+                      (setq ins_y (- ins_y (+ (/ (+ g3_min_h g3_max_h) 2.0) 3.0)))
                       (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g3_min_h g3_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "6" (* g3_qty {cant_trav}) g3_min_h g3_max_h 0.20)
 
                       (setq ins_y (- ins_y (+ (/ (+ g3_min_h g3_max_h) 2.0) 3.0)))
-                      (draw-str-bar (list ins_x ins_y 0.0) (/ (+ g_gri_min_l g_gri_max_l) 2.0) (/ {phi_horiz} 1000.0) {phi_horiz} "7" (* (* g_gri_qty 2) {cant_trav}) g_gri_min_l g_gri_max_l 0.20)
+                      (draw-str-bar (list ins_x ins_y 0.0) (/ (+ g_gri_min_l g_gri_max_l) 2.0) (/ {phi_horiz} 1000.0) {phi_horiz} "7" (* (* g_gri_qty 2) {cant_trav}) g_gri_min_l g_gri_max_l 0.0)
 
-                      (setq ins_y (- ins_y 3.0))
-                      (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr (deg2rad (+ 90 {esviaje})) (/ {phi_horiz} 1000.0) {phi_horiz} "8" (* 2 {cant_trav}) len_cyan_L len_cyan_L 0.0 nil)
-                      
-                      (setq ins_y (- ins_y 3.0))
-                      (draw-l-bar (list ins_x ins_y 0.0) len_cyan_R w_estr (deg2rad (+ 90 {esviaje})) (/ {phi_horiz} 1000.0) {phi_horiz} "9" (* 2 {cant_trav}) len_cyan_R len_cyan_R 0.0 t)
+                      (if (< (abs (- len_cyan_L len_cyan_R)) 0.01)
+                        (progn
+                          (setq ins_y (- ins_y 3.0))
+                          (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr {esviaje} (/ {phi_horiz} 1000.0) {phi_horiz} "8" (* 4 {cant_trav}) len_cyan_L len_cyan_L 0.0 nil)
+                        )
+                        (progn
+                          (setq ins_y (- ins_y 3.0))
+                          (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr {esviaje} (/ {phi_horiz} 1000.0) {phi_horiz} "8" (* 2 {cant_trav}) len_cyan_L len_cyan_L 0.0 nil)
+                          (setq ins_y (- ins_y 3.0))
+                          (draw-l-bar (list ins_x ins_y 0.0) len_cyan_R w_estr {esviaje} (/ {phi_horiz} 1000.0) {phi_horiz} "9" (* 2 {cant_trav}) len_cyan_R len_cyan_R 0.0 t)
+                        )
+                      )
 
                       (princ "\\n[OK] Despiece generado.")
                     )
@@ -1635,14 +1651,14 @@ class TabArmaduras(ctk.CTkFrame):
                       (setq ins_y (- ins_y 4.0))
                       (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g1_min_h g1_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "2" (* g1_qty {cant_trav}) g1_min_h g1_max_h 0.20)
                       
-                      (setq ins_y (- ins_y (+ (/ (+ g1_min_h g1_max_h) 2.0) 3.0)))
+                      (setq ins_y (- ins_y (+ (/ (+ g2_min_h g2_max_h) 2.0) 3.0)))
                       (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g2_min_h g2_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "3" (* g2_qty {cant_trav}) g2_min_h g2_max_h 0.20)
                       
-                      (setq ins_y (- ins_y (+ (/ (+ g2_min_h g2_max_h) 2.0) 3.0)))
+                      (setq ins_y (- ins_y (+ (/ (+ g3_min_h g3_max_h) 2.0) 3.0)))
                       (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g3_min_h g3_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "4" (* g3_qty {cant_trav}) g3_min_h g3_max_h 0.20)
 
                       (setq ins_y (- ins_y (+ (/ (+ g3_min_h g3_max_h) 2.0) 3.0)))
-                      (draw-str-bar (list ins_x ins_y 0.0) (/ (+ g_gri_min_l g_gri_max_l) 2.0) (/ {phi_horiz} 1000.0) {phi_horiz} "5" (* (* g_gri_qty 2) {cant_trav}) g_gri_min_l g_gri_max_l 0.20)
+                      (draw-str-bar (list ins_x ins_y 0.0) (/ (+ g_gri_min_l g_gri_max_l) 2.0) (/ {phi_horiz} 1000.0) {phi_horiz} "5" (* (* g_gri_qty 2) {cant_trav}) g_gri_min_l g_gri_max_l 0.0)
 
                       (princ "\\n[OK] Despiece generado.")
                     )
@@ -1665,7 +1681,7 @@ class TabArmaduras(ctk.CTkFrame):
                   (setvar "OSMODE" 0)
                   (if ins_pt
                     (progn
-                      (draw-str-bar ins_pt len_viga (/ {phi_horiz} 1000.0) {phi_horiz} "1" (* (* g_qty 2) {cant_trav}) len_viga len_viga 0.20)
+                      (draw-str-bar ins_pt len_viga (/ {phi_horiz} 1000.0) {phi_horiz} "1" (* (* g_qty 2) {cant_trav}) len_viga len_viga 0.0)
                       (princ "\\n[OK] Despiece generado.")
                     )
                   )
@@ -1698,21 +1714,23 @@ class TabArmaduras(ctk.CTkFrame):
                 datos = json.load(f)
 
             e_data = datos.get("estribos", {})
-            for ent, key in [(self.ent_z_largo, "dado_muro_frontal_largo_entrada"), 
-                             (self.ent_z_ancho, "dado_muro_frontal_ancho_entrada"), 
+            for ent, key in [(self.ent_z_largo, "dado_muro_frontal_largo_entrada"),
+                             (self.ent_z_ancho, "dado_muro_frontal_ancho_entrada"),
                              (self.ent_z_alto, "dado_muro_frontal_espesor_entrada")]:
                 if key in e_data:
                     ent.delete(0, 'end')
                     ent.insert(0, str(e_data.get(key, 0) / 10.0))
 
             if "elementos_comunes" in datos and "travesanos" in datos["elementos_comunes"]:
-                espesor_mm = datos["elementos_comunes"]["travesanos"].get("espesor_travesano")
+                espesor_mm = datos["elementos_comunes"]["travesanos"].get(
+                    "espesor_travesano")
                 if espesor_mm is not None:
                     self.ent_t_espesor.delete(0, 'end')
                     self.ent_t_espesor.insert(0, str(espesor_mm / 10.0))
 
             if "parametros_generales" in datos:
-                esviaje = datos["parametros_generales"].get("angulo_esviaje_puente")
+                esviaje = datos["parametros_generales"].get(
+                    "angulo_esviaje_puente")
                 if esviaje is not None:
                     self.ent_t_esviaje.delete(0, 'end')
                     self.ent_t_esviaje.insert(0, str(esviaje))
