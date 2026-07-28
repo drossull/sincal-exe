@@ -25,7 +25,6 @@ from datetime import datetime, timedelta
 def ruta_recurso(relative_path):
     """Obtiene la ruta absoluta al recurso, funciona para dev y para PyInstaller"""
     try:
-        # PyInstaller crea una carpeta temporal y guarda la ruta en _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
@@ -130,8 +129,7 @@ class ActualizadorCAD(ctk.CTk):
         if getattr(sys, 'frozen', False):
             self.configurar_inicio_con_windows()
         threading.Thread(target=self.cargar_info_github, daemon=True).start()
-        threading.Thread(
-            target=self.loop_verificador_actualizaciones_silencioso, daemon=True).start()
+        # NOTA: El Thread del verificador automático ha sido borrado para no molestar.
 
     # ==========================================================
     # LÓGICA DE WINDOWS (SYSTEM TRAY / AUTOSTART)
@@ -140,11 +138,9 @@ class ActualizadorCAD(ctk.CTk):
         self.withdraw()  # Oculta la ventana principal
         try:
             ruta_logo = ruta_recurso('logo.ico')
-            # Forzamos la conversión a RGBA. Si pystray no ve el canal Alfa, falla en silencio en Windows
             icono = Image.open(ruta_logo).convert("RGBA")
         except Exception as e:
             self.log_r(f"Error cargando ícono: {e}")
-            # El cuadrado de respaldo también debe ser RGBA estricto
             icono = Image.new('RGBA', (64, 64), color=(43, 43, 43, 255))
 
         menu = pystray.Menu(
@@ -157,13 +153,10 @@ class ActualizadorCAD(ctk.CTk):
         threading.Thread(target=self.icono_bandeja.run, daemon=True).start()
 
     def mostrar_desde_bandeja(self, icon, item):
-        # Detenemos el ícono de la bandeja
         self.icono_bandeja.stop()
-        # Le decimos a la interfaz que se vuelva a dibujar (de forma segura)
         self.after(0, self.deiconify)
 
     def salir_completamente(self, icon, item):
-        # Detenemos el ícono y destruimos el programa
         self.icono_bandeja.stop()
         self.after(0, self.destroy)
 
@@ -185,13 +178,12 @@ class ActualizadorCAD(ctk.CTk):
             pass
 
     def setup_tab_armaduras(self):
-        # Conectamos el módulo externo a la pestaña de armaduras
         self.vista_armaduras = TabArmaduras(
             master=self.tab_armaduras, parent_app=self, fg_color="transparent")
         self.vista_armaduras.pack(fill="both", expand=True)
 
     # ==========================================================
-    # PARTE COMÚN Y SOPORTE DE ACTUALIZACIONES (MANTENIDO/OPTIMIZADO)
+    # PARTE COMÚN Y SOPORTE DE ACTUALIZACIONES
     # ==========================================================
     def cargar_info_github(self):
         try:
@@ -205,7 +197,6 @@ class ActualizadorCAD(ctk.CTk):
                          "07": "Jul", "08": "Ago", "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dic"}
 
                 for c in r.json():
-                    # 1. Fecha y Hora local
                     raw_date = c['commit']['author']['date']
                     dt_utc = datetime.strptime(raw_date, "%Y-%m-%dT%H:%M:%SZ")
                     dt_local = dt_utc - timedelta(hours=4)
@@ -213,12 +204,9 @@ class ActualizadorCAD(ctk.CTk):
                     mes_str = meses[dt_local.strftime("%m")]
                     fecha_formateada = f"{dt_local.strftime('%d')} {mes_str} {dt_local.strftime('%y %H:%M')}"
 
-                    # 2. VIAJE EN EL TIEMPO: Leer el version.json de ese commit exacto
                     sha_completo = c['sha']
-                    # Respaldo por si el json no existía en ese commit antiguo
                     version_mostrar = sha_completo[:7]
                     try:
-                        # Buscamos el archivo en la URL histórica usando el SHA
                         url_hist = f"https://raw.githubusercontent.com/{USUARIO_GITHUB}/{REPO_GITHUB}/{sha_completo}/version.json"
                         r_json = requests.get(url_hist, timeout=3)
                         if r_json.status_code == 200:
@@ -226,12 +214,10 @@ class ActualizadorCAD(ctk.CTk):
                     except:
                         pass
 
-                    # 3. Formatear el Mensaje
                     mensaje = c['commit']['message'].strip()
                     mensaje = mensaje.replace(
                         "\r\n", " + ").replace("\n\n", " + ").replace("\n", " + ")
 
-                    # Ensamblar la línea final
                     linea = f"• ({version_mostrar}) / {fecha_formateada} / {mensaje}\n"
                     self.txt_updates.insert("end", linea)
 
@@ -241,64 +227,19 @@ class ActualizadorCAD(ctk.CTk):
 
     def cad_esta_ejecutandose(self):
         try:
-            # Ponytail: Verificación simple de strings en la tasklist de Windows.
-            # Ceiling: Falsos positivos si otro software contiene "acad" en su proceso. Upgrade: Validar PID y firmas ejecutables reales de Autodesk/ZWSoft.
             salida = subprocess.check_output("tasklist", creationflags=0x08000000).decode(
                 'utf-8', errors='ignore').lower()
             return any(x in salida for x in ["acad.exe", "zwcad.exe", "accoreconsole.exe"])
         except:
             return False
 
-    def loop_verificador_actualizaciones_silencioso(self):
-        import time
-        version_notificada = None  # Memoria para no bombardearte con el mismo pop-up
-
-        while True:
-            time.sleep(30)
-            try:
-                # 1. DESTRUCTOR DE CACHÉ: Obligamos a GitHub a darnos el archivo en vivo
-                timestamp = str(time.time())
-                url_fresca = f"{URL_BASE_RAW}version.json?t={timestamp}"
-
-                r = requests.get(url_fresca, timeout=5)
-                nueva_version = r.json().get("version")
-
-                # 2. Si la versión es nueva Y no te hemos avisado ya de esta misma versión...
-                if nueva_version != self.version_local_actual and nueva_version != version_notificada:
-
-                    desc_commit = "Mejoras generales y corrección de errores."
-                    try:
-                        # También aplicamos el truco del caché a la API
-                        url_api = f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits"
-                        r_commit = requests.get(
-                            url_api, params={"per_page": 1, "t": timestamp}, timeout=5)
-                        if r_commit.status_code == 200:
-                            desc_commit = r_commit.json()[
-                                0]['commit']['message']
-                    except:
-                        pass
-
-                    # Registramos que ya avisamos para no repetir el pop-up cada 30 segundos
-                    version_notificada = nueva_version
-
-                    # Lanzamos el aviso
-                    self.after(0, lambda v=nueva_version,
-                               d=desc_commit: self.mostrar_popup_actualizacion(v, d))
-
-            except:
-                pass
-
     def mostrar_popup_actualizacion(self, nueva_version, desc_commit):
-        # Forzar la ventana principal al frente si estaba minimizada o en la bandeja
         self.deiconify()
         self.focus_force()
 
-        # Armar el mensaje
         msg = f"Versión detectada: {nueva_version}\n\nNovedades:\n{desc_commit}\n\n¿Deseas instalar esta actualización ahora?"
 
-        # Lanzar el Pop-Up
         if messagebox.askyesno("¡Actualización SINCAL Disponible!", msg):
-            # Verificamos si tiene el CAD abierto para proteger la inyección
             if self.cad_esta_ejecutandose():
                 messagebox.showwarning(
                     "Software CAD en uso",
@@ -325,6 +266,11 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkButton(botones_sec_frame, text="Reparar / Forzar PATH", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_TITULO,
                       corner_radius=0, text_color=COLOR_TITULO, hover_color="#444444", command=self.forzar_path_manual).pack(side="left", padx=10)
 
+        # NUEVO BOTÓN MANUAL DE ACTUALIZACIÓN
+        self.btn_verificar_update = ctk.CTkButton(botones_sec_frame, text="Verificar nueva actualización", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color="#00FF00",
+                                                  corner_radius=0, text_color="#00FF00", hover_color="#444444", command=self.verificar_actualizacion_manual)
+        self.btn_verificar_update.pack(side="left", padx=10)
+
         self.consola = ctk.CTkTextbox(self.tab_main, width=850, height=180, font=FUENTE_CONSOLA,
                                       fg_color="#1E1E1E", text_color=COLOR_TEXTO, state="disabled")
         self.consola.pack(pady=10)
@@ -338,8 +284,48 @@ class ActualizadorCAD(ctk.CTk):
             self.frame_updates, width=850, height=160, font=FUENTE_NORMAL, fg_color="#1E1E1E", state="disabled")
         self.txt_updates.pack(pady=5)
 
+    def verificar_actualizacion_manual(self):
+        self.log("\n[*] Verificando nueva actualización en GitHub...")
+        self.btn_verificar_update.configure(
+            state="disabled", text="Verificando...")
+        threading.Thread(
+            target=self._hilo_verificar_actualizacion, daemon=True).start()
+
+    def _hilo_verificar_actualizacion(self):
+        try:
+            import time
+            timestamp = str(time.time())
+            url_fresca = f"{URL_BASE_RAW}version.json?t={timestamp}"
+            r = requests.get(url_fresca, timeout=5)
+            nueva_version = r.json().get("version")
+
+            if nueva_version != self.version_local_actual:
+                desc_commit = "Mejoras generales y corrección de errores."
+                try:
+                    url_api = f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits"
+                    r_commit = requests.get(
+                        url_api, params={"per_page": 1, "t": timestamp}, timeout=5)
+                    if r_commit.status_code == 200:
+                        desc_commit = r_commit.json()[0]['commit']['message']
+                except:
+                    pass
+
+                self.log(
+                    f"[!] Nueva versión disponible: {nueva_version}. Novedades: {desc_commit}")
+                self.after(0, lambda v=nueva_version,
+                           d=desc_commit: self.mostrar_popup_actualizacion(v, d))
+            else:
+                self.log(
+                    "[OK] El sistema ya se encuentra en su última versión.")
+                self.after(0, lambda: messagebox.showinfo(
+                    "Actualización", "El sistema ya se encuentra en su última versión."))
+        except Exception as e:
+            self.log(f"[X] Fallo al verificar versión en GitHub: {e}")
+        finally:
+            self.btn_verificar_update.configure(
+                state="normal", text="Verificar nueva actualización")
+
     def setup_tab_renombrado(self):
-        # --- TÍTULO Y CARGA DE RUTA ---
         lbl_titulo = ctk.CTkLabel(
             self.tab_renombrado, text="PROCESAMIENTO MASIVO DE PLANOS", font=FUENTE_TITULO, text_color=COLOR_TITULO)
         lbl_titulo.pack(pady=(10, 5))
@@ -353,16 +339,12 @@ class ActualizadorCAD(ctk.CTk):
             top_frame, text="Ruta: Ninguna", font=FUENTE_NORMAL, text_color="#888888")
         self.lbl_ruta_adv.pack(side="left", padx=15)
 
-        # =========================================================
-        # SECCIÓN SUPERIOR: SPLIT 1/3 (Lista) y 2/3 (Herramientas)
-        # =========================================================
         split_frame = ctk.CTkFrame(self.tab_renombrado, fg_color="transparent")
         split_frame.pack(fill="both", expand=True, padx=20, pady=5)
-        split_frame.grid_columnconfigure(0, weight=1)  # 33% del ancho
-        split_frame.grid_columnconfigure(1, weight=2)  # 66% del ancho
+        split_frame.grid_columnconfigure(0, weight=1)
+        split_frame.grid_columnconfigure(1, weight=2)
         split_frame.grid_rowconfigure(0, weight=1)
 
-        # --- PANEL IZQUIERDO (1/3): LISTA DE ARCHIVOS ---
         left_frame = ctk.CTkFrame(split_frame, fg_color="#1E1E1E",
                                   corner_radius=0, border_width=1, border_color="#444444")
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
@@ -382,11 +364,9 @@ class ActualizadorCAD(ctk.CTk):
         self.scroll_archivos.pack(
             fill="both", expand=True, padx=15, pady=(5, 15))
 
-        # --- PANEL DERECHO (2/3): HERRAMIENTAS RÁPIDAS ---
         right_frame = ctk.CTkFrame(split_frame, fg_color="transparent")
         right_frame.grid(row=0, column=1, sticky="nsew")
 
-        # HERRAMIENTA 2A: Buscar y Reemplazar
         h1_frame = ctk.CTkFrame(right_frame, fg_color="#1E1E1E",
                                 corner_radius=0, border_width=1, border_color="#444444")
         h1_frame.pack(fill="x", pady=(0, 10))
@@ -406,12 +386,10 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkButton(h1_frame, text="Aplicar Reemplazo a la Selección", font=FUENTE_NORMAL, corner_radius=0, fg_color="transparent", border_width=1,
                       border_color=COLOR_ACENTO, text_color=COLOR_ACENTO, hover_color="#444444", command=self.aplicar_reemplazo_adv).pack(pady=15, padx=15, fill="x")
 
-        # Dejamos la consola de renombrado chiquita por si hay errores de Windows
         self.log_rename = ctk.CTkTextbox(h1_frame, height=60, font=FUENTE_CONSOLA,
                                          fg_color="#000000", text_color="#AAAAAA", state="disabled", corner_radius=0)
         self.log_rename.pack(fill="x", padx=15, pady=(0, 15))
 
-        # HERRAMIENTA 2B: Comandos en Vivo
         self.frame_live = ctk.CTkFrame(
             right_frame, fg_color="#1E1E1E", border_width=1, border_color="#444444", corner_radius=0)
         self.frame_live.pack(fill="x")
@@ -437,9 +415,6 @@ class ActualizadorCAD(ctk.CTk):
                                               hover_color="#C9302C", width=80, corner_radius=0, state="disabled", command=self.detener_comando_en_vivo)
         self.btn_cancelar_cmd.pack(side="left")
 
-        # =========================================================
-        # SECCIÓN INFERIOR: CONSOLA DE SCRIPTS (FULL WIDTH)
-        # =========================================================
         bottom_frame = ctk.CTkFrame(self.tab_renombrado, fg_color="#1E1E1E",
                                     corner_radius=0, border_width=1, border_color="#444444")
         bottom_frame.pack(fill="x", padx=20, pady=(10, 15))
@@ -447,7 +422,6 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkLabel(bottom_frame, text="4. Consola de Automatización (Inyectar a planos cerrados):",
                      font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(anchor="w", padx=15, pady=(10, 5))
 
-        # Contenedor de botones con GRILLA UNIFORME
         btn_container = ctk.CTkFrame(bottom_frame, fg_color="transparent")
         btn_container.pack(fill="x", padx=15, pady=5)
 
@@ -456,12 +430,10 @@ class ActualizadorCAD(ctk.CTk):
                                 f"{nombre_script}.ps1")
             return f"& '{ruta}'"
 
-        # Le decimos a la grilla que las 4 columnas deben tener exactamente el mismo ancho
         for i in range(4):
             btn_container.grid_columnconfigure(
                 i, weight=1, uniform="botones_script")
 
-        # Fila 1
         ctk.CTkButton(btn_container, text="▶ Auditar", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555",
                       corner_radius=0, command=lambda: self.lanzar_script(cmd_ps("AUDIT"))).grid(row=0, column=0, padx=5, pady=5, sticky="ew")
         ctk.CTkButton(btn_container, text="▶ Purgar", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", corner_radius=0,
@@ -471,7 +443,6 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkButton(btn_container, text="▶ Eliminar Layout2", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555",
                       corner_radius=0, command=lambda: self.lanzar_script(cmd_ps("DL2"))).grid(row=0, column=3, padx=5, pady=5, sticky="ew")
 
-        # Fila 2
         ctk.CTkButton(btn_container, text="▶ Bloquear Viewports", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555",
                       corner_radius=0, command=lambda: self.lanzar_script(cmd_ps("BV"))).grid(row=1, column=0, padx=5, pady=5, sticky="ew")
         ctk.CTkButton(btn_container, text="▶ Configurar en A1", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555",
@@ -481,7 +452,6 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkButton(btn_container, text="🔄 Convertir DXF a DWG", font=FUENTE_NORMAL, fg_color="#005BBF", hover_color="#004A9E",
                       corner_radius=0, command=self.convertir_dxf_a_dwg).grid(row=1, column=3, padx=5, pady=5, sticky="ew")
 
-        # Consola Hacker
         self.consola_scripts = ctk.CTkTextbox(bottom_frame, height=120, font=FUENTE_CONSOLA,
                                               fg_color="#000000", text_color="#00FF00", state="disabled", corner_radius=0)
         self.consola_scripts.pack(fill="x", padx=15, pady=(5, 15))
@@ -499,7 +469,6 @@ class ActualizadorCAD(ctk.CTk):
         for w in self.scroll_archivos.winfo_children():
             w.destroy()
         self.checkboxes_archivos = []
-        # AHORA LEE TANTO DWG COMO DXF
         arcs = [f for f in os.listdir(
             self.ruta_renombre) if f.lower().endswith(('.dwg', '.dxf'))]
         for arc in arcs:
@@ -536,18 +505,15 @@ class ActualizadorCAD(ctk.CTk):
         self.log_r(f"[OK] {cont} procesados.")
 
     def lanzar_script(self, comando_ps):
-        # 1. Validar si cargaron carpeta
         if not getattr(self, 'ruta_renombre', None):
             return messagebox.showwarning("Sin ruta", "Por favor, carga una carpeta DWG primero en el paso 1.")
 
-        # 2. Validar que el CAD esté cerrado
         if self.cad_esta_ejecutandose():
             return messagebox.showwarning(
                 "CAD en Uso",
                 "Por favor, cierra AutoCAD o ZWCAD completamente antes de ejecutar rutinas masivas.\n\nEsto evita que los archivos estén bloqueados por el programa."
             )
 
-        # 3. Limpiar consola y lanzar hilo
         self.consola_scripts.configure(state="normal")
         self.consola_scripts.delete("1.0", "end")
         self.consola_scripts.configure(state="disabled")
@@ -559,22 +525,19 @@ class ActualizadorCAD(ctk.CTk):
         self.log_script(
             f"> Directorio Activo: {self.ruta_renombre}\n> Comando: {comando_ps}\n" + "-"*60 + "\n")
 
-        # Ensamblamos la orden para PowerShell
         comando = ["powershell", "-NoProfile",
                    "-ExecutionPolicy", "Bypass", "-Command", comando_ps]
 
         try:
-            # Popen nos permite capturar el texto en vivo y define el CWD (Current Working Directory)
             proceso = subprocess.Popen(
                 comando,
-                cwd=self.ruta_renombre,  # <--- La Magia: Abre CMD/PS exactamente en esa carpeta
+                cwd=self.ruta_renombre,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 creationflags=subprocess.CREATE_NO_WINDOW
             )
 
-            # Leemos la salida en tiempo real
             for linea in iter(proceso.stdout.readline, ''):
                 self.log_script(linea)
 
@@ -591,7 +554,6 @@ class ActualizadorCAD(ctk.CTk):
         if not getattr(self, 'ruta_renombre', None):
             return messagebox.showwarning("Sin ruta", "Por favor, carga una carpeta primero en el Paso 1.")
 
-        # Filtramos solo los archivos que sean DXF y que estén seleccionados
         dxfs = [cb.cget("text") for cb in self.checkboxes_archivos if cb.get(
         ) == 1 and cb.cget("text").lower().endswith('.dxf')]
 
@@ -625,7 +587,6 @@ class ActualizadorCAD(ctk.CTk):
             if not app:
                 return self.log_script("[X] No se pudo iniciar ni ZWCAD ni AutoCAD en segundo plano.\n")
 
-            # Intentar ocultar la ventana para que trabaje silenciosamente
             try:
                 app.Visible = False
             except:
@@ -638,11 +599,10 @@ class ActualizadorCAD(ctk.CTk):
                 self.log_script(f"> Convirtiendo: {f} ... ")
                 try:
                     doc = app.Documents.Open(ruta_dxf)
-                    # 64 equivale al formato ac2018_dwg (Estándar de la industria)
                     try:
                         doc.SaveAs(ruta_dwg, 64)
                     except:
-                        doc.SaveAs(ruta_dwg)  # Fallback seguro
+                        doc.SaveAs(ruta_dwg)
 
                     doc.Close(False)
                     self.log_script("OK\n")
@@ -656,8 +616,6 @@ class ActualizadorCAD(ctk.CTk):
 
             self.log_script(
                 "\n[!] Conversión finalizada. Actualizando lista...\n")
-
-            # Refrescar la lista automáticamente para que los nuevos DWG aparezcan arriba
             self.after(1000, self.refrescar_lista_archivos)
 
         except Exception as e:
@@ -682,7 +640,6 @@ class ActualizadorCAD(ctk.CTk):
     def _hilo_comando_en_vivo(self, comando):
         pythoncom.CoInitialize()
         try:
-            # 1. Armamos la lista masiva de versiones (15 a 35)
             prog_ids = ["ZWCAD.Application", "AutoCAD.Application"]
             for i in range(15, 36):
                 prog_ids.append(f"ZWCAD.Application.{i}")
@@ -690,7 +647,6 @@ class ActualizadorCAD(ctk.CTk):
 
             apps_encontradas = []
 
-            # 2. Recolectamos TODOS los programas CAD que estén abiertos
             for s in prog_ids:
                 try:
                     app = win32com.client.GetActiveObject(s)
@@ -702,11 +658,9 @@ class ActualizadorCAD(ctk.CTk):
             if not apps_encontradas:
                 return self.log("\n[X] Error: No se detecta CAD abierto. (Recuerda abrirlo como Administrador).")
 
-            # Memoria para no repetir el comando en la misma pestaña si el ID de versión se cruza
             docs_procesados = set()
             ejecuciones = 0
 
-            # 3. Disparamos a las pestañas de TODOS los programas encontrados
             for app in apps_encontradas:
                 if self.cancelar_comando_vivo:
                     break
@@ -717,23 +671,18 @@ class ActualizadorCAD(ctk.CTk):
                             break
                         try:
                             doc = docs.Item(i)
-
-                            # Identificador único del plano (Ruta + Nombre)
                             doc_id = f"{doc.FullName}_{doc.Name}"
 
-                            # Si ya procesamos esta pestaña, saltamos a la siguiente
                             if doc_id in docs_procesados:
                                 continue
 
                             docs_procesados.add(doc_id)
 
-                            # Activamos la pestaña y enviamos el comando
                             if app.ActiveDocument.Name != doc.Name:
                                 app.ActiveDocument = doc
                                 time.sleep(0.2)
 
                             try:
-                                # Cancelamos comandos previos (ESC ESC)
                                 doc.SendCommand("\x03\x03")
                             except:
                                 pass
@@ -744,7 +693,6 @@ class ActualizadorCAD(ctk.CTk):
                         except Exception as e:
                             self.log(f"  > [X] Error pestaña: {e}")
                 except:
-                    # Falla silenciosa si la aplicación no responde (ej. si el usuario la cerró de golpe)
                     pass
 
             if ejecuciones == 0:
@@ -776,17 +724,13 @@ class ActualizadorCAD(ctk.CTk):
 
     def motor_actualizacion(self):
         try:
-            # Detecta el nombre exacto del ejecutable actual (ej: SINCAL.exe)
             nombre_exe_actual = os.path.basename(sys.executable).lower()
 
             if os.path.exists(RUTA_LOCAL_APP):
                 for elemento in os.listdir(RUTA_LOCAL_APP):
                     ruta_elemento = os.path.join(RUTA_LOCAL_APP, elemento)
-
-                    # SALVAVIDAS: Protege el programa actual y el desinstalador de Inno Setup
                     if elemento.lower() == nombre_exe_actual or elemento.lower().startswith("unins"):
                         continue
-
                     try:
                         if os.path.isdir(ruta_elemento):
                             shutil.rmtree(ruta_elemento)
@@ -798,12 +742,10 @@ class ActualizadorCAD(ctk.CTk):
             os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
 
             r = requests.get(URL_BASE_RAW + "version.json").json()
-            # Ahora le decimos que descargue ambos archivos de texto
             archivos = r.get("archivos", []) + ["README.md", "TUTORIAL.md"]
             total_archivos = len(archivos)
             spinner = ['|', '/', '-', '\\']
 
-            # Imprimimos la línea base que será animada
             self.consola.configure(state="normal")
             self.consola.insert("end", "[|] Iniciando descarga...\n")
             self.consola.configure(state="disabled")
@@ -820,12 +762,10 @@ class ActualizadorCAD(ctk.CTk):
                         with open(r_save, 'wb') as f:
                             f.write(res.content)
 
-                # --- ANIMACIÓN Y PORCENTAJE ---
                 porcentaje = int(((idx + 1) / total_archivos) * 100)
                 simbolo = spinner[idx % 4]
 
                 self.consola.configure(state="normal")
-                # Borramos la última línea y la reemplazamos con la animada
                 self.consola.delete("end-2l", "end-1c")
                 self.consola.insert(
                     "end", f"[{simbolo}] Actualizando SINCAL... {porcentaje}% ({idx+1}/{total_archivos})\n")
@@ -835,7 +775,7 @@ class ActualizadorCAD(ctk.CTk):
             self.generar_archivos_lisp(archivos)
             self.actualizar_rutas_registro()
             self.actualizar_variable_entorno()
-            self.registrar_menu_contextual()  # <--- INYECCIÓN MENÚ CONTEXTUAL AÑADIDA
+            self.registrar_menu_contextual()
             self.buscar_y_configurar_consolas()
 
             self.version_local_actual = r.get("version", "v1.0.0")
@@ -860,24 +800,18 @@ class ActualizadorCAD(ctk.CTk):
                             if "zwcad" in f.lower():
                                 self.es_zwcad = True
 
-                            # --- NUEVA CONEXIÓN: Crear el cad_wrapper.bat para PowerShell ---
                             ruta_wrapper = os.path.join(
                                 RUTA_LOCAL_APP, "cad_wrapper.bat")
                             try:
                                 with open(ruta_wrapper, 'w', encoding='utf-8') as wf:
-                                    # Genera un bat que recibe los comandos (/i, /s) y se los pasa a la consola CAD oculta (%*)
                                     wf.write(
                                         f'@echo off\n"{self.cad_exe_path}" %*\n')
                             except Exception as e:
                                 self.log(f"[X] Error creando wrapper CAD: {e}")
-                            # ----------------------------------------------------------------
 
                             return
 
     def actualizar_rutas_registro(self):
-        """Inyecta la bóveda SINCAL en la prioridad 1 de AutoCAD/ZWCAD y neutraliza fantasmas"""
-
-        # --- 1. CAZAFANTASMAS: Neutralizar acaddoc/zwcaddoc antiguos ---
         appdata = os.getenv('APPDATA')
         for carpeta_cad in ["Autodesk", "ZWSOFT"]:
             base = os.path.join(appdata, carpeta_cad)
@@ -886,7 +820,6 @@ class ActualizadorCAD(ctk.CTk):
                     for file in files:
                         if file.lower() in ["acaddoc.lsp", "zwcaddoc.lsp"]:
                             ruta_fantasma = os.path.join(root, file)
-                            # Verificamos que no esté intentando borrar nuestro propio archivo en la bóveda
                             if RUTA_LOCAL_APP.lower() not in ruta_fantasma.lower():
                                 try:
                                     os.rename(ruta_fantasma,
@@ -896,19 +829,16 @@ class ActualizadorCAD(ctk.CTk):
                                 except:
                                     pass
 
-        # --- 2. INYECTOR DE REGISTRO UNIVERSAL ---
         def inyectar_ruta_recursivo(ruta_reg):
             try:
                 llave = winreg.OpenKey(
                     winreg.HKEY_CURRENT_USER, ruta_reg, 0, winreg.KEY_ALL_ACCESS)
 
-                # Buscamos directamente las variables maestras sin importar en qué subcarpeta estén
                 for nombre_valor in ["ACAD", "ZWCAD", "ZWCADSEARCHPATH", "SRCHPATH", "TRUSTEDPATHS"]:
                     try:
                         valor_actual, tipo = winreg.QueryValueEx(
                             llave, nombre_valor)
                         if RUTA_LOCAL_APP.lower() not in valor_actual.lower():
-                            # Inyectamos nuestra bóveda de primera (Separada por punto y coma)
                             nuevo_valor = f"{RUTA_LOCAL_APP};{valor_actual}"
                             winreg.SetValueEx(
                                 llave, nombre_valor, 0, tipo, nuevo_valor)
@@ -917,7 +847,6 @@ class ActualizadorCAD(ctk.CTk):
                     except OSError:
                         pass
 
-                # Exploración profunda en todas las subcarpetas del registro
                 i = 0
                 while True:
                     try:
@@ -930,7 +859,6 @@ class ActualizadorCAD(ctk.CTk):
             except Exception:
                 pass
 
-        # Disparamos la inyección en las dos marcas de software
         inyectar_ruta_recursivo(r"Software\Autodesk\AutoCAD")
         inyectar_ruta_recursivo(r"Software\ZWSOFT\ZWCAD")
 
@@ -947,28 +875,16 @@ class ActualizadorCAD(ctk.CTk):
             pass
 
     def registrar_menu_contextual(self):
-        """Inyecta SINCAL en el menú de clic derecho de Windows para carpetas"""
         try:
             import winreg
-            # Obtenemos la ruta exacta de tu SINCAL.exe
             exe_path = sys.executable
 
-            # Ruta en el registro para el clic derecho SOBRE una carpeta
             ruta_llave = r"Directory\shell\SINCAL_Plotear"
-
-            # 1. Creamos la llave principal
             llave = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, ruta_llave)
-
-            # 2. Nombre a mostrar en el menú (Aquí pones lo que quieras que lea el usuario)
             winreg.SetValue(llave, "", winreg.REG_SZ, "Plotear con SINCAL")
-
-            # 3. Asignar el ícono (Usamos el mismo ícono que tu .exe)
             winreg.SetValueEx(llave, "Icon", 0, winreg.REG_SZ, f'"{exe_path}"')
 
-            # 4. Crear la sub-llave que le dice a Windows qué ejecutar al hacer clic
             llave_comando = winreg.CreateKey(llave, "command")
-
-            # El "%1" captura la ruta de la carpeta a la que le hiciste clic
             comando_ejecucion = f'"{exe_path}" --plotear "%1"'
             winreg.SetValue(llave_comando, "",
                             winreg.REG_SZ, comando_ejecucion)
@@ -976,7 +892,6 @@ class ActualizadorCAD(ctk.CTk):
             winreg.CloseKey(llave_comando)
             winreg.CloseKey(llave)
 
-            # Opcional: También agregarlo cuando haces clic en el fondo vacío de una carpeta
             ruta_llave_fondo = r"Directory\Background\shell\SINCAL_Plotear"
             llave_fondo = winreg.CreateKey(
                 winreg.HKEY_CLASSES_ROOT, ruta_llave_fondo)
@@ -992,26 +907,23 @@ class ActualizadorCAD(ctk.CTk):
             winreg.CloseKey(llave_fondo)
 
         except Exception as e:
-            pass  # Falla silenciosa si el antivirus bloquea la escritura
+            pass
 
     def generar_archivos_lisp(self, archivos):
         contenido_arranque = ""
 
         for a in archivos:
             if a.lower().endswith('.lsp') and os.path.basename(a).lower() not in ["acaddoc.lsp", "zwcaddoc.lsp"]:
-                # Convertimos la ruta a estándar puro de LISP (slashes frontales)
                 ruta_lisp = os.path.normpath(os.path.join(
                     RUTA_LOCAL_APP, a)).replace("\\", "/")
                 nombre = os.path.basename(a)
                 contenido_arranque += f'(princ (load "{ruta_lisp}" "\\n[X] SINCAL: Fallo al cargar {nombre}"))\n'
 
-        # --- Cargar Startup Automáticamente ---
         if "startup/SINCAL_STARTUP.lsp" in archivos or "SINCAL_STARTUP.lsp" in archivos:
             contenido_arranque += '(princ "\\n[SINCAL] Políticas de empresa y variables aplicadas.")\n'
 
         contenido_arranque += '(princ "\\n[OK] SINCAL: Todos los LISPs procesados correctamente.")\n(princ)\n'
 
-        # --- GUARDAR PARA AMBOS PROGRAMAS ---
         r_acad = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
         r_zwcad = os.path.join(RUTA_LOCAL_APP, "zwcaddoc.lsp")
 
@@ -1054,7 +966,6 @@ class ActualizadorCAD(ctk.CTk):
             self.txt_log_global.configure(state="disabled")
 
     def mostrar_ventana_log(self):
-        # Si la ventana ya está abierta, la traemos al frente
         if hasattr(self, 'ventana_log') and self.ventana_log.winfo_exists():
             self.ventana_log.focus()
             return
@@ -1062,14 +973,12 @@ class ActualizadorCAD(ctk.CTk):
         self.ventana_log = ctk.CTkToplevel(self)
         self.ventana_log.title("Consola de Diagnóstico - SINCAL")
         self.ventana_log.geometry("750x450")
-        # Hace que la ventana flote por encima de SINCAL
         self.ventana_log.transient(self)
 
         self.txt_log_global = ctk.CTkTextbox(
             self.ventana_log, font=FUENTE_CONSOLA, fg_color="#000000", text_color="#00FF00", corner_radius=0)
         self.txt_log_global.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Al abrir, volcamos todo el historial guardado en la memoria
         self.txt_log_global.configure(state="normal")
         self.txt_log_global.insert(
             "end", "\n".join(self.historial_logs) + "\n")
