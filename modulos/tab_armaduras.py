@@ -248,6 +248,14 @@ class TabArmaduras(ctk.CTkFrame):
         self.ent_t_phi_estr.grid(row=2, column=5, padx=5, pady=5)
         self.ent_t_phi_estr.insert(0, "12")
 
+        # Fila 3: Largo de fierros en Cuadrante Viga
+        ctk.CTkLabel(frame_params, text="Largo fierros viga (cm):", font=fuente_normal).grid(
+            row=3, column=0, sticky="w", padx=5, pady=5)
+        self.ent_viga_largo = ctk.CTkEntry(
+            frame_params, font=fuente_normal, width=60, corner_radius=0)
+        self.ent_viga_largo.grid(row=3, column=1, padx=5, pady=5)
+        self.ent_viga_largo.insert(0, "200")
+
         # --- II. HERRAMIENTAS DE GENERACIÓN ---
         frame_botones_t = ctk.CTkFrame(tab_trav_main, fg_color="transparent")
         frame_botones_t.pack(fill="x", padx=10, pady=15)
@@ -271,6 +279,11 @@ class TabArmaduras(ctk.CTkFrame):
                                    hover_color="#007FFF", corner_radius=0, command=lambda: self.generar_travesano_cad("INT_MACIZO"))
         btn_macizo.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
 
+        btn_viga = ctk.CTkButton(frame_botones_t, text="5. Cuadrante Viga", font=fuente_normal, fg_color="#444444",
+                                 hover_color="#FFBF00", text_color="#1E1E1E", corner_radius=0, command=lambda: self.generar_travesano_cad("INT_VIGA"))
+        btn_viga.grid(row=3, column=0, columnspan=2,
+                      padx=5, pady=5, sticky="ew")
+
         frame_botones_t.grid_columnconfigure(0, weight=1)
         frame_botones_t.grid_columnconfigure(1, weight=1)
 
@@ -281,13 +294,10 @@ class TabArmaduras(ctk.CTkFrame):
         visor = ctk.CTkToplevel(self)
         visor.title("SINCAL - Ayuda Cuadrantes de Travesaño")
         visor.geometry("900x350")
-        # Mantiene la ventana por encima del programa principal
         visor.transient(self)
 
-        # Primero busca la imagen en la bóveda descargada de la nube (APPDATA)
         ruta_img = os.path.join(RUTA_LOCAL_APP, "mapas", "ayuda_travesano.png")
 
-        # Fallback de seguridad: si estás probando el código desde VSCode (Modo desarrollador)
         if not os.path.exists(ruta_img):
             base_dir = os.path.dirname(os.path.dirname(__file__))
             ruta_img = os.path.abspath(os.path.join(
@@ -296,7 +306,6 @@ class TabArmaduras(ctk.CTkFrame):
         if os.path.exists(ruta_img):
             try:
                 img = Image.open(ruta_img)
-                # Renderizamos la imagen manteniendo la proporción original
                 ctk_img = ctk.CTkImage(
                     light_image=img, dark_image=img, size=(850, 300))
                 lbl_img = ctk.CTkLabel(visor, image=ctk_img, text="")
@@ -319,6 +328,7 @@ class TabArmaduras(ctk.CTkFrame):
             phi_ext = int(self.ent_t_phi_ext.get())
             phi_horiz = int(self.ent_t_phi_horiz.get())
             phi_estr = int(self.ent_t_phi_estr.get())
+            largo_viga = float(self.ent_viga_largo.get())
         except ValueError:
             return messagebox.showerror("Error", "Por favor, ingresa solo valores numéricos válidos en los parámetros del travesaño.")
 
@@ -326,310 +336,471 @@ class TabArmaduras(ctk.CTkFrame):
             RUTA_LOCAL_APP, f"Travesano_{tipo_cuadrante}.lsp")
         ruta_lisp = ruta_temp.replace("\\", "\\\\")
 
-        # SOLO PROCESAMOS EXT_IZQ POR AHORA PARA VALIDAR REGLAS. EL RESTO LANZARÁ ALERTA.
-        if tipo_cuadrante not in ["EXT_IZQ", "EXT_DER"]:
-            lisp_code = f"""(defun c:SINCAL-TRAVESANO () (alert "Modulo de Cuadrante Intermedio en desarrollo.") (princ))"""
-        else:
-            lisp_code = f"""(defun c:SINCAL-TRAVESANO (/ ent obj old_osnap recub_m offset_obj coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k lowest_four lowest_by_x right_bot)
-              (vl-load-com)
-              (setvar "CMDECHO" 0)
-              (setq old_osnap (getvar "OSMODE"))
-              (setvar "OSMODE" 0)
-              
-              ;; CAPA MAESTRA UNICA
-              (if (not (tblsearch "LAYER" "FIERROS")) (command "._layer" "_M" "FIERROS" "_C" "5" "" ""))
-              (setvar "CLAYER" "FIERROS")
-              
-              (princ "\\n[SINCAL] Cuadrante: {tipo_cuadrante} | Extrayendo y ordenando vertices...")
-              (setq ent (car (entsel "\\nSeleccione la polilinea cerrada del cuadrante: ")))
-              
-              (if ent
+        lisp_code = f"""(defun c:SINCAL-TRAVESANO (/ ent obj old_osnap recub_m offset_obj coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k lowest_four lowest_by_x right_bot pair1 pair2 pair3 pair4 pair5 pair6 bot4 y_max_L y_max_R raw_len rnd_len ext x_start x_end dist_sacado num_spaces step_sacado i_sac m_slope offset y_center y_left y_right cyan_y half_l x_mid)
+          (vl-load-com)
+          (setvar "CMDECHO" 0)
+          (setq old_osnap (getvar "OSMODE"))
+          (setvar "OSMODE" 0)
+          
+          (if (not (tblsearch "LAYER" "FIERROS")) (command "._layer" "_M" "FIERROS" "_C" "5" "" ""))
+          (setvar "CLAYER" "FIERROS")
+          
+          (princ "\\n[SINCAL] Cuadrante: {tipo_cuadrante} | Extrayendo y ordenando vertices...")
+          (setq ent (car (entsel "\\nSeleccione la polilinea cerrada del cuadrante: ")))
+          
+          (if ent
+            (progn
+              (setq obj (vlax-ename->vla-object ent))
+              (if (= (vla-get-Closed obj) :vlax-true)
                 (progn
-                  (setq obj (vlax-ename->vla-object ent))
-                  (if (= (vla-get-Closed obj) :vlax-true)
+                  (setq recub_m (/ {recub} 100.0))
+                  
+                  (setq offset_obj (car (vlax-safearray->list (vlax-variant-value (vla-offset obj (- recub_m))))))
+                  (if (> (vla-get-Area offset_obj) (vla-get-Area obj))
                     (progn
-                      (setq recub_m (/ {recub} 100.0))
-                      
-                      ;; GENERAR JAULA (OFFSET)
-                      ;; Intentamos offset negativo. Si el area crece (hacia afuera), lo corregimos a positivo (hacia adentro).
-                      (setq offset_obj (car (vlax-safearray->list (vlax-variant-value (vla-offset obj (- recub_m))))))
-                      (if (> (vla-get-Area offset_obj) (vla-get-Area obj))
-                        (progn
-                          (vla-delete offset_obj)
-                          (setq offset_obj (car (vlax-safearray->list (vlax-variant-value (vla-offset obj recub_m)))))
-                        )
-                      )
-                      
-                      ;; EXTRAER Y ORDENAR LOS 10 VERTICES GEOMETRICAMENTE
-                      (setq coords (vlax-safearray->list (vlax-variant-value (vla-get-Coordinates offset_obj))))
-                      (setq pts nil i 0)
-                      (while (< i (length coords))
-                        (setq pts (append pts (list (list (nth i coords) (nth (1+ i) coords)))))
-                        (setq i (+ i 2))
-                      )
-                      
-                      (if (= (length pts) 10)
-                        (cond
-                          ;; ========================================================
-                          ;; ALGORITMO EXTREMO IZQUIERDO (Original Exacto + Magentas extendidas a 1.00m)
-                          ;; ========================================================
-                          ((= "{tipo_cuadrante}" "EXT_IZQ")
-                            (setq pts_by_x (vl-sort pts '(lambda (a b) (< (car a) (car b)))))
-                            (setq left_pts (list (nth 0 pts_by_x) (nth 1 pts_by_x)))
-                            (setq right_pts (list (nth 8 pts_by_x) (nth 9 pts_by_x)))
-                            (setq mid_pts (list (nth 2 pts_by_x) (nth 3 pts_by_x) (nth 4 pts_by_x) (nth 5 pts_by_x) (nth 6 pts_by_x) (nth 7 pts_by_x)))
-                            
-                            (if (> (cadr (car left_pts)) (cadr (cadr left_pts)))
-                              (setq v1 (car left_pts) v2 (cadr left_pts))
-                              (setq v1 (cadr left_pts) v2 (car left_pts)))
-                              
-                            (if (> (cadr (car right_pts)) (cadr (cadr right_pts)))
-                              (setq v8 (car right_pts) v7 (cadr right_pts))
-                              (setq v8 (cadr right_pts) v7 (car right_pts)))
-                              
-                            (setq mid_by_y (vl-sort mid_pts '(lambda (a b) (< (cadr a) (cadr b)))))
-                            (setq lowest_two (list (nth 0 mid_by_y) (nth 1 mid_by_y)))
-                            (setq highest_two (list (nth 4 mid_by_y) (nth 5 mid_by_y)))
-                            (setq middle_two (list (nth 2 mid_by_y) (nth 3 mid_by_y)))
-                            
-                            (if (< (car (car lowest_two)) (car (cadr lowest_two)))
-                              (setq v4 (car lowest_two) v5 (cadr lowest_two))
-                              (setq v4 (cadr lowest_two) v5 (car lowest_two)))
-                              
-                            (if (< (car (car highest_two)) (car (cadr highest_two)))
-                              (setq v10 (car highest_two) v9 (cadr highest_two))
-                              (setq v10 (cadr highest_two) v9 (car highest_two)))
-                              
-                            (if (< (car (car middle_two)) (car (cadr middle_two)))
-                              (setq v3 (car middle_two) v6 (cadr middle_two))
-                              (setq v3 (cadr middle_two) v6 (car middle_two)))
-
-                            (setq y_ext (+ (cadr v1) 0.18))
-                            
-                            (setq dx (- (car v3) (car v2)))
-                            (setq dy (- (cadr v3) (cadr v2)))
-                            (if (not (zerop dy))
-                              (progn
-                                (setq t_val (/ (- (cadr v4) (cadr v3)) dy))
-                                (setq x_end (+ (car v3) (* t_val dx)))
-                                (command "._pline" "_NON" (list (car v1) y_ext) "_NON" v1 "_NON" v2 "_NON" v3 "_NON" (list x_end (cadr v4)) "")
-                                (command "._chprop" (entlast) "" "_C" "1" "")
-                              )
-                            )
-                            
-                            (command "._pline" "_NON" v8 "_NON" v7 "_NON" v6 "_NON" v5 "_NON" v4 "_NON" (list (car v4) y_ext) "")
-                            (command "._chprop" (entlast) "" "_C" "1" "")
-                            
-                            (setq y_curr (cadr v8))
-                            (while (>= y_curr (cadr v7))
-                              (setq ray_start (list (- (car v2) 2.0) y_curr 0.0))
-                              (setq ray_end (list (+ (car v8) 2.0) y_curr 0.0))
-                              (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
-                              (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
-                              (if int_pts
-                                (progn
-                                  (setq min_x (car int_pts) k 3)
-                                  (while (< k (length int_pts))
-                                    (setq min_x (min min_x (nth k int_pts)))
-                                    (setq k (+ k 3))
-                                  )
-                                  ;; CORRECCION: Extension horizontal de 1.00m
-                                  (command "._pline" "_NON" (list min_x y_curr) "_NON" (list (+ (car v8) 1.00) y_curr) "")
-                                  (command "._chprop" (entlast) "" "_C" "6" "")
-                                )
-                              )
-                              (vla-delete ray_obj)
-                              (setq y_curr (- y_curr 0.20))
-                            )
-                            
-                            (setq x_curr (+ (car v1) 0.20))
-                            (while (< x_curr (car v3))
-                              (setq ray_start (list x_curr (+ y_ext 1.0) 0.0))
-                              (setq ray_end (list x_curr (- (cadr v4) 1.0) 0.0))
-                              (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
-                              (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
-                              (if int_pts
-                                (progn
-                                  (setq min_y (cadr int_pts) k 4)
-                                  (while (< k (length int_pts))
-                                    (setq min_y (min min_y (nth k int_pts)))
-                                    (setq k (+ k 3))
-                                  )
-                                  (command "._pline" "_NON" (list x_curr y_ext) "_NON" (list x_curr min_y) "")
-                                  (command "._chprop" (entlast) "" "_C" "3" "")
-                                )
-                              )
-                              (vla-delete ray_obj)
-                              (setq x_curr (+ x_curr 0.20))
-                            )
-                            
-                            (setq x_curr (car v9))
-                            (while (>= x_curr (car v10))
-                              (setq ray_start (list x_curr (+ (cadr v8) 1.0) 0.0))
-                              (setq ray_end (list x_curr (- (cadr v4) 1.0) 0.0))
-                              (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
-                              (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
-                              (if int_pts
-                                (progn
-                                  (setq min_y (cadr int_pts) k 4)
-                                  (while (< k (length int_pts))
-                                    (setq min_y (min min_y (nth k int_pts)))
-                                    (setq k (+ k 3))
-                                  )
-                                  (command "._pline" "_NON" (list x_curr (cadr v8)) "_NON" (list x_curr min_y) "")
-                                  (command "._chprop" (entlast) "" "_C" "3" "")
-                                )
-                              )
-                              (vla-delete ray_obj)
-                              (setq x_curr (- x_curr 0.20))
-                            )
-                            
-                            (vla-delete offset_obj)
-                            (princ "\\n[OK] Enfierradura inyectada (Extremo Izquierdo).")
-                          )
-
-                          ;; ========================================================
-                          ;; ALGORITMO EXTREMO DERECHO (Corregido V4, V8, V10-V9 y Estribos G2)
-                          ;; ========================================================
-                          ((= "{tipo_cuadrante}" "EXT_DER")
-                            (setq pts_by_x (vl-sort pts '(lambda (a b) (< (car a) (car b)))))
-                            (setq left_pts (list (nth 0 pts_by_x) (nth 1 pts_by_x)))
-                            (setq right_pts (list (nth 8 pts_by_x) (nth 9 pts_by_x)))
-                            (setq mid_pts (list (nth 2 pts_by_x) (nth 3 pts_by_x) (nth 4 pts_by_x) (nth 5 pts_by_x) (nth 6 pts_by_x) (nth 7 pts_by_x)))
-                            
-                            ;; V4 y V5 (Alma a la Izquierda)
-                            (if (> (cadr (car left_pts)) (cadr (cadr left_pts)))
-                              (setq v4 (car left_pts) v5 (cadr left_pts))
-                              (setq v4 (cadr left_pts) v5 (car left_pts)))
-                              
-                            ;; V1 y V10 (Caida a la Derecha)
-                            (if (> (cadr (car right_pts)) (cadr (cadr right_pts)))
-                              (setq v1 (car right_pts) v10 (cadr right_pts))
-                              (setq v1 (cadr right_pts) v10 (car right_pts)))
-                              
-                            ;; Ordenar los del medio por Y (los 2 mas altos son V2 y V3)
-                            (setq mid_by_y (vl-sort mid_pts '(lambda (a b) (> (cadr a) (cadr b)))))
-                            (setq highest_two (list (nth 0 mid_by_y) (nth 1 mid_by_y)))
-                            
-                            (if (> (car (car highest_two)) (car (cadr highest_two)))
-                              (setq v2 (car highest_two) v3 (cadr highest_two))
-                              (setq v2 (cadr highest_two) v3 (car highest_two)))
-                              
-                            ;; Los 4 de mas abajo son V6, V7, V8, V9
-                            (setq lowest_four (list (nth 2 mid_by_y) (nth 3 mid_by_y) (nth 4 mid_by_y) (nth 5 mid_by_y)))
-                            (setq lowest_by_x (vl-sort lowest_four '(lambda (a b) (< (car a) (car b)))))
-                            
-                            ;; V6 y V7 (Fondo izquierdo)
-                            (setq v6 (nth 0 lowest_by_x) v7 (nth 1 lowest_by_x))
-                            
-                            ;; V8 y V9 (Esquina inferior derecha) -> V9 siempre arriba de V8
-                            (setq right_bot (list (nth 2 lowest_by_x) (nth 3 lowest_by_x)))
-                            (if (> (cadr (car right_bot)) (cadr (cadr right_bot)))
-                              (setq v9 (car right_bot) v8 (cadr right_bot))
-                              (setq v9 (cadr right_bot) v8 (car right_bot)))
-
-                            (setq y_ext (+ (cadr v1) 0.18))
-                            
-                            ;; 1. LINEA 1 (Exterior Derecha: Sigue Pendiente V10-V9 exacto)
-                            (setq dx (- (car v9) (car v10)))
-                            (setq dy (- (cadr v9) (cadr v10)))
-                            (if (not (zerop dy))
-                              (progn
-                                (setq t_val (/ (- (cadr v8) (cadr v9)) dy))
-                                (setq x_end (+ (car v9) (* t_val dx)))
-                                (command "._pline" "_NON" (list (car v1) y_ext) "_NON" v1 "_NON" v10 "_NON" v9 "_NON" (list x_end (cadr v8)) "")
-                                (command "._chprop" (entlast) "" "_C" "1" "")
-                              )
-                            )
-                            
-                            ;; 2. LINEA 2 (Alma y Fondo: Empieza en V4 EXACTO, no salta V8, sube a Losa)
-                            (command "._pline" "_NON" v4 "_NON" v5 "_NON" v6 "_NON" v7 "_NON" v8 "_NON" (list (car v8) y_ext) "")
-                            (command "._chprop" (entlast) "" "_C" "1" "")
-                            
-                            ;; 3. MAGENTAS (Horizontales espaciados 20cm en Y hacia abajo, desde Y=V4)
-                            (setq y_curr (cadr v4))
-                            (while (>= y_curr (cadr v5))
-                              (setq ray_start (list (+ (car v1) 2.0) y_curr 0.0))
-                              (setq ray_end (list (- (car v4) 2.0) y_curr 0.0))
-                              (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
-                              (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
-                              (if int_pts
-                                (progn
-                                  (setq max_x (car int_pts) k 3)
-                                  (while (< k (length int_pts))
-                                    (setq max_x (max max_x (nth k int_pts)))
-                                    (setq k (+ k 3))
-                                  )
-                                  ;; CORRECCION: Extension horizontal de 1.00m hacia la izquierda desde V4
-                                  (command "._pline" "_NON" (list (- (car v4) 1.00) y_curr) "_NON" (list max_x y_curr) "")
-                                  (command "._chprop" (entlast) "" "_C" "6" "")
-                                )
-                              )
-                              (vla-delete ray_obj)
-                              (setq y_curr (- y_curr 0.20))
-                            )
-                            
-                            ;; 4. VERDES G1 (Top Flat, Derecha a Izquierda)
-                            (setq x_curr (- (car v1) 0.20))
-                            (while (> x_curr (car v2))
-                              (setq ray_start (list x_curr (+ y_ext 1.0) 0.0))
-                              (setq ray_end (list x_curr (- (cadr v8) 1.0) 0.0))
-                              (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
-                              (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
-                              (if int_pts
-                                (progn
-                                  (setq min_y (cadr int_pts) k 4)
-                                  (while (< k (length int_pts))
-                                    (setq min_y (min min_y (nth k int_pts)))
-                                    (setq k (+ k 3))
-                                  )
-                                  (command "._pline" "_NON" (list x_curr y_ext) "_NON" (list x_curr min_y) "")
-                                  (command "._chprop" (entlast) "" "_C" "3" "")
-                                )
-                              )
-                              (vla-delete ray_obj)
-                              (setq x_curr (- x_curr 0.20))
-                            )
-                            
-                            ;; 5. VERDES G2 (Inner Step, de V4 hacia V2 en X+) - CORREGIDO PUNTO Y MAXIMO
-                            (setq x_curr (car v4))
-                            (while (<= x_curr (car v2))
-                              (setq ray_start (list x_curr (+ (cadr v4) 1.0) 0.0))
-                              (setq ray_end (list x_curr (- (cadr v8) 1.0) 0.0))
-                              (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
-                              (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
-                              (if int_pts
-                                (progn
-                                  (setq min_y (cadr int_pts) k 4)
-                                  (while (< k (length int_pts))
-                                    (setq min_y (min min_y (nth k int_pts)))
-                                    (setq k (+ k 3))
-                                  )
-                                  (command "._pline" "_NON" (list x_curr (cadr v4)) "_NON" (list x_curr min_y) "")
-                                  (command "._chprop" (entlast) "" "_C" "3" "")
-                                )
-                              )
-                              (vla-delete ray_obj)
-                              (setq x_curr (+ x_curr 0.20))
-                            )
-                            
-                            (vla-delete offset_obj)
-                            (princ "\\n[OK] Enfierradura inyectada y auditada (Extremo Derecho).")
-                          )
-                          
-                          (t (alert "Modulo de Cuadrante Intermedio en desarrollo."))
-                        )
-                        (alert "Fallo de Topologia: La polilinea debe tener exactamente 10 vertices para este cuadrante.\\nUse BOUNDARY o revise su dibujo.")
-                      )
+                      (vla-delete offset_obj)
+                      (setq offset_obj (car (vlax-safearray->list (vlax-variant-value (vla-offset obj recub_m)))))
                     )
-                    (alert "Fallo de Geometria: La polilinea seleccionada NO esta cerrada.")
+                  )
+                  
+                  (setq coords (vlax-safearray->list (vlax-variant-value (vla-get-Coordinates offset_obj))))
+                  (setq pts nil i 0)
+                  (while (< i (length coords))
+                    (setq pts (append pts (list (list (nth i coords) (nth (1+ i) coords)))))
+                    (setq i (+ i 2))
+                  )
+                  
+                  (cond
+                    ;; ========================================================
+                    ;; ALGORITMO EXTREMO IZQUIERDO (10 Vertices)
+                    ;; ========================================================
+                    ((and (= "{tipo_cuadrante}" "EXT_IZQ") (= (length pts) 10))
+                      (setq pts_by_x (vl-sort pts '(lambda (a b) (< (car a) (car b)))))
+                      (setq left_pts (list (nth 0 pts_by_x) (nth 1 pts_by_x)))
+                      (setq right_pts (list (nth 8 pts_by_x) (nth 9 pts_by_x)))
+                      (setq mid_pts (list (nth 2 pts_by_x) (nth 3 pts_by_x) (nth 4 pts_by_x) (nth 5 pts_by_x) (nth 6 pts_by_x) (nth 7 pts_by_x)))
+                      
+                      (if (> (cadr (car left_pts)) (cadr (cadr left_pts)))
+                        (setq v1 (car left_pts) v2 (cadr left_pts))
+                        (setq v1 (cadr left_pts) v2 (car left_pts)))
+                        
+                      (if (> (cadr (car right_pts)) (cadr (cadr right_pts)))
+                        (setq v8 (car right_pts) v7 (cadr right_pts))
+                        (setq v8 (cadr right_pts) v7 (car right_pts)))
+                        
+                      (setq mid_by_y (vl-sort mid_pts '(lambda (a b) (< (cadr a) (cadr b)))))
+                      (setq lowest_two (list (nth 0 mid_by_y) (nth 1 mid_by_y)))
+                      (setq highest_two (list (nth 4 mid_by_y) (nth 5 mid_by_y)))
+                      (setq middle_two (list (nth 2 mid_by_y) (nth 3 mid_by_y)))
+                      
+                      (if (< (car (car lowest_two)) (car (cadr lowest_two)))
+                        (setq v4 (car lowest_two) v5 (cadr lowest_two))
+                        (setq v4 (cadr lowest_two) v5 (car lowest_two)))
+                        
+                      (if (< (car (car highest_two)) (car (cadr highest_two)))
+                        (setq v10 (car highest_two) v9 (cadr highest_two))
+                        (setq v10 (cadr highest_two) v9 (car highest_two)))
+                        
+                      (if (< (car (car middle_two)) (car (cadr middle_two)))
+                        (setq v3 (car middle_two) v6 (cadr middle_two))
+                        (setq v3 (cadr middle_two) v6 (car middle_two)))
+
+                      (setq y_ext (+ (cadr v1) 0.18))
+                      
+                      (setq dx (- (car v3) (car v2)))
+                      (setq dy (- (cadr v3) (cadr v2)))
+                      (if (not (zerop dy))
+                        (progn
+                          (setq t_val (/ (- (cadr v4) (cadr v3)) dy))
+                          (setq x_end (+ (car v3) (* t_val dx)))
+                          (command "._pline" "_NON" (list (car v1) y_ext) "_NON" v1 "_NON" v2 "_NON" v3 "_NON" (list x_end (cadr v4)) "")
+                          (command "._chprop" (entlast) "" "_C" "1" "")
+                        )
+                      )
+                      
+                      (command "._pline" "_NON" v8 "_NON" v7 "_NON" v6 "_NON" v5 "_NON" v4 "_NON" (list (car v4) y_ext) "")
+                      (command "._chprop" (entlast) "" "_C" "1" "")
+                      
+                      (setq y_curr (cadr v8))
+                      (while (>= y_curr (cadr v7))
+                        (setq ray_start (list (- (car v2) 2.0) y_curr 0.0))
+                        (setq ray_end (list (+ (car v8) 2.0) y_curr 0.0))
+                        (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                        (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                        (if int_pts
+                          (progn
+                            (setq min_x (car int_pts) k 3)
+                            (while (< k (length int_pts))
+                              (setq min_x (min min_x (nth k int_pts)))
+                              (setq k (+ k 3))
+                            )
+                            (command "._pline" "_NON" (list min_x y_curr) "_NON" (list (+ (car v8) 1.00) y_curr) "")
+                            (command "._chprop" (entlast) "" "_C" "6" "")
+                          )
+                        )
+                        (vla-delete ray_obj)
+                        (setq y_curr (- y_curr 0.20))
+                      )
+                      
+                      (setq x_curr (+ (car v1) 0.20))
+                      (while (< x_curr (car v3))
+                        (setq ray_start (list x_curr (+ y_ext 1.0) 0.0))
+                        (setq ray_end (list x_curr (- (cadr v4) 1.0) 0.0))
+                        (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                        (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                        (if int_pts
+                          (progn
+                            (setq min_y (cadr int_pts) k 4)
+                            (while (< k (length int_pts))
+                              (setq min_y (min min_y (nth k int_pts)))
+                              (setq k (+ k 3))
+                            )
+                            (command "._pline" "_NON" (list x_curr y_ext) "_NON" (list x_curr min_y) "")
+                            (command "._chprop" (entlast) "" "_C" "3" "")
+                          )
+                        )
+                        (vla-delete ray_obj)
+                        (setq x_curr (+ x_curr 0.20))
+                      )
+                      
+                      (setq x_curr (car v9))
+                      (while (>= x_curr (car v10))
+                        (setq ray_start (list x_curr (+ (cadr v8) 1.0) 0.0))
+                        (setq ray_end (list x_curr (- (cadr v4) 1.0) 0.0))
+                        (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                        (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                        (if int_pts
+                          (progn
+                            (setq min_y (cadr int_pts) k 4)
+                            (while (< k (length int_pts))
+                              (setq min_y (min min_y (nth k int_pts)))
+                              (setq k (+ k 3))
+                            )
+                            (command "._pline" "_NON" (list x_curr (cadr v8)) "_NON" (list x_curr min_y) "")
+                            (command "._chprop" (entlast) "" "_C" "3" "")
+                          )
+                        )
+                        (vla-delete ray_obj)
+                        (setq x_curr (- x_curr 0.20))
+                      )
+                      
+                      (vla-delete offset_obj)
+                      (princ "\\n[OK] Enfierradura inyectada (Extremo Izquierdo).")
+                    )
+
+                    ;; ========================================================
+                    ;; ALGORITMO EXTREMO DERECHO (10 Vertices)
+                    ;; ========================================================
+                    ((and (= "{tipo_cuadrante}" "EXT_DER") (= (length pts) 10))
+                      (setq pts_by_x (vl-sort pts '(lambda (a b) (< (car a) (car b)))))
+                      (setq left_pts (list (nth 0 pts_by_x) (nth 1 pts_by_x)))
+                      (setq right_pts (list (nth 8 pts_by_x) (nth 9 pts_by_x)))
+                      (setq mid_pts (list (nth 2 pts_by_x) (nth 3 pts_by_x) (nth 4 pts_by_x) (nth 5 pts_by_x) (nth 6 pts_by_x) (nth 7 pts_by_x)))
+                      
+                      (if (> (cadr (car left_pts)) (cadr (cadr left_pts)))
+                        (setq v4 (car left_pts) v5 (cadr left_pts))
+                        (setq v4 (cadr left_pts) v5 (car left_pts)))
+                        
+                      (if (> (cadr (car right_pts)) (cadr (cadr right_pts)))
+                        (setq v1 (car right_pts) v10 (cadr right_pts))
+                        (setq v1 (cadr right_pts) v10 (car right_pts)))
+                        
+                      (setq mid_by_y (vl-sort mid_pts '(lambda (a b) (> (cadr a) (cadr b)))))
+                      (setq highest_two (list (nth 0 mid_by_y) (nth 1 mid_by_y)))
+                      
+                      (if (> (car (car highest_two)) (car (cadr highest_two)))
+                        (setq v2 (car highest_two) v3 (cadr highest_two))
+                        (setq v2 (cadr highest_two) v3 (car highest_two)))
+                        
+                      (setq lowest_four (list (nth 2 mid_by_y) (nth 3 mid_by_y) (nth 4 mid_by_y) (nth 5 mid_by_y)))
+                      (setq lowest_by_x (vl-sort lowest_four '(lambda (a b) (< (car a) (car b)))))
+                      
+                      (setq v6 (nth 0 lowest_by_x) v7 (nth 1 lowest_by_x))
+                      
+                      (setq right_bot (list (nth 2 lowest_by_x) (nth 3 lowest_by_x)))
+                      (if (> (cadr (car right_bot)) (cadr (cadr right_bot)))
+                        (setq v9 (car right_bot) v8 (cadr right_bot))
+                        (setq v9 (cadr right_bot) v8 (car right_bot)))
+
+                      (setq y_ext (+ (cadr v1) 0.18))
+                      
+                      (setq dx (- (car v9) (car v10)))
+                      (setq dy (- (cadr v9) (cadr v10)))
+                      (if (not (zerop dy))
+                        (progn
+                          (setq t_val (/ (- (cadr v8) (cadr v9)) dy))
+                          (setq x_end (+ (car v9) (* t_val dx)))
+                          (command "._pline" "_NON" (list (car v1) y_ext) "_NON" v1 "_NON" v10 "_NON" v9 "_NON" (list x_end (cadr v8)) "")
+                          (command "._chprop" (entlast) "" "_C" "1" "")
+                        )
+                      )
+                      
+                      (command "._pline" "_NON" v4 "_NON" v5 "_NON" v6 "_NON" v7 "_NON" v8 "_NON" (list (car v8) y_ext) "")
+                      (command "._chprop" (entlast) "" "_C" "1" "")
+                      
+                      (setq y_curr (cadr v4))
+                      (while (>= y_curr (cadr v5))
+                        (setq ray_start (list (+ (car v1) 2.0) y_curr 0.0))
+                        (setq ray_end (list (- (car v4) 2.0) y_curr 0.0))
+                        (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                        (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                        (if int_pts
+                          (progn
+                            (setq max_x (car int_pts) k 3)
+                            (while (< k (length int_pts))
+                              (setq max_x (max max_x (nth k int_pts)))
+                              (setq k (+ k 3))
+                            )
+                            (command "._pline" "_NON" (list (- (car v4) 1.00) y_curr) "_NON" (list max_x y_curr) "")
+                            (command "._chprop" (entlast) "" "_C" "6" "")
+                          )
+                        )
+                        (vla-delete ray_obj)
+                        (setq y_curr (- y_curr 0.20))
+                      )
+                      
+                      (setq x_curr (- (car v1) 0.20))
+                      (while (> x_curr (car v2))
+                        (setq ray_start (list x_curr (+ y_ext 1.0) 0.0))
+                        (setq ray_end (list x_curr (- (cadr v8) 1.0) 0.0))
+                        (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                        (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                        (if int_pts
+                          (progn
+                            (setq min_y (cadr int_pts) k 4)
+                            (while (< k (length int_pts))
+                              (setq min_y (min min_y (nth k int_pts)))
+                              (setq k (+ k 3))
+                            )
+                            (command "._pline" "_NON" (list x_curr y_ext) "_NON" (list x_curr min_y) "")
+                            (command "._chprop" (entlast) "" "_C" "3" "")
+                          )
+                        )
+                        (vla-delete ray_obj)
+                        (setq x_curr (- x_curr 0.20))
+                      )
+                      
+                      (setq x_curr (car v3))
+                      (while (<= x_curr (car v2))
+                        (setq ray_start (list x_curr (+ (cadr v4) 1.0) 0.0))
+                        (setq ray_end (list x_curr (- (cadr v8) 1.0) 0.0))
+                        (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                        (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                        (if int_pts
+                          (progn
+                            (setq min_y (cadr int_pts) k 4)
+                            (while (< k (length int_pts))
+                              (setq min_y (min min_y (nth k int_pts)))
+                              (setq k (+ k 3))
+                            )
+                            (command "._pline" "_NON" (list x_curr (cadr v4)) "_NON" (list x_curr min_y) "")
+                            (command "._chprop" (entlast) "" "_C" "3" "")
+                          )
+                        )
+                        (vla-delete ray_obj)
+                        (setq x_curr (+ x_curr 0.20))
+                      )
+                      
+                      (vla-delete offset_obj)
+                      (princ "\\n[OK] Enfierradura inyectada y auditada (Extremo Derecho).")
+                    )
+
+                    ;; ========================================================
+                    ;; ALGORITMO CUADRANTE TOPE (16 Vertices)
+                    ;; ========================================================
+                    ((and (= "{tipo_cuadrante}" "INT_TOPE") (= (length pts) 16))
+                      ;; 1. Ordenar todos los puntos por Y descendente
+                      (setq pts_by_y (vl-sort pts '(lambda (a b) (> (cadr a) (cadr b)))))
+                      
+                      ;; 2. Agrupar en pares y ordenarlos por X para definir Left/Right
+                      (setq pair1 (vl-sort (list (nth 0 pts_by_y) (nth 1 pts_by_y)) '(lambda (a b) (< (car a) (car b)))))
+                      (setq v1 (car pair1) v16 (cadr pair1))
+                      
+                      (setq pair2 (vl-sort (list (nth 2 pts_by_y) (nth 3 pts_by_y)) '(lambda (a b) (< (car a) (car b)))))
+                      (setq v2 (car pair2) v15 (cadr pair2))
+                      
+                      (setq pair3 (vl-sort (list (nth 4 pts_by_y) (nth 5 pts_by_y)) '(lambda (a b) (< (car a) (car b)))))
+                      (setq v3 (car pair3) v14 (cadr pair3))
+                      
+                      (setq pair4 (vl-sort (list (nth 6 pts_by_y) (nth 7 pts_by_y)) '(lambda (a b) (< (car a) (car b)))))
+                      (setq v8 (car pair4) v9 (cadr pair4))
+                      
+                      (setq pair5 (vl-sort (list (nth 8 pts_by_y) (nth 9 pts_by_y)) '(lambda (a b) (< (car a) (car b)))))
+                      (setq v4 (car pair5) v13 (cadr pair5))
+                      
+                      (setq pair6 (vl-sort (list (nth 10 pts_by_y) (nth 11 pts_by_y)) '(lambda (a b) (< (car a) (car b)))))
+                      (setq v5 (car pair6) v12 (cadr pair6))
+                      
+                      (setq bot4 (vl-sort (list (nth 12 pts_by_y) (nth 13 pts_by_y) (nth 14 pts_by_y) (nth 15 pts_by_y)) '(lambda (a b) (< (car a) (car b)))))
+                      (setq v6 (nth 0 bot4) v7 (nth 1 bot4) v10 (nth 2 bot4) v11 (nth 3 bot4))
+
+                      ;; ========================================================
+                      ;; INYECCIÓN DE REGLAS ESTRUCTURALES
+                      ;; ========================================================
+                      (setq y_max_L (+ (cadr v1) 0.18))
+                      (setq y_max_R (+ (cadr v16) 0.18))
+
+                      ;; FIERRO 1 (Externo Izquierdo)
+                      (command "._pline" "_NON" v3 "_NON" v4 "_NON" v5 "_NON" v6 "_NON" v7 "_NON" (list (car v7) y_max_L) "")
+                      (command "._chprop" (entlast) "" "_C" "1" "")
+
+                      ;; FIERRO 2 (Externo Sacado)
+                      (setq raw_len (+ (- (car v9) (car v8)) 1.40))
+                      (setq rnd_len (* (fix (+ (/ raw_len 0.10) 0.5)) 0.10))
+                      (setq ext (/ (- rnd_len (- (car v9) (car v8))) 2.0))
+                      (command "._pline" "_NON" (list (- (car v8) ext) (cadr v8)) "_NON" (list (+ (car v9) ext) (cadr v9)) "")
+                      (command "._chprop" (entlast) "" "_C" "1" "")
+
+                      ;; FIERRO 3 (Externo Derecho)
+                      (command "._pline" "_NON" v14 "_NON" v13 "_NON" v12 "_NON" v11 "_NON" v10 "_NON" (list (car v10) y_max_R) "")
+                      (command "._chprop" (entlast) "" "_C" "1" "")
+
+                      ;; GRUPO 1 ESTRIBOS VERDES (Izquierda)
+                      (setq x_curr (car v2))
+                      (while (<= x_curr (car v8))
+                        (setq ray_start (list x_curr (+ y_max_L 1.0) 0.0))
+                        (setq ray_end (list x_curr (- (cadr v6) 1.0) 0.0))
+                        (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                        (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                        (if int_pts
+                          (progn
+                            (setq min_y (cadr int_pts) k 4)
+                            (while (< k (length int_pts))
+                              (setq min_y (min min_y (nth k int_pts)))
+                              (setq k (+ k 3))
+                            )
+                            (command "._pline" "_NON" (list x_curr (cadr v3)) "_NON" (list x_curr min_y) "")
+                            (command "._chprop" (entlast) "" "_C" "3" "")
+                          )
+                        )
+                        (vla-delete ray_obj)
+                        (setq x_curr (+ x_curr 0.20))
+                      )
+
+                      ;; GRUPO 2 ESTRIBOS VERDES (Derecha)
+                      (setq x_curr (car v15))
+                      (while (>= x_curr (car v9))
+                        (setq ray_start (list x_curr (+ y_max_R 1.0) 0.0))
+                        (setq ray_end (list x_curr (- (cadr v11) 1.0) 0.0))
+                        (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                        (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                        (if int_pts
+                          (progn
+                            (setq min_y (cadr int_pts) k 4)
+                            (while (< k (length int_pts))
+                              (setq min_y (min min_y (nth k int_pts)))
+                              (setq k (+ k 3))
+                            )
+                            (command "._pline" "_NON" (list x_curr (cadr v14)) "_NON" (list x_curr min_y) "")
+                            (command "._chprop" (entlast) "" "_C" "3" "")
+                          )
+                        )
+                        (vla-delete ray_obj)
+                        (setq x_curr (- x_curr 0.20))
+                      )
+
+                      ;; GRUPO 3 ESTRIBOS VERDES (Centro Sacado)
+                      (setq dist_sacado (- (car v9) (car v8)))
+                      (setq num_spaces (fix (+ (/ dist_sacado 0.20) 0.999)))
+                      (setq step_sacado (/ dist_sacado num_spaces))
+                      (setq i_sac 0)
+                      (while (<= i_sac num_spaces)
+                        (setq x_curr (+ (car v8) (* i_sac step_sacado)))
+                        (setq ray_start (list x_curr (+ y_max_L 1.0) 0.0))
+                        (setq ray_end (list x_curr (- (cadr v8) 1.0) 0.0))
+                        (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                        (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                        (if int_pts
+                          (progn
+                            (setq min_y (cadr int_pts) k 4)
+                            (while (< k (length int_pts))
+                              (setq min_y (min min_y (nth k int_pts)))
+                              (setq k (+ k 3))
+                            )
+                            (command "._pline" "_NON" (list x_curr y_max_L) "_NON" (list x_curr min_y) "")
+                            (command "._chprop" (entlast) "" "_C" "3" "")
+                          )
+                        )
+                        (vla-delete ray_obj)
+                        (setq i_sac (1+ i_sac))
+                      )
+
+                      ;; GRUPO 1 GRISES HORIZONTALES
+                      (setq m_slope (/ (- (cadr v14) (cadr v3)) (- (car v14) (car v3))))
+                      (setq offset 0.20)
+                      (setq y_center (- (+ (cadr v3) (* m_slope (- (/ (+ (car v8) (car v9)) 2.0) (car v3)))) offset))
+                      (while (>= y_center (+ (cadr v8) 0.20))
+                        (setq y_left (- (cadr v3) offset))
+                        (setq y_right (- (cadr v14) offset))
+                        (setq ray_start (list (- (car v3) 1.0) (- y_left (* m_slope 1.0)) 0.0))
+                        (setq ray_end (list (+ (car v14) 1.0) (+ y_right (* m_slope 1.0)) 0.0))
+                        (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                        (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                        (if int_pts
+                          (progn
+                            (setq min_x (car int_pts) max_x min_x k 3)
+                            (while (< k (length int_pts))
+                              (setq min_x (min min_x (nth k int_pts)))
+                              (setq max_x (max max_x (nth k int_pts)))
+                              (setq k (+ k 3))
+                            )
+                            (command "._pline" "_NON" (list min_x (- y_left (* m_slope (- (car v3) min_x)))) "_NON" (list max_x (+ y_right (* m_slope (- max_x (car v14))))) "")
+                            (command "._chprop" (entlast) "" "_C" "8" "")
+                          )
+                        )
+                        (vla-delete ray_obj)
+                        (setq offset (+ offset 0.20))
+                        (setq y_center (- (+ (cadr v3) (* m_slope (- (/ (+ (car v8) (car v9)) 2.0) (car v3)))) offset))
+                      )
+
+                      ;; GRUPO 2 CYAN
+                      (setq cyan_y (+ (cadr v4) 0.20))
+                      (command "._pline" "_NON" (list (+ (car v4) 0.20) cyan_y) "_NON" (list (+ (car v8) 0.80) cyan_y) "")
+                      (command "._chprop" (entlast) "" "_C" "4" "")
+
+                      (vla-delete offset_obj)
+                      (princ "\\n[OK] Cuadrante de Tope (16v) inyectado.")
+                    )
+
+                    ;; ========================================================
+                    ;; ALGORITMO CUADRANTE VIGA (4 Vertices)
+                    ;; ========================================================
+                    ((and (= "{tipo_cuadrante}" "INT_VIGA") (= (length pts) 4))
+                      (setq pts_by_y (vl-sort pts '(lambda (a b) (> (cadr a) (cadr b)))))
+                      (setq v1 (nth 0 pts_by_y) v2 (nth 1 pts_by_y) v3 (nth 2 pts_by_y) v4 (nth 3 pts_by_y))
+                      (setq x_mid (/ (+ (car v1) (car v2)) 2.0))
+                      (setq len_viga (/ {largo_viga} 100.0))
+                      (setq half_l (/ len_viga 2.0))
+                      
+                      (setq y_curr (- (cadr v1) 0.05))
+                      (setq y_min (+ (cadr v3) 0.10))
+                      
+                      (while (>= y_curr y_min)
+                        (command "._pline" "_NON" (list (- x_mid half_l) y_curr) "_NON" (list (+ x_mid half_l) y_curr) "")
+                        (command "._chprop" (entlast) "" "_C" "2" "")
+                        (setq y_curr (- y_curr 0.20))
+                      )
+                      (vla-delete offset_obj)
+                      (princ "\\n[OK] Cuadrante de Viga inyectado.")
+                    )
+
+                    ;; ========================================================
+                    ;; VALIDACIONES
+                    ;; ========================================================
+                    ((and (= "{tipo_cuadrante}" "INT_MACIZO") (/= (length pts) 10))
+                      (alert "Modulo de Cuadrante Intermedio Macizo en desarrollo."))
+                      
+                    (t (alert (strcat "Fallo de Topologia.\\nEsperaba otra cantidad de vertices para este modulo, pero se leyeron " (itoa (length pts)) " vertices.\\nRevise su polilinea.")))
                   )
                 )
-                (princ "\\n[X] No se selecciono nada.")
+                (alert "Fallo de Geometria: La polilinea seleccionada NO esta cerrada.")
               )
-              (setvar "OSMODE" old_osnap)
-              (princ)
-            )"""
+            )
+            (princ "\\n[X] No se selecciono nada.")
+          )
+          (setvar "OSMODE" old_osnap)
+          (princ)
+        )"""
 
         with open(ruta_temp, 'w', encoding='utf-8') as f:
             f.write(lisp_code)
