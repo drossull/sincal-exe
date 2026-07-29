@@ -711,51 +711,6 @@ class ActualizadorCAD(ctk.CTk):
         self.actualizar_variable_entorno()
         self.log("[!] PATH y Registro CAD reparados.")
 
-    def reiniciar_aplicacion(self):
-        """Mata el hilo de la bandeja y usa un script puente con entorno sanitizado para reiniciar SINCAL limpio."""
-        try:
-            if hasattr(self, 'icono_bandeja'):
-                self.icono_bandeja.stop()
-        except:
-            pass
-
-        exe_path = sys.executable
-        bat_path = os.path.join(os.environ.get(
-            'TEMP', 'C:\\Temp'), "restart_sincal.bat")
-        meipass = getattr(sys, '_MEIPASS', '')
-
-        # 1. Limpieza a nivel MS-DOS (Reemplazo de strings para arrancar la ruta vieja del PATH)
-        with open(bat_path, "w", encoding="utf-8") as f:
-            f.write("@echo off\n")
-            f.write("timeout /t 2 /nobreak > NUL\n")
-            f.write("set _MEIPASS2=\n")
-            f.write("set _MEIPASS=\n")
-            if meipass:
-                f.write(f'set PATH=%PATH:{meipass};=%\n')
-                f.write(f'set PATH=%PATH:{meipass}=%\n')
-            f.write(f'start "" "{exe_path}"\n')
-            f.write('del "%~f0"\n')
-
-        # 2. Limpieza a nivel Python (El lavado de cerebro definitivo)
-        env_limpio = os.environ.copy()
-        env_limpio.pop('_MEIPASS2', None)
-        env_limpio.pop('_MEIPASS', None)
-        if meipass and 'PATH' in env_limpio:
-            env_limpio['PATH'] = os.pathsep.join(
-                [p for p in env_limpio['PATH'].split(
-                    os.pathsep) if p.lower() != meipass.lower()]
-            )
-
-        # 3. Lanzamos el .bat totalmente desvinculado (0x08000000 = CREATE_NO_WINDOW)
-        subprocess.Popen(
-            ["cmd.exe", "/c", bat_path],
-            creationflags=0x08000000,
-            env=env_limpio
-        )
-
-        # Permitimos que la versión actual se cierre y borre su carpeta temporal
-        sys.exit(0)
-
     def iniciar_actualizacion_hilo(self):
         self.btn_actualizar.configure(
             state="disabled", text="Sincronizando...")
@@ -826,11 +781,13 @@ class ActualizadorCAD(ctk.CTk):
                 "SINCAL Actualizado", f"Instalada versión {self.version_local_actual}")
 
             self.log(
-                "\n[!] Aplicando cambios... Reiniciando SINCAL en 3 segundos.")
-            self.after(3000, self.reiniciar_aplicacion)
+                "\n[OK] Actualización completada. Por favor, CIERRA este programa y vuelve a abrirlo para aplicar los cambios.")
+            messagebox.showinfo(
+                "Actualización Exitosa", "Los archivos se han descargado correctamente.\n\nPor favor, cierra SINCAL Suite y vuelve a abrirlo para que los cambios surtan efecto.")
 
         except Exception as e:
             self.log(f"[!] Error crítico en actualización: {e}")
+        finally:
             self.btn_actualizar.configure(
                 state="normal", text="Instalar / Actualizar Todo")
 
