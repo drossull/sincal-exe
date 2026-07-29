@@ -307,9 +307,6 @@ class TabArmaduras(ctk.CTkFrame):
         frame_botones_t.grid_columnconfigure(0, weight=1)
         frame_botones_t.grid_columnconfigure(1, weight=1)
 
-    # =========================================================
-    # FUNCIONES INTERACTIVAS (Visores)
-    # =========================================================
     def mostrar_ayuda_travesano(self):
         visor = ctk.CTkToplevel(self)
         visor.title("SINCAL - Ayuda Cuadrantes de Travesaño")
@@ -337,9 +334,6 @@ class TabArmaduras(ctk.CTkFrame):
             ctk.CTkLabel(
                 visor, text=f"No se encontró la imagen de ayuda en:\n{ruta_img}\n\nPor favor, guarda el DXF como 'ayuda_travesano.png' en la carpeta 'mapas'.").pack(pady=20)
 
-    # =========================================================
-    # FUNCIONES DE EJECUCIÓN (AutoCAD)
-    # =========================================================
     def generar_travesano_cad(self, tipo_cuadrante):
         try:
             recub = float(self.ent_t_rec.get())
@@ -372,7 +366,7 @@ class TabArmaduras(ctk.CTkFrame):
           
           (if ent
             (progn
-              (setq *SINCAL_TRAV_HANDLE* (cdr (assoc 5 (entget ent)))) ;; Guarda el ID persistente de la polilinea
+              (setq *SINCAL_TRAV_HANDLE* (cdr (assoc 5 (entget ent))))
               (setq obj (vlax-ename->vla-object ent))
               (if (= (vla-get-Closed obj) :vlax-true)
                 (progn
@@ -409,46 +403,34 @@ class TabArmaduras(ctk.CTkFrame):
                         ;; ========================================================
                         ;; ALGORITMO EXTREMO IZQUIERDO (10 Vertices)
                         ;; ========================================================
-                        ((and (= "{tipo_cuadrante}" "EXT_IZQ") (= (length pts) 10))
+                        ((= "{tipo_cuadrante}" "EXT_IZQ")
                           (setq pts_by_x (vl-sort pts '(lambda (a b) (< (car a) (car b)))))
                           (setq left_pts (list (nth 0 pts_by_x) (nth 1 pts_by_x)))
-                          (setq right_pts (list (nth 8 pts_by_x) (nth 9 pts_by_x)))
-                          (setq mid_pts (list (nth 2 pts_by_x) (nth 3 pts_by_x) (nth 4 pts_by_x) (nth 5 pts_by_x) (nth 6 pts_by_x) (nth 7 pts_by_x)))
+                          (setq right_pts (list (nth (- (length pts) 2) pts_by_x) (nth (- (length pts) 1) pts_by_x)))
+                          (setq mid_pts nil i 2)
+                          (while (< i (- (length pts) 2))
+                            (setq mid_pts (append mid_pts (list (nth i pts_by_x))))
+                            (setq i (1+ i))
+                          )
                           
-                          (if (> (cadr (car left_pts)) (cadr (cadr left_pts)))
-                            (setq v1 (car left_pts) v2 (cadr left_pts))
-                            (setq v1 (cadr left_pts) v2 (car left_pts)))
-                            
-                          (if (> (cadr (car right_pts)) (cadr (cadr right_pts)))
-                            (setq v8 (car right_pts) v7 (cadr right_pts))
-                            (setq v8 (cadr right_pts) v7 (car right_pts)))
-                            
+                          (if (> (cadr (car left_pts)) (cadr (cadr left_pts))) (setq v1 (car left_pts) v2 (cadr left_pts)) (setq v1 (cadr left_pts) v2 (car left_pts)))
+                          (if (> (cadr (car right_pts)) (cadr (cadr right_pts))) (setq v8 (car right_pts) v7 (cadr right_pts)) (setq v8 (cadr right_pts) v7 (car right_pts)))
+                          
                           (setq mid_by_y (vl-sort mid_pts '(lambda (a b) (< (cadr a) (cadr b)))))
                           (setq lowest_two (list (nth 0 mid_by_y) (nth 1 mid_by_y)))
-                          (setq highest_two (list (nth 4 mid_by_y) (nth 5 mid_by_y)))
+                          (setq highest_two (list (nth (- (length mid_by_y) 2) mid_by_y) (nth (- (length mid_by_y) 1) mid_by_y)))
                           (setq middle_two (list (nth 2 mid_by_y) (nth 3 mid_by_y)))
                           
-                          (if (< (car (car lowest_two)) (car (cadr lowest_two)))
-                            (setq v4 (car lowest_two) v5 (cadr lowest_two))
-                            (setq v4 (cadr lowest_two) v5 (car lowest_two)))
-                            
-                          (if (< (car (car highest_two)) (car (cadr highest_two)))
-                            (setq v10 (car highest_two) v9 (cadr highest_two))
-                            (setq v10 (cadr highest_two) v9 (car highest_two)))
-                            
-                          (if (< (car (car middle_two)) (car (cadr middle_two)))
-                            (setq v3 (car middle_two) v6 (cadr middle_two))
-                            (setq v3 (cadr middle_two) v6 (car middle_two)))
+                          (if (< (car (car lowest_two)) (car (cadr lowest_two))) (setq v4 (car lowest_two) v5 (cadr lowest_two)) (setq v4 (cadr lowest_two) v5 (car lowest_two)))
+                          (if (< (car (car highest_two)) (car (cadr highest_two))) (setq v10 (car highest_two) v9 (cadr highest_two)) (setq v10 (cadr highest_two) v9 (car highest_two)))
+                          (if (< (car (car middle_two)) (car (cadr middle_two))) (setq v3 (car middle_two) v6 (cadr middle_two)) (setq v3 (cadr middle_two) v6 (car middle_two)))
 
-                          ;; Losa con pendiente V1-V10 (+18cm)
                           (setq m_top (/ (- (cadr v10) (cadr v1)) (- (car v10) (car v1))))
                           (setq ang_top (atan m_top))
                           (setq perp_top (+ ang_top (/ pi 2.0)))
                           (setq x1_off (+ (car v1) (* 0.18 (cos perp_top))))
                           (setq y1_off (+ (cadr v1) (* 0.18 (sin perp_top))))
-                          (defun get-y-losa (x_target / )
-                            (+ y1_off (* m_top (- x_target x1_off)))
-                          )
+                          (defun get-y-losa (x_target / ) (+ y1_off (* m_top (- x_target x1_off))))
 
                           (setq y_ext (get-y-losa (car v1)))
                           (setq y_dim_global (+ y_ext 0.15))
@@ -467,7 +449,6 @@ class TabArmaduras(ctk.CTkFrame):
                           (command "._pline" "_NON" v8 "_NON" v7 "_NON" v6 "_NON" v5 "_NON" v4 "_NON" (list (car v4) (get-y-losa (car v4))) "")
                           (command "._chprop" (entlast) "" "_C" "1" "")
                           
-                          ;; MAGENTAS
                           (setq y_curr (cadr v8))
                           (while (>= y_curr (cadr v7))
                             (setq ray_start (list (- (car v2) 2.0) y_curr 0.0))
@@ -489,7 +470,6 @@ class TabArmaduras(ctk.CTkFrame):
                             (setq y_curr (- y_curr 0.20))
                           )
                           
-                          ;; ESTRIBOS G1 (Izquierda)
                           (setq first_x_g1 nil last_x_g1 nil)
                           (setq x_curr (+ (car v1) 0.20))
                           (while (< x_curr (car v3))
@@ -518,7 +498,6 @@ class TabArmaduras(ctk.CTkFrame):
                             (command "_.DIMALIGNED" "_NON" (list first_x_g1 (get-y-losa first_x_g1)) "_NON" (list last_x_g1 (get-y-losa last_x_g1)) "_T" (strcat "(3) %%c" (itoa {phi_estr}) " @20") "_NON" (list (/ (+ first_x_g1 last_x_g1) 2.0) y_dim_global))
                           )
                           
-                          ;; ESTRIBOS G3 (Derecha)
                           (setq first_x_g3 nil last_x_g3 nil)
                           (setq x_curr (car v9))
                           (while (>= x_curr (car v10))
@@ -542,7 +521,7 @@ class TabArmaduras(ctk.CTkFrame):
                             (vla-delete ray_obj)
                             (setq x_curr (- x_curr 0.20))
                           )
-
+                          
                           (if first_x_g3
                             (command "_.DIMALIGNED" "_NON" (list last_x_g3 (cadr v8)) "_NON" (list first_x_g3 (cadr v8)) "_T" (strcat "(5) %%c" (itoa {phi_estr}) " @20") "_NON" (list (/ (+ first_x_g3 last_x_g3) 2.0) y_dim_global))
                           )
@@ -554,45 +533,35 @@ class TabArmaduras(ctk.CTkFrame):
                         ;; ========================================================
                         ;; ALGORITMO EXTREMO DERECHO (10 Vertices)
                         ;; ========================================================
-                        ((and (= "{tipo_cuadrante}" "EXT_DER") (= (length pts) 10))
+                        ((= "{tipo_cuadrante}" "EXT_DER")
                           (setq pts_by_x (vl-sort pts '(lambda (a b) (< (car a) (car b)))))
                           (setq left_pts (list (nth 0 pts_by_x) (nth 1 pts_by_x)))
-                          (setq right_pts (list (nth 8 pts_by_x) (nth 9 pts_by_x)))
-                          (setq mid_pts (list (nth 2 pts_by_x) (nth 3 pts_by_x) (nth 4 pts_by_x) (nth 5 pts_by_x) (nth 6 pts_by_x) (nth 7 pts_by_x)))
+                          (setq right_pts (list (nth (- (length pts) 2) pts_by_x) (nth (- (length pts) 1) pts_by_x)))
+                          (setq mid_pts nil i 2)
+                          (while (< i (- (length pts) 2))
+                            (setq mid_pts (append mid_pts (list (nth i pts_by_x))))
+                            (setq i (1+ i))
+                          )
                           
-                          (if (> (cadr (car left_pts)) (cadr (cadr left_pts)))
-                            (setq v4 (car left_pts) v5 (cadr left_pts))
-                            (setq v4 (cadr left_pts) v5 (car left_pts)))
-                            
-                          (if (> (cadr (car right_pts)) (cadr (cadr right_pts)))
-                            (setq v1 (car right_pts) v10 (cadr right_pts))
-                            (setq v1 (cadr right_pts) v10 (car right_pts)))
-                            
+                          (if (> (cadr (car left_pts)) (cadr (cadr left_pts))) (setq v4 (car left_pts) v5 (cadr left_pts)) (setq v4 (cadr left_pts) v5 (car left_pts)))
+                          (if (> (cadr (car right_pts)) (cadr (cadr right_pts))) (setq v1 (car right_pts) v10 (cadr right_pts)) (setq v1 (cadr right_pts) v10 (car right_pts)))
+                          
                           (setq mid_by_y (vl-sort mid_pts '(lambda (a b) (> (cadr a) (cadr b)))))
                           (setq highest_two (list (nth 0 mid_by_y) (nth 1 mid_by_y)))
-                          
-                          (if (> (car (car highest_two)) (car (cadr highest_two)))
-                            (setq v2 (car highest_two) v3 (cadr highest_two))
-                            (setq v2 (cadr highest_two) v3 (car highest_two)))
-                            
-                          (setq lowest_four (list (nth 2 mid_by_y) (nth 3 mid_by_y) (nth 4 mid_by_y) (nth 5 mid_by_y)))
+                          (if (> (car (car highest_two)) (car (cadr highest_two))) (setq v2 (car highest_two) v3 (cadr highest_two)) (setq v2 (cadr highest_two) v3 (car highest_two)))
+                          (setq lowest_four nil i 2)
+                          (while (< i (length mid_by_y)) (setq lowest_four (append lowest_four (list (nth i mid_by_y)))) (setq i (1+ i)))
                           (setq lowest_by_x (vl-sort lowest_four '(lambda (a b) (< (car a) (car b)))))
-                          
                           (setq v6 (nth 0 lowest_by_x) v7 (nth 1 lowest_by_x))
-                          
-                          (setq right_bot (list (nth 2 lowest_by_x) (nth 3 lowest_by_x)))
-                          (if (> (cadr (car right_bot)) (cadr (cadr right_bot)))
-                            (setq v9 (car right_bot) v8 (cadr right_bot))
-                            (setq v9 (cadr right_bot) v8 (car right_bot)))
+                          (setq right_bot (list (nth (- (length lowest_by_x) 2) lowest_by_x) (nth (- (length lowest_by_x) 1) lowest_by_x)))
+                          (if (> (cadr (car right_bot)) (cadr (cadr right_bot))) (setq v9 (car right_bot) v8 (cadr right_bot)) (setq v9 (cadr right_bot) v8 (car right_bot)))
 
                           (setq m_top (/ (- (cadr v1) (cadr v2)) (- (car v1) (car v2))))
                           (setq ang_top (atan m_top))
                           (setq perp_top (+ ang_top (/ pi 2.0)))
                           (setq x1_off (+ (car v2) (* 0.18 (cos perp_top))))
                           (setq y1_off (+ (cadr v2) (* 0.18 (sin perp_top))))
-                          (defun get-y-losa (x_target / )
-                            (+ y1_off (* m_top (- x_target x1_off)))
-                          )
+                          (defun get-y-losa (x_target / ) (+ y1_off (* m_top (- x_target x1_off))))
                           
                           (setq y_ext (get-y-losa (car v1)))
                           (setq y_dim_global (+ y_ext 0.15))
@@ -695,7 +664,7 @@ class TabArmaduras(ctk.CTkFrame):
                         ;; ========================================================
                         ;; ALGORITMO CUADRANTE TOPE (16 Vertices)
                         ;; ========================================================
-                        ((and (= "{tipo_cuadrante}" "INT_TOPE") (= (length pts) 16))
+                        ((= "{tipo_cuadrante}" "INT_TOPE")
                           (setq pts_by_y (vl-sort pts '(lambda (a b) (> (cadr a) (cadr b)))))
                           
                           (setq pair1 (vl-sort (list (nth 0 pts_by_y) (nth 1 pts_by_y)) '(lambda (a b) (< (car a) (car b)))))
@@ -716,7 +685,9 @@ class TabArmaduras(ctk.CTkFrame):
                           (setq pair6 (vl-sort (list (nth 10 pts_by_y) (nth 11 pts_by_y)) '(lambda (a b) (< (car a) (car b)))))
                           (setq v5 (car pair6) v12 (cadr pair6))
                           
-                          (setq bot4 (vl-sort (list (nth 12 pts_by_y) (nth 13 pts_by_y) (nth 14 pts_by_y) (nth 15 pts_by_y)) '(lambda (a b) (< (car a) (car b)))))
+                          (setq bot4 nil i 12)
+                          (while (< i (length pts_by_y)) (setq bot4 (append bot4 (list (nth i pts_by_y)))) (setq i (1+ i)))
+                          (setq bot4 (vl-sort bot4 '(lambda (a b) (< (car a) (car b)))))
                           (setq v6 (nth 0 bot4) v7 (nth 1 bot4) v10 (nth 2 bot4) v11 (nth 3 bot4))
 
                           (setq m_top (/ (- (cadr v16) (cadr v1)) (- (car v16) (car v1))))
@@ -724,10 +695,7 @@ class TabArmaduras(ctk.CTkFrame):
                           (setq perp_top (+ ang_top (/ pi 2.0)))
                           (setq x1_off (+ (car v1) (* 0.18 (cos perp_top))))
                           (setq y1_off (+ (cadr v1) (* 0.18 (sin perp_top))))
-                          
-                          (defun get-y-losa (x_target / )
-                            (+ y1_off (* m_top (- x_target x1_off)))
-                          )
+                          (defun get-y-losa (x_target / ) (+ y1_off (* m_top (- x_target x1_off))))
 
                           (setq y_dim_global (+ (get-y-losa (car v16)) 0.15))
 
@@ -887,7 +855,7 @@ class TabArmaduras(ctk.CTkFrame):
                         ;; ========================================================
                         ;; ALGORITMO CUADRANTE MACIZO (12 Vertices)
                         ;; ========================================================
-                        ((and (= "{tipo_cuadrante}" "INT_MACIZO") (= (length pts) 12))
+                        ((= "{tipo_cuadrante}" "INT_MACIZO")
                           (setq pts_by_y (vl-sort pts '(lambda (a b) (> (cadr a) (cadr b)))))
                           
                           (setq pair1 (vl-sort (list (nth 0 pts_by_y) (nth 1 pts_by_y)) '(lambda (a b) (< (car a) (car b)))))
@@ -1006,7 +974,7 @@ class TabArmaduras(ctk.CTkFrame):
                           )
 
                           (setq m_horiz (/ (- (cadr v10) (cadr v3)) (- (car v10) (car v3))))
-                          (setq offset_h 0.0)
+                          (setq offset_h 0.20)
                           (setq y_L (- (cadr v3) offset_h))
                           (setq y_R (- (cadr v10) offset_h))
                           (setq y_limit (max (cadr v4) (cadr v9)))
@@ -1141,12 +1109,25 @@ class TabArmaduras(ctk.CTkFrame):
             (command "._chprop" (entlast) "" "_C" "3" "")
           )
           
-          (defun draw-custom-bar (ins_p pts_list phi_m phi_val mark qty / new_pts x0 y0 p_trans L_tot i pA pB p_dim ang text_str dim_off)
+          (defun draw-custom-bar (ins_p pts_list phi_m phi_val mark qty / raw_pts new_pts x0 y0 p_trans L_tot i pA pB p_dim ang text_str dim_off p1 p2 p3 a)
             (command "._-dimstyle" "_R" "GSG_ARM-COTAS")
             (setvar "FILLETRAD" (* 3.0 phi_m))
+            
+            ;; 1. Elimina vertices colineales para evitar cotas fragmentadas y cotas "0"
+            (setq raw_pts (list (car pts_list)))
+            (setq i 1)
+            (while (< i (1- (length pts_list)))
+              (setq p1 (last raw_pts) p2 (nth i pts_list) p3 (nth (1+ i) pts_list))
+              ;; Area de triangulo para detectar alineacion (si Area > epsilon, es curva legitima)
+              (setq a (abs (+ (* (car p1) (- (cadr p2) (cadr p3))) (* (car p2) (- (cadr p3) (cadr p1))) (* (car p3) (- (cadr p1) (cadr p2))))))
+              (if (> a 0.0001) (setq raw_pts (append raw_pts (list p2))))
+              (setq i (1+ i))
+            )
+            (if (> (length pts_list) 1) (setq raw_pts (append raw_pts (list (last pts_list)))))
+
             (setq new_pts nil L_tot 0.0)
-            (setq x0 (car (car pts_list)) y0 (cadr (car pts_list)))
-            (foreach p pts_list
+            (setq x0 (car (car raw_pts)) y0 (cadr (car raw_pts)))
+            (foreach p raw_pts
               (setq p_trans (list (+ (car ins_p) (- (car p) x0)) (+ (cadr ins_p) (- (cadr p) y0))))
               (setq new_pts (append new_pts (list p_trans)))
             )
@@ -1161,7 +1142,9 @@ class TabArmaduras(ctk.CTkFrame):
               (setq L_tot (+ L_tot (distance pA pB)))
               (setq ang (angle pA pB))
               (setq p_dim (polar (list (/ (+ (car pA) (car pB)) 2.0) (/ (+ (cadr pA) (cadr pB)) 2.0)) (+ ang (/ pi 2.0)) dim_off))
-              (command "_.DIMALIGNED" "_NON" pA "_NON" pB "_T" (rtos (* (distance pA pB) 100) 2 0) "_NON" p_dim)
+              (if (> (distance pA pB) 0.01)
+                (command "_.DIMALIGNED" "_NON" pA "_NON" pB "_T" (rtos (* (distance pA pB) 100) 2 0) "_NON" p_dim)
+              )
               (setq i (1+ i))
             )
             (setq text_str (strcat "(" mark ") " (itoa qty) " %%c" (itoa phi_val) " L= " (rtos (* L_tot 100) 2 0)))
@@ -1177,8 +1160,8 @@ class TabArmaduras(ctk.CTkFrame):
             (setq pC (list (+ (car ins_p) w) (cadr ins_p)))
             (setq pD (list (+ (car ins_p) w) (+ (cadr ins_p) h)))
             (setq hkA (polar pA (deg2rad 315) 0.15))
-            (setq pA2 (list (+ (car pA) 0.001) (cadr pA)))
-            (setq hkB (polar pA2 (deg2rad 285) 0.15))
+            (setq pA2 (polar pA (deg2rad 0) 0.04)) ;; Desfase para que sean paralelos
+            (setq hkB (polar pA2 (deg2rad 315) 0.15))
             (command "._pline" "_NON" hkA "_NON" pA "_NON" pB "_NON" pC "_NON" pD "_NON" pA2 "_NON" hkB "")
             (command "._fillet" "P" (entlast))
             (command "._chprop" (entlast) "" "_C" "5" "")
@@ -1196,7 +1179,7 @@ class TabArmaduras(ctk.CTkFrame):
               (command "_.DIMALIGNED" "_NON" pA "_NON" pB "_T" (rtos (* l_mi 100) 2 0) "_NON" (list (- (car ins_p) dim_off) (+ (cadr ins_p) (/ h 2.0))))
               (command "_.DIMALIGNED" "_NON" pA "_NON" pB "_T" (strcat "VAR. " (rtos (* l_mi 100) 2 0) "-" (rtos (* l_ma 100) 2 0)) "_NON" (list (- (car ins_p) dim_off) (+ (cadr ins_p) (/ h 2.0))))
             )
-            (command "_.DIMALIGNED" "_NON" pA "_NON" hkA "_T" "15" "_NON" (polar pA (deg2rad 135) dim_off))
+            (draw-text (list (+ (car pA) 0.15) (- (cadr pA) 0.05)) "g=15" "_ML")
           )
 
           (defun draw-l-bar (ins_p l_bar hk_len ang_deg phi_m phi_val mark qty l_mi l_ma spa is_right / pA pB pC rad text_str L_min L_max dim_off)
@@ -1307,7 +1290,9 @@ class TabArmaduras(ctk.CTkFrame):
                   (if (< (car (car middle_two)) (car (cadr middle_two))) (setq v3 (car middle_two) v6 (cadr middle_two)) (setq v3 (cadr middle_two) v6 (car middle_two)))
 
                   (setq m_top (/ (- (cadr v10) (cadr v1)) (- (car v10) (car v1))))
-                  (defun get-y-losa (x_target / ) (+ (cadr v1) (* m_top (- x_target (car v1)))))
+                  (setq ang_top (atan m_top)) (setq perp_top (+ ang_top (/ pi 2.0)))
+                  (setq x1_off (+ (car v1) (* 0.18 (cos perp_top)))) (setq y1_off (+ (cadr v1) (* 0.18 (sin perp_top))))
+                  (defun get-y-losa (x_target / ) (+ y1_off (* m_top (- x_target x1_off))))
                   (setq y_ext (get-y-losa (car v1)))
                   (setq t_val (/ (- (cadr v4) (cadr v3)) (- (cadr v3) (cadr v2))))
                   (setq x_end (+ (car v3) (* t_val (- (car v3) (car v2)))))
@@ -1363,7 +1348,7 @@ class TabArmaduras(ctk.CTkFrame):
                       (draw-custom-bar ins_pt pts1 (/ {phi_ext} 1000.0) {phi_ext} "1" (* 2 {cant_trav}))
                       
                       (setq ins_y (- ins_y 4.0))
-                      (setq pts2 (list v8 v7 v6 v5 v4 (list (car v4) (cadr v4))))
+                      (setq pts2 (list v8 v7 v6 v5 v4 (list (car v4) (get-y-losa (car v4)))))
                       (draw-custom-bar (list ins_x ins_y 0.0) pts2 (/ {phi_ext} 1000.0) {phi_ext} "2" (* 2 {cant_trav}))
                       
                       (setq ins_y (- ins_y 4.0))
@@ -1413,7 +1398,9 @@ class TabArmaduras(ctk.CTkFrame):
                   (if (> (cadr (car right_bot)) (cadr (cadr right_bot))) (setq v9 (car right_bot) v8 (cadr right_bot)) (setq v9 (cadr right_bot) v8 (car right_bot)))
 
                   (setq m_top (/ (- (cadr v1) (cadr v2)) (- (car v1) (car v2))))
-                  (defun get-y-losa (x_target / ) (+ (cadr v2) (* m_top (- x_target (car v2)))))
+                  (setq ang_top (atan m_top)) (setq perp_top (+ ang_top (/ pi 2.0)))
+                  (setq x1_off (+ (car v2) (* 0.18 (cos perp_top)))) (setq y1_off (+ (cadr v2) (* 0.18 (sin perp_top))))
+                  (defun get-y-losa (x_target / ) (+ y1_off (* m_top (- x_target x1_off))))
                   (setq y_ext (get-y-losa (car v1)))
                   (setq t_val (/ (- (cadr v8) (cadr v9)) (- (cadr v9) (cadr v10))))
                   (setq x_end (+ (car v9) (* t_val (- (car v9) (car v10)))))
@@ -1469,7 +1456,7 @@ class TabArmaduras(ctk.CTkFrame):
                       (draw-custom-bar ins_pt pts1 (/ {phi_ext} 1000.0) {phi_ext} "1" (* 2 {cant_trav}))
                       
                       (setq ins_y (- ins_y 4.0))
-                      (setq pts2 (list v4 v5 v6 v7 v8 (list (car v8) (cadr v8))))
+                      (setq pts2 (list v4 v5 v6 v7 v8 (list (car v8) (get-y-losa (car v8)))))
                       (draw-custom-bar (list ins_x ins_y 0.0) pts2 (/ {phi_ext} 1000.0) {phi_ext} "2" (* 2 {cant_trav}))
                       
                       (setq ins_y (- ins_y 4.0))
@@ -1510,7 +1497,9 @@ class TabArmaduras(ctk.CTkFrame):
                   (setq v6 (nth 0 bot4) v7 (nth 1 bot4) v10 (nth 2 bot4) v11 (nth 3 bot4))
 
                   (setq m_top (/ (- (cadr v16) (cadr v1)) (- (car v16) (car v1))))
-                  (defun get-y-losa (x_target / ) (+ (cadr v1) (* m_top (- x_target (car v1)))))
+                  (setq ang_top (atan m_top)) (setq perp_top (+ ang_top (/ pi 2.0)))
+                  (setq x1_off (+ (car v1) (* 0.18 (cos perp_top)))) (setq y1_off (+ (cadr v1) (* 0.18 (sin perp_top))))
+                  (defun get-y-losa (x_target / ) (+ y1_off (* m_top (- x_target x1_off))))
                   (setq dist_sacado (- (car v9) (car v8)))
 
                   ;; G1 (Left)
@@ -1584,7 +1573,7 @@ class TabArmaduras(ctk.CTkFrame):
                   (if ins_pt
                     (progn
                       (setq ins_x (car ins_pt) ins_y (cadr ins_pt))
-                      (setq pts1 (list v3 v4 v5 v6 v7 (list (car v7) (cadr v7))))
+                      (setq pts1 (list v3 v4 v5 v6 v7 (list (car v7) (get-y-losa (car v7)))))
                       (draw-custom-bar ins_pt pts1 (/ {phi_ext} 1000.0) {phi_ext} "1" (* 2 {cant_trav}))
                       
                       (setq ins_y (- ins_y 4.0))
@@ -1593,7 +1582,7 @@ class TabArmaduras(ctk.CTkFrame):
                       (draw-custom-bar (list ins_x ins_y 0.0) pts2 (/ {phi_ext} 1000.0) {phi_ext} "2" (* 2 {cant_trav}))
                       
                       (setq ins_y (- ins_y 3.0))
-                      (setq pts3 (list v14 v13 v12 v11 v10 (list (car v10) (cadr v10))))
+                      (setq pts3 (list v14 v13 v12 v11 v10 (list (car v10) (get-y-losa (car v10)))))
                       (draw-custom-bar (list ins_x ins_y 0.0) pts3 (/ {phi_ext} 1000.0) {phi_ext} "3" (* 2 {cant_trav}))
                       
                       (setq ins_y (- ins_y 4.0))
@@ -1606,7 +1595,7 @@ class TabArmaduras(ctk.CTkFrame):
                       (if (> g3_qty 0) (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g3_min_h g3_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "6" (* g3_qty {cant_trav}) g3_min_h g3_max_h 0.20))
 
                       (setq ins_y (- ins_y (+ (/ (+ g3_min_h g3_max_h) 2.0) 3.0)))
-                      (draw-str-bar (list ins_x ins_y 0.0) (/ (+ g_gri_min_l g_gri_max_l) 2.0) (/ {phi_horiz} 1000.0) {phi_horiz} "7" (* (* g_gri_qty 2) {cant_trav}) g_gri_min_l g_gri_max_l 0.20)
+                      (draw-str-bar (list ins_x ins_y 0.0) (/ (+ g_gri_min_l g_gri_max_l) 2.0) (/ {phi_horiz} 1000.0) {phi_horiz} "7" (* (* g_gri_qty 2) {cant_trav}) g_gri_min_l g_gri_max_l 0.0)
 
                       (if (< (abs (- len_cyan_L len_cyan_R)) 0.01)
                         (progn
@@ -1650,6 +1639,7 @@ class TabArmaduras(ctk.CTkFrame):
                 ;; ============================ INT_MACIZO ============================
                 ((= "{tipo_cuadrante}" "INT_MACIZO")
                   (setq pts_by_y (vl-sort pts '(lambda (a b) (> (cadr a) (cadr b)))))
+                  
                   (setq pair1 (vl-sort (list (nth 0 pts_by_y) (nth 1 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v1 (car pair1) v12 (cadr pair1))
                   (setq pair2 (vl-sort (list (nth 2 pts_by_y) (nth 3 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v2 (car pair2) v11 (cadr pair2))
                   (setq pair3 (vl-sort (list (nth 4 pts_by_y) (nth 5 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v3 (car pair3) v10 (cadr pair3))
@@ -1658,7 +1648,9 @@ class TabArmaduras(ctk.CTkFrame):
                   (setq pair6 (vl-sort (list (nth 10 pts_by_y) (nth 11 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v6 (car pair6) v7 (cadr pair6))
 
                   (setq m_top (/ (- (cadr v12) (cadr v1)) (- (car v12) (car v1))))
-                  (defun get-y-losa (x_target / ) (+ (cadr v1) (* m_top (- x_target (car v1)))))
+                  (setq ang_top (atan m_top)) (setq perp_top (+ ang_top (/ pi 2.0)))
+                  (setq x1_off (+ (car v1) (* 0.18 (cos perp_top)))) (setq y1_off (+ (cadr v1) (* 0.18 (sin perp_top))))
+                  (defun get-y-losa (x_target / ) (+ y1_off (* m_top (- x_target x1_off))))
 
                   (setq g1_min_h 9999.0 g1_max_h -9999.0 g1_qty 0)
                   (setq x_curr (car v2))
@@ -1731,7 +1723,7 @@ class TabArmaduras(ctk.CTkFrame):
                       (if (> g3_qty 0) (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g3_min_h g3_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "4" (* g3_qty {cant_trav}) g3_min_h g3_max_h 0.20))
 
                       (setq ins_y (- ins_y (+ (/ (+ g3_min_h g3_max_h) 2.0) 3.0)))
-                      (draw-str-bar (list ins_x ins_y 0.0) (/ (+ g_gri_min_l g_gri_max_l) 2.0) (/ {phi_horiz} 1000.0) {phi_horiz} "5" (* (* g_gri_qty 2) {cant_trav}) g_gri_min_l g_gri_max_l 0.20)
+                      (draw-str-bar (list ins_x ins_y 0.0) (/ (+ g_gri_min_l g_gri_max_l) 2.0) (/ {phi_horiz} 1000.0) {phi_horiz} "5" (* (* g_gri_qty 2) {cant_trav}) g_gri_min_l g_gri_max_l 0.0)
 
                       (princ "\\n[OK] Despiece generado.")
                     )
@@ -1754,7 +1746,7 @@ class TabArmaduras(ctk.CTkFrame):
                   (setvar "OSMODE" 0)
                   (if ins_pt
                     (progn
-                      (draw-str-bar ins_pt len_viga (/ {phi_horiz} 1000.0) {phi_horiz} "1" (* (* g_qty 2) {cant_trav}) len_viga len_viga 0.20)
+                      (draw-str-bar ins_pt len_viga (/ {phi_horiz} 1000.0) {phi_horiz} "1" (* (* g_qty 2) {cant_trav}) len_viga len_viga 0.0)
                       (princ "\\n[OK] Despiece generado.")
                     )
                   )
