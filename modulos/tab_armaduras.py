@@ -1075,45 +1075,67 @@ class TabArmaduras(ctk.CTkFrame):
             (draw-text (list (+ (car ins_p) 0.5) (- (cadr ins_p) 1.2)) text_str "_TL")
           )
 
-          (defun draw-stirrup (ins_p w h phi_m phi_val mark qty l_mi l_ma spa / pBL pTR rad text_str L_min L_max dim_off pTopLeft_H pTopLeft_V hk1_end hk2_end)
+          (defun draw-stirrup (ins_p w h phi_m phi_val mark qty l_mi l_ma spa / pA pB pC pD rad text_str L_min L_max dim_off center_tl p_start1 p_end1 p_start2 p_end2)
             (command "._-dimstyle" "_R" "GSG_ARM-COTAS")
             (setq rad (* 3.0 phi_m))
-            (setq pBL (list (car ins_p) (cadr ins_p)))
-            (setq pTR (list (+ (car ins_p) w) (+ (cadr ins_p) h)))
-
-            (command "._rectang" "_F" rad "_NON" pBL "_NON" pTR)
-            (command "._chprop" (entlast) "" "_C" "5" "")
-
-            (setq pTopLeft_H (list (+ (car ins_p) rad) (+ (cadr ins_p) h)))
-            (setq pTopLeft_V (list (car ins_p) (- (+ (cadr ins_p) h) rad)))
             
-            ;; Desfase sutil a hk1_end para que los ganchos sean paralelos perfectos a 315 grados
-            (setq hk1_end (polar (list (+ (car pTopLeft_H) 0.04) (cadr pTopLeft_H)) (deg2rad 315) 0.15))
-            (setq hk2_end (polar pTopLeft_V (deg2rad 315) 0.15))
+            ;; Puntos de las esquinas exteriores
+            (setq pA (list (car ins_p) (+ (cadr ins_p) h)))       ;; Arriba-Izq
+            (setq pB (list (car ins_p) (cadr ins_p)))             ;; Abajo-Izq
+            (setq pC (list (+ (car ins_p) w) (cadr ins_p)))       ;; Abajo-Der
+            (setq pD (list (+ (car ins_p) w) (+ (cadr ins_p) h))) ;; Arriba-Der
 
-            (command "._pline" "_NON" hk1_end "_NON" pTopLeft_H "")
-            (command "._chprop" (entlast) "" "_C" "5" "")
-            (command "._pline" "_NON" hk2_end "_NON" pTopLeft_V "")
+            ;; 1. Dibujar el rectángulo con fillet
+            (setvar "FILLETRAD" rad)
+            (command "._rectang" "_F" rad "_NON" pB "_NON" pD)
             (command "._chprop" (entlast) "" "_C" "5" "")
 
+            ;; 2. Geometría exacta de los ganchos (Basado en el centro del radio superior izquierdo)
+            (setq center_tl (list (+ (car ins_p) rad) (- (+ (cadr ins_p) h) rad)))
+            
+            ;; Puntos sobre la circunferencia proyectada (a 135 y 315 grados)
+            (setq p_start1 (polar center_tl (deg2rad 135) rad))
+            (setq p_start2 (polar center_tl (deg2rad 315) rad))
+            
+            ;; Trazar las líneas de 15 cm hacia adentro (ángulo 315 grados / -45 grados)
+            (setq p_end1 (polar p_start1 (deg2rad 315) 0.15))
+            (setq p_end2 (polar p_start2 (deg2rad 315) 0.15))
+
+            (command "._pline" "_NON" p_start1 "_NON" p_end1 "")
+            (command "._chprop" (entlast) "" "_C" "5" "")
+            (command "._pline" "_NON" p_start2 "_NON" p_end2 "")
+            (command "._chprop" (entlast) "" "_C" "5" "")
+
+            ;; 3. Textos y Cotas
             (setq dim_off 0.3)
             (setq L_min (* (+ (* 2.0 w) (* 2.0 l_mi) 0.30) 100.0))
             (setq L_max (* (+ (* 2.0 w) (* 2.0 l_ma) 0.30) 100.0))
 
-            (command "_.DIMALIGNED" "_NON" pBL "_NON" (list (+ (car ins_p) w) (cadr ins_p)) "_T" (rtos (* w 100) 2 0) "_NON" (list (+ (car ins_p) (/ w 2.0)) (- (cadr ins_p) dim_off)))
-
-            (if (= l_mi l_ma)
-              (command "_.DIMALIGNED" "_NON" (list (car ins_p) (+ (cadr ins_p) h)) "_NON" pBL "_T" (rtos (* l_mi 100) 2 0) "_NON" (list (- (car ins_p) dim_off) (+ (cadr ins_p) (/ h 2.0))))
-              (command "_.DIMALIGNED" "_NON" (list (car ins_p) (+ (cadr ins_p) h)) "_NON" pBL "_T" (strcat "VAR. " (rtos (* l_mi 100) 2 0) "-" (rtos (* l_ma 100) 2 0)) "_NON" (list (- (car ins_p) dim_off) (+ (cadr ins_p) (/ h 2.0))))
-            )
-
-            (draw-text (list (+ (car pTopLeft_H) 0.15) (- (cadr pTopLeft_H) 0.05)) "g=15" "_ML")
-
+            ;; Texto de marca inferior
             (if (= l_mi l_ma)
               (setq text_str (strcat "(" mark ") " (itoa qty) " %%c" (itoa phi_val) " @" (rtos (* spa 100) 2 0) " L= " (rtos L_min 2 0)))
               (setq text_str (strcat "(" mark ") " (itoa qty) " %%c" (itoa phi_val) " @" (rtos (* spa 100) 2 0) " L= VAR. " (rtos L_min 2 0) " - " (rtos L_max 2 0)))
             )
             (draw-text (list (+ (car ins_p) (/ w 2.0)) (- (cadr ins_p) 1.2)) text_str "_TC")
+            
+            ;; Texto g=15
+            (draw-text (list (+ (car center_tl) 0.15) (+ (cadr center_tl) 0.05)) "g=15" "_ML")
+
+            ;; Cotas Rojas (Color 1) - Superior, Inferior y Derecha
+            (command "_.DIMALIGNED" "_NON" pA "_NON" pD "_T" (rtos (* w 100) 2 0) "_NON" (list (+ (car ins_p) (/ w 2.0)) (+ (cadr ins_p) h dim_off)))
+            (command "._chprop" (entlast) "" "_C" "1" "")
+            
+            (command "_.DIMALIGNED" "_NON" pB "_NON" pC "_T" (rtos (* w 100) 2 0) "_NON" (list (+ (car ins_p) (/ w 2.0)) (- (cadr ins_p) dim_off)))
+            (command "._chprop" (entlast) "" "_C" "1" "")
+            
+            (command "_.DIMALIGNED" "_NON" pD "_NON" pC "_T" (rtos (* l_ma 100) 2 0) "_NON" (list (+ (car ins_p) w dim_off) (+ (cadr ins_p) (/ h 2.0))))
+            (command "._chprop" (entlast) "" "_C" "1" "")
+
+            ;; Cota Izquierda (Verde) - Variable o fija
+            (if (= l_mi l_ma)
+              (command "_.DIMALIGNED" "_NON" pA "_NON" pB "_T" (rtos (* l_mi 100) 2 0) "_NON" (list (- (car ins_p) dim_off) (+ (cadr ins_p) (/ h 2.0))))
+              (command "_.DIMALIGNED" "_NON" pA "_NON" pB "_T" (strcat "VAR. " (rtos (* l_mi 100) 2 0) "-" (rtos (* l_ma 100) 2 0)) "_NON" (list (- (car ins_p) (* dim_off 2.5)) (+ (cadr ins_p) (/ h 2.0))))
+            )
           )
 
           (defun draw-l-bar (ins_p l_bar hk_len ang_deg phi_m phi_val mark qty l_mi l_ma spa is_right / pA pB pC rad text_str L_min L_max dim_off)
