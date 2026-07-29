@@ -712,7 +712,7 @@ class ActualizadorCAD(ctk.CTk):
         self.log("[!] PATH y Registro CAD reparados.")
 
     def reiniciar_aplicacion(self):
-        """Mata el hilo de la bandeja, purga la RAM de Python y reinicia SINCAL limpio."""
+        """Mata el hilo de la bandeja, purga la RAM de Python y reinicia SINCAL limpio como Administrador."""
         try:
             if hasattr(self, 'icono_bandeja'):
                 self.icono_bandeja.stop()
@@ -721,7 +721,11 @@ class ActualizadorCAD(ctk.CTk):
 
         # Filtramos la etiqueta background en caso de que se haya lanzado manualmente
         argumentos = [arg for arg in sys.argv if arg != "--background"]
-        subprocess.Popen([sys.executable] + argumentos[1:])
+        argumentos_str = " ".join(argumentos[1:])
+
+        # Lanzar el nuevo proceso forzando privilegios de administrador para heredar UAC
+        ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", sys.executable, argumentos_str, None, 1)
         os._exit(0)
 
     def iniciar_actualizacion_hilo(self):
