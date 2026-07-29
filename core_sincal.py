@@ -712,28 +712,41 @@ class ActualizadorCAD(ctk.CTk):
         self.log("[!] PATH y Registro CAD reparados.")
 
     def reiniciar_aplicacion(self):
-        """Usa un script puente para permitir que PyInstaller borre su basura y herede el token de Administrador."""
+        """Usa un script puente con entorno limpio para evitar colisiones de PyInstaller."""
         try:
             if hasattr(self, 'icono_bandeja'):
                 self.icono_bandeja.stop()
         except:
             pass
-        
+
         exe_path = sys.executable
-        bat_path = os.path.join(os.environ['TEMP'], "restart_sincal.bat")
-        
-        # Escribimos un archivo .bat temporal que espera 2 segundos y vuelve a abrir el programa
+        bat_path = os.path.join(os.environ.get(
+            'TEMP', 'C:\\Temp'), "restart_sincal.bat")
+
+        # Escribimos el .bat puente
         with open(bat_path, "w", encoding="utf-8") as f:
             f.write("@echo off\n")
             f.write("timeout /t 2 /nobreak > NUL\n")
             f.write(f'start "" "{exe_path}"\n')
-            f.write('del "%~f0"\n') # El .bat se auto-elimina al terminar
-            
-        # Ejecutamos el .bat de forma totalmente independiente y oculta
-        # 0x08000000 equivale a subprocess.CREATE_NO_WINDOW para que no parpadee la consola negra
-        subprocess.Popen(bat_path, shell=True, creationflags=0x08000000)
-        
-        # sys.exit(0) en lugar de os._exit(0) permite que el basurero de PyInstaller haga su trabajo
+            f.write('del "%~f0"\n')
+
+        # LA MAGIA: Limpiar variables de entorno heredadas de PyInstaller
+        env_limpio = os.environ.copy()
+        env_limpio.pop('_MEIPASS2', None)
+        env_limpio.pop('_MEIPASS', None)
+
+        # Limpiar también la ruta vieja del PATH
+        if getattr(sys, 'frozen', False):
+            antiguo_mei = sys._MEIPASS
+            if 'PATH' in env_limpio:
+                env_limpio['PATH'] = os.pathsep.join(
+                    [p for p in env_limpio['PATH'].split(
+                        os.pathsep) if antiguo_mei not in p]
+                )
+
+        # Lanzamos el .bat pasándole este entorno puro y sin memoria del pasado
+        subprocess.Popen(bat_path, shell=True,
+                         creationflags=0x08000000, env=env_limpio)
         sys.exit(0)
 
     def iniciar_actualizacion_hilo(self):
