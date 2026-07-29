@@ -392,7 +392,7 @@ class TabArmaduras(ctk.CTkFrame):
                         )
                       )
                       
-                      ;; LECTURA PURA (Sin lavado colineal global para no corromper topologia)
+                      ;; LECTURA PURA INTACTA
                       (setq coords (vlax-safearray->list (vlax-variant-value (vla-get-Coordinates offset_obj))))
                       (setq pts nil i 0)
                       (while (< i (length coords))
@@ -447,7 +447,7 @@ class TabArmaduras(ctk.CTkFrame):
                             )
                           )
                           
-                          (command "._pline" "_NON" (list (car v8) (get-y-losa (car v8))) "_NON" v8 "_NON" v7 "_NON" v6 "_NON" v5 "_NON" v4 "_NON" (list (car v4) (get-y-losa (car v4))) "")
+                          (command "._pline" "_NON" v8 "_NON" v7 "_NON" v6 "_NON" v5 "_NON" v4 "_NON" (list (car v4) (cadr v8)) "")
                           (command "._chprop" (entlast) "" "_C" "1" "")
                           
                           (setq y_curr (cadr v8))
@@ -576,7 +576,7 @@ class TabArmaduras(ctk.CTkFrame):
                             )
                           )
                           
-                          (command "._pline" "_NON" (list (car v4) (get-y-losa (car v4))) "_NON" v4 "_NON" v5 "_NON" v6 "_NON" v7 "_NON" v8 "_NON" (list (car v8) (get-y-losa (car v8))) "")
+                          (command "._pline" "_NON" v4 "_NON" v5 "_NON" v6 "_NON" v7 "_NON" v8 "_NON" (list (car v8) (cadr v4)) "")
                           (command "._chprop" (entlast) "" "_C" "1" "")
                           
                           (setq y_curr (cadr v4))
@@ -883,7 +883,7 @@ class TabArmaduras(ctk.CTkFrame):
         ruta_temp = os.path.join(
             RUTA_LOCAL_APP, f"Despiece_Trav_{tipo_cuadrante}.lsp")
 
-        lisp_code = f"""(defun c:SINCAL-DESPIECE-TRAV (/ ent obj old_osnap recub_m offset_obj offset_res coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k ins_pt ins_x ins_y shift_x shift_y pts1 pts2 L1 L2 w_estr g1_min_h g1_max_h g1_qty first_x_g1 last_x_g1 g2_min_l g2_max_l g2_qty g3_min_h g3_max_h g3_qty first_x_g3 last_x_g3 h len_line L3_min L3_max L4_min L4_max L5_min L5_max h_avg l_avg txt_height m_top ang_top perp_top x1_off y1_off pts_by_y pair1 pair2 pair3 pair4 pair5 pair6 bot4 dist_sacado num_spaces step_sacado pad_g3 i_sac m_horiz offset_h y_L y_R y_limit real_y_L real_y_R m_cyan_L y_mid_L x_start_L y_start_L m_cyan_R y_mid_R x_end_R y_end_R len_viga half_l x_mid y_min ang_hk_L ang_hk_R l_min l_max spa hk1 hk2 rad text_str p_dim_w p_dim_h p_dim_hk g_gri_min_l g_gri_max_l g_gri_qty len_cyan_L len_cyan_R g_qty dim_off p1 p2 p3 raw_pts raw_list pA_raw pB_raw pC_raw a_val center_tl p_start1 p_end1 p_start2 p_end2)
+        lisp_code = f"""(defun c:SINCAL-DESPIECE-TRAV (/ ent obj old_osnap recub_m offset_obj offset_res coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k ins_pt ins_x ins_y shift_x shift_y pts1 pts2 L1 L2 w_estr g1_min_h g1_max_h g1_qty first_x_g1 last_x_g1 g2_min_l g2_max_l g2_qty g3_min_h g3_max_h g3_qty first_x_g3 last_x_g3 h len_line L3_min L3_max L4_min L4_max L5_min L5_max h_avg l_avg txt_height m_top ang_top perp_top x1_off y1_off pts_by_y pair1 pair2 pair3 pair4 pair5 pair6 bot4 dist_sacado num_spaces step_sacado pad_g3 i_sac m_horiz offset_h y_L y_R y_limit real_y_L real_y_R m_cyan_L y_mid_L x_start_L y_start_L m_cyan_R y_mid_R x_end_R y_end_R len_viga half_l x_mid y_min ang_hk_L ang_hk_R l_min l_max spa hk1 hk2 rad text_str p_dim_w p_dim_h p_dim_hk g_gri_min_l g_gri_max_l g_gri_qty len_cyan_L len_cyan_R g_qty dim_off p1 p2 p3 raw_pts raw_list pA_raw pB_raw pC_raw a_val center_tl p_start1 p_end1 p_start2 p_end2 left_by_y right_by_y)
           (vl-load-com)
           (setvar "CMDECHO" 0)
           (setq old_osnap (getvar "OSMODE"))
@@ -1115,7 +1115,7 @@ class TabArmaduras(ctk.CTkFrame):
             (progn
               (if (> (vla-get-Area offset_obj) (vla-get-Area obj)) (progn (vla-delete offset_obj) (setq offset_obj (car (vlax-safearray->list (vlax-variant-value (vla-offset obj recub_m)))))))
               
-              ;; EXTRACCION PURA (Sin lavado, respeta indices)
+              ;; EXTRACCION PURA INTACTA
               (setq coords (vlax-safearray->list (vlax-variant-value (vla-get-Coordinates offset_obj))))
               (setq pts nil i 0)
               (while (< i (length coords))
@@ -1206,8 +1206,8 @@ class TabArmaduras(ctk.CTkFrame):
                       (draw-custom-bar ins_pt pts1 (/ {phi_ext} 1000.0) {phi_ext} "1" (* 2 {cant_trav}))
                       
                       (setq ins_y (- ins_y 4.0))
-                      ;; AQUI: Proyeccion completa hacia la losa para pts2 de Extremo Izquierdo
-                      (setq pts2 (list (list (car v8) (get-y-losa (car v8))) v8 v7 v6 v5 v4 (list (car v4) (get-y-losa (car v4)))))
+                      ;; AQUI: Proyeccion completa para Extremo Izquierdo (Sube hasta Y de vertice 8)
+                      (setq pts2 (list v8 v7 v6 v5 v4 (list (car v4) (cadr v8))))
                       (draw-custom-bar (list ins_x ins_y 0.0) pts2 (/ {phi_ext} 1000.0) {phi_ext} "2" (* 2 {cant_trav}))
                       
                       (setq ins_y (- ins_y 4.0))
@@ -1315,8 +1315,8 @@ class TabArmaduras(ctk.CTkFrame):
                       (draw-custom-bar ins_pt pts1 (/ {phi_ext} 1000.0) {phi_ext} "1" (* 2 {cant_trav}))
                       
                       (setq ins_y (- ins_y 4.0))
-                      ;; AQUI: Proyeccion completa hacia la losa para pts2 de Extremo Derecho
-                      (setq pts2 (list (list (car v4) (get-y-losa (car v4))) v4 v5 v6 v7 v8 (list (car v8) (get-y-losa (car v8)))))
+                      ;; AQUI: Proyeccion completa para Extremo Derecho (Sube hasta Y de vertice 4)
+                      (setq pts2 (list v4 v5 v6 v7 v8 (list (car v8) (cadr v4))))
                       (draw-custom-bar (list ins_x ins_y 0.0) pts2 (/ {phi_ext} 1000.0) {phi_ext} "2" (* 2 {cant_trav}))
                       
                       (setq ins_y (- ins_y 4.0))
@@ -1428,197 +1428,111 @@ class TabArmaduras(ctk.CTkFrame):
                   (setq len_cyan_R (distance (list (car v9) y_mid_R) (list x_end_R y_end_R)))
 
                   (vla-delete offset_obj)
-
-                  (setvar "OSMODE" old_osnap)
-                  (setq ins_pt (getpoint "\\n[SINCAL] Clic para insertar tabla de despiece: "))
-                  (setvar "OSMODE" 0)
-                  (if ins_pt
-                    (progn
-                      (setq ins_x (car ins_pt) ins_y (cadr ins_pt))
-                      (setq pts1 (list v3 v4 v5 v6 v7 (list (car v7) (get-y-losa (car v7)))))
-                      (draw-custom-bar ins_pt pts1 (/ {phi_ext} 1000.0) {phi_ext} "1" (* 2 {cant_trav}))
-                      
-                      (setq ins_y (- ins_y 4.0))
-                      (setq raw_len (+ dist_sacado 1.40)) (setq rnd_len (* (fix (+ (/ raw_len 0.10) 0.5)) 0.10)) (setq ext (/ (- rnd_len dist_sacado) 2.0))
-                      (setq pts2 (list (list (- (car v8) ext) (cadr v8)) (list (+ (car v9) ext) (cadr v9))))
-                      (draw-custom-bar (list ins_x ins_y 0.0) pts2 (/ {phi_ext} 1000.0) {phi_ext} "2" (* 2 {cant_trav}))
-                      
-                      (setq ins_y (- ins_y 3.0))
-                      (setq pts3 (list v14 v13 v12 v11 v10 (list (car v10) (get-y-losa (car v10)))))
-                      (draw-custom-bar (list ins_x ins_y 0.0) pts3 (/ {phi_ext} 1000.0) {phi_ext} "3" (* 2 {cant_trav}))
-                      
-                      (setq ins_y (- ins_y 4.0))
-                      (if (> g1_qty 0) (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g1_min_h g1_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "4" (* g1_qty {cant_trav}) g1_min_h g1_max_h 0.20))
-                      
-                      (setq ins_y (- ins_y (+ (/ (+ g2_min_h g2_max_h) 2.0) 3.0)))
-                      (if (> g2_qty 0) (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g2_min_h g2_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "5" (* g2_qty {cant_trav}) g2_min_h g2_max_h 0.20))
-                      
-                      (setq ins_y (- ins_y (+ (/ (+ g3_min_h g3_max_h) 2.0) 3.0)))
-                      (if (> g3_qty 0) (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g3_min_h g3_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "6" (* g3_qty {cant_trav}) g3_min_h g3_max_h 0.20))
-
-                      (setq ins_y (- ins_y (+ (/ (+ g3_min_h g3_max_h) 2.0) 3.0)))
-                      (draw-str-bar (list ins_x ins_y 0.0) (/ (+ g_gri_min_l g_gri_max_l) 2.0) (/ {phi_horiz} 1000.0) {phi_horiz} "7" (* (* g_gri_qty 2) {cant_trav}) g_gri_min_l g_gri_max_l 0.0)
-
-                      (if (< (abs (- len_cyan_L len_cyan_R)) 0.01)
-                        (progn
-                          (setq ins_y (- ins_y 3.0))
-                          (if (= {esviaje} 0.0)
-                             (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr 90.0 (/ {phi_horiz} 1000.0) {phi_horiz} "8" (* 4 {cant_trav}) len_cyan_L len_cyan_L 0.0 nil)
-                             (progn
-                               (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr (- 90.0 {esviaje}) (/ {phi_horiz} 1000.0) {phi_horiz} "8" (* 2 {cant_trav}) len_cyan_L len_cyan_L 0.0 nil)
-                               (setq ins_y (- ins_y 2.0))
-                               (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr (+ 90.0 {esviaje}) (/ {phi_horiz} 1000.0) {phi_horiz} "8A" (* 2 {cant_trav}) len_cyan_L len_cyan_L 0.0 nil)
-                             )
-                          )
+                  (princ "\\n[OK] Cuadrante de Tope inyectado.")
                         )
-                        (progn
-                          (setq ins_y (- ins_y 3.0))
-                          (if (= {esviaje} 0.0)
-                             (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr 90.0 (/ {phi_horiz} 1000.0) {phi_horiz} "8" (* 2 {cant_trav}) len_cyan_L len_cyan_L 0.0 nil)
-                             (progn
-                               (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr (- 90.0 {esviaje}) (/ {phi_horiz} 1000.0) {phi_horiz} "8" {cant_trav} len_cyan_L len_cyan_L 0.0 nil)
-                               (setq ins_y (- ins_y 2.0))
-                               (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr (+ 90.0 {esviaje}) (/ {phi_horiz} 1000.0) {phi_horiz} "8A" {cant_trav} len_cyan_L len_cyan_L 0.0 nil)
-                             )
-                          )
-                          (setq ins_y (- ins_y 3.0))
-                          (if (= {esviaje} 0.0)
-                             (draw-l-bar (list ins_x ins_y 0.0) len_cyan_R w_estr 90.0 (/ {phi_horiz} 1000.0) {phi_horiz} "9" (* 2 {cant_trav}) len_cyan_R len_cyan_R 0.0 t)
-                             (progn
-                               (draw-l-bar (list ins_x ins_y 0.0) len_cyan_R w_estr (- 90.0 {esviaje}) (/ {phi_horiz} 1000.0) {phi_horiz} "9" {cant_trav} len_cyan_R len_cyan_R 0.0 t)
-                               (setq ins_y (- ins_y 2.0))
-                               (draw-l-bar (list ins_x ins_y 0.0) len_cyan_R w_estr (+ 90.0 {esviaje}) (/ {phi_horiz} 1000.0) {phi_horiz} "9A" {cant_trav} len_cyan_R len_cyan_R 0.0 t)
-                             )
-                          )
-                        )
-                      )
 
-                      (princ "\\n[OK] Despiece generado.")
-                    )
-                  )
-                )
+                        ;; ========================================================
+                        ;; ALGORITMO CUADRANTE MACIZO
+                        ;; ========================================================
+                        ((= "{tipo_cuadrante}" "INT_MACIZO")
+                          (setq pts_by_y (vl-sort pts '(lambda (a b) (> (cadr a) (cadr b)))))
+                          
+                          (setq pair1 (vl-sort (list (nth 0 pts_by_y) (nth 1 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v1 (car pair1) v12 (cadr pair1))
+                          (setq pair2 (vl-sort (list (nth 2 pts_by_y) (nth 3 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v2 (car pair2) v11 (cadr pair2))
+                          (setq pair3 (vl-sort (list (nth 4 pts_by_y) (nth 5 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v3 (car pair3) v10 (cadr pair3))
+                          (setq pair4 (vl-sort (list (nth 6 pts_by_y) (nth 7 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v4 (car pair4) v9 (cadr pair4))
+                          (setq pair5 (vl-sort (list (nth 8 pts_by_y) (nth 9 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v5 (car pair5) v8 (cadr pair5))
+                          (setq pair6 (vl-sort (list (nth 10 pts_by_y) (nth 11 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v6 (car pair6) v7 (cadr pair6))
 
-                ;; ============================ INT_MACIZO ============================
-                ((= "{tipo_cuadrante}" "INT_MACIZO")
-                  (setq pts_by_y (vl-sort pts '(lambda (a b) (> (cadr a) (cadr b)))))
-                  
-                  (setq pair1 (vl-sort (list (nth 0 pts_by_y) (nth 1 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v1 (car pair1) v12 (cadr pair1))
-                  (setq pair2 (vl-sort (list (nth 2 pts_by_y) (nth 3 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v2 (car pair2) v11 (cadr pair2))
-                  (setq pair3 (vl-sort (list (nth 4 pts_by_y) (nth 5 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v3 (car pair3) v10 (cadr pair3))
-                  (setq pair4 (vl-sort (list (nth 6 pts_by_y) (nth 7 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v4 (car pair4) v9 (cadr pair4))
-                  (setq pair5 (vl-sort (list (nth 8 pts_by_y) (nth 9 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v5 (car pair5) v8 (cadr pair5))
-                  (setq pair6 (vl-sort (list (nth 10 pts_by_y) (nth 11 pts_by_y)) '(lambda (a b) (< (car a) (car b))))) (setq v6 (car pair6) v7 (cadr pair6))
+                          (command "._pline" "_NON" v3 "_NON" v4 "_NON" v5 "_NON" v6 "_NON" v7 "_NON" v8 "_NON" v9 "_NON" v10 "")
+                          (command "._chprop" (entlast) "" "_C" "1" "")
 
-                  (setq m_top (/ (- (cadr v12) (cadr v1)) (- (car v12) (car v1))))
-                  (setq ang_top (atan m_top)) (setq perp_top (+ ang_top (/ pi 2.0)))
-                  (setq x1_off (+ (car v1) (* 0.18 (cos perp_top)))) (setq y1_off (+ (cadr v1) (* 0.18 (sin perp_top))))
-                  (defun get-y-losa (x_target / ) (+ y1_off (* m_top (- x_target x1_off))))
+                          (setq m_top (/ (- (cadr v12) (cadr v1)) (- (car v12) (car v1))))
+                          (setq ang_top (atan m_top)) (setq perp_top (+ ang_top (/ pi 2.0)))
+                          (setq x1_off (+ (car v1) (* 0.18 (cos perp_top)))) (setq y1_off (+ (cadr v1) (* 0.18 (sin perp_top))))
+                          (defun get-y-losa (x_target / ) (+ y1_off (* m_top (- x_target x1_off))))
 
-                  (setq g1_min_h 9999.0 g1_max_h -9999.0 g1_qty 0)
-                  (setq x_curr (car v2))
-                  (while (<= x_curr (car v1))
-                    (setq ray_start (list x_curr (+ (cadr v3) 1.0) 0.0)) (setq ray_end (list x_curr (- (cadr v6) 1.0) 0.0))
-                    (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
-                    (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
-                    (if int_pts (progn (setq min_y (cadr int_pts) k 4) (while (< k (length int_pts)) (setq min_y (min min_y (nth k int_pts))) (setq k (+ k 3)))
+                          (setq g1_min_h 9999.0 g1_max_h -9999.0 g1_qty 0)
+                          (setq x_curr (car v2))
+                          (while (<= x_curr (car v1))
+                            (setq ray_start (list x_curr (+ (cadr v3) 1.0) 0.0)) (setq ray_end (list x_curr (- (cadr v6) 1.0) 0.0))
+                            (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                            (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                            (if int_pts (progn (setq min_y (cadr int_pts) k 4) (while (< k (length int_pts)) (setq min_y (min min_y (nth k int_pts))) (setq k (+ k 3)))
                              (setq h (- (cadr v3) min_y)) (setq g1_min_h (min g1_min_h h) g1_max_h (max g1_max_h h) g1_qty (1+ g1_qty))))
-                    (vla-delete ray_obj) (setq x_curr (+ x_curr 0.20))
-                  )
-                  
-                  (setq g2_min_h 9999.0 g2_max_h -9999.0 g2_qty 0)
-                  (setq x_curr (car v11))
-                  (while (>= x_curr (car v12))
-                    (setq ray_start (list x_curr (+ (cadr v10) 1.0) 0.0)) (setq ray_end (list x_curr (- (cadr v7) 1.0) 0.0))
-                    (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
-                    (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
-                    (if int_pts (progn (setq min_y (cadr int_pts) k 4) (while (< k (length int_pts)) (setq min_y (min min_y (nth k int_pts))) (setq k (+ k 3)))
+                            (vla-delete ray_obj) (setq x_curr (+ x_curr 0.20))
+                          )
+                          
+                          (setq g2_min_h 9999.0 g2_max_h -9999.0 g2_qty 0)
+                          (setq x_curr (car v11))
+                          (while (>= x_curr (car v12))
+                            (setq ray_start (list x_curr (+ (cadr v10) 1.0) 0.0)) (setq ray_end (list x_curr (- (cadr v7) 1.0) 0.0))
+                            (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                            (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                            (if int_pts (progn (setq min_y (cadr int_pts) k 4) (while (< k (length int_pts)) (setq min_y (min min_y (nth k int_pts))) (setq k (+ k 3)))
                              (setq h (- (cadr v10) min_y)) (setq g2_min_h (min g2_min_h h) g2_max_h (max g2_max_h h) g2_qty (1+ g2_qty))))
-                    (vla-delete ray_obj) (setq x_curr (- x_curr 0.20))
-                  )
+                            (vla-delete ray_obj) (setq x_curr (- x_curr 0.20))
+                          )
 
-                  (setq g3_min_h 9999.0 g3_max_h -9999.0 g3_qty 0)
-                  (setq dist_sacado (- (car v12) (car v1))) (setq num_spaces (fix (/ dist_sacado 0.20))) (setq pad_g3 (/ (- dist_sacado (* num_spaces 0.20)) 2.0))
-                  (setq i_sac 0)
-                  (while (<= i_sac num_spaces)
-                    (setq x_curr (+ (car v1) pad_g3 (* i_sac 0.20)))
-                    (setq ray_start (list x_curr (+ (cadr v1) 1.0) 0.0)) (setq ray_end (list x_curr (- (cadr v6) 1.0) 0.0))
-                    (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
-                    (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
-                    (if int_pts (progn (setq min_y (cadr int_pts) k 4) (while (< k (length int_pts)) (setq min_y (min min_y (nth k int_pts))) (setq k (+ k 3)))
+                          (setq g3_min_h 9999.0 g3_max_h -9999.0 g3_qty 0)
+                          (setq dist_sacado (- (car v12) (car v1))) (setq num_spaces (fix (/ dist_sacado 0.20))) (setq pad_g3 (/ (- dist_sacado (* num_spaces 0.20)) 2.0))
+                          (setq i_sac 0)
+                          (while (<= i_sac num_spaces)
+                            (setq x_curr (+ (car v1) pad_g3 (* i_sac 0.20)))
+                            (setq ray_start (list x_curr (+ (cadr v1) 1.0) 0.0)) (setq ray_end (list x_curr (- (cadr v6) 1.0) 0.0))
+                            (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                            (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                            (if int_pts (progn (setq min_y (cadr int_pts) k 4) (while (< k (length int_pts)) (setq min_y (min min_y (nth k int_pts))) (setq k (+ k 3)))
                              (setq h (- (get-y-losa x_curr) min_y)) (setq g3_min_h (min g3_min_h h) g3_max_h (max g3_max_h h) g3_qty (1+ g3_qty))))
-                    (vla-delete ray_obj) (setq i_sac (1+ i_sac))
-                  )
+                            (vla-delete ray_obj) (setq i_sac (1+ i_sac))
+                          )
 
-                  (setq m_horiz (/ (- (cadr v10) (cadr v3)) (- (car v10) (car v3))))
-                  (setq offset_h 0.20 y_L (- (cadr v3) offset_h) y_R (- (cadr v10) offset_h) y_limit (max (cadr v4) (cadr v9)))
-                  (setq g_gri_min_l 9999.0 g_gri_max_l -9999.0 g_gri_qty 1) 
-                  (setq g_gri_min_l (distance v3 v10) g_gri_max_l (distance v3 v10))
-                  (while (>= (min y_L y_R) y_limit)
-                    (setq ray_start (list (- (car v3) 1.0) (- y_L (* m_horiz 1.0)) 0.0)) (setq ray_end (list (+ (car v10) 1.0) (+ y_R (* m_horiz 1.0)) 0.0))
-                    (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
-                    (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
-                    (if int_pts (progn (setq min_x (car int_pts) max_x min_x k 3) (while (< k (length int_pts)) (setq min_x (min min_x (nth k int_pts))) (setq max_x (max max_x (nth k int_pts))) (setq k (+ k 3)))
+                          (setq m_horiz (/ (- (cadr v10) (cadr v3)) (- (car v10) (car v3))))
+                          (setq offset_h 0.20 y_L (- (cadr v3) offset_h) y_R (- (cadr v10) offset_h) y_limit (max (cadr v4) (cadr v9)))
+                          (setq g_gri_min_l 9999.0 g_gri_max_l -9999.0 g_gri_qty 1) 
+                          (setq g_gri_min_l (distance v3 v10) g_gri_max_l (distance v3 v10))
+                          (while (>= (min y_L y_R) y_limit)
+                            (setq ray_start (list (- (car v3) 1.0) (- y_L (* m_horiz 1.0)) 0.0)) (setq ray_end (list (+ (car v10) 1.0) (+ y_R (* m_horiz 1.0)) 0.0))
+                            (setq ray_obj (vlax-ename->vla-object (entmakex (list '(0 . "LINE") (cons 10 ray_start) (cons 11 ray_end)))))
+                            (setq int_pts (vlax-invoke ray_obj 'IntersectWith offset_obj acExtendNone))
+                            (if int_pts (progn (setq min_x (car int_pts) max_x min_x k 3) (while (< k (length int_pts)) (setq min_x (min min_x (nth k int_pts))) (setq max_x (max max_x (nth k int_pts))) (setq k (+ k 3)))
                              (setq real_y_L (+ y_L (* m_horiz (- min_x (car v3))))) (setq real_y_R (+ y_L (* m_horiz (- max_x (car v3)))))
                              (setq len_line (distance (list min_x real_y_L) (list max_x real_y_R)))
                              (setq g_gri_min_l (min g_gri_min_l len_line) g_gri_max_l (max g_gri_max_l len_line) g_gri_qty (1+ g_gri_qty))))
-                    (vla-delete ray_obj) (setq offset_h (+ offset_h 0.20)) (setq y_L (- (cadr v3) offset_h)) (setq y_R (- (cadr v10) offset_h))
-                  )
-                  
-                  (vla-delete offset_obj)
+                            (vla-delete ray_obj) (setq offset_h (+ offset_h 0.20)) (setq y_L (- (cadr v3) offset_h)) (setq y_R (- (cadr v10) offset_h))
+                          )
+                          
+                          (vla-delete offset_obj)
+                          (princ "\\n[OK] Cuadrante Macizo inyectado.")
+                        )
 
-                  (setvar "OSMODE" old_osnap)
-                  (setq ins_pt (getpoint "\\n[SINCAL] Clic para insertar tabla de despiece: "))
-                  (setvar "OSMODE" 0)
-                  (if ins_pt
-                    (progn
-                      (setq ins_x (car ins_pt) ins_y (cadr ins_pt))
-                      ;; AQUI: Se incluyeron de vuelta v11 y v12 para que el macizo no se corte en diagonal.
-                      (setq pts1 (list (list (car v1) (get-y-losa (car v1))) v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 (list (car v12) (get-y-losa (car v12)))))
-                      (draw-custom-bar ins_pt pts1 (/ {phi_ext} 1000.0) {phi_ext} "1" (* 2 {cant_trav}))
-                      
-                      (setq ins_y (- ins_y 4.0))
-                      (if (> g1_qty 0) (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g1_min_h g1_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "2" (* g1_qty {cant_trav}) g1_min_h g1_max_h 0.20))
-                      
-                      (setq ins_y (- ins_y (+ (/ (+ g2_min_h g2_max_h) 2.0) 3.0)))
-                      (if (> g2_qty 0) (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g2_min_h g2_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "3" (* g2_qty {cant_trav}) g2_min_h g2_max_h 0.20))
-                      
-                      (setq ins_y (- ins_y (+ (/ (+ g3_min_h g3_max_h) 2.0) 3.0)))
-                      (if (> g3_qty 0) (draw-stirrup (list ins_x ins_y 0.0) w_estr (/ (+ g3_min_h g3_max_h) 2.0) (/ {phi_estr} 1000.0) {phi_estr} "4" (* g3_qty {cant_trav}) g3_min_h g3_max_h 0.20))
-
-                      (setq ins_y (- ins_y (+ (/ (+ g3_min_h g3_max_h) 2.0) 3.0)))
-                      (draw-str-bar (list ins_x ins_y 0.0) (/ (+ g_gri_min_l g_gri_max_l) 2.0) (/ {phi_horiz} 1000.0) {phi_horiz} "5" (* (* g_gri_qty 2) {cant_trav}) g_gri_min_l g_gri_max_l 0.0)
-
-                      (princ "\\n[OK] Despiece generado.")
+                        ;; ========================================================
+                        ;; ALGORITMO CUADRANTE VIGA
+                        ;; ========================================================
+                        ((= "{tipo_cuadrante}" "INT_VIGA")
+                          (setq pts_by_y (vl-sort pts '(lambda (a b) (> (cadr a) (cadr b)))))
+                          (setq v1 (nth 0 pts_by_y) v2 (nth 1 pts_by_y) v3 (nth 2 pts_by_y) v4 (nth 3 pts_by_y))
+                          (setq len_viga (/ {largo_viga} 100.0))
+                          (setq half_l (/ len_viga 2.0))
+                          (setq x_mid (/ (+ (car v1) (car v2)) 2.0))
+                          (setq y_curr (cadr v1)) (setq y_min (cadr v3))
+                          (while (>= y_curr y_min)
+                            (command "._pline" "_NON" (list (- x_mid half_l) y_curr) "_NON" (list (+ x_mid half_l) y_curr) "")
+                            (command "._chprop" (entlast) "" "_C" "2" "")
+                            (setq y_curr (- y_curr 0.20))
+                          )
+                          (vla-delete offset_obj)
+                          (princ "\\n[OK] Cuadrante de Viga inyectado.")
+                        )
+                      )
                     )
+                    (alert "Fallo al generar jaula interior.")
                   )
                 )
-
-                ;; ============================ INT_VIGA ============================
-                ((= "{tipo_cuadrante}" "INT_VIGA")
-                  (setq pts_by_y (vl-sort pts '(lambda (a b) (> (cadr a) (cadr b)))))
-                  (setq v1 (nth 0 pts_by_y) v2 (nth 1 pts_by_y) v3 (nth 2 pts_by_y) v4 (nth 3 pts_by_y))
-                  (setq len_viga (/ {largo_viga} 100.0))
-                  (setq half_l (/ len_viga 2.0))
-                  (setq x_mid (/ (+ (car v1) (car v2)) 2.0))
-                  (setq y_curr (cadr v1)) (setq y_min (cadr v3))
-                  (setq g_qty 0)
-                  (while (>= y_curr y_min) (setq g_qty (1+ g_qty)) (setq y_curr (- y_curr 0.20)))
-                  (vla-delete offset_obj)
-
-                  (setvar "OSMODE" old_osnap)
-                  (setq ins_pt (getpoint "\\n[SINCAL] Clic para insertar tabla de despiece: "))
-                  (setvar "OSMODE" 0)
-                  (if ins_pt
-                    (progn
-                      (draw-str-bar ins_pt len_viga (/ {phi_horiz} 1000.0) {phi_horiz} "1" (* (* g_qty 2) {cant_trav}) len_viga len_viga 0.0)
-                      (princ "\\n[OK] Despiece generado.")
-                    )
-                  )
-                )
-
+                (alert "Fallo de Geometria: La polilinea seleccionada NO esta cerrada.")
               )
             )
-            (alert "Fallo interno al procesar el recubrimiento de la polilinea.")
+            (princ "\\n[X] No se selecciono nada.")
           )
           (setvar "OSMODE" old_osnap)
           (princ)
@@ -1630,7 +1544,7 @@ class TabArmaduras(ctk.CTkFrame):
         self.parent_app.cancelar_comando_vivo = False
         ruta_lisp = ruta_temp.replace("\\", "\\\\")
         threading.Thread(target=self.parent_app._hilo_comando_en_vivo, args=(
-            f'(load "{ruta_lisp}") (c:SINCAL-DESPIECE-TRAV)\n',), daemon=True).start()
+            f'(load "{ruta_lisp}") (c:SINCAL-TRAVESANO)\n',), daemon=True).start()
 
     def cargar_json_bim(self):
         ruta = filedialog.askopenfilename(
