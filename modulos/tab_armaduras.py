@@ -350,7 +350,7 @@ class TabArmaduras(ctk.CTkFrame):
             RUTA_LOCAL_APP, f"Travesano_{tipo_cuadrante}.lsp")
         ruta_lisp = ruta_temp.replace("\\", "\\\\")
 
-        lisp_code = f"""(defun c:SINCAL-TRAVESANO (/ ent obj old_osnap recub_m offset_obj offset_res coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k lowest_four lowest_by_x right_bot pts_by_y pair1 pair2 pair3 pair4 pair5 pair6 bot4 y_max_L y_max_R raw_len rnd_len ext x_start x_end dist_sacado num_spaces step_sacado i_sac m_top ang_top perp_top x1_off y1_off m_horiz offset_h y_L y_R y_limit pt_start pt_end real_y_L real_y_R dx_67 dy_67 m_cyan_L y_mid_L x_start_L y_start_L dx_1011 dy_1011 m_cyan_R y_mid_R x_end_R y_end_R x_mid len_viga half_l y_min pad_g3 first_x_g1 last_x_g1 first_x_g2 last_x_g2 first_x_g3 last_x_g3 y_dim_global raw_pts p1 p2 p3 left_by_y right_by_y)
+        lisp_code = f"""(defun c:SINCAL-TRAVESANO (/ ent obj old_osnap recub_m offset_obj offset_res coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k lowest_four lowest_by_x right_bot pts_by_y pair1 pair2 pair3 pair4 pair5 pair6 bot4 y_max_L y_max_R raw_len rnd_len ext x_start x_end dist_sacado num_spaces step_sacado i_sac m_top ang_top perp_top x1_off y1_off m_horiz offset_h y_L y_R y_limit pt_start pt_end real_y_L real_y_R dx_67 dy_67 m_cyan_L y_mid_L x_start_L y_start_L dx_1011 dy_1011 m_cyan_R y_mid_R x_end_R y_end_R x_mid len_viga half_l y_min pad_g3 first_x_g1 last_x_g1 first_x_g2 last_x_g2 first_x_g3 last_x_g3 y_dim_global raw_pts p1 p2 p3 a_val left_by_y right_by_y)
           (vl-load-com)
           (setvar "CMDECHO" 0)
           (setq old_osnap (getvar "OSMODE"))
@@ -392,7 +392,7 @@ class TabArmaduras(ctk.CTkFrame):
                         )
                       )
                       
-                      ;; LAVADO COLINEAL SEGURO (Mata micro-vertices que rompen la geometria, tolerancia de 0.28 grados)
+                      ;; LECTURA CON LAVADO COLINEAL SEGURO (Evita colapsos de AutoCAD)
                       (setq coords (vlax-safearray->list (vlax-variant-value (vla-get-Coordinates offset_obj))))
                       (setq raw_pts nil i 0)
                       (while (< i (length coords))
@@ -400,30 +400,22 @@ class TabArmaduras(ctk.CTkFrame):
                         (setq i (+ i 2))
                       )
                       
-                      (defun is-collinear (pa pb pc / a1 a2 diff)
-                        (setq a1 (angle pa pb) a2 (angle pb pc))
-                        (setq diff (abs (- a1 a2)))
-                        (if (> diff pi) (setq diff (- (* 2.0 pi) diff)))
-                        (if (and (> (distance pa pb) 0.001) (> (distance pb pc) 0.001))
-                          (or (< diff 0.005) (> diff (- pi 0.005)))
-                          t
-                        )
-                      )
-                      
                       (setq pts (list (car raw_pts)))
                       (setq i 1)
                       (while (< i (1- (length raw_pts)))
                         (setq p1 (last pts) p2 (nth i raw_pts) p3 (nth (1+ i) raw_pts))
-                        (if (not (is-collinear p1 p2 p3))
-                          (setq pts (append pts (list p2)))
+                        (if (and (> (distance p1 p2) 0.005) (> (distance p2 p3) 0.005))
+                          (progn
+                            (setq a_val (abs (- (angle p1 p2) (angle p2 p3))))
+                            (if (> a_val pi) (setq a_val (- (* 2.0 pi) a_val)))
+                            (if (not (or (< a_val 0.005) (> a_val (- pi 0.005))))
+                              (setq pts (append pts (list p2)))
+                            )
+                          )
                         )
                         (setq i (1+ i))
                       )
-                      (if (> (length raw_pts) 1) 
-                        (if (not (is-collinear (last pts) (last raw_pts) (car pts)))
-                          (setq pts (append pts (list (last raw_pts))))
-                        )
-                      )
+                      (if (> (length raw_pts) 1) (setq pts (append pts (list (last raw_pts)))))
                       
                       (cond
                         ;; ========================================================
@@ -472,7 +464,7 @@ class TabArmaduras(ctk.CTkFrame):
                             )
                           )
                           
-                          ;; AQUI: Sube el fierro externo a la cota Y de v8
+                          ;; AQUI: Sube el fierro exterior hasta la cota Y de v8
                           (command "._pline" "_NON" (list (car v8) (get-y-losa (car v8))) "_NON" v8 "_NON" v7 "_NON" v6 "_NON" v5 "_NON" v4 "_NON" (list (car v4) (cadr v8)) "")
                           (command "._chprop" (entlast) "" "_C" "1" "")
                           
@@ -602,7 +594,7 @@ class TabArmaduras(ctk.CTkFrame):
                             )
                           )
                           
-                          ;; AQUI: Sube el fierro externo a la cota Y de v4
+                          ;; AQUI: Sube el fierro exterior hasta la cota Y de v4
                           (command "._pline" "_NON" (list (car v4) (get-y-losa (car v4))) "_NON" v4 "_NON" v5 "_NON" v6 "_NON" v7 "_NON" v8 "_NON" (list (car v8) (cadr v4)) "")
                           (command "._chprop" (entlast) "" "_C" "1" "")
                           
@@ -724,7 +716,6 @@ class TabArmaduras(ctk.CTkFrame):
                           (command "._pline" "_NON" v14 "_NON" v13 "_NON" v12 "_NON" v11 "_NON" v10 "_NON" (list (car v10) (get-y-losa (car v10))) "")
                           (command "._chprop" (entlast) "" "_C" "1" "")
 
-                          ;; G1 (Left)
                           (setq g1_min_h 9999.0 g1_max_h -9999.0 g1_qty 0)
                           (setq x_curr (car v2))
                           (while (<= x_curr (car v8))
@@ -739,7 +730,6 @@ class TabArmaduras(ctk.CTkFrame):
                             (vla-delete ray_obj) (setq x_curr (+ x_curr 0.20))
                           )
                           
-                          ;; G2 (Right)
                           (setq g2_min_h 9999.0 g2_max_h -9999.0 g2_qty 0)
                           (setq x_curr (car v15))
                           (while (>= x_curr (car v9))
@@ -754,7 +744,6 @@ class TabArmaduras(ctk.CTkFrame):
                             (vla-delete ray_obj) (setq x_curr (- x_curr 0.20))
                           )
 
-                          ;; G3 (Center)
                           (setq g3_min_h 9999.0 g3_max_h -9999.0 g3_qty 0)
                           (setq num_spaces (fix (/ dist_sacado 0.20))) (setq pad_g3 (/ (- dist_sacado (* num_spaces 0.20)) 2.0))
                           (setq i_sac 0)
@@ -771,7 +760,6 @@ class TabArmaduras(ctk.CTkFrame):
                             (vla-delete ray_obj) (setq i_sac (1+ i_sac))
                           )
 
-                          ;; Grises
                           (setq m_horiz (/ (- (cadr v14) (cadr v3)) (- (car v14) (car v3))))
                           (setq offset_h 0.20 y_L (- (cadr v3) offset_h) y_R (- (cadr v14) offset_h) y_limit (+ (max (cadr v8) (cadr v9)) 0.20))
                           (setq g_gri_min_l 9999.0 g_gri_max_l -9999.0 g_gri_qty 1) 
@@ -790,14 +778,15 @@ class TabArmaduras(ctk.CTkFrame):
                             (vla-delete ray_obj) (setq offset_h (+ offset_h 0.20)) (setq y_L (- (cadr v3) offset_h)) (setq y_R (- (cadr v14) offset_h))
                           )
                           
-                          ;; Cyan
                           (setq dx_67 (- (car v7) (car v6))) (setq dy_67 (- (cadr v7) (cadr v6))) (if (= dx_67 0.0) (setq m_cyan_L 0.0) (setq m_cyan_L (/ dy_67 dx_67)))
                           (setq y_mid_L (/ (+ (cadr v8) (cadr v7)) 2.0)) (setq x_start_L (car v5)) (setq y_start_L (+ y_mid_L (* m_cyan_L (- x_start_L (car v8)))))
-                          (setq len_cyan_L (distance (list x_start_L y_start_L) (list (car v8) y_mid_L)))
+                          (command "._pline" "_NON" (list x_start_L y_start_L) "_NON" (list (car v8) y_mid_L) "")
+                          (command "._chprop" (entlast) "" "_C" "4" "")
 
                           (setq dx_1011 (- (car v11) (car v10))) (setq dy_1011 (- (cadr v11) (cadr v10))) (if (= dx_1011 0.0) (setq m_cyan_R 0.0) (setq m_cyan_R (/ dy_1011 dx_1011)))
                           (setq y_mid_R (/ (+ (cadr v9) (cadr v10)) 2.0)) (setq x_end_R (car v12)) (setq y_end_R (+ y_mid_R (* m_cyan_R (- x_end_R (car v9)))))
-                          (setq len_cyan_R (distance (list (car v9) y_mid_R) (list x_end_R y_end_R)))
+                          (command "._pline" "_NON" (list (car v9) y_mid_R) "_NON" (list x_end_R y_end_R) "")
+                          (command "._chprop" (entlast) "" "_C" "4" "")
 
                           (vla-delete offset_obj)
                           (princ "\\n[OK] Cuadrante de Tope inyectado.")
@@ -814,19 +803,19 @@ class TabArmaduras(ctk.CTkFrame):
                           (while (< i 12) (setq right_pts (append right_pts (list (nth i pts_by_x)))) (setq i (1+ i)))
                           
                           (setq left_by_y (vl-sort left_pts '(lambda (a b) (> (cadr a) (cadr b)))))
-                          (setq right_by_y (vl-sort right_pts '(lambda (a b) (< (cadr a) (cadr b)))))
+                          (setq right_by_y (vl-sort right_pts '(lambda (a b) (> (cadr a) (cadr b)))))
                           
                           (setq v1 (nth 0 left_by_y) v2 (nth 1 left_by_y) v3 (nth 2 left_by_y) v4 (nth 3 left_by_y) v5 (nth 4 left_by_y) v6 (nth 5 left_by_y))
-                          (setq v7 (nth 0 right_by_y) v8 (nth 1 right_by_y) v9 (nth 2 right_by_y) v10 (nth 3 right_by_y) v11 (nth 4 right_by_y) v12 (nth 5 right_by_y))
+                          (setq v12 (nth 0 right_by_y) v11 (nth 1 right_by_y) v10 (nth 2 right_by_y) v9 (nth 3 right_by_y) v8 (nth 4 right_by_y) v7 (nth 5 right_by_y))
+
+                          ;; AQUI: Dibuja desde v3 hasta v10 exactamente
+                          (command "._pline" "_NON" v3 "_NON" v4 "_NON" v5 "_NON" v6 "_NON" v7 "_NON" v8 "_NON" v9 "_NON" v10 "")
+                          (command "._chprop" (entlast) "" "_C" "1" "")
 
                           (setq m_top (/ (- (cadr v12) (cadr v1)) (- (car v12) (car v1))))
                           (setq ang_top (atan m_top)) (setq perp_top (+ ang_top (/ pi 2.0)))
                           (setq x1_off (+ (car v1) (* 0.18 (cos perp_top)))) (setq y1_off (+ (cadr v1) (* 0.18 (sin perp_top))))
                           (defun get-y-losa (x_target / ) (+ y1_off (* m_top (- x_target x1_off))))
-
-                          ;; DIBUJO DE LA CANASTA EXTERIOR
-                          (command "._pline" "_NON" (list (car v1) (get-y-losa (car v1))) "_NON" v1 "_NON" v2 "_NON" v3 "_NON" v4 "_NON" v5 "_NON" v6 "_NON" v7 "_NON" v8 "_NON" v9 "_NON" v10 "_NON" v11 "_NON" v12 "_NON" (list (car v12) (get-y-losa (car v12))) "")
-                          (command "._chprop" (entlast) "" "_C" "1" "")
 
                           (setq g1_min_h 9999.0 g1_max_h -9999.0 g1_qty 0)
                           (setq x_curr (car v2))
@@ -950,7 +939,7 @@ class TabArmaduras(ctk.CTkFrame):
         ruta_temp = os.path.join(
             RUTA_LOCAL_APP, f"Despiece_Trav_{tipo_cuadrante}.lsp")
 
-        lisp_code = f"""(defun c:SINCAL-DESPIECE-TRAV (/ ent obj old_osnap recub_m offset_obj offset_res coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k ins_pt ins_x ins_y shift_x shift_y pts1 pts2 L1 L2 w_estr g1_min_h g1_max_h g1_qty first_x_g1 last_x_g1 g2_min_l g2_max_l g2_qty g3_min_h g3_max_h g3_qty first_x_g3 last_x_g3 h len_line L3_min L3_max L4_min L4_max L5_min L5_max h_avg l_avg txt_height m_top ang_top perp_top x1_off y1_off pts_by_y pair1 pair2 pair3 pair4 pair5 pair6 bot4 dist_sacado num_spaces step_sacado pad_g3 i_sac m_horiz offset_h y_L y_R y_limit real_y_L real_y_R m_cyan_L y_mid_L x_start_L y_start_L m_cyan_R y_mid_R x_end_R y_end_R len_viga half_l x_mid y_min ang_hk_L ang_hk_R l_min l_max spa hk1 hk2 rad text_str p_dim_w p_dim_h p_dim_hk g_gri_min_l g_gri_max_l g_gri_qty len_cyan_L len_cyan_R g_qty dim_off p1 p2 p3 raw_pts raw_list pA_raw pB_raw pC_raw a_val center_tl p_start1 p_end1 p_start2 p_end2 left_by_y right_by_y)
+        lisp_code = f"""(defun c:SINCAL-DESPIECE-TRAV (/ ent obj old_osnap recub_m offset_obj offset_res coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k ins_pt ins_x ins_y shift_x shift_y pts1 pts2 L1 L2 w_estr g1_min_h g1_max_h g1_qty first_x_g1 last_x_g1 g2_min_l g2_max_l g2_qty g3_min_h g3_max_h g3_qty first_x_g3 last_x_g3 h len_line L3_min L3_max L4_min L4_max L5_min L5_max h_avg l_avg txt_height m_top ang_top perp_top x1_off y1_off pts_by_y pair1 pair2 pair3 pair4 pair5 pair6 bot4 dist_sacado num_spaces step_sacado pad_g3 i_sac m_horiz offset_h y_L y_R y_limit real_y_L real_y_R m_cyan_L y_mid_L x_start_L y_start_L m_cyan_R y_mid_R x_end_R y_end_R len_viga half_l x_mid y_min ang_hk_L ang_hk_R l_min l_max spa hk1 hk2 rad text_str p_dim_w p_dim_h p_dim_hk g_gri_min_l g_gri_max_l g_gri_qty len_cyan_L len_cyan_R g_qty dim_off p1 p2 p3 raw_pts raw_list pA_raw pB_raw pC_raw a_val center_tl p_start1 p_end1 p_start2 p_end2 p_90 p_180 left_by_y right_by_y)
           (vl-load-com)
           (setvar "CMDECHO" 0)
           (setq old_osnap (getvar "OSMODE"))
@@ -998,7 +987,7 @@ class TabArmaduras(ctk.CTkFrame):
             (setq i 1)
             (while (< i (1- (length pts_list)))
               (setq pA_raw (last raw_list) pB_raw (nth i pts_list) pC_raw (nth (1+ i) pts_list))
-              (if (and (> (distance pA_raw pB_raw) 0.001) (> (distance pB_raw pC_raw) 0.001))
+              (if (and (> (distance pA_raw pB_raw) 0.005) (> (distance pB_raw pC_raw) 0.005))
                 (progn
                   (setq a_val (abs (- (angle pA_raw pB_raw) (angle pB_raw pC_raw))))
                   (if (> a_val pi) (setq a_val (- (* 2.0 pi) a_val)))
@@ -1037,7 +1026,7 @@ class TabArmaduras(ctk.CTkFrame):
             (draw-text (list (+ (car ins_p) 0.5) (- (cadr ins_p) 1.2)) text_str "_TL")
           )
 
-          (defun draw-stirrup (ins_p w h phi_m phi_val mark qty l_mi l_ma spa / pA pB pC pD rad text_str L_min L_max dim_off center_tl p_start1 p_end1 p_start2 p_end2)
+          (defun draw-stirrup (ins_p w h phi_m phi_val mark qty l_mi l_ma spa / pA pB pC pD rad text_str L_min L_max dim_off center_tl p_start1 p_end1 p_start2 p_end2 p_90 p_180)
             (command "._-dimstyle" "_R" "GSG_ARM-COTAS")
             (setq rad (* 3.0 phi_m))
             
@@ -1058,9 +1047,13 @@ class TabArmaduras(ctk.CTkFrame):
             ;; Puntos diametrales a 45 y 225 grados
             (setq p_start1 (polar center_tl (deg2rad 45) rad))
             (setq p_start2 (polar center_tl (deg2rad 225) rad))
+            (setq p_90 (polar center_tl (deg2rad 90) rad))
+            (setq p_180 (polar center_tl (deg2rad 180) rad))
             
-            ;; DIBUJO DEL ARCO: Desde 45 hasta 225 grados (sentido antihorario). 
-            (command "._arc" "_C" "_NON" center_tl "_NON" p_start1 "_NON" p_start2)
+            ;; DIBUJO DE LOS ARCOS DE RELLENO
+            (command "._arc" "_C" "_NON" center_tl "_NON" p_start1 "_NON" p_90)
+            (command "._chprop" (entlast) "" "_C" "5" "")
+            (command "._arc" "_C" "_NON" center_tl "_NON" p_180 "_NON" p_start2)
             (command "._chprop" (entlast) "" "_C" "5" "")
             
             ;; Trazar las lineas de 15 cm hacia adentro (paralelas a 315 grados)
@@ -1181,7 +1174,7 @@ class TabArmaduras(ctk.CTkFrame):
             (progn
               (if (> (vla-get-Area offset_obj) (vla-get-Area obj)) (progn (vla-delete offset_obj) (setq offset_obj (car (vlax-safearray->list (vlax-variant-value (vla-offset obj recub_m)))))))
               
-              ;; EXTRACCION PURA INTACTA (Sin lavar la geometria base)
+              ;; LECTURA PURA INTACTA
               (setq coords (vlax-safearray->list (vlax-variant-value (vla-get-Coordinates offset_obj))))
               (setq pts nil i 0)
               (while (< i (length coords))
@@ -1382,7 +1375,7 @@ class TabArmaduras(ctk.CTkFrame):
                       
                       (setq ins_y (- ins_y 4.0))
                       ;; AQUI: Proyeccion completa para Extremo Derecho (Sube hasta Y de vertice 4)
-                      (setq pts2 (list v4 v5 v6 v7 v8 (list (car v8) (cadr v4))))
+                      (setq pts2 (list (list (car v4) (get-y-losa (car v4))) v4 v5 v6 v7 v8 (list (car v8) (cadr v4))))
                       (draw-custom-bar (list ins_x ins_y 0.0) pts2 (/ {phi_ext} 1000.0) {phi_ext} "2" (* 2 {cant_trav}))
                       
                       (setq ins_y (- ins_y 4.0))
@@ -1484,15 +1477,6 @@ class TabArmaduras(ctk.CTkFrame):
                     (vla-delete ray_obj) (setq offset_h (+ offset_h 0.20)) (setq y_L (- (cadr v3) offset_h)) (setq y_R (- (cadr v14) offset_h))
                   )
                   
-                  ;; Cyan
-                  (setq dx_67 (- (car v7) (car v6))) (setq dy_67 (- (cadr v7) (cadr v6))) (if (= dx_67 0.0) (setq m_cyan_L 0.0) (setq m_cyan_L (/ dy_67 dx_67)))
-                  (setq y_mid_L (/ (+ (cadr v8) (cadr v7)) 2.0)) (setq x_start_L (car v5)) (setq y_start_L (+ y_mid_L (* m_cyan_L (- x_start_L (car v8)))))
-                  (setq len_cyan_L (distance (list x_start_L y_start_L) (list (car v8) y_mid_L)))
-
-                  (setq dx_1011 (- (car v11) (car v10))) (setq dy_1011 (- (cadr v11) (cadr v10))) (if (= dx_1011 0.0) (setq m_cyan_R 0.0) (setq m_cyan_R (/ dy_1011 dx_1011)))
-                  (setq y_mid_R (/ (+ (cadr v9) (cadr v10)) 2.0)) (setq x_end_R (car v12)) (setq y_end_R (+ y_mid_R (* m_cyan_R (- x_end_R (car v9)))))
-                  (setq len_cyan_R (distance (list (car v9) y_mid_R) (list x_end_R y_end_R)))
-
                   (vla-delete offset_obj)
 
                   (setvar "OSMODE" old_osnap)
@@ -1525,40 +1509,6 @@ class TabArmaduras(ctk.CTkFrame):
                       (setq ins_y (- ins_y (+ (/ (+ g3_min_h g3_max_h) 2.0) 3.0)))
                       (draw-str-bar (list ins_x ins_y 0.0) (/ (+ g_gri_min_l g_gri_max_l) 2.0) (/ {phi_horiz} 1000.0) {phi_horiz} "7" (* (* g_gri_qty 2) {cant_trav}) g_gri_min_l g_gri_max_l 0.0)
 
-                      (if (< (abs (- len_cyan_L len_cyan_R)) 0.01)
-                        (progn
-                          (setq ins_y (- ins_y 3.0))
-                          (if (= {esviaje} 0.0)
-                             (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr 90.0 (/ {phi_horiz} 1000.0) {phi_horiz} "8" (* 4 {cant_trav}) len_cyan_L len_cyan_L 0.0 nil)
-                             (progn
-                               (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr (- 90.0 {esviaje}) (/ {phi_horiz} 1000.0) {phi_horiz} "8" (* 2 {cant_trav}) len_cyan_L len_cyan_L 0.0 nil)
-                               (setq ins_y (- ins_y 2.0))
-                               (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr (+ 90.0 {esviaje}) (/ {phi_horiz} 1000.0) {phi_horiz} "8A" (* 2 {cant_trav}) len_cyan_L len_cyan_L 0.0 nil)
-                             )
-                          )
-                        )
-                        (progn
-                          (setq ins_y (- ins_y 3.0))
-                          (if (= {esviaje} 0.0)
-                             (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr 90.0 (/ {phi_horiz} 1000.0) {phi_horiz} "8" (* 2 {cant_trav}) len_cyan_L len_cyan_L 0.0 nil)
-                             (progn
-                               (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr (- 90.0 {esviaje}) (/ {phi_horiz} 1000.0) {phi_horiz} "8" {cant_trav} len_cyan_L len_cyan_L 0.0 nil)
-                               (setq ins_y (- ins_y 2.0))
-                               (draw-l-bar (list ins_x ins_y 0.0) len_cyan_L w_estr (+ 90.0 {esviaje}) (/ {phi_horiz} 1000.0) {phi_horiz} "8A" {cant_trav} len_cyan_L len_cyan_L 0.0 nil)
-                             )
-                          )
-                          (setq ins_y (- ins_y 3.0))
-                          (if (= {esviaje} 0.0)
-                             (draw-l-bar (list ins_x ins_y 0.0) len_cyan_R w_estr 90.0 (/ {phi_horiz} 1000.0) {phi_horiz} "9" (* 2 {cant_trav}) len_cyan_R len_cyan_R 0.0 t)
-                             (progn
-                               (draw-l-bar (list ins_x ins_y 0.0) len_cyan_R w_estr (- 90.0 {esviaje}) (/ {phi_horiz} 1000.0) {phi_horiz} "9" {cant_trav} len_cyan_R len_cyan_R 0.0 t)
-                               (setq ins_y (- ins_y 2.0))
-                               (draw-l-bar (list ins_x ins_y 0.0) len_cyan_R w_estr (+ 90.0 {esviaje}) (/ {phi_horiz} 1000.0) {phi_horiz} "9A" {cant_trav} len_cyan_R len_cyan_R 0.0 t)
-                             )
-                          )
-                        )
-                      )
-
                       (princ "\\n[OK] Despiece generado.")
                     )
                   )
@@ -1573,10 +1523,10 @@ class TabArmaduras(ctk.CTkFrame):
                   (while (< i 12) (setq right_pts (append right_pts (list (nth i pts_by_x)))) (setq i (1+ i)))
                   
                   (setq left_by_y (vl-sort left_pts '(lambda (a b) (> (cadr a) (cadr b)))))
-                  (setq right_by_y (vl-sort right_pts '(lambda (a b) (< (cadr a) (cadr b)))))
+                  (setq right_by_y (vl-sort right_pts '(lambda (a b) (> (cadr a) (cadr b)))))
                   
                   (setq v1 (nth 0 left_by_y) v2 (nth 1 left_by_y) v3 (nth 2 left_by_y) v4 (nth 3 left_by_y) v5 (nth 4 left_by_y) v6 (nth 5 left_by_y))
-                  (setq v7 (nth 0 right_by_y) v8 (nth 1 right_by_y) v9 (nth 2 right_by_y) v10 (nth 3 right_by_y) v11 (nth 4 right_by_y) v12 (nth 5 right_by_y))
+                  (setq v12 (nth 0 right_by_y) v11 (nth 1 right_by_y) v10 (nth 2 right_by_y) v9 (nth 3 right_by_y) v8 (nth 4 right_by_y) v7 (nth 5 right_by_y))
 
                   (setq m_top (/ (- (cadr v12) (cadr v1)) (- (car v12) (car v1))))
                   (setq ang_top (atan m_top)) (setq perp_top (+ ang_top (/ pi 2.0)))
@@ -1641,8 +1591,8 @@ class TabArmaduras(ctk.CTkFrame):
                   (if ins_pt
                     (progn
                       (setq ins_x (car ins_pt) ins_y (cadr ins_pt))
-                      ;; AQUI: Restaurada la linea perfecta para INT_MACIZO (v3 a v10 SIN DIAGONAL).
-                      (setq pts1 (list (list (car v1) (get-y-losa (car v1))) v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 (list (car v12) (get-y-losa (car v12)))))
+                      ;; AQUI: Restaurada la linea perfecta v3 a v10 SIN DIAGONAL.
+                      (setq pts1 (list (list (car v1) (get-y-losa (car v1))) v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 (list (car v12) (get-y-losa (car v12)))))
                       (draw-custom-bar ins_pt pts1 (/ {phi_ext} 1000.0) {phi_ext} "1" (* 2 {cant_trav}))
                       
                       (setq ins_y (- ins_y 4.0))
