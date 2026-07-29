@@ -712,21 +712,29 @@ class ActualizadorCAD(ctk.CTk):
         self.log("[!] PATH y Registro CAD reparados.")
 
     def reiniciar_aplicacion(self):
-        """Mata el hilo de la bandeja, purga la RAM de Python y reinicia SINCAL limpio como Administrador."""
+        """Usa un script puente para permitir que PyInstaller borre su basura y herede el token de Administrador."""
         try:
             if hasattr(self, 'icono_bandeja'):
                 self.icono_bandeja.stop()
         except:
             pass
-
-        # Filtramos la etiqueta background en caso de que se haya lanzado manualmente
-        argumentos = [arg for arg in sys.argv if arg != "--background"]
-        argumentos_str = " ".join(argumentos[1:])
-
-        # Lanzar el nuevo proceso forzando privilegios de administrador para heredar UAC
-        ctypes.windll.shell32.ShellExecuteW(
-            None, "runas", sys.executable, argumentos_str, None, 1)
-        os._exit(0)
+        
+        exe_path = sys.executable
+        bat_path = os.path.join(os.environ['TEMP'], "restart_sincal.bat")
+        
+        # Escribimos un archivo .bat temporal que espera 2 segundos y vuelve a abrir el programa
+        with open(bat_path, "w", encoding="utf-8") as f:
+            f.write("@echo off\n")
+            f.write("timeout /t 2 /nobreak > NUL\n")
+            f.write(f'start "" "{exe_path}"\n')
+            f.write('del "%~f0"\n') # El .bat se auto-elimina al terminar
+            
+        # Ejecutamos el .bat de forma totalmente independiente y oculta
+        # 0x08000000 equivale a subprocess.CREATE_NO_WINDOW para que no parpadee la consola negra
+        subprocess.Popen(bat_path, shell=True, creationflags=0x08000000)
+        
+        # sys.exit(0) en lugar de os._exit(0) permite que el basurero de PyInstaller haga su trabajo
+        sys.exit(0)
 
     def iniciar_actualizacion_hilo(self):
         self.btn_actualizar.configure(
