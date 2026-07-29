@@ -980,20 +980,30 @@ class TabArmaduras(ctk.CTkFrame):
             (command "._-dimstyle" "_R" "GSG_ARM-COTAS")
             (setq rad (* 3.0 phi_m))
             
-            (setq pA (list (car ins_p) (+ (cadr ins_p) h)))
-            (setq pB (list (car ins_p) (cadr ins_p)))
-            (setq pC (list (+ (car ins_p) w) (cadr ins_p)))
-            (setq pD (list (+ (car ins_p) w) (+ (cadr ins_p) h)))
+            ;; Puntos de las esquinas exteriores
+            (setq pA (list (car ins_p) (+ (cadr ins_p) h)))       ;; Arriba-Izq
+            (setq pB (list (car ins_p) (cadr ins_p)))             ;; Abajo-Izq
+            (setq pC (list (+ (car ins_p) w) (cadr ins_p)))       ;; Abajo-Der
+            (setq pD (list (+ (car ins_p) w) (+ (cadr ins_p) h))) ;; Arriba-Der
 
-            ;; Rectangulo Base
+            ;; 1. Dibujar el rectangulo con fillet (Dibuja arco de 90 a 180 grados)
             (setvar "FILLETRAD" rad)
             (command "._rectang" "_F" rad "_NON" pB "_NON" pD)
             (command "._chprop" (entlast) "" "_C" "5" "")
 
-            ;; Geometria Exacta de Ganchos Sismicos (Rotados 45 grados al centro)
+            ;; 2. Rellenar el GAP proyectando el arco
             (setq center_tl (list (+ (car ins_p) rad) (- (+ (cadr ins_p) h) rad)))
+            
+            ;; Puntos diametrales a 45 y 225 grados
             (setq p_start1 (polar center_tl (deg2rad 45) rad))
             (setq p_start2 (polar center_tl (deg2rad 225) rad))
+            
+            ;; DIBUJO DEL ARCO: Desde 45 hasta 225 grados (sentido antihorario). 
+            ;; Esto cubre los gaps de 45-90 y 180-225 uniendose perfectamente al fillet.
+            (command "._arc" "_C" "_NON" center_tl "_NON" p_start1 "_NON" p_start2)
+            (command "._chprop" (entlast) "" "_C" "5" "")
+            
+            ;; Trazar las lineas de 15 cm hacia adentro (paralelas a 315 grados)
             (setq p_end1 (polar p_start1 (deg2rad 315) 0.15))
             (setq p_end2 (polar p_start2 (deg2rad 315) 0.15))
 
@@ -1002,27 +1012,28 @@ class TabArmaduras(ctk.CTkFrame):
             (command "._pline" "_NON" p_start2 "_NON" p_end2 "")
             (command "._chprop" (entlast) "" "_C" "5" "")
 
+            ;; 3. Textos y Cotas
             (setq dim_off 0.3)
             (setq L_min (* (+ (* 2.0 w) (* 2.0 l_mi) 0.30) 100.0))
             (setq L_max (* (+ (* 2.0 w) (* 2.0 l_ma) 0.30) 100.0))
 
+            ;; Texto de marca inferior
             (if (= l_mi l_ma)
               (setq text_str (strcat "(" mark ") " (itoa qty) " %%c" (itoa phi_val) " @" (rtos (* spa 100) 2 0) " L= " (rtos L_min 2 0)))
               (setq text_str (strcat "(" mark ") " (itoa qty) " %%c" (itoa phi_val) " @" (rtos (* spa 100) 2 0) " L= VAR. " (rtos L_min 2 0) " - " (rtos L_max 2 0)))
             )
             (draw-text (list (+ (car ins_p) (/ w 2.0)) (- (cadr ins_p) 1.2)) text_str "_TC")
             
-            ;; Texto G=15
+            ;; Texto g= 15 cm
             (draw-text (list (+ (car center_tl) 0.15) (+ (cadr center_tl) 0.05)) "g= 15 cm" "_ML")
 
-            ;; Cotas (Arriba/Abajo) Rojas
+            ;; Cota Superior (Ancho)
             (command "_.DIMALIGNED" "_NON" pA "_NON" pD "_T" (rtos (* w 100) 2 0) "_NON" (list (+ (car ins_p) (/ w 2.0)) (+ (cadr ins_p) h dim_off)))
-            (command "._chprop" (entlast) "" "_C" "1" "")
             
+            ;; Cota Inferior (Ancho)
             (command "_.DIMALIGNED" "_NON" pB "_NON" pC "_T" (rtos (* w 100) 2 0) "_NON" (list (+ (car ins_p) (/ w 2.0)) (- (cadr ins_p) dim_off)))
-            (command "._chprop" (entlast) "" "_C" "1" "")
             
-            ;; Cota Izquierda (Verde - Variable o Fija)
+            ;; Cota Izquierda (Alto - Variable o fija)
             (if (= l_mi l_ma)
               (command "_.DIMALIGNED" "_NON" pA "_NON" pB "_T" (rtos (* l_mi 100) 2 0) "_NON" (list (- (car ins_p) dim_off) (+ (cadr ins_p) (/ h 2.0))))
               (command "_.DIMALIGNED" "_NON" pA "_NON" pB "_T" (strcat "VAR. " (rtos (* l_mi 100) 2 0) "-" (rtos (* l_ma 100) 2 0)) "_NON" (list (- (car ins_p) (* dim_off 2.5)) (+ (cadr ins_p) (/ h 2.0))))
