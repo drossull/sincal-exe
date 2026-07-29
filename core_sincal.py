@@ -712,7 +712,7 @@ class ActualizadorCAD(ctk.CTk):
         self.log("[!] PATH y Registro CAD reparados.")
 
     def reiniciar_aplicacion(self):
-        """Mata el hilo de la bandeja y usa un script puente que limpia la caché de MS-DOS antes de reiniciar."""
+        """Mata el hilo de la bandeja y usa un script puente con entorno sanitizado para reiniciar SINCAL limpio."""
         try:
             if hasattr(self, 'icono_bandeja'):
                 self.icono_bandeja.stop()
@@ -720,25 +720,40 @@ class ActualizadorCAD(ctk.CTk):
             pass
 
         exe_path = sys.executable
-        bat_path = os.path.join(os.environ.get('TEMP', 'C:\\Temp'), "restart_sincal.bat")
+        bat_path = os.path.join(os.environ.get(
+            'TEMP', 'C:\\Temp'), "restart_sincal.bat")
+        meipass = getattr(sys, '_MEIPASS', '')
 
-        # Escribimos el .bat puente con limpieza EXPLÍCITA de variables de entorno
+        # 1. Limpieza a nivel MS-DOS (Reemplazo de strings para arrancar la ruta vieja del PATH)
         with open(bat_path, "w", encoding="utf-8") as f:
             f.write("@echo off\n")
             f.write("timeout /t 2 /nobreak > NUL\n")
-            # --- LA CURA DEFINITIVA PARA PYINSTALLER ---
             f.write("set _MEIPASS2=\n")
             f.write("set _MEIPASS=\n")
-            f.write("set TCL_LIBRARY=\n")
-            f.write("set TK_LIBRARY=\n")
-            # -------------------------------------------
+            if meipass:
+                f.write(f'set PATH=%PATH:{meipass};=%\n')
+                f.write(f'set PATH=%PATH:{meipass}=%\n')
             f.write(f'start "" "{exe_path}"\n')
             f.write('del "%~f0"\n')
 
-        # Lanzamos el .bat de forma silenciosa
-        subprocess.Popen(bat_path, shell=True, creationflags=0x08000000)
-        
-        # Permitimos que la versión actual se cierre y borre su carpeta _MEI...
+        # 2. Limpieza a nivel Python (El lavado de cerebro definitivo)
+        env_limpio = os.environ.copy()
+        env_limpio.pop('_MEIPASS2', None)
+        env_limpio.pop('_MEIPASS', None)
+        if meipass and 'PATH' in env_limpio:
+            env_limpio['PATH'] = os.pathsep.join(
+                [p for p in env_limpio['PATH'].split(
+                    os.pathsep) if p.lower() != meipass.lower()]
+            )
+
+        # 3. Lanzamos el .bat totalmente desvinculado (0x08000000 = CREATE_NO_WINDOW)
+        subprocess.Popen(
+            ["cmd.exe", "/c", bat_path],
+            creationflags=0x08000000,
+            env=env_limpio
+        )
+
+        # Permitimos que la versión actual se cierre y borre su carpeta temporal
         sys.exit(0)
 
     def iniciar_actualizacion_hilo(self):
