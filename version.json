@@ -1,5 +1,5 @@
 {
-  "version": "v27.3.9",
+  "version": "v27.4.0",
   "archivos": [
     "core_sincal.py",
     "modulos/tab_ubicacion.py",
@@ -10,6 +10,7 @@
     "lisps/SINCAL.lsp",
     "lisps/SINCAL_ESCALAS.lsp",
     "lisps/DL2.lsp",
+    "lisps/DUP.lsp",
     "lisps/DIMEL.lsp",
     "lisps/CPOL.lsp",
     "lisps/MC.lsp",
