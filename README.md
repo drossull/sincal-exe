@@ -1,16 +1,17 @@
 # 🏛️ SINCAL - Suite de Ingeniería y Estándares CAD
 
-**SINCAL** es una potente aplicación de escritorio ligera, autónoma y conectada a la nube. Su objetivo es unificar los estándares de dibujo (AutoCAD/ZWCAD), automatizar tareas repetitivas de ingeniería estructural y procesar planos geográficos con alta precisión.
+**SINCAL Suite 1.0** es una aplicación para Windows orientada a unificar estándares de dibujo (AutoCAD/ZWCAD), automatizar tareas repetitivas de ingeniería estructural y generar apoyo gráfico de ubicación a partir de archivos `.kmz`.
 
 ---
 
 ## 🚀 Características Principales
 
-* **Sincronización en la Nube (OTA):** Descarga automáticamente LISPs, scripts, formatos, imágenes y configuraciones nuevas desde el repositorio corporativo.
-* **Inyección Automática:** Se vincula silenciosamente a tu versión de AutoCAD/ZWCAD, cargando todos los comandos al iniciar el programa.
+* **Distribución por instalador firmado:** El ejecutable y los recursos se entregan como una instalación local autocontenida.
+* **Integración CAD local:** Prepara archivos auxiliares locales para trabajar con AutoCAD/ZWCAD sin ejecutar código descargado en caliente.
+* **Vista previa integrada en AutoCAD 2025:** El instalador incluye una primera pestaña Ribbon SINCAL y una paleta acoplable de prueba. La aplicación de escritorio sigue siendo la interfaz funcional principal durante la migración.
 * **Procesamiento Masivo Nativo (PowerShell):** Permite procesar decenas de planos de golpe directamente desde la carpeta de Windows sin abrir AutoCAD.
 * **Módulo Estructural (BIM 2D):** Generación inteligente de vistas de armaduras (Zapatas, Consolas, Muros), dibujo y despiece paramétrico, inyección de cotas matemáticas, y lectura de parámetros desde archivos JSON de proyecto.
-* **Generador de Croquis de Ubicación (GIS):** Lector nativo de archivos `.kmz` (Google Earth) que, a través de un motor de interpolación espacial y mapas MOP pre-calibrados, estampa la ubicación exacta del puente en un PNG listo para AutoCAD.
+* **Generador de Croquis de Ubicación:** Lector nativo de archivos `.kmz` (Google Earth) que usa mapas MOP calibrados disponibles localmente para generar un PNG de apoyo.
 * **Comandos en Vivo (Conexión COM):** Ejecuta comandos de forma remota en AutoCAD directamente desde la interfaz del programa.
 * **Renombrado Avanzado:** Herramienta de interfaz para buscar, reemplazar y actualizar revisiones de planos DWG de forma masiva en milisegundos.
 * **Documentación (Wiki):** Biblioteca interactiva integrada con todos los comandos y manuales.
@@ -19,9 +20,9 @@
 
 ## 💻 Guía de Uso Rápido
 
-1. **Descarga el ejecutable:** Obtén el archivo `SINCAL.exe`.
-2. **Ejecuta como Administrador:** El programa solicitará permisos automáticamente para conectarse al motor de CAD y el registro del sistema.
-3. **Actualiza:** Ve a la pestaña "Sincronizador" y haz clic en **"Instalar / Actualizar Todo"**.
+1. **Instala SINCAL:** Usa el instalador oficial `Setup_SINCAL_*.exe`.
+2. **Ejecuta SINCAL:** La aplicación ya no necesita elevarse globalmente para iniciar.
+3. **Preparación CAD:** Ve a la pestaña "Sincronizador" y haz clic en **"Preparar integración CAD"** si necesitas regenerar el wrapper o los archivos de arranque local.
 4. **Módulos Activos:** * Visita la pestaña **"Módulo Estructural"** para detallar encapados y generar despieces.
    * Visita la pestaña **"Ubicación"** para generar mapas regionales georreferenciados.
 

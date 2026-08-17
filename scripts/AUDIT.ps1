@@ -7,17 +7,19 @@ if ($dwgFiles.Count -eq 0) {
     exit
 }
 
-$appDataPath = [Environment]::GetFolderPath("ApplicationData")
-$wrapperPath = Join-Path $appDataPath "Estandar SINCAL\cad_wrapper.bat"
-$scrPath = Join-Path $appDataPath "Estandar SINCAL\scripts\AUDIT.scr"
+$appDataPath = [Environment]::GetFolderPath("LocalApplicationData")
+$runtimePath = Join-Path $appDataPath "SINCAL\runtime"
+$wrapperPath = Join-Path $runtimePath "cad_wrapper.bat"
+$appPath = if ($PSScriptRoot) { Split-Path $PSScriptRoot -Parent } else { (Get-Location).Path }
+$scrPath = Join-Path $appPath "scripts\AUDIT.scr"
 
 if (-not (Test-Path $wrapperPath)) {
-    Write-Host "[ERROR] Consola CAD no detectada. Abre SINCAL y presiona 'Instalar / Actualizar Todo'." -ForegroundColor Red
+    Write-Host "[ERROR] Consola CAD no detectada. Abre SINCAL y presiona 'Preparar integración CAD'." -ForegroundColor Red
     exit
 }
 
 if (-not (Test-Path $scrPath)) {
-    Write-Host "[ERROR] Archivo AUDIT.scr no encontrado en AppData." -ForegroundColor Red
+    Write-Host "[ERROR] Archivo AUDIT.scr no encontrado en la instalación de SINCAL." -ForegroundColor Red
     exit
 }
 
@@ -25,11 +27,22 @@ Write-Host "---------------------------------------------------" -ForegroundColo
 Write-Host "Auditoría masiva de planos" -ForegroundColor Cyan
 Write-Host "---------------------------------------------------" -ForegroundColor Cyan
 
+$errores = 0
+
 foreach ($file in $dwgFiles) {
     Write-Host "Auditando el plano: $($file.Name)" -ForegroundColor Green
     
     $argList = "/i `"$($file.FullName)`" /s `"$scrPath`""
-    Start-Process -FilePath $wrapperPath -ArgumentList $argList -Wait -NoNewWindow
+    $proc = Start-Process -FilePath $wrapperPath -ArgumentList $argList -Wait -NoNewWindow -PassThru
+    if ($proc.ExitCode -ne 0) {
+        Write-Host "  [ERROR] Proceso CAD falló para $($file.Name) con código $($proc.ExitCode)." -ForegroundColor Red
+        $errores++
+    }
 }
 
-Write-Host "`n¡Proceso finalizado!" -ForegroundColor Cyan
+if ($errores -gt 0) {
+    Write-Host "`n[ERROR] Auditoría terminada con $errores archivo(s) con error." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "`n[OK] Auditoría finalizada sin errores." -ForegroundColor Cyan

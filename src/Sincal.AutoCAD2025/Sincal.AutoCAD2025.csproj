@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PlatformTarget>x64</PlatformTarget>
+    <AutoCAD2025Dir Condition="'$(AutoCAD2025Dir)' == ''">C:\Program Files\Autodesk\AutoCAD 2025</AutoCAD2025Dir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="AcMgd">
+      <HintPath>$(AutoCAD2025Dir)\acmgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AcDbMgd">
+      <HintPath>$(AutoCAD2025Dir)\acdbmgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AcCoreMgd">
+      <HintPath>$(AutoCAD2025Dir)\accoremgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AcWindows">
+      <HintPath>$(AutoCAD2025Dir)\AcWindows.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AdWindows">
+      <HintPath>$(AutoCAD2025Dir)\AdWindows.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

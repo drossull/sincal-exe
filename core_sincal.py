@@ -2,12 +2,13 @@ import os
 import sys
 import json
 import requests
-import winreg
 import threading
-import ctypes
-import shutil
 import subprocess
 import time
+import queue
+import webbrowser
+import logging
+from logging.handlers import RotatingFileHandler
 import customtkinter as ctk
 from customtkinter import filedialog
 from tkinter import messagebox
@@ -20,38 +21,21 @@ from modulos.tab_armaduras import TabArmaduras
 from modulos.tab_ubicacion import TabUbicacion
 from modulos.tab_docs import TabDocs
 from datetime import datetime, timedelta
+from sincal_runtime import (
+    VERSION_ACTUAL,
+    asegurar_directorios,
+    is_newer_version,
+    ruta_recurso as runtime_ruta_recurso,
+    ruta_runtime,
+    RUTA_DATOS_USUARIO,
+    RUTA_LOGS,
+)
 
-
-def ruta_recurso(relative_path):
-    """Obtiene la ruta absoluta al recurso, funciona para dev y para PyInstaller"""
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
-
-# --- 1. FORZAR MODO ADMINISTRADOR ---
-
-
-def is_admin():
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
-        return False
-
-
-if not is_admin():
-    ctypes.windll.shell32.ShellExecuteW(
-        None, "runas", sys.executable, " ".join(sys.argv), None, 1)
-    sys.exit()
 
 # --- CONFIGURACIÓN GLOBALES ---
 USUARIO_GITHUB = "drossull"
 REPO_GITHUB = "sincal-exe"
-RAMA = "main"
-URL_BASE_RAW = f"https://raw.githubusercontent.com/{USUARIO_GITHUB}/{REPO_GITHUB}/{RAMA}/"
-RUTA_LOCAL_APP = os.path.join(os.getenv('APPDATA'), "Estandar SINCAL")
-URL_WEBHOOK_SHEETS = "https://script.google.com/macros/s/AKfycbywJwskXQrAhNYHV559ngE5WAPa-bhvrfgcYg0ej_WDfxQMP5vmT31b66mEPqeFCchaPQ/exec"
+URL_RELEASES = f"https://github.com/{USUARIO_GITHUB}/{REPO_GITHUB}/releases"
 
 COLOR_FONDO, COLOR_TITULO, COLOR_TEXTO, COLOR_ACENTO = "#2B2B2B", "#FFBF00", "#CCCCCC", "#007FFF"
 FUENTE_TITULO, FUENTE_SUBTITULO, FUENTE_MENU, FUENTE_NORMAL, FUENTE_CONSOLA = [
@@ -63,15 +47,34 @@ ctk.set_appearance_mode("dark")
 
 
 def obtener_ruta_recurso(ruta_relativa):
-    try:
-        return os.path.join(sys._MEIPASS, ruta_relativa)
-    except:
-        return os.path.abspath(ruta_relativa)
+    return runtime_ruta_recurso(ruta_relativa)
+
+
+def configurar_logging():
+    asegurar_directorios()
+    logger = logging.getLogger("sincal")
+    if logger.handlers:
+        return logger
+    logger.setLevel(logging.INFO)
+    handler = RotatingFileHandler(
+        os.path.join(RUTA_LOGS, "sincal.log"),
+        maxBytes=1_000_000,
+        backupCount=3,
+        encoding="utf-8",
+    )
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    logger.addHandler(handler)
+    return logger
 
 
 class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
+        asegurar_directorios()
+        self.logger = configurar_logging()
+        self.historial_logs = []
+        self._cerrando = False
+        self._ui_queue = queue.Queue()
         self.title("SINCAL - Suite de Herramientas Professional")
         self.geometry("1000x800")
         self.configure(fg_color=COLOR_FONDO)
@@ -80,12 +83,14 @@ class ActualizadorCAD(ctk.CTk):
         except:
             pass
 
-        self.version_local_actual = "v1.5.6"
+        self.version_local_actual = VERSION_ACTUAL
         self.tutoriales, self.cad_exe_path, self.es_zwcad, self.cancelar_comando_vivo = {
         }, None, False, False
         self.ruta_renombre, self.checkboxes_archivos, self.tray_activo = "", [], False
-
+        self.icono_bandeja = None
         self.protocol("WM_DELETE_WINDOW", self.ocultar_a_bandeja)
+        self.after(50, self._procesar_ui_queue)
+
         self.main_scroll = ctk.CTkScrollableFrame(
             self, fg_color=COLOR_FONDO, corner_radius=0)
         self.main_scroll.pack(fill="both", expand=True)
@@ -118,22 +123,54 @@ class ActualizadorCAD(ctk.CTk):
         self.vista_docs.pack(fill="both", expand=True)
 
         # --- CONSOLA FLOTANTE GLOBAL ---
-        self.historial_logs = []
         self.btn_consola = ctk.CTkButton(self, text="💻 Consola", font=FUENTE_NORMAL, width=90, fg_color="#333333",
                                          hover_color="#555555", border_width=1, border_color="#444444", corner_radius=5, command=self.mostrar_ventana_log)
         self.btn_consola.place(relx=0.97, rely=0.03, anchor="ne")
 
-        self.protocol("WM_DELETE_WINDOW", self.ocultar_a_bandeja)
-
-        if getattr(sys, 'frozen', False):
-            self.configurar_inicio_con_windows()
         threading.Thread(target=self.cargar_info_github, daemon=True).start()
+
+    def _ui(self, callback, *args, **kwargs):
+        if getattr(self, '_cerrando', False):
+            return
+        self._ui_queue.put((callback, args, kwargs))
+
+    def _procesar_ui_queue(self):
+        try:
+            while True:
+                callback, args, kwargs = self._ui_queue.get_nowait()
+                try:
+                    callback(*args, **kwargs)
+                except Exception as e:
+                    self.logger.warning("Error UI callback: %s", e)
+        except queue.Empty:
+            pass
+        finally:
+            if not getattr(self, '_cerrando', False) and self.winfo_exists():
+                self.after(50, self._procesar_ui_queue)
+
+    def _set_textbox_content(self, widget, texto):
+        widget.configure(state="normal")
+        widget.delete("1.0", "end")
+        widget.insert("end", texto)
+        widget.see("end")
+        widget.configure(state="disabled")
+
+    def _append_textbox(self, widget, texto):
+        widget.configure(state="normal")
+        widget.insert("end", texto)
+        widget.see("end")
+        widget.configure(state="disabled")
 
     # ==========================================================
     # LÓGICA DE WINDOWS (SYSTEM TRAY / AUTOSTART)
     # ==========================================================
     def ocultar_a_bandeja(self):
+        if getattr(self, '_cerrando', False):
+            return
         self.withdraw()
+        if self.icono_bandeja:
+            self.tray_activo = True
+            return
         try:
             ruta_logo = ruta_recurso('logo.ico')
             icono = Image.open(ruta_logo).convert("RGBA")
@@ -148,32 +185,30 @@ class ActualizadorCAD(ctk.CTk):
 
         self.icono_bandeja = pystray.Icon(
             "SINCAL", icono, "SINCAL Suite", menu)
+        self.tray_activo = True
         threading.Thread(target=self.icono_bandeja.run, daemon=True).start()
 
     def mostrar_desde_bandeja(self, icon, item):
-        self.icono_bandeja.stop()
-        self.after(0, self.deiconify)
+        if self.icono_bandeja:
+            self.icono_bandeja.stop()
+            self.icono_bandeja = None
+        self.tray_activo = False
+        self._ui(self.deiconify)
 
     def salir_completamente(self, icon, item):
-        self.icono_bandeja.stop()
-        self.after(0, self.destroy)
+        self._cerrando = True
+        if self.icono_bandeja:
+            self.icono_bandeja.stop()
+            self.icono_bandeja = None
+        self.tray_activo = False
+        self.destroy()
 
     def mostrar_notificacion(self, titulo, mensaje):
-        if getattr(self, 'tray_activo', False) and hasattr(self, 'tray'):
+        if getattr(self, 'tray_activo', False) and self.icono_bandeja:
             try:
-                self.tray.notify(mensaje, titulo)
+                self.icono_bandeja.notify(mensaje, titulo)
             except:
                 pass
-
-    def configurar_inicio_con_windows(self):
-        try:
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_ALL_ACCESS)
-            winreg.SetValueEx(key, "SINCAL_Suite", 0,
-                              winreg.REG_SZ, f'"{sys.executable}" --background')
-            winreg.CloseKey(key)
-        except:
-            pass
 
     def setup_tab_armaduras(self):
         self.vista_armaduras = TabArmaduras(
@@ -188,8 +223,7 @@ class ActualizadorCAD(ctk.CTk):
             r = requests.get(
                 f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits", params={"per_page": 10}, timeout=5)
             if r.status_code == 200:
-                self.txt_updates.configure(state="normal")
-                self.txt_updates.delete("1.0", "end")
+                lineas = []
 
                 meses = {"01": "Ene", "02": "Feb", "03": "Mar", "04": "Abr", "05": "May", "06": "Jun",
                          "07": "Jul", "08": "Ago", "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dic"}
@@ -204,24 +238,16 @@ class ActualizadorCAD(ctk.CTk):
 
                     sha_completo = c['sha']
                     version_mostrar = sha_completo[:7]
-                    try:
-                        url_hist = f"https://raw.githubusercontent.com/{USUARIO_GITHUB}/{REPO_GITHUB}/{sha_completo}/version.json"
-                        r_json = requests.get(url_hist, timeout=3)
-                        if r_json.status_code == 200:
-                            version_mostrar = r_json.json().get("version", version_mostrar)
-                    except:
-                        pass
 
                     mensaje = c['commit']['message'].strip()
                     mensaje = mensaje.replace(
                         "\r\n", " + ").replace("\n\n", " + ").replace("\n", " + ")
 
-                    linea = f"• ({version_mostrar}) / {fecha_formateada} / {mensaje}\n"
-                    self.txt_updates.insert("end", linea)
+                    lineas.append(f"• ({version_mostrar}) / {fecha_formateada} / {mensaje}\n")
 
-                self.txt_updates.configure(state="disabled")
+                self._ui(self._set_textbox_content, self.txt_updates, "".join(lineas))
         except Exception as e:
-            pass
+            self.logger.warning("No se pudo cargar el historial de cambios: %s", e)
 
     def cad_esta_ejecutandose(self):
         try:
@@ -235,16 +261,16 @@ class ActualizadorCAD(ctk.CTk):
         self.deiconify()
         self.focus_force()
 
-        msg = f"Versión detectada: {nueva_version}\n\nNovedades:\n{desc_commit}\n\n¿Deseas instalar esta actualización ahora?"
+        msg = (
+            f"Versión detectada: {nueva_version}\n\n"
+            f"Novedades:\n{desc_commit}\n\n"
+            "SINCAL ya no descarga código ejecutable en caliente.\n"
+            "¿Deseas abrir la página oficial de releases para instalar la actualización?"
+        )
 
         if messagebox.askyesno("¡Actualización SINCAL Disponible!", msg):
-            if self.cad_esta_ejecutandose():
-                messagebox.showwarning(
-                    "Software CAD en uso",
-                    "Para que los cambios se apliquen correctamente, por favor cierra ZWCAD o AutoCAD y luego presiona 'Instalar / Actualizar Todo' en esta ventana."
-                )
-            else:
-                self.iniciar_actualizacion_hilo()
+            webbrowser.open(URL_RELEASES)
+            self.log("[!] Abriendo página oficial de releases para actualizar SINCAL.")
         else:
             self.log(
                 f"[!] Actualización a {nueva_version} pospuesta por el usuario.")
@@ -253,15 +279,15 @@ class ActualizadorCAD(ctk.CTk):
         lbl_titulo = ctk.CTkLabel(
             self.tab_main, text="ESTÁNDAR SINCAL", font=FUENTE_TITULO, text_color=COLOR_TITULO)
         lbl_titulo.pack(pady=10)
-        self.btn_actualizar = ctk.CTkButton(self.tab_main, text="Instalar / Actualizar Todo", font=FUENTE_SUBTITULO, fg_color="transparent", border_width=2,
-                                            border_color=COLOR_ACENTO, corner_radius=0, hover_color="#444444", text_color=COLOR_TEXTO, border_spacing=8, command=self.iniciar_actualizacion_hilo)
+        self.btn_actualizar = ctk.CTkButton(self.tab_main, text="Abrir instalador oficial", font=FUENTE_SUBTITULO, fg_color="transparent", border_width=2,
+                                            border_color=COLOR_ACENTO, corner_radius=0, hover_color="#444444", text_color=COLOR_TEXTO, border_spacing=8, command=lambda: webbrowser.open(URL_RELEASES))
         self.btn_actualizar.pack(pady=5)
 
         botones_sec_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         botones_sec_frame.pack(pady=5)
         ctk.CTkButton(botones_sec_frame, text="Abrir carpeta local", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_ACENTO,
                       corner_radius=0, text_color=COLOR_TEXTO, hover_color="#444444", command=self.abrir_carpeta_local).pack(side="left", padx=10)
-        ctk.CTkButton(botones_sec_frame, text="Reparar / Forzar PATH", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_TITULO,
+        ctk.CTkButton(botones_sec_frame, text="Preparar integración CAD", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_TITULO,
                       corner_radius=0, text_color=COLOR_TITULO, hover_color="#444444", command=self.forzar_path_manual).pack(side="left", padx=10)
 
         self.btn_verificar_update = ctk.CTkButton(botones_sec_frame, text="Verificar nueva actualización", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color="#00FF00",
@@ -290,37 +316,30 @@ class ActualizadorCAD(ctk.CTk):
 
     def _hilo_verificar_actualizacion(self):
         try:
-            import time
-            timestamp = str(time.time())
-            url_fresca = f"{URL_BASE_RAW}version.json?t={timestamp}"
-            r = requests.get(url_fresca, timeout=5)
-            nueva_version = r.json().get("version")
+            r = requests.get(
+                f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/releases/latest",
+                timeout=5,
+            )
+            r.raise_for_status()
+            release = r.json()
+            nueva_version = release.get("tag_name") or release.get("name") or self.version_local_actual
 
-            if nueva_version != self.version_local_actual:
-                desc_commit = "Mejoras generales y corrección de errores."
-                try:
-                    url_api = f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits"
-                    r_commit = requests.get(
-                        url_api, params={"per_page": 1, "t": timestamp}, timeout=5)
-                    if r_commit.status_code == 200:
-                        desc_commit = r_commit.json()[0]['commit']['message']
-                except:
-                    pass
+            if is_newer_version(nueva_version, self.version_local_actual):
+                desc_commit = (release.get("body") or "Mejoras generales y corrección de errores.").strip()[:1200]
 
                 self.log(
                     f"[!] Nueva versión disponible: {nueva_version}. Novedades: {desc_commit}")
-                self.after(0, lambda v=nueva_version,
-                           d=desc_commit: self.mostrar_popup_actualizacion(v, d))
+                self._ui(self.mostrar_popup_actualizacion, nueva_version, desc_commit)
             else:
                 self.log(
                     "[OK] El sistema ya se encuentra en su última versión.")
-                self.after(0, lambda: messagebox.showinfo(
-                    "Actualización", "El sistema ya se encuentra en su última versión."))
+                self._ui(messagebox.showinfo,
+                         "Actualización", "El sistema ya se encuentra en su última versión.")
         except Exception as e:
             self.log(f"[X] Fallo al verificar versión en GitHub: {e}")
         finally:
-            self.btn_verificar_update.configure(
-                state="normal", text="Verificar nueva actualización")
+            self._ui(self.btn_verificar_update.configure,
+                     state="normal", text="Verificar nueva actualización")
 
     def setup_tab_renombrado(self):
         lbl_titulo = ctk.CTkLabel(
@@ -423,7 +442,7 @@ class ActualizadorCAD(ctk.CTk):
         btn_container.pack(fill="x", padx=15, pady=5)
 
         def cmd_ps(nombre_script):
-            ruta = os.path.join(RUTA_LOCAL_APP, "scripts",
+            ruta = os.path.join(runtime_ruta_recurso("scripts"),
                                 f"{nombre_script}.ps1")
             return f"& '{ruta}'"
 
@@ -540,8 +559,12 @@ class ActualizadorCAD(ctk.CTk):
 
             proceso.stdout.close()
             proceso.wait()
-            self.log_script(
-                f"\n[OK] Script finalizado (Código de salida: {proceso.returncode})\n")
+            if proceso.returncode == 0:
+                self.log_script(
+                    f"\n[OK] Script finalizado (Código de salida: {proceso.returncode})\n")
+            else:
+                self.log_script(
+                    f"\n[X] Script finalizado con error (Código de salida: {proceso.returncode})\n")
 
         except Exception as e:
             self.log_script(
@@ -602,7 +625,10 @@ class ActualizadorCAD(ctk.CTk):
                         doc.SaveAs(ruta_dwg)
 
                     doc.Close(False)
-                    self.log_script("OK\n")
+                    if os.path.exists(ruta_dwg) and os.path.getsize(ruta_dwg) > 0:
+                        self.log_script("OK\n")
+                    else:
+                        self.log_script("Error (DWG no generado o vacío)\n")
                 except Exception as e:
                     self.log_script(f"Error ({str(e)})\n")
 
@@ -613,7 +639,7 @@ class ActualizadorCAD(ctk.CTk):
 
             self.log_script(
                 "\n[!] Conversión finalizada. Actualizando lista...\n")
-            self.after(1000, self.refrescar_lista_archivos)
+            self._ui(self.refrescar_lista_archivos)
 
         except Exception as e:
             self.log_script(f"\n[X] Error fatal de COM: {e}\n")
@@ -653,7 +679,7 @@ class ActualizadorCAD(ctk.CTk):
                     pass
 
             if not apps_encontradas:
-                return self.log("\n[X] Error: No se detecta CAD abierto. (Recuerda abrirlo como Administrador).")
+                return self.log("\n[X] Error: No se detecta CAD abierto o accesible para la sesión actual.")
 
             docs_procesados = set()
             ejecuciones = 0
@@ -699,97 +725,24 @@ class ActualizadorCAD(ctk.CTk):
         except Exception as e:
             self.log(f"\n[X] Fallo COM: {e}")
         finally:
-            self.btn_enviar_cmd.configure(state="normal", text="Ejecutar")
-            self.btn_cancelar_cmd.configure(state="disabled", text="Cancelar")
+            self._ui(self.btn_enviar_cmd.configure, state="normal", text="Ejecutar")
+            self._ui(self.btn_cancelar_cmd.configure, state="disabled", text="Cancelar")
             pythoncom.CoUninitialize()
 
     def abrir_carpeta_local(self): os.startfile(
-        RUTA_LOCAL_APP) if os.path.exists(RUTA_LOCAL_APP) else None
+        RUTA_DATOS_USUARIO) if os.path.exists(RUTA_DATOS_USUARIO) else None
 
     def forzar_path_manual(self):
-        self.actualizar_rutas_registro()
-        self.actualizar_variable_entorno()
-        self.log("[!] PATH y Registro CAD reparados.")
+        self.generar_archivos_lisp()
+        self.buscar_y_configurar_consolas()
+        self.log("[!] Integración CAD preparada en la carpeta local de runtime.")
 
     def iniciar_actualizacion_hilo(self):
-        self.btn_actualizar.configure(
-            state="disabled", text="Sincronizando...")
-        self.consola.configure(state="normal")
-        self.consola.delete("1.0", "end")
-        self.consola.configure(state="disabled")
-        threading.Thread(target=self.motor_actualizacion, daemon=True).start()
+        webbrowser.open(URL_RELEASES)
+        self.log("[!] SINCAL ya no sincroniza código en caliente. Usa el instalador oficial.")
 
     def motor_actualizacion(self):
-        try:
-            nombre_exe_actual = os.path.basename(sys.executable).lower()
-
-            if os.path.exists(RUTA_LOCAL_APP):
-                for elemento in os.listdir(RUTA_LOCAL_APP):
-                    ruta_elemento = os.path.join(RUTA_LOCAL_APP, elemento)
-                    if elemento.lower() == nombre_exe_actual or elemento.lower().startswith("unins"):
-                        continue
-                    try:
-                        if os.path.isdir(ruta_elemento):
-                            shutil.rmtree(ruta_elemento)
-                        else:
-                            os.remove(ruta_elemento)
-                    except Exception:
-                        pass
-
-            os.makedirs(RUTA_LOCAL_APP, exist_ok=True)
-
-            r = requests.get(URL_BASE_RAW + "version.json").json()
-            archivos = r.get("archivos", []) + ["README.md", "TUTORIAL.md"]
-            total_archivos = len(archivos)
-            spinner = ['|', '/', '-', '\\']
-
-            self.consola.configure(state="normal")
-            self.consola.insert("end", "[|] Iniciando descarga...\n")
-            self.consola.configure(state="disabled")
-
-            for idx, a in enumerate(archivos):
-                r_save = os.path.normpath(os.path.join(RUTA_LOCAL_APP, a))
-                os.makedirs(os.path.dirname(r_save), exist_ok=True)
-                res = requests.get(URL_BASE_RAW + a)
-                if res.status_code == 200:
-                    if a.lower().endswith('.lsp'):
-                        with open(r_save, 'w', encoding='utf-8', errors='ignore') as f:
-                            f.write(res.text)
-                    else:
-                        with open(r_save, 'wb') as f:
-                            f.write(res.content)
-
-                porcentaje = int(((idx + 1) / total_archivos) * 100)
-                simbolo = spinner[idx % 4]
-
-                self.consola.configure(state="normal")
-                self.consola.delete("end-2l", "end-1c")
-                self.consola.insert(
-                    "end", f"[{simbolo}] Actualizando SINCAL... {porcentaje}% ({idx+1}/{total_archivos})\n")
-                self.consola.see("end")
-                self.consola.configure(state="disabled")
-
-            self.generar_archivos_lisp(archivos)
-            self.actualizar_rutas_registro()
-            self.actualizar_variable_entorno()
-            self.registrar_menu_contextual()
-            self.buscar_y_configurar_consolas()
-
-            self.version_local_actual = r.get("version", "v1.0.0")
-            self.log(f"\n[!] SINCAL Sincronizado: {self.version_local_actual}")
-            self.mostrar_notificacion(
-                "SINCAL Actualizado", f"Instalada versión {self.version_local_actual}")
-
-            self.log(
-                "\n[OK] Actualización completada. Por favor, CIERRA este programa y vuelve a abrirlo para aplicar los cambios.")
-            messagebox.showinfo(
-                "Actualización Exitosa", "Los archivos se han descargado correctamente.\n\nPor favor, cierra SINCAL Suite y vuelve a abrirlo para que los cambios surtan efecto.")
-
-        except Exception as e:
-            self.log(f"[!] Error crítico en actualización: {e}")
-        finally:
-            self.btn_actualizar.configure(
-                state="normal", text="Instalar / Actualizar Todo")
+        self.log("[!] Actualización en caliente deshabilitada por seguridad.")
 
     def buscar_y_configurar_consolas(self):
         self.cad_exe_path = None
@@ -802,8 +755,7 @@ class ActualizadorCAD(ctk.CTk):
                             if "zwcad" in f.lower():
                                 self.es_zwcad = True
 
-                            ruta_wrapper = os.path.join(
-                                RUTA_LOCAL_APP, "cad_wrapper.bat")
+                            ruta_wrapper = ruta_runtime("cad_wrapper.bat")
                             try:
                                 with open(ruta_wrapper, 'w', encoding='utf-8') as wf:
                                     wf.write(
@@ -814,110 +766,31 @@ class ActualizadorCAD(ctk.CTk):
                             return
 
     def actualizar_rutas_registro(self):
-        appdata = os.getenv('APPDATA')
-        for carpeta_cad in ["Autodesk", "ZWSOFT"]:
-            base = os.path.join(appdata, carpeta_cad)
-            if os.path.exists(base):
-                for root, dirs, files in os.walk(base):
-                    for file in files:
-                        if file.lower() in ["acaddoc.lsp", "zwcaddoc.lsp"]:
-                            ruta_fantasma = os.path.join(root, file)
-                            if RUTA_LOCAL_APP.lower() not in ruta_fantasma.lower():
-                                try:
-                                    os.rename(ruta_fantasma,
-                                              ruta_fantasma + ".bak")
-                                    self.log(
-                                        f"[*] Fantasma neutralizado en: {os.path.basename(root)}")
-                                except:
-                                    pass
-
-        def inyectar_ruta_recursivo(ruta_reg):
-            try:
-                llave = winreg.OpenKey(
-                    winreg.HKEY_CURRENT_USER, ruta_reg, 0, winreg.KEY_ALL_ACCESS)
-
-                for nombre_valor in ["ACAD", "ZWCAD", "ZWCADSEARCHPATH", "SRCHPATH", "TRUSTEDPATHS"]:
-                    try:
-                        valor_actual, tipo = winreg.QueryValueEx(
-                            llave, nombre_valor)
-                        if RUTA_LOCAL_APP.lower() not in valor_actual.lower():
-                            nuevo_valor = f"{RUTA_LOCAL_APP};{valor_actual}"
-                            winreg.SetValueEx(
-                                llave, nombre_valor, 0, tipo, nuevo_valor)
-                            self.log(
-                                f"[*] SINCAL inyectado en registro: {nombre_valor}")
-                    except OSError:
-                        pass
-
-                i = 0
-                while True:
-                    try:
-                        sub_llave = winreg.EnumKey(llave, i)
-                        inyectar_ruta_recursivo(f"{ruta_reg}\\{sub_llave}")
-                        i += 1
-                    except OSError:
-                        break
-                winreg.CloseKey(llave)
-            except Exception:
-                pass
-
-        inyectar_ruta_recursivo(r"Software\Autodesk\AutoCAD")
-        inyectar_ruta_recursivo(r"Software\ZWSOFT\ZWCAD")
+        self.log("[!] Integración automática de rutas CAD deshabilitada por seguridad.")
 
     def actualizar_variable_entorno(self):
-        try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                                 "Environment", 0, winreg.KEY_ALL_ACCESS)
-            p, _ = winreg.QueryValueEx(key, "Path")
-            if RUTA_LOCAL_APP.lower() not in p.lower():
-                winreg.SetValueEx(
-                    key, "Path", 0, winreg.REG_EXPAND_SZ, f"{p};{RUTA_LOCAL_APP}")
-            winreg.CloseKey(key)
-        except:
-            pass
+        self.log("[!] Modificación automática de PATH deshabilitada por seguridad.")
 
     def registrar_menu_contextual(self):
-        try:
-            import winreg
-            exe_path = sys.executable
+        self.log("[!] Menú contextual deshabilitado hasta tener una ruta de ejecución validada.")
 
-            ruta_llave = r"Directory\shell\SINCAL_Plotear"
-            llave = winreg.CreateKey(winreg.HKEY_CLASSES_ROOT, ruta_llave)
-            winreg.SetValue(llave, "", winreg.REG_SZ, "Plotear con SINCAL")
-            winreg.SetValueEx(llave, "Icon", 0, winreg.REG_SZ, f'"{exe_path}"')
-
-            llave_comando = winreg.CreateKey(llave, "command")
-            comando_ejecucion = f'"{exe_path}" --plotear "%1"'
-            winreg.SetValue(llave_comando, "",
-                            winreg.REG_SZ, comando_ejecucion)
-
-            winreg.CloseKey(llave_comando)
-            winreg.CloseKey(llave)
-
-            ruta_llave_fondo = r"Directory\Background\shell\SINCAL_Plotear"
-            llave_fondo = winreg.CreateKey(
-                winreg.HKEY_CLASSES_ROOT, ruta_llave_fondo)
-            winreg.SetValue(llave_fondo, "", winreg.REG_SZ,
-                            "Plotear con SINCAL")
-            winreg.SetValueEx(llave_fondo, "Icon", 0,
-                              winreg.REG_SZ, f'"{exe_path}"')
-            llave_comando_fondo = winreg.CreateKey(llave_fondo, "command")
-            comando_fondo = f'"{exe_path}" --plotear "%V"'
-            winreg.SetValue(llave_comando_fondo, "",
-                            winreg.REG_SZ, comando_fondo)
-            winreg.CloseKey(llave_comando_fondo)
-            winreg.CloseKey(llave_fondo)
-
-        except Exception as e:
-            pass
-
-    def generar_archivos_lisp(self, archivos):
+    def generar_archivos_lisp(self, archivos=None):
         contenido_arranque = ""
+
+        if archivos is None:
+            archivos = []
+            for carpeta in ("lisps", "startup"):
+                ruta_carpeta = runtime_ruta_recurso(carpeta)
+                if not os.path.isdir(ruta_carpeta):
+                    continue
+                for root, _, files in os.walk(ruta_carpeta):
+                    for nombre in files:
+                        ruta_abs = os.path.join(root, nombre)
+                        archivos.append(os.path.relpath(ruta_abs, runtime_ruta_recurso("")))
 
         for a in archivos:
             if a.lower().endswith('.lsp') and os.path.basename(a).lower() not in ["acaddoc.lsp", "zwcaddoc.lsp"]:
-                ruta_lisp = os.path.normpath(os.path.join(
-                    RUTA_LOCAL_APP, a)).replace("\\", "/")
+                ruta_lisp = runtime_ruta_recurso(a).replace("\\", "/")
                 nombre = os.path.basename(a)
                 contenido_arranque += f'(princ (load "{ruta_lisp}" "\\n[X] SINCAL: Fallo al cargar {nombre}"))\n'
 
@@ -926,8 +799,8 @@ class ActualizadorCAD(ctk.CTk):
 
         contenido_arranque += '(princ "\\n[OK] SINCAL: Todos los LISPs procesados correctamente.")\n(princ)\n'
 
-        r_acad = os.path.join(RUTA_LOCAL_APP, "acaddoc.lsp")
-        r_zwcad = os.path.join(RUTA_LOCAL_APP, "zwcaddoc.lsp")
+        r_acad = ruta_runtime("acaddoc.lsp")
+        r_zwcad = ruta_runtime("zwcaddoc.lsp")
 
         with open(r_acad, 'w', encoding='utf-8') as f:
             f.write(contenido_arranque)
@@ -939,33 +812,31 @@ class ActualizadorCAD(ctk.CTk):
     # SISTEMA DE LOGS Y CONSOLA FLOTANTE
     # ==========================================================
     def log(self, m):
-        self.consola.configure(state="normal")
-        self.consola.insert("end", m + "\n")
-        self.consola.see("end")
-        self.consola.configure(state="disabled")
+        self.logger.info(m)
+        if hasattr(self, 'consola'):
+            self._ui(self._append_textbox, self.consola, m + "\n")
         self.escribir_en_consola_global(m)
 
     def log_r(self, m):
-        self.log_rename.configure(state="normal")
-        self.log_rename.insert("end", m + "\n")
-        self.log_rename.see("end")
-        self.log_rename.configure(state="disabled")
+        self.logger.info(m)
+        if hasattr(self, 'log_rename'):
+            self._ui(self._append_textbox, self.log_rename, m + "\n")
         self.escribir_en_consola_global("[PROCESAMIENTO MASIVO] " + m)
 
     def log_script(self, texto):
-        self.consola_scripts.configure(state="normal")
-        self.consola_scripts.insert("end", texto)
-        self.consola_scripts.see("end")
-        self.consola_scripts.configure(state="disabled")
+        self.logger.info(texto.strip())
+        if hasattr(self, 'consola_scripts'):
+            self._ui(self._append_textbox, self.consola_scripts, texto)
         self.escribir_en_consola_global(texto.strip('\n'))
 
     def escribir_en_consola_global(self, m):
         self.historial_logs.append(m)
-        if hasattr(self, 'ventana_log') and self.ventana_log.winfo_exists():
-            self.txt_log_global.configure(state="normal")
-            self.txt_log_global.insert("end", m + "\n")
-            self.txt_log_global.see("end")
-            self.txt_log_global.configure(state="disabled")
+        if hasattr(self, 'ventana_log') and hasattr(self, 'txt_log_global'):
+            self._ui(self._append_if_exists, self.txt_log_global, m + "\n")
+
+    def _append_if_exists(self, widget, texto):
+        if widget.winfo_exists():
+            self._append_textbox(widget, texto)
 
     def mostrar_ventana_log(self):
         if hasattr(self, 'ventana_log') and self.ventana_log.winfo_exists():
@@ -989,8 +860,5 @@ class ActualizadorCAD(ctk.CTk):
 
 
 def arrancar():
-    import sys
     app = ActualizadorCAD()
-    if "--background" in sys.argv:
-        app.ocultar_a_bandeja()
     app.mainloop()

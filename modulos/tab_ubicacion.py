@@ -6,8 +6,109 @@ import xml.etree.ElementTree as ET
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
 from PIL import Image, ImageDraw
+from sincal_runtime import ruta_recurso
 
-RUTA_LOCAL_APP = os.path.join(os.getenv('APPDATA'), "Estandar SINCAL")
+RUTA_LOCAL_APP = ruta_recurso()
+KMZ_MAX_BYTES = 10 * 1024 * 1024
+KML_MAX_BYTES = 5 * 1024 * 1024
+ZIP_MAX_FILES = 1000
+KMZ_MAX_POINTS = 10000
+
+
+def _normalizar_etiquetas(root):
+    for elem in root.iter():
+        if '}' in elem.tag:
+            elem.tag = elem.tag.split('}', 1)[1]
+    return root
+
+
+def _elegir_kml(zip_file):
+    infos = zip_file.infolist()
+    if len(infos) > ZIP_MAX_FILES:
+        raise ValueError("El KMZ contiene demasiados archivos.")
+
+    candidatos = [info for info in infos if info.filename.lower().endswith('.kml')]
+    if not candidatos:
+        raise ValueError("El KMZ no contiene ningún archivo KML.")
+
+    for candidato in candidatos:
+        normalizado = candidato.filename.replace('\\', '/').lower().lstrip('./')
+        if normalizado == 'doc.kml':
+            return candidato
+
+    if len(candidatos) > 1:
+        raise ValueError("El KMZ contiene múltiples KML y no se puede determinar cuál usar.")
+    return candidatos[0]
+
+
+def _leer_kml_desde_kmz(ruta_kmz):
+    if os.path.getsize(ruta_kmz) > KMZ_MAX_BYTES:
+        raise ValueError("El archivo KMZ es demasiado grande.")
+
+    with zipfile.ZipFile(ruta_kmz, 'r') as zip_file:
+        kml_info = _elegir_kml(zip_file)
+        if kml_info.file_size > KML_MAX_BYTES:
+            raise ValueError("El archivo KML interno es demasiado grande.")
+        with zip_file.open(kml_info) as archivo_kml:
+            return archivo_kml.read(), kml_info.filename
+
+
+def _duplicado_resuelto(nombre, usados):
+    if nombre not in usados:
+        usados[nombre] = 1
+        return nombre
+    usados[nombre] += 1
+    return f"{nombre} ({usados[nombre]})"
+
+
+def _parsear_kml_puntos(kml_data):
+    root = _normalizar_etiquetas(ET.fromstring(kml_data))
+    estructuras = {}
+    duplicados = {}
+    ignorados = 0
+
+    for placemark in root.findall('.//Placemark'):
+        point_elem = placemark.find('Point')
+        if point_elem is None:
+            continue
+
+        name_elem = placemark.find('name')
+        coord_elem = placemark.find('.//coordinates')
+        if name_elem is None or coord_elem is None:
+            ignorados += 1
+            continue
+
+        nombre = (name_elem.text or '').strip()
+        coordenadas = (coord_elem.text or '').strip()
+        if not nombre or not coordenadas:
+            ignorados += 1
+            continue
+
+        partes = [p.strip() for p in coordenadas.split(',')]
+        if len(partes) < 2:
+            ignorados += 1
+            continue
+
+        try:
+            lon = float(partes[0])
+            lat = float(partes[1])
+        except ValueError:
+            ignorados += 1
+            continue
+
+        if not (math.isfinite(lon) and math.isfinite(lat)):
+            ignorados += 1
+            continue
+        if not (-180.0 <= lon <= 180.0 and -90.0 <= lat <= 90.0):
+            ignorados += 1
+            continue
+
+        nombre_final = _duplicado_resuelto(nombre, duplicados)
+        estructuras[nombre_final] = (lat, lon)
+        if len(estructuras) > KMZ_MAX_POINTS:
+            raise ValueError("El KMZ contiene demasiados puntos válidos.")
+
+    return estructuras, ignorados
 
 
 class TabUbicacion(ctk.CTkFrame):
@@ -26,10 +127,38 @@ class TabUbicacion(ctk.CTkFrame):
         if os.path.exists(ruta_json):
             try:
                 with open(ruta_json, 'r', encoding='utf-8') as f:
-                    self.datos_mapas = json.load(f)
+                    datos = json.load(f)
+                self.datos_mapas = {
+                    nombre: cfg for nombre, cfg in datos.items()
+                    if self.mapa_esta_calibrado(cfg)
+                }
+                mapas_invalidos = sorted(set(datos) - set(self.datos_mapas))
+                if mapas_invalidos:
+                    self.parent_app.log(
+                        "[!] Mapas deshabilitados por calibración inválida: " + ", ".join(mapas_invalidos)
+                    )
             except Exception as e:
                 self.parent_app.log(
                     f"[X] Error leyendo mapas_calibrados.json: {e}")
+
+    @staticmethod
+    def mapa_esta_calibrado(datos_calibracion):
+        try:
+            lat1_geo, lon1_geo = datos_calibracion["pt1_geo"]
+            x1_px, y1_px = datos_calibracion["pt1_pixel"]
+            lat2_geo, lon2_geo = datos_calibracion["pt2_geo"]
+            x2_px, y2_px = datos_calibracion["pt2_pixel"]
+        except (KeyError, TypeError, ValueError):
+            return False
+
+        return all(
+            delta != 0 for delta in (
+                lon2_geo - lon1_geo,
+                lat2_geo - lat1_geo,
+                x2_px - x1_px,
+                y2_px - y1_px,
+            )
+        )
 
     def setup_ui(self):
         fuente_subtitulo = ("Consolas", 18, "bold")
@@ -81,7 +210,7 @@ class TabUbicacion(ctk.CTkFrame):
                      text_color="#007FFF").grid(row=2, column=0, sticky="w", padx=20, pady=(25, 10))
 
         lista_mapas = list(self.datos_mapas.keys()) if self.datos_mapas else [
-            "Falta sincronizar mapas_calibrados.json"]
+            "No hay mapas calibrados válidos"]
         self.combo_mapas = ctk.CTkComboBox(
             frame_main, font=fuente_normal, width=400, values=lista_mapas)
         self.combo_mapas.grid(row=2, column=1, columnspan=3,
@@ -129,30 +258,12 @@ class TabUbicacion(ctk.CTkFrame):
             return
 
         try:
-            with zipfile.ZipFile(ruta_kmz, 'r') as z:
-                kml_filename = [f for f in z.namelist(
-                ) if f.lower().endswith('.kml')][0]
-                with z.open(kml_filename) as f:
-                    kml_data = f.read()
+            kml_data, kml_name = _leer_kml_desde_kmz(ruta_kmz)
+            nuevas_estructuras, ignorados = _parsear_kml_puntos(kml_data)
 
-            root = ET.fromstring(kml_data)
-            for elem in root.iter():
-                if '}' in elem.tag:
-                    elem.tag = elem.tag.split('}', 1)[1]
-
-            self.estructuras_gps.clear()
-            for placemark in root.findall('.//Placemark'):
-                name_elem = placemark.find('name')
-                coord_elem = placemark.find('.//coordinates')
-                if name_elem is not None and coord_elem is not None:
-                    nombre = name_elem.text.strip()
-                    coords_str = coord_elem.text.strip().split(',')
-                    if len(coords_str) >= 2:
-                        self.estructuras_gps[nombre] = (
-                            float(coords_str[1]), float(coords_str[0]))
-
-            if self.estructuras_gps:
-                lista_nombres = sorted(list(self.estructuras_gps.keys()))
+            if nuevas_estructuras:
+                self.estructuras_gps = nuevas_estructuras
+                lista_nombres = sorted(list(nuevas_estructuras.keys()))
                 self.combo_estructuras.configure(
                     values=lista_nombres, state="normal")
                 self.combo_estructuras.set(lista_nombres[0])
@@ -160,6 +271,9 @@ class TabUbicacion(ctk.CTkFrame):
 
                 self.lbl_kmz_status.configure(
                     text=f"KMZ: {os.path.basename(ruta_kmz)}", text_color="#007FFF")
+                if ignorados:
+                    self.parent_app.log(
+                        f"[!] KMZ cargado desde {kml_name}. Se ignoraron {ignorados} puntos inválidos.")
             else:
                 messagebox.showwarning(
                     "KMZ Vacío", "No se encontraron puntos en el KMZ.", parent=ventana_principal)
@@ -200,12 +314,20 @@ class TabUbicacion(ctk.CTkFrame):
                 return
 
             datos_calibracion = self.datos_mapas[mapa_sel]
+            if not self.mapa_esta_calibrado(datos_calibracion):
+                messagebox.showerror(
+                    "Mapa inválido",
+                    "El mapa seleccionado no tiene una calibración válida.",
+                    parent=ventana_principal,
+                )
+                return
+
             ruta_mapa_base = os.path.join(
                 RUTA_LOCAL_APP, "mapas", datos_calibracion["archivo"])
 
             if not os.path.exists(ruta_mapa_base):
                 messagebox.showerror(
-                    "Archivo Faltante", f"No se encontró la imagen base:\n{ruta_mapa_base}\nAsegúrate de subir el mapa a GitHub y sincronizar.", parent=ventana_principal)
+                    "Archivo Faltante", f"No se encontró la imagen base:\n{ruta_mapa_base}\nReinstala SINCAL o prepara nuevamente el runtime local.", parent=ventana_principal)
                 return
 
             nombre_limpio = "".join(
@@ -248,6 +370,14 @@ class TabUbicacion(ctk.CTkFrame):
 
             with Image.open(ruta_mapa_base) as img:
                 img_rgba = img.convert("RGB")
+                ancho, alto = img_rgba.size
+                if not (0 <= x_final < ancho and 0 <= y_final < alto):
+                    messagebox.showerror(
+                        "Coordenada fuera de rango",
+                        "La ubicación calculada cae fuera de los límites del mapa seleccionado.",
+                        parent=ventana_principal,
+                    )
+                    return
                 from PIL import ImageDraw
                 draw = ImageDraw.Draw(img_rgba)
 

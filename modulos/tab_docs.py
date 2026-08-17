@@ -1,7 +1,8 @@
 import os
 import customtkinter as ctk
+from sincal_runtime import ruta_recurso
 
-RUTA_LOCAL_APP = os.path.join(os.getenv('APPDATA'), "Estandar SINCAL")
+RUTA_LOCAL_APP = ruta_recurso()
 
 
 class TabDocs(ctk.CTkFrame):

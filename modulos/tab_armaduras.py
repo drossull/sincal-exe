@@ -5,8 +5,10 @@ import math
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
 from PIL import Image
+from sincal_runtime import ruta_recurso, ruta_runtime
 
-RUTA_LOCAL_APP = os.path.join(os.getenv('APPDATA'), "Estandar SINCAL")
+RUTA_LOCAL_APP = ruta_recurso()
+RUTA_TEMPORAL = ruta_runtime()
 
 
 class TabArmaduras(ctk.CTkFrame):
@@ -347,7 +349,7 @@ class TabArmaduras(ctk.CTkFrame):
             return messagebox.showerror("Error", "Por favor, ingresa solo valores numéricos válidos en los parámetros del travesaño.")
 
         ruta_temp = os.path.join(
-            RUTA_LOCAL_APP, f"Travesano_{tipo_cuadrante}.lsp")
+            RUTA_TEMPORAL, f"Travesano_{tipo_cuadrante}.lsp")
         ruta_lisp = ruta_temp.replace("\\", "\\\\")
 
         lisp_code = f"""(defun c:SINCAL-TRAVESANO (/ ent obj old_osnap recub_m offset_obj offset_res coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k lowest_four lowest_by_x right_bot pts_by_y pair1 pair2 pair3 pair4 pair5 pair6 bot4 y_max_L y_max_R raw_len rnd_len ext x_start x_end dist_sacado num_spaces step_sacado i_sac m_top ang_top perp_top x1_off y1_off m_horiz offset_h y_L y_R y_limit pt_start pt_end real_y_L real_y_R dx_67 dy_67 m_cyan_L y_mid_L x_start_L y_start_L dx_1011 dy_1011 m_cyan_R y_mid_R x_end_R y_end_R x_mid len_viga half_l y_min pad_g3 first_x_g1 last_x_g1 first_x_g2 last_x_g2 first_x_g3 last_x_g3 y_dim_global raw_pts p1 p2 p3 a_val left_by_y right_by_y)
@@ -937,7 +939,7 @@ class TabArmaduras(ctk.CTkFrame):
             return messagebox.showerror("Error", "Entradas numéricas inválidas.")
 
         ruta_temp = os.path.join(
-            RUTA_LOCAL_APP, f"Despiece_Trav_{tipo_cuadrante}.lsp")
+            RUTA_TEMPORAL, f"Despiece_Trav_{tipo_cuadrante}.lsp")
 
         lisp_code = f"""(defun c:SINCAL-DESPIECE-TRAV (/ ent obj old_osnap recub_m offset_obj offset_res coords i pts pts_by_x left_pts right_pts mid_pts mid_by_y lowest_two highest_two middle_two v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 y_ext dx dy t_val x_end y_curr x_curr ray_start ray_end ray_obj int_pts min_x max_x min_y k ins_pt ins_x ins_y shift_x shift_y pts1 pts2 L1 L2 w_estr g1_min_h g1_max_h g1_qty first_x_g1 last_x_g1 g2_min_l g2_max_l g2_qty g3_min_h g3_max_h g3_qty first_x_g3 last_x_g3 h len_line L3_min L3_max L4_min L4_max L5_min L5_max h_avg l_avg txt_height m_top ang_top perp_top x1_off y1_off pts_by_y pair1 pair2 pair3 pair4 pair5 pair6 bot4 dist_sacado num_spaces step_sacado pad_g3 i_sac m_horiz offset_h y_L y_R y_limit real_y_L real_y_R m_cyan_L y_mid_L x_start_L y_start_L m_cyan_R y_mid_R x_end_R y_end_R len_viga half_l x_mid y_min ang_hk_L ang_hk_R l_min l_max spa hk1 hk2 rad text_str p_dim_w p_dim_h p_dim_hk g_gri_min_l g_gri_max_l g_gri_qty len_cyan_L len_cyan_R g_qty dim_off p1 p2 p3 raw_pts raw_list pA_raw pB_raw pC_raw a_val center_tl p_start1 p_end1 p_start2 p_end2 p_90 p_180 left_by_y right_by_y)
           (vl-load-com)

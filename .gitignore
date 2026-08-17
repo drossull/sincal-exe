@@ -16,6 +16,12 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+src/**/bin/
+src/**/obj/
+cad-packages/**/Contents/**/*.dll
+cad-packages/**/Contents/**/*.pdb
+cad-packages/**/Contents/**/*.deps.json
+cad-packages/**/Contents/**/*.runtimeconfig.json
 
 # 4. Archivos de sistema operativo (Basura de Windows)
 Thumbs.db

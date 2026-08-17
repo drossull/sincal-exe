@@ -1,8 +1,39 @@
 (vl-load-com)
+
+(setq old_filedia (getvar "FILEDIA"))
+(setq old_cmddia (getvar "CMDDIA"))
+(setq old_backgroundplot (getvar "BACKGROUNDPLOT"))
+(setq old_expert (getvar "EXPERT"))
+
 (setvar "FILEDIA" 0)
 (setvar "CMDDIA" 0)
 (setvar "BACKGROUNDPLOT" 0)
 (setvar "EXPERT" 5)
+
+(defun *error* (msg)
+  (if statusFile (close statusFile))
+  (setvar "FILEDIA" old_filedia)
+  (setvar "CMDDIA" old_cmddia)
+  (setvar "BACKGROUNDPLOT" old_backgroundplot)
+  (setvar "EXPERT" old_expert)
+  (if msg (princ (strcat "\n[X] " msg)))
+  (princ)
+)
+
+(defun SINCAL:SanitizeFileName (s / chars)
+  (setq chars '("<" ">" ":" '"' "/" "\\" "|" "?" "*"))
+  (foreach c chars
+    (setq s (vl-string-subst "_" c s))
+  )
+  (while (and (> (strlen s) 0) (= (substr s (strlen s) 1) " "))
+    (setq s (substr s 1 (1- (strlen s))))
+  )
+  (while (and (> (strlen s) 0) (= (substr s (strlen s) 1) "."))
+    (setq s (substr s 1 (1- (strlen s))))
+  )
+  (if (= s "") (setq s "Layout"))
+  s
+)
 
 ;; 1. Obtener documento puenteando la falta de interfaz grafica
 (setq doc (vla-get-Document (vlax-ename->vla-object (namedobjdict))))
@@ -75,20 +106,33 @@
 
 ;; 5. Publicacion masiva de los Layouts a PDF
 (setq lays nil)
+(setq statusPath (strcat (getvar "DWGPREFIX") (vl-filename-base (getvar "DWGNAME")) "__publish_status.txt"))
+(setq statusFile (open statusPath "w"))
 (foreach x (dictsearch (namedobjdict) "ACAD_LAYOUT") 
   (if (and (= (car x) 3) (/= (strcase (cdr x)) "MODEL")) 
     (setq lays (cons (cdr x) lays))
   )
 )
-(foreach lay lays 
-  (setq outPath (strcat (getvar "DWGPREFIX") (vl-filename-base (getvar "DWGNAME")) ".pdf")) 
+(setq lays (acad_strlsort lays))
+(setq idx 1)
+(foreach lay lays
+  (setq safeLay (SINCAL:SanitizeFileName lay))
+  (setq outPath (strcat (getvar "DWGPREFIX") (vl-filename-base (getvar "DWGNAME")) "__" (if (< idx 10) "0" "") (itoa idx) "__" safeLay ".pdf"))
   (command "_.-PLOT" "_N" lay "" "" outPath "_N" "_Y")
+  (if (findfile outPath)
+    (write-line (strcat "PDF|" outPath) statusFile)
+    (write-line (strcat "ERROR|" lay "|PDF no generado") statusFile)
+  )
+  (setq idx (1+ idx))
 )
+(write-line (strcat "OK|" (itoa (length lays))) statusFile)
+(close statusFile)
 
 ;; 6. Limpieza y Guardado
-(setvar "EXPERT" 0)
-(setvar "DYNMODE" 3)
-(setvar "WIPEOUTFRAME" 0)
+(setvar "FILEDIA" old_filedia)
+(setvar "CMDDIA" old_cmddia)
+(setvar "BACKGROUNDPLOT" old_backgroundplot)
+(setvar "EXPERT" old_expert)
 (vl-cmdf "_.QSAVE")
 (princ)
 _.QUIT
