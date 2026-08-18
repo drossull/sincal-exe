@@ -25,11 +25,25 @@ function Read-Version([string]$ProjectRoot) {
 
 function Assert-VersionConsistency([string]$ProjectRoot, [string]$Version) {
     $installer = Get-Content (Join-Path $ProjectRoot 'SINCAL_Installer.iss') -Raw
+    $normalizedVersion = $Version.TrimStart('v', 'V')
+    if ($Version -notmatch '^v\d+\.\d+\.\d+$') {
+        throw "La versión '$Version' no cumple el formato vMAJOR.MINOR.PATCH."
+    }
     if ($installer -notmatch '#error AppVersion must be supplied by the build script\.') {
         throw 'SINCAL_Installer.iss no está parametrizado para AppVersion.'
     }
     if ($installer -notmatch '#error AppVersionTag must be supplied by the build script\.') {
         throw 'SINCAL_Installer.iss no está parametrizado para AppVersionTag.'
+    }
+
+    $bundle = Get-Content (Join-Path $ProjectRoot 'cad-packages\Autodesk\SINCAL.bundle\PackageContents.xml') -Raw
+    if ($bundle -notmatch ('AppVersion="' + [regex]::Escape($normalizedVersion) + '"')) {
+        throw "PackageContents.xml no coincide con la versión $normalizedVersion."
+    }
+
+    $plugin = Get-Content (Join-Path $ProjectRoot 'src\Sincal.AutoCAD2025\PluginEntry.cs') -Raw
+    if ($plugin -notmatch ('release ' + [regex]::Escape($normalizedVersion))) {
+        throw "PluginEntry.cs no muestra la versión técnica $normalizedVersion."
     }
 }
 
@@ -38,6 +52,8 @@ function Invoke-PythonCompile([string]$ProjectRoot) {
         'main.py',
         'core_sincal.py',
         'sincal_runtime.py',
+        'sincal_resource_sync.py',
+        'sincal_cad_integration.py',
         'modulos\tab_armaduras.py',
         'modulos\tab_docs.py',
         'modulos\tab_ubicacion.py',
@@ -74,6 +90,10 @@ function Invoke-SelfCheck([string]$ProjectRoot) {
         & python 'tests\selfcheck_runtime.py'
         if ($LASTEXITCODE -ne 0) {
             throw 'Falló selfcheck_runtime.py.'
+        }
+        & python -m unittest discover -s tests -p 'test_*.py'
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Fallaron las pruebas unitarias.'
         }
     }
     finally {
@@ -242,7 +262,7 @@ Remove-ArtifactIfExists (Join-Path $projectRoot 'installer_output\SHA256SUMS.txt
 Write-Step "Compilando ejecutable"
 Push-Location $projectRoot
 try {
-    & pyinstaller --noconfirm 'SINCAL.spec'
+    & python -m PyInstaller --noconfirm 'SINCAL.spec'
     if ($LASTEXITCODE -ne 0) {
         throw 'PyInstaller terminó con error.'
     }

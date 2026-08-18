@@ -9,7 +9,7 @@ installer_output/
 
 # 2. Archivos ejecutables y empaquetados
 *.exe
-*.spec
+main.spec
 
 # 3. Archivos temporales de caché de Python
 __pycache__/

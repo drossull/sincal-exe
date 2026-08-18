@@ -1,14 +1,15 @@
-import os
-import zipfile
 import json
 import math
+import os
 import xml.etree.ElementTree as ET
+import zipfile
+from tkinter import filedialog, messagebox
+
 import customtkinter as ctk
-from tkinter import messagebox, filedialog
 from PIL import Image, ImageDraw
+
 from sincal_runtime import ruta_recurso
 
-RUTA_LOCAL_APP = ruta_recurso()
 KMZ_MAX_BYTES = 10 * 1024 * 1024
 KML_MAX_BYTES = 5 * 1024 * 1024
 ZIP_MAX_FILES = 1000
@@ -122,8 +123,7 @@ class TabUbicacion(ctk.CTkFrame):
 
     def cargar_bd_mapas(self):
         """Lee el JSON de mapas pre-calibrados desde la carpeta 'mapas'"""
-        ruta_json = os.path.join(
-            RUTA_LOCAL_APP, "mapas", "mapas_calibrados.json")
+        ruta_json = ruta_recurso("mapas", "mapas_calibrados.json")
         if os.path.exists(ruta_json):
             try:
                 with open(ruta_json, 'r', encoding='utf-8') as f:
@@ -322,8 +322,7 @@ class TabUbicacion(ctk.CTkFrame):
                 )
                 return
 
-            ruta_mapa_base = os.path.join(
-                RUTA_LOCAL_APP, "mapas", datos_calibracion["archivo"])
+            ruta_mapa_base = ruta_recurso("mapas", datos_calibracion["archivo"])
 
             if not os.path.exists(ruta_mapa_base):
                 messagebox.showerror(

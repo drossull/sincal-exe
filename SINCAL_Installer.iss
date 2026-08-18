@@ -49,7 +49,6 @@ Filename: "{app}\SINCAL.exe"; Description: "{cm:LaunchProgram,SINCAL Suite}"; Fl
 
 [Code]
 const
-  LegacyCertThumbprint = 'FBA955A855C5E7C95D7C570E0DB9FB0D98E2721A';
   LegacyRunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
   LegacyRunValue = 'SINCAL_Suite';
   LegacyMenuDir = 'Directory\shell\SINCAL_Plotear';
@@ -94,11 +93,7 @@ begin
 end;
 
 procedure RemoveLegacyArtifacts;
-var
-  ResultCode: Integer;
 begin
-  Exec(ExpandConstant('{cmd}'), '/c certutil -delstore Root ' + LegacyCertThumbprint, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-
   RegDeleteValue(HKCU, LegacyRunKey, LegacyRunValue);
 
   RegDeleteKeyIncludingSubkeys(HKCR, LegacyMenuDir);

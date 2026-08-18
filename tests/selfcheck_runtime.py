@@ -7,6 +7,7 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sincal_runtime import VERSION_ACTUAL, ruta_recurso, ruta_runtime, asegurar_directorios
+from sincal_resource_sync import git_blob_sha
 from modulos.tab_ubicacion import _leer_kml_desde_kmz, _parsear_kml_puntos
 
 
@@ -22,9 +23,14 @@ def main() -> int:
         ruta_recurso("scripts", "AUDIT.scr"),
         ruta_recurso("mapas", "mapas_calibrados.json"),
         ruta_recurso("lisps", "SINCAL.lsp"),
+        ruta_recurso("masters", "FORMATOS ANOTATIVOS ACAD_2025.dwg"),
     ]
     faltantes = [ruta for ruta in requeridos if not os.path.exists(ruta)]
     assert not faltantes, f"Faltan recursos: {faltantes}"
+    with open(ruta_recurso("masters", "FORMATOS ANOTATIVOS ACAD_2025.dwg"), "rb") as master:
+        cabecera_master = master.read(6)
+    assert len(cabecera_master) == 6 and cabecera_master.startswith(b"AC"), "Master DWG inválido"
+    assert git_blob_sha(b"test") == "30d74d258442c7c65512eafab474568dd706c430"
     runtime = ruta_runtime()
     assert os.path.isdir(runtime), f"Runtime no disponible: {runtime}"
     with open(ruta_recurso("mapas", "mapas_calibrados.json"), encoding="utf-8") as archivo:

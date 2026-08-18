@@ -1,36 +1,46 @@
-import os
-import sys
-import json
-import requests
-import threading
-import subprocess
-import time
-import queue
-import webbrowser
 import logging
+import os
+import queue
+import subprocess
+import threading
+import time
+import webbrowser
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
-import customtkinter as ctk
-from customtkinter import filedialog
 from tkinter import messagebox
-import win32com.client
-import pythoncom
+
+import customtkinter as ctk
 import pystray
-from pystray import MenuItem as item
+import pythoncom
+import requests
+import win32com.client
+from customtkinter import filedialog
 from PIL import Image
+from pystray import MenuItem as item
+
 from modulos.tab_armaduras import TabArmaduras
-from modulos.tab_ubicacion import TabUbicacion
 from modulos.tab_docs import TabDocs
-from datetime import datetime, timedelta
+from modulos.tab_ubicacion import TabUbicacion
+from sincal_cad_integration import registrar_ruta_cad_usuario
+from sincal_resource_sync import (
+    active_resource_paths,
+    apply_resource_updates,
+    check_resource_updates,
+    materialize_cad_resources,
+    record_resource_state,
+)
 from sincal_runtime import (
+    RUTA_DATOS_USUARIO,
+    RUTA_LOGS,
     VERSION_ACTUAL,
     asegurar_directorios,
     is_newer_version,
-    ruta_recurso as runtime_ruta_recurso,
+    ruta_cad_usuario,
     ruta_runtime,
-    RUTA_DATOS_USUARIO,
-    RUTA_LOGS,
 )
-
+from sincal_runtime import (
+    ruta_recurso as runtime_ruta_recurso,
+)
 
 # --- CONFIGURACIÓN GLOBALES ---
 USUARIO_GITHUB = "drossull"
@@ -172,7 +182,7 @@ class ActualizadorCAD(ctk.CTk):
             self.tray_activo = True
             return
         try:
-            ruta_logo = ruta_recurso('logo.ico')
+            ruta_logo = runtime_ruta_recurso('logo.ico')
             icono = Image.open(ruta_logo).convert("RGBA")
         except Exception as e:
             self.log_r(f"Error cargando ícono: {e}")
@@ -230,8 +240,7 @@ class ActualizadorCAD(ctk.CTk):
 
                 for c in r.json():
                     raw_date = c['commit']['author']['date']
-                    dt_utc = datetime.strptime(raw_date, "%Y-%m-%dT%H:%M:%SZ")
-                    dt_local = dt_utc - timedelta(hours=4)
+                    dt_local = datetime.fromisoformat(raw_date.replace("Z", "+00:00")).astimezone()
 
                     mes_str = meses[dt_local.strftime("%m")]
                     fecha_formateada = f"{dt_local.strftime('%d')} {mes_str} {dt_local.strftime('%y %H:%M')}"
@@ -290,6 +299,10 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkButton(botones_sec_frame, text="Preparar integración CAD", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_TITULO,
                       corner_radius=0, text_color=COLOR_TITULO, hover_color="#444444", command=self.forzar_path_manual).pack(side="left", padx=10)
 
+        self.btn_sync_resources = ctk.CTkButton(botones_sec_frame, text="Actualizar recursos CAD", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_ACENTO,
+                                                corner_radius=0, text_color=COLOR_TEXTO, hover_color="#444444", command=self.verificar_recursos_manual)
+        self.btn_sync_resources.pack(side="left", padx=10)
+
         self.btn_verificar_update = ctk.CTkButton(botones_sec_frame, text="Verificar nueva actualización", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color="#00FF00",
                                                   corner_radius=0, text_color="#00FF00", hover_color="#444444", command=self.verificar_actualizacion_manual)
         self.btn_verificar_update.pack(side="left", padx=10)
@@ -306,6 +319,140 @@ class ActualizadorCAD(ctk.CTk):
         self.txt_updates = ctk.CTkTextbox(
             self.frame_updates, width=850, height=160, font=FUENTE_NORMAL, fg_color="#1E1E1E", state="disabled")
         self.txt_updates.pack(pady=5)
+
+        threading.Thread(target=self._hilo_verificar_recursos, args=(False,), daemon=True).start()
+
+    def verificar_recursos_manual(self):
+        self.log("\n[*] Buscando actualizaciones menores de recursos CAD en GitHub...")
+        self.btn_sync_resources.configure(state="disabled", text="Verificando...")
+        threading.Thread(target=self._hilo_verificar_recursos, args=(True,), daemon=True).start()
+
+    def _preparar_archivos_cad(self):
+        copiados = materialize_cad_resources()
+        archivos_lisp = active_resource_paths(("lisps/", "startup/"))
+        self.generar_archivos_lisp(archivos_lisp)
+        registros = registrar_ruta_cad_usuario()
+        return copiados, registros
+
+    def _hilo_verificar_recursos(self, manual):
+        actualizacion_ofrecida = False
+        try:
+            plan = check_resource_updates()
+            if plan.has_changes:
+                actualizacion_ofrecida = True
+                self.log(
+                    f"[!] Actualización menor disponible: {len(plan.changed)} archivo(s) nuevo(s) o modificado(s)"
+                    f" y {len(plan.removed)} eliminado(s)."
+                )
+                self._ui(self._ofrecer_actualizacion_recursos, plan, manual)
+                return
+
+            record_resource_state(plan)
+            self._preparar_archivos_cad()
+            self.log("[OK] Los LISPs, scripts, estilos y el master DWG ya están actualizados.")
+            if manual:
+                self._ui(
+                    messagebox.showinfo,
+                    "Recursos CAD",
+                    "Los recursos CAD ya coinciden con la rama main de GitHub.",
+                )
+        except Exception as e:
+            self.logger.warning("No se pudieron verificar los recursos CAD: %s", e)
+            self.log(f"[!] No se pudieron verificar los recursos CAD; se conservarán las copias locales: {e}")
+            if manual:
+                self._ui(
+                    messagebox.showwarning,
+                    "Recursos CAD",
+                    "No fue posible consultar GitHub. Se conservarán los últimos recursos válidos.\n\n"
+                    f"Detalle: {e}",
+                )
+        finally:
+            if manual and not actualizacion_ofrecida:
+                self._ui(self.btn_sync_resources.configure, state="normal", text="Actualizar recursos CAD")
+
+    def _ofrecer_actualizacion_recursos(self, plan, manual):
+        rutas = [entry.path for entry in plan.changed] + [f"{path} (eliminado)" for path in plan.removed]
+        vista = "\n".join(f"• {path}" for path in rutas[:12])
+        if len(rutas) > 12:
+            vista += f"\n• ... y {len(rutas) - 12} archivo(s) más"
+        mensaje = (
+            "Hay una actualización menor de recursos CAD disponible.\n\n"
+            f"{vista}\n\n"
+            "Se actualizarán LISPs, scripts, estilos, mapas o el master DWG; el ejecutable no será reemplazado.\n"
+            "¿Deseas descargarla ahora?"
+        )
+        if messagebox.askyesno("Actualización de recursos SINCAL", mensaje):
+            self.btn_sync_resources.configure(state="disabled", text="Actualizando...")
+            threading.Thread(target=self._hilo_aplicar_recursos, args=(plan,), daemon=True).start()
+        else:
+            self.log("[!] Actualización menor pospuesta por el usuario.")
+            if manual:
+                self.btn_sync_resources.configure(state="normal", text="Actualizar recursos CAD")
+
+    def _hilo_aplicar_recursos(self, plan):
+        try:
+            resultado = apply_resource_updates(plan)
+            self._preparar_archivos_cad()
+            recargados = self._recargar_lisps_cad_abierto()
+            self.log(
+                f"[OK] Actualización menor instalada: {len(resultado.updated)} archivo(s) actualizado(s)"
+                f" y {len(resultado.removed)} eliminado(s)."
+            )
+            estado_cad = (
+                f"Los comandos LISP se recargaron en {recargados} dibujo(s) abierto(s)."
+                if recargados
+                else "Si AutoCAD/ZWCAD estaba abierto, abre un dibujo nuevo o reinícialo para cargar comandos LISP nuevos."
+            )
+            self._ui(
+                messagebox.showinfo,
+                "Actualización lista",
+                "Los recursos fueron actualizados correctamente.\n\n"
+                "Cierra y vuelve a abrir SINCAL para refrescar toda la interfaz. "
+                + estado_cad,
+            )
+        except Exception as e:
+            self.logger.exception("Falló la actualización de recursos CAD")
+            self.log(f"[X] No se pudo completar la actualización menor: {e}")
+            self._ui(
+                messagebox.showerror,
+                "Actualización incompleta",
+                "No se aplicó completamente la actualización. SINCAL volverá a intentarlo al iniciar.\n\n"
+                f"Detalle: {e}",
+            )
+        finally:
+            self._ui(self.btn_sync_resources.configure, state="normal", text="Actualizar recursos CAD")
+
+    def _recargar_lisps_cad_abierto(self):
+        loader = ruta_cad_usuario("acaddoc.lsp").replace("\\", "/")
+        command = f'(load "{loader}")\n'
+        pythoncom.CoInitialize()
+        try:
+            prog_ids = ["ZWCAD.Application", "AutoCAD.Application"]
+            for version in range(15, 36):
+                prog_ids.extend((f"ZWCAD.Application.{version}", f"AutoCAD.Application.{version}"))
+
+            processed = set()
+            count = 0
+            for prog_id in prog_ids:
+                try:
+                    app = win32com.client.GetActiveObject(prog_id)
+                    documents = app.Documents
+                except Exception:
+                    continue
+                for index in range(documents.Count):
+                    try:
+                        document = documents.Item(index)
+                        identity = f"{document.FullName}|{document.Name}"
+                        if identity in processed:
+                            continue
+                        processed.add(identity)
+                        document.SendCommand(command)
+                        count += 1
+                    except Exception as e:
+                        self.logger.warning("No se pudo recargar LISP en un dibujo abierto: %s", e)
+            return count
+        finally:
+            pythoncom.CoUninitialize()
 
     def verificar_actualizacion_manual(self):
         self.log("\n[*] Verificando nueva actualización en GitHub...")
@@ -442,8 +589,7 @@ class ActualizadorCAD(ctk.CTk):
         btn_container.pack(fill="x", padx=15, pady=5)
 
         def cmd_ps(nombre_script):
-            ruta = os.path.join(runtime_ruta_recurso("scripts"),
-                                f"{nombre_script}.ps1")
+            ruta = runtime_ruta_recurso("scripts", f"{nombre_script}.ps1")
             return f"& '{ruta}'"
 
         for i in range(4):
@@ -733,16 +879,28 @@ class ActualizadorCAD(ctk.CTk):
         RUTA_DATOS_USUARIO) if os.path.exists(RUTA_DATOS_USUARIO) else None
 
     def forzar_path_manual(self):
-        self.generar_archivos_lisp()
-        self.buscar_y_configurar_consolas()
-        self.log("[!] Integración CAD preparada en la carpeta local de runtime.")
+        try:
+            copiados, registros = self._preparar_archivos_cad()
+            self.buscar_y_configurar_consolas()
+            self.log(
+                f"[OK] Integración CAD preparada: {len(copiados)} recurso(s) materializado(s) y "
+                f"{len(registros)} ruta(s) de perfil actualizada(s)."
+            )
+            messagebox.showinfo(
+                "Integración CAD",
+                "La integración quedó preparada. Reinicia AutoCAD/ZWCAD una vez para activar "
+                "las rutas de confianza y el cargador automático.",
+            )
+        except Exception as e:
+            self.logger.exception("No se pudo preparar la integración CAD")
+            messagebox.showerror("Integración CAD", f"No se pudo completar la preparación.\n\nDetalle: {e}")
 
     def iniciar_actualizacion_hilo(self):
         webbrowser.open(URL_RELEASES)
-        self.log("[!] SINCAL ya no sincroniza código en caliente. Usa el instalador oficial.")
+        self.log("[!] Los cambios del ejecutable se instalan desde Releases; los recursos CAD se actualizan desde main.")
 
     def motor_actualizacion(self):
-        self.log("[!] Actualización en caliente deshabilitada por seguridad.")
+        self.log("[!] La actualización en caliente está limitada a recursos CAD autorizados.")
 
     def buscar_y_configurar_consolas(self):
         self.cad_exe_path = None
@@ -778,19 +936,11 @@ class ActualizadorCAD(ctk.CTk):
         contenido_arranque = ""
 
         if archivos is None:
-            archivos = []
-            for carpeta in ("lisps", "startup"):
-                ruta_carpeta = runtime_ruta_recurso(carpeta)
-                if not os.path.isdir(ruta_carpeta):
-                    continue
-                for root, _, files in os.walk(ruta_carpeta):
-                    for nombre in files:
-                        ruta_abs = os.path.join(root, nombre)
-                        archivos.append(os.path.relpath(ruta_abs, runtime_ruta_recurso("")))
+            archivos = active_resource_paths(("lisps/", "startup/"))
 
         for a in archivos:
             if a.lower().endswith('.lsp') and os.path.basename(a).lower() not in ["acaddoc.lsp", "zwcaddoc.lsp"]:
-                ruta_lisp = runtime_ruta_recurso(a).replace("\\", "/")
+                ruta_lisp = ruta_cad_usuario(*a.replace("\\", "/").split("/")).replace("\\", "/")
                 nombre = os.path.basename(a)
                 contenido_arranque += f'(princ (load "{ruta_lisp}" "\\n[X] SINCAL: Fallo al cargar {nombre}"))\n'
 
@@ -799,8 +949,8 @@ class ActualizadorCAD(ctk.CTk):
 
         contenido_arranque += '(princ "\\n[OK] SINCAL: Todos los LISPs procesados correctamente.")\n(princ)\n'
 
-        r_acad = ruta_runtime("acaddoc.lsp")
-        r_zwcad = ruta_runtime("zwcaddoc.lsp")
+        r_acad = ruta_cad_usuario("acaddoc.lsp")
+        r_zwcad = ruta_cad_usuario("zwcaddoc.lsp")
 
         with open(r_acad, 'w', encoding='utf-8') as f:
             f.write(contenido_arranque)

@@ -28,6 +28,7 @@ def iniciar():
         ruta_recurso("tutoriales.json"),
         ruta_recurso("scripts", "AUDIT.ps1"),
         ruta_recurso("mapas", "mapas_calibrados.json"),
+        ruta_recurso("masters", "FORMATOS ANOTATIVOS ACAD_2025.dwg"),
     ]
     faltantes = [ruta for ruta in recursos_minimos if not os.path.exists(ruta)]
     if faltantes:

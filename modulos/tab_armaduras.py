@@ -1,13 +1,14 @@
-import os
 import json
-import threading
 import math
+import os
+import threading
+from tkinter import filedialog, messagebox
+
 import customtkinter as ctk
-from tkinter import messagebox, filedialog
 from PIL import Image
+
 from sincal_runtime import ruta_recurso, ruta_runtime
 
-RUTA_LOCAL_APP = ruta_recurso()
 RUTA_TEMPORAL = ruta_runtime()
 
 
@@ -315,7 +316,7 @@ class TabArmaduras(ctk.CTkFrame):
         visor.geometry("900x350")
         visor.transient(self)
 
-        ruta_img = os.path.join(RUTA_LOCAL_APP, "mapas", "ayuda_travesano.png")
+        ruta_img = ruta_recurso("mapas", "ayuda_travesano.png")
 
         if not os.path.exists(ruta_img):
             base_dir = os.path.dirname(os.path.dirname(__file__))
