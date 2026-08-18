@@ -1,8 +1,13 @@
 {
-  "version": "v28.0.0",
+  "version": "v28.0.1",
   "product_version": "1.0",
   "archivos": [
+    "main.py",
     "core_sincal.py",
+    "sincal_runtime.py",
+    "sincal_resource_sync.py",
+    "sincal_cad_integration.py",
+    "sincal_update_config.py",
     "modulos/tab_ubicacion.py",
     "modulos/tab_armaduras.py",
     "modulos/tab_docs.py",

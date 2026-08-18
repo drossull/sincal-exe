@@ -41,11 +41,13 @@ from sincal_runtime import (
 from sincal_runtime import (
     ruta_recurso as runtime_ruta_recurso,
 )
+from sincal_update_config import (
+    DISTRIBUTION_RELEASES_URL,
+    api_url as distribution_api_url,
+)
 
 # --- CONFIGURACIÓN GLOBALES ---
-USUARIO_GITHUB = "drossull"
-REPO_GITHUB = "sincal-exe"
-URL_RELEASES = f"https://github.com/{USUARIO_GITHUB}/{REPO_GITHUB}/releases"
+URL_RELEASES = DISTRIBUTION_RELEASES_URL
 
 COLOR_FONDO, COLOR_TITULO, COLOR_TEXTO, COLOR_ACENTO = "#2B2B2B", "#FFBF00", "#CCCCCC", "#007FFF"
 FUENTE_TITULO, FUENTE_SUBTITULO, FUENTE_MENU, FUENTE_NORMAL, FUENTE_CONSOLA = [
@@ -231,7 +233,7 @@ class ActualizadorCAD(ctk.CTk):
     def cargar_info_github(self):
         try:
             r = requests.get(
-                f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/commits", params={"per_page": 10}, timeout=5)
+                distribution_api_url("commits"), params={"per_page": 10}, timeout=5)
             if r.status_code == 200:
                 lineas = []
 
@@ -464,7 +466,7 @@ class ActualizadorCAD(ctk.CTk):
     def _hilo_verificar_actualizacion(self):
         try:
             r = requests.get(
-                f"https://api.github.com/repos/{USUARIO_GITHUB}/{REPO_GITHUB}/releases/latest",
+                distribution_api_url("releases/latest"),
                 timeout=5,
             )
             r.raise_for_status()

@@ -185,7 +185,7 @@ internal sealed class SincalPanel : UserControl
 
         root.Children.Add(new TextBlock
         {
-            Text = "SINCAL Suite 1.0 · release 28.0.0",
+            Text = "SINCAL Suite 1.0 · release 28.0.1",
             FontSize = 20,
             FontWeight = FontWeights.Bold,
             Margin = new Thickness(0, 0, 0, 12)

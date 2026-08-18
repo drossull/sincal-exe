@@ -14,10 +14,13 @@ from sincal_runtime import (
     ruta_recurso,
     ruta_recurso_instalado,
 )
+from sincal_update_config import (
+    DISTRIBUTION_BRANCH,
+    DISTRIBUTION_OWNER,
+    DISTRIBUTION_REPOSITORY,
+    api_url as distribution_api_url,
+)
 
-GITHUB_OWNER = "drossull"
-GITHUB_REPOSITORY = "sincal-exe"
-GITHUB_BRANCH = "main"
 REQUEST_TIMEOUT = (3.05, 30)
 STATE_SCHEMA = 1
 MAX_TOTAL_UPDATE_BYTES = 250 * 1024 * 1024
@@ -133,9 +136,9 @@ def _load_state() -> dict:
             state = json.load(source)
         if state.get("schema") != STATE_SCHEMA:
             return {}
-        if state.get("repository") != f"{GITHUB_OWNER}/{GITHUB_REPOSITORY}":
+        if state.get("repository") != f"{DISTRIBUTION_OWNER}/{DISTRIBUTION_REPOSITORY}":
             return {}
-        if state.get("branch") != GITHUB_BRANCH:
+        if state.get("branch") != DISTRIBUTION_BRANCH:
             return {}
         if not isinstance(state.get("resources"), dict):
             return {}
@@ -169,8 +172,8 @@ def _serialize_state(plan: ResourceUpdatePlan) -> bytes:
     }
     state = {
         "schema": STATE_SCHEMA,
-        "repository": f"{GITHUB_OWNER}/{GITHUB_REPOSITORY}",
-        "branch": GITHUB_BRANCH,
+        "repository": f"{DISTRIBUTION_OWNER}/{DISTRIBUTION_REPOSITORY}",
+        "branch": DISTRIBUTION_BRANCH,
         "tree_sha": plan.tree_sha,
         "resources": resources,
     }
@@ -182,8 +185,8 @@ def record_resource_state(plan: ResourceUpdatePlan) -> None:
 
 
 def _tree_url() -> str:
-    branch = quote(GITHUB_BRANCH, safe="")
-    return f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPOSITORY}/git/trees/{branch}?recursive=1"
+    branch = quote(DISTRIBUTION_BRANCH, safe="")
+    return distribution_api_url(f"git/trees/{branch}?recursive=1")
 
 
 def _session_or_requests(session):
@@ -281,7 +284,10 @@ def check_resource_updates(session=None) -> ResourceUpdatePlan:
 
 def _raw_url(path: str) -> str:
     encoded = quote(_normalize_relative_path(path), safe="/")
-    return f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPOSITORY}/{GITHUB_BRANCH}/{encoded}"
+    return (
+        f"https://raw.githubusercontent.com/{DISTRIBUTION_OWNER}/"
+        f"{DISTRIBUTION_REPOSITORY}/{DISTRIBUTION_BRANCH}/{encoded}"
+    )
 
 
 def _download_resource(entry: ResourceEntry, client) -> bytes:

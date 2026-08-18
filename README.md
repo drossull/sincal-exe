@@ -1,6 +1,6 @@
 # 🏛️ SINCAL - Suite de Ingeniería y Estándares CAD
 
-**SINCAL Suite 1.0** es una aplicación para Windows orientada a unificar estándares de dibujo (AutoCAD/ZWCAD), automatizar tareas repetitivas de ingeniería estructural y generar apoyo gráfico de ubicación a partir de archivos `.kmz`. La generación del producto se mantiene como 1.0; la secuencia técnica de distribución continúa en `v28.0.0` para que las instalaciones históricas v27 detecten correctamente la migración.
+**SINCAL Suite 1.0** es una aplicación para Windows orientada a unificar estándares de dibujo (AutoCAD/ZWCAD), automatizar tareas repetitivas de ingeniería estructural y generar apoyo gráfico de ubicación a partir de archivos `.kmz`. La generación del producto se mantiene como 1.0; la secuencia técnica de distribución continúa en `v28.0.1` para que las instalaciones históricas v27 detecten correctamente la migración.
 
 ---
 
@@ -8,7 +8,7 @@
 
 * **Distribución por instalador firmado:** El ejecutable y los recursos se entregan como una instalación local autocontenida.
 * **Integración CAD local:** Prepara un cargador confiable en `%APPDATA%\Estandar SINCAL` para AutoCAD/ZWCAD y mantiene allí los recursos CAD activos.
-* **Actualizaciones menores desde GitHub:** Detecta automáticamente LISPs nuevos o editados, scripts, estilos, mapas y el master DWG publicados en `main`. Cada archivo se limita por tipo y tamaño y se valida contra el SHA del blob de Git antes de activarlo.
+* **Actualizaciones menores desde un canal público separado:** Detecta automáticamente LISPs nuevos o editados, scripts, estilos, mapas y el master DWG publicados en `drossull/sincal-updates`. Cada archivo se limita por tipo y tamaño y se valida contra el SHA del blob de Git antes de activarlo.
 * **Vista previa integrada en AutoCAD 2025:** El instalador incluye una primera pestaña Ribbon SINCAL y una paleta acoplable de prueba. La aplicación de escritorio sigue siendo la interfaz funcional principal durante la migración.
 * **Procesamiento Masivo Nativo (PowerShell):** Permite procesar decenas de planos de golpe directamente desde la carpeta de Windows sin abrir AutoCAD.
 * **Módulo Estructural (BIM 2D):** Generación inteligente de vistas de armaduras (Zapatas, Consolas, Muros), dibujo y despiece paramétrico, inyección de cotas matemáticas, y lectura de parámetros desde archivos JSON de proyecto.
@@ -32,11 +32,13 @@
 
 1. Agrega o edita el archivo dentro de una carpeta autorizada: `lisps`, `startup`, `scripts`, `plotstyles`, `mapas` o el master `masters/FORMATOS ANOTATIVOS ACAD_2025.dwg`.
 2. Valida el recurso localmente. Para el master, guarda una copia de respaldo y comprueba bloques, atributos y referencias externas con AutoCAD.
-3. Haz commit y push a la rama `main`. Un LISP nuevo se detecta desde el árbol de Git; no es necesario incorporarlo manualmente a una lista.
+3. Haz commit y push a la rama `main` del repositorio privado de desarrollo. El workflow `publish-distribution.yml` exporta únicamente la lista blanca a `drossull/sincal-updates`; un LISP nuevo no necesita incorporarse manualmente a un manifiesto.
 4. Al abrir SINCAL, acepta el aviso de actualización. Los archivos se guardan en `%LOCALAPPDATA%\SINCAL\resources` y los recursos CAD activos se materializan en `%APPDATA%\Estandar SINCAL`.
 5. Cierra y vuelve a abrir SINCAL para refrescar la interfaz. SINCAL intenta recargar automáticamente los LISPs en dibujos CAD abiertos; si el host no permite la recarga, abre un dibujo nuevo o reinicia AutoCAD/ZWCAD.
 
 La sincronización no reemplaza `SINCAL.exe`, Python ni el plugin .NET. Esos cambios requieren un instalador oficial desde Releases. Como los LISPs y scripts sí son código ejecutable, la rama `main` debe tener protección, revisión y acceso de escritura limitado. La primera versión que incorpora este sistema debe instalarse una vez de manera convencional; las actualizaciones menores posteriores ya no requieren reinstalación.
+
+El repositorio de desarrollo puede permanecer privado. El repositorio público de distribución no recibe código Python, fuentes .NET, archivos de proyecto ni secretos; `tools/export_distribution.py` aplica la misma política de rutas que el cliente y genera un manifiesto auditable.
 
 ### Preparar un entorno de compilación
 

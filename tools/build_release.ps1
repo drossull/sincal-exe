@@ -45,6 +45,11 @@ function Assert-VersionConsistency([string]$ProjectRoot, [string]$Version) {
     if ($plugin -notmatch ('release ' + [regex]::Escape($normalizedVersion))) {
         throw "PluginEntry.cs no muestra la versión técnica $normalizedVersion."
     }
+
+    $updateConfig = Get-Content (Join-Path $ProjectRoot 'sincal_update_config.py') -Raw
+    if ($updateConfig -notmatch 'DISTRIBUTION_REPOSITORY\s*=\s*"sincal-updates"') {
+        throw 'El canal público no apunta a drossull/sincal-updates.'
+    }
 }
 
 function Invoke-PythonCompile([string]$ProjectRoot) {
@@ -54,6 +59,8 @@ function Invoke-PythonCompile([string]$ProjectRoot) {
         'sincal_runtime.py',
         'sincal_resource_sync.py',
         'sincal_cad_integration.py',
+        'sincal_update_config.py',
+        'tools\export_distribution.py',
         'modulos\tab_armaduras.py',
         'modulos\tab_docs.py',
         'modulos\tab_ubicacion.py',

@@ -1,0 +1,61 @@
+name: Publicar recursos SINCAL
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "lisps/**"
+      - "startup/**"
+      - "scripts/**"
+      - "plotstyles/**"
+      - "mapas/**"
+      - "masters/FORMATOS ANOTATIVOS ACAD_2025.dwg"
+      - "tutoriales.json"
+      - "version.json"
+      - "sincal_runtime.py"
+      - "tools/export_distribution.py"
+      - ".github/workflows/publish-distribution.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sincal-public-distribution
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar desarrollo privado
+        uses: actions/checkout@v4
+
+      - name: Descargar canal público
+        uses: actions/checkout@v4
+        with:
+          repository: drossull/sincal-updates
+          token: ${{ secrets.SINCAL_DISTRIBUTION_TOKEN }}
+          path: distribution
+
+      - name: Exportar lista blanca
+        run: >-
+          python tools/export_distribution.py
+          --source .
+          --destination distribution
+          --source-commit "$GITHUB_SHA"
+
+      - name: Publicar cambios
+        working-directory: distribution
+        shell: bash
+        run: |
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "No hay cambios de distribución."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "resources: sync ${GITHUB_SHA::7}"
+          git push origin HEAD:main
