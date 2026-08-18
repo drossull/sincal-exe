@@ -396,9 +396,12 @@ class ActualizadorCAD(ctk.CTk):
                     return
                 actualizacion_ofrecida = True
                 self._last_resource_offer_tree = plan.tree_sha
+                rutas_cambiadas = [entry.path for entry in plan.changed] + [
+                    f"{path} (eliminado)" for path in plan.removed
+                ]
                 self.log(
                     f"[!] Actualización menor disponible: {len(plan.changed)} archivo(s) nuevo(s) o modificado(s)"
-                    f" y {len(plan.removed)} eliminado(s)."
+                    f" y {len(plan.removed)} eliminado(s): {', '.join(rutas_cambiadas)}"
                 )
                 self._ui(self._ofrecer_actualizacion_recursos, plan, manual)
                 return
@@ -459,25 +462,6 @@ class ActualizadorCAD(ctk.CTk):
     def _hilo_aplicar_recursos(self, plan):
         try:
             resultado = apply_resource_updates(plan)
-            self._preparar_archivos_cad()
-            recargados = self._recargar_lisps_cad_abierto()
-            self._ui(self._refrescar_interfaces_recursos)
-            self.log(
-                f"[OK] Actualización menor instalada: {len(resultado.updated)} archivo(s) actualizado(s)"
-                f" y {len(resultado.removed)} eliminado(s)."
-            )
-            estado_cad = (
-                f"Los comandos LISP se recargaron en {recargados} dibujo(s) abierto(s)."
-                if recargados
-                else "Si AutoCAD/ZWCAD estaba abierto, abre un dibujo nuevo o reinícialo para cargar comandos LISP nuevos."
-            )
-            self._ui(
-                messagebox.showinfo,
-                "Actualización lista",
-                "Los recursos fueron actualizados correctamente.\n\n"
-                "Cierra y vuelve a abrir SINCAL para refrescar toda la interfaz. "
-                + estado_cad,
-            )
         except Exception as e:
             self.logger.exception("Falló la actualización de recursos CAD")
             self.log(f"[X] No se pudo completar la actualización menor: {e}")
@@ -487,8 +471,63 @@ class ActualizadorCAD(ctk.CTk):
                 "No se aplicó completamente la actualización. SINCAL volverá a intentarlo al iniciar.\n\n"
                 f"Detalle: {e}",
             )
-        finally:
             self._ui(self.btn_sync_resources.configure, state="normal", text="Actualizar recursos CAD")
+            return
+
+        avisos = []
+        integracion_preparada = False
+        try:
+            self._preparar_archivos_cad()
+            integracion_preparada = True
+        except Exception as e:
+            self.logger.warning(
+                "Los recursos se instalaron, pero no se pudo preparar la integración CAD: %s",
+                e,
+            )
+            avisos.append(
+                "No fue posible refrescar la carpeta de integración CAD. "
+                "Pulsa Preparar integración CAD cuando el programa CAD esté disponible."
+            )
+
+        recargados = 0
+        if integracion_preparada:
+            try:
+                recargados = self._recargar_lisps_cad_abierto()
+            except Exception as e:
+                self.logger.warning(
+                    "Los recursos se instalaron, pero AutoCAD/ZWCAD rechazó la recarga en vivo: %s",
+                    e,
+                )
+                avisos.append(
+                    "AutoCAD/ZWCAD no aceptó la recarga en vivo. Reinicia CAD para cargar los comandos nuevos."
+                )
+
+        self._ui(self._refrescar_interfaces_recursos)
+        rutas_actualizadas = list(resultado.updated) + [
+            f"{path} (eliminado)" for path in resultado.removed
+        ]
+        self.log(
+            f"[OK] Actualización menor instalada: {len(resultado.updated)} archivo(s) actualizado(s)"
+            f" y {len(resultado.removed)} eliminado(s): {', '.join(rutas_actualizadas)}"
+        )
+        estado_cad = (
+            f"Los comandos LISP se recargaron en {recargados} dibujo(s) abierto(s)."
+            if recargados
+            else "Abre un dibujo nuevo o reinicia AutoCAD/ZWCAD para cargar comandos LISP nuevos."
+        )
+        mensaje = (
+            "Los recursos fueron descargados, validados e instalados correctamente.\n\n"
+            "Cierra y vuelve a abrir SINCAL para refrescar toda la interfaz. "
+            + estado_cad
+        )
+        if avisos:
+            mensaje += "\n\n" + "\n".join(avisos)
+        self._ui(
+            messagebox.showwarning if avisos else messagebox.showinfo,
+            "Recursos actualizados" if avisos else "Actualización lista",
+            mensaje,
+        )
+        self._ui(self.btn_sync_resources.configure, state="normal", text="Actualizar recursos CAD")
 
     def _refrescar_interfaces_recursos(self):
         if hasattr(self, "tab_ubicacion"):
@@ -511,9 +550,10 @@ class ActualizadorCAD(ctk.CTk):
                 try:
                     app = win32com.client.GetActiveObject(prog_id)
                     documents = app.Documents
+                    document_count = documents.Count
                 except Exception:
                     continue
-                for index in range(documents.Count):
+                for index in range(document_count):
                     try:
                         document = documents.Item(index)
                         identity = f"{document.FullName}|{document.Name}"
