@@ -2,8 +2,8 @@
 <ApplicationPackage SchemaVersion="1.0"
                     AutodeskProduct="AutoCAD"
                     Name="SINCAL Suite"
-                    Description="SINCAL Suite 1.0 para AutoCAD 2025 (release 28.0.3)"
-                    AppVersion="28.0.3"
+                    Description="SINCAL Suite 1.0 para AutoCAD 2025 (release 28.0.4)"
+                    AppVersion="28.0.4"
                     ProductCode="{2E8D9BA6-5E86-4FF0-9E09-4B0A36CBBF01}"
                     UpgradeCode="{4F2C4E0E-BC2F-49F8-A9C1-91E7C8272101}"
                     Author="Gonzalo Mardones V.">
@@ -12,7 +12,7 @@
   <Components>
     <ComponentEntry AppName="SINCAL Suite"
                     ModuleName="./Contents/AutoCAD2025/Sincal.AutoCAD2025.dll"
-                    AppDescription="SINCAL Suite 1.0 (release 28.0.3)"
+                    AppDescription="SINCAL Suite 1.0 (release 28.0.4)"
                     LoadOnAutoCADStartup="True" />
   </Components>
 </ApplicationPackage>

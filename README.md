@@ -1,24 +1,24 @@
 # SINCAL — Suite de Ingeniería y Estándares CAD
 
-**SINCAL Suite 1.0** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión del producto se mantiene como 1.0 y la secuencia técnica continúa en `v28.0.3` para conservar la actualización desde instalaciones históricas v27.
+**SINCAL Suite 1.0** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión del producto se mantiene como 1.0 y la secuencia técnica continúa en `v28.0.4` para conservar la actualización desde instalaciones históricas v27.
 
 ## Instalación web y distribución
 
-SINCAL se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v28.0.3.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
+SINCAL se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v28.0.4.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
 
-El programa base no incorpora los 125 MB de mapas regionales. El master DWG, LISPs, startup, scripts, plumilla y calibración se descargan desde el canal público al iniciar. Cada mapa regional se descarga solamente cuando se selecciona por primera vez en el módulo Ubicación.
+El programa base no incorpora los 125 MB de mapas regionales. El paquete web sí contiene una copia inicial del master DWG, LISPs, startup, scripts, plumilla, calibración y ayuda estructural para que el primer arranque sea funcional. GitHub mantiene esos recursos al día mediante actualizaciones menores. Cada mapa regional se descarga solamente cuando se selecciona por primera vez en el módulo Ubicación.
 
 Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `raw.githubusercontent.com`. Una vez descargados los componentes necesarios, las funciones instaladas continúan disponibles sin conexión.
 
 ## Primer inicio
 
-1. Ejecuta el instalador oficial de la release `v28.0.3`.
-2. Abre SINCAL y acepta la actualización inicial de recursos CAD.
+1. Ejecuta el instalador oficial de la release `v28.0.4`.
+2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
 3. Pulsa **Preparar integración CAD**.
 4. Reinicia AutoCAD/ZWCAD una vez para activar el cargador y las rutas de confianza.
 5. Abre **Documentación** para consultar el manual buscable de comandos y módulos.
 
-Los recursos se almacenan en `%LOCALAPPDATA%\SINCAL\resources` y la integración CAD activa se materializa en `%APPDATA%\Estandar SINCAL`.
+La copia base de los recursos esenciales queda junto a la aplicación. Las revisiones descargadas se almacenan en `%LOCALAPPDATA%\SINCAL\resources` y la integración CAD activa se materializa en `%APPDATA%\Estandar SINCAL`.
 
 ## Componentes principales
 
@@ -93,10 +93,10 @@ El proceso valida código y pruebas, compila y firma el plugin y la aplicación,
 
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v28.0.3.exe`
-- `SINCAL_App_v28.0.3.zip`
-- `SINCAL_AutoCAD_v28.0.3.zip`
-- `release-manifest_v28.0.3.json`
+- `Setup_SINCAL_v28.0.4.exe`
+- `SINCAL_App_v28.0.4.zip`
+- `SINCAL_AutoCAD_v28.0.4.zip`
+- `release-manifest_v28.0.4.json`
 - `SHA256SUMS.txt`
 
 No renombres los paquetes después de compilar: el instalador usa URLs versionadas y hashes fijados en el momento del build.

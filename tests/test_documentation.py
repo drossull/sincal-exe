@@ -50,6 +50,13 @@ class WebInstallerConfigurationTests(unittest.TestCase):
         self.assertIn('Hash: "{#AppPayloadHash}"', installer)
         self.assertIn('Hash: "{#PluginPayloadHash}"', installer)
 
+    def test_web_payload_bundles_core_resources_but_not_regional_maps(self):
+        build_script = (ROOT / "tools" / "build_release.ps1").read_text(encoding="utf-8")
+        self.assertIn("scripts/AUDIT.ps1", build_script)
+        self.assertIn("mapas/mapas_calibrados.json", build_script)
+        self.assertIn("mapas/ayuda_travesano.png", build_script)
+        self.assertIn("^mapas/Region_.*\\.png$", build_script)
+
 
 if __name__ == "__main__":
     unittest.main()

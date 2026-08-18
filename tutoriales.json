@@ -6,7 +6,7 @@
       "categoria": "Inicio",
       "titulo": "Primer inicio y preparación",
       "tags": "instalar iniciar preparar autocad zwcad",
-      "contenido": "1. Instala SINCAL con el instalador web oficial y mantén conexión a Internet durante la descarga.\n2. Abre SINCAL desde el menú Inicio.\n3. Acepta la descarga inicial de recursos CAD: master DWG, LISPs, startup, scripts y plumilla.\n4. Pulsa Preparar integración CAD. SINCAL detectará AutoCAD o ZWCAD, creará el puente para procesos cerrados y registrará la ruta de confianza.\n5. Reinicia CAD una vez. Al abrir un dibujo debe aparecer el mensaje SINCAL STARTUP CARGADO EXITOSAMENTE.\n\nLos mapas regionales grandes no se descargan durante la instalación. El módulo Ubicación descarga solamente la región elegida cuando se usa por primera vez."
+      "contenido": "1. Instala SINCAL con el instalador web oficial y mantén conexión a Internet durante la descarga.\n2. Abre SINCAL desde el menú Inicio. El paquete ya contiene una copia funcional del master DWG, LISPs, startup, scripts, plumilla, calibración y ayuda estructural.\n3. Si existe una revisión posterior de esos recursos, SINCAL la ofrecerá automáticamente al iniciar o dentro del siguiente ciclo de un minuto.\n4. Pulsa Preparar integración CAD. SINCAL detectará AutoCAD o ZWCAD, creará el puente para procesos cerrados y registrará la ruta de confianza.\n5. Reinicia CAD una vez. Al abrir un dibujo debe aparecer el mensaje SINCAL STARTUP CARGADO EXITOSAMENTE.\n\nLos mapas regionales grandes no se descargan durante la instalación. El módulo Ubicación descarga solamente la región elegida cuando se usa por primera vez."
     },
     {
       "id": "actualizaciones",
@@ -41,7 +41,7 @@
       "categoria": "Recursos CAD",
       "titulo": "Qué contiene cada carpeta",
       "tags": "lisps startup scripts plotstyles mapas tutoriales",
-      "contenido": "lisps/: comandos interactivos cargados en los dibujos.\nstartup/: inicialización automática por documento.\nscripts/: BAT, PowerShell y SCR usados por la automatización masiva.\nplotstyles/: plumillas CTB; actualmente SINCAL_A1 (2025).ctb.\nmasters/: DWG central de formatos anotativos.\nmapas/: calibración, ayuda gráfica y mapas regionales descargables.\ntutoriales.json: contenido estructurado de esta biblioteca.\n\nLos recursos activos se guardan en %LOCALAPPDATA%\\SINCAL\\resources y se copian a la integración CAD cuando corresponde."
+      "contenido": "lisps/: comandos interactivos cargados en los dibujos.\nstartup/: inicialización automática por documento.\nscripts/: BAT, PowerShell y SCR usados por la automatización masiva.\nplotstyles/: plumillas CTB; actualmente SINCAL_A1 (2025).ctb.\nmasters/: DWG central de formatos anotativos.\nmapas/: calibración, ayuda gráfica y mapas regionales descargables.\ntutoriales.json: contenido estructurado de esta biblioteca.\n\nEl instalador deja una copia base de los recursos esenciales junto a la aplicación. Las revisiones activas se guardan en %LOCALAPPDATA%\\SINCAL\\resources y se copian a la integración CAD cuando corresponde."
     },
     {
       "id": "procesamiento-general",
@@ -90,7 +90,7 @@
       "categoria": "Ayuda",
       "titulo": "Solución de problemas frecuentes",
       "tags": "error logs consola recursos cad mapa",
-      "contenido": "COMANDOS NO CARGAN: actualiza recursos, pulsa Preparar integración CAD y reinicia CAD.\nMASTER NO ENCONTRADO: acepta la actualización inicial y comprueba que el archivo exista en %LOCALAPPDATA%\\SINCAL\\resources\\masters.\nPROCESO MASIVO FALLA: cierra CAD, verifica cad_wrapper.bat y prueba con un DWG de copia.\nMAPAS VACÍOS: actualiza recursos para recibir mapas_calibrados.json; vuelve a abrir el módulo.\nDESCARGA FALLA: revisa Internet, proxy/antivirus y vuelve a intentar.\n\nLos registros están en %LOCALAPPDATA%\\SINCAL\\logs\\sincal.log. El botón Consola muestra los mensajes de la sesión actual."
+      "contenido": "COMANDOS NO CARGAN: actualiza recursos, pulsa Preparar integración CAD y reinicia CAD.\nMASTER NO ENCONTRADO: reinstala la release oficial para recuperar la copia base o usa Actualizar recursos CAD para descargar la revisión publicada.\nPROCESO MASIVO FALLA: cierra CAD, verifica cad_wrapper.bat y prueba con un DWG de copia.\nMAPAS VACÍOS: actualiza recursos para recibir mapas_calibrados.json; vuelve a abrir el módulo.\nDESCARGA FALLA: revisa Internet, proxy/antivirus y vuelve a intentar.\n\nLos registros están en %LOCALAPPDATA%\\SINCAL\\logs\\sincal.log. El botón Consola muestra los mensajes de la sesión actual."
     }
   ],
   "comandos_lisp": {

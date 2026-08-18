@@ -241,6 +241,38 @@ function Assert-ArtifactExists([string]$Path) {
     }
 }
 
+function Assert-AppPayloadContents([string]$Path) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($Path)
+    try {
+        $entries = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
+        $required = @(
+            'SINCAL.exe',
+            'version.json',
+            'tutoriales.json',
+            'lisps/SINCAL.lsp',
+            'startup/SINCAL_STARTUP.lsp',
+            'scripts/AUDIT.ps1',
+            'plotstyles/SINCAL_A1 (2025).ctb',
+            'masters/FORMATOS ANOTATIVOS ACAD_2025.dwg',
+            'mapas/mapas_calibrados.json',
+            'mapas/ayuda_travesano.png'
+        )
+        $missing = @($required | Where-Object { $_ -notin $entries })
+        if ($missing.Count -gt 0) {
+            throw "El paquete de aplicación no contiene recursos esenciales: $($missing -join ', ')"
+        }
+
+        $regionalMaps = @($entries | Where-Object { $_ -match '^mapas/Region_.*\.png$' })
+        if ($regionalMaps.Count -gt 0) {
+            throw "El paquete de aplicación contiene mapas regionales que deben quedar bajo demanda: $($regionalMaps -join ', ')"
+        }
+    }
+    finally {
+        $archive.Dispose()
+    }
+}
+
 function Write-Checksums([string]$ProjectRoot, [string[]]$Paths) {
     $outputPath = Join-Path $ProjectRoot 'installer_output\SHA256SUMS.txt'
     $lines = foreach ($path in $Paths) {
@@ -268,6 +300,33 @@ function New-ReleasePayloads(
         Copy-Item (Join-Path $ProjectRoot $relative) (Join-Path $appStage $relative) -Force
     }
     Copy-Item $DistExe (Join-Path $appStage 'SINCAL.exe') -Force
+
+    # La primera apertura debe ser funcional incluso antes de crear el estado de
+    # sincronización. Se incluyen sólo los recursos esenciales y livianos; cada
+    # mapa regional continúa descargándose bajo demanda desde el canal público.
+    $coreResourcePolicies = @(
+        [pscustomobject]@{ Directory = 'lisps'; Extensions = @('.lsp') },
+        [pscustomobject]@{ Directory = 'startup'; Extensions = @('.lsp') },
+        [pscustomobject]@{ Directory = 'scripts'; Extensions = @('.bat', '.ps1', '.scr') },
+        [pscustomobject]@{ Directory = 'plotstyles'; Extensions = @('.ctb') },
+        [pscustomobject]@{ Directory = 'masters'; Extensions = @('.dwg') }
+    )
+    foreach ($policy in $coreResourcePolicies) {
+        $sourceDirectory = Join-Path $ProjectRoot $policy.Directory
+        Get-ChildItem $sourceDirectory -Recurse -File | Where-Object {
+            $_.Extension.ToLowerInvariant() -in $policy.Extensions
+        } | ForEach-Object {
+            $relative = [IO.Path]::GetRelativePath($ProjectRoot, $_.FullName)
+            $destination = Join-Path $appStage $relative
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+            Copy-Item $_.FullName $destination -Force
+        }
+    }
+    foreach ($relative in @('mapas\mapas_calibrados.json', 'mapas\ayuda_travesano.png')) {
+        $destination = Join-Path $appStage $relative
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination) | Out-Null
+        Copy-Item (Join-Path $ProjectRoot $relative) $destination -Force
+    }
 
     $bundleSource = Join-Path $ProjectRoot 'cad-packages\Autodesk\SINCAL.bundle'
     Copy-Item (Join-Path $bundleSource '*') $pluginStage -Recurse -Force
@@ -395,6 +454,7 @@ $payloadInfo = New-ReleasePayloads `
     -AppPayload $appPayload `
     -PluginPayload $pluginPayload `
     -StageRoot $payloadStage
+Assert-AppPayloadContents -Path $appPayload
 Remove-ArtifactIfExists $payloadStage
 $releaseBaseUrl = "https://github.com/drossull/sincal-updates/releases/download/$version"
 $appPayloadUrl = "$releaseBaseUrl/$([IO.Path]::GetFileName($appPayload))"
