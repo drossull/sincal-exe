@@ -1,27 +1,29 @@
 import logging
 import os
 import queue
+import shutil
 import subprocess
 import threading
 import time
+import traceback
 import webbrowser
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from tkinter import messagebox
 
 import customtkinter as ctk
-import pystray
 import pythoncom
 import requests
 import win32com.client
 from customtkinter import filedialog
-from PIL import Image
-from pystray import MenuItem as item
 
 from modulos.tab_armaduras import TabArmaduras
+from modulos.tab_diagnostico import TabDiagnostico
 from modulos.tab_docs import TabDocs
 from modulos.tab_ubicacion import TabUbicacion
+from sincal_cad_engine import ensure_cad_engine
 from sincal_cad_integration import registrar_ruta_cad_usuario
+from sincal_diagnostics import record_incident
 from sincal_resource_sync import (
     active_resource_paths,
     apply_resource_updates,
@@ -37,7 +39,6 @@ from sincal_runtime import (
     asegurar_directorios,
     is_newer_version,
     ruta_cad_usuario,
-    ruta_runtime,
 )
 from sincal_runtime import (
     ruta_recurso as runtime_ruta_recurso,
@@ -100,13 +101,12 @@ class ActualizadorCAD(ctk.CTk):
         self.version_local_actual = VERSION_ACTUAL
         self.tutoriales, self.cad_exe_path, self.es_zwcad, self.cancelar_comando_vivo = {
         }, None, False, False
-        self.ruta_renombre, self.checkboxes_archivos, self.tray_activo = "", [], False
-        self.icono_bandeja = None
+        self.ruta_renombre, self.checkboxes_archivos = "", []
         self._resource_check_running = False
         self._last_resource_offer_tree = ""
         self._resource_manifest_revision = ""
         self._resource_poll_job = None
-        self.protocol("WM_DELETE_WINDOW", self.ocultar_a_bandeja)
+        self.protocol("WM_DELETE_WINDOW", self.cerrar_aplicacion)
         self.after(50, self._procesar_ui_queue)
 
         self.main_scroll = ctk.CTkScrollableFrame(
@@ -128,6 +128,12 @@ class ActualizadorCAD(ctk.CTk):
         self.tab_armaduras = self.tabview.add("Módulo Estructural / ")
 
         self.tab_renombrado = self.tabview.add("Procesamiento Masivo / ")
+
+        tab_diagnostico_frame = self.tabview.add("Diagnóstico / ")
+        self.tab_diagnostico = TabDiagnostico(
+            tab_diagnostico_frame, parent_app=self, fg_color="transparent"
+        )
+        self.tab_diagnostico.pack(expand=True, fill="both")
 
         self.tab_docs = self.tabview.add("Documentación")
 
@@ -152,6 +158,24 @@ class ActualizadorCAD(ctk.CTk):
             return
         self._ui_queue.put((callback, args, kwargs))
 
+    def report_callback_exception(self, exc_type, value, tb):
+        detail = "".join(traceback.format_exception(exc_type, value, tb))
+        self.logger.error("Error no controlado en la interfaz:\n%s", detail)
+        record_incident(
+            "interfaz",
+            "error",
+            {"type": exc_type.__name__, "error": str(value), "traceback": detail},
+        )
+        try:
+            messagebox.showerror(
+                "Error SINCAL",
+                "Ocurrió un error inesperado. El detalle quedó guardado en Diagnóstico y soporte.\n\n"
+                f"{value}",
+                parent=self,
+            )
+        except Exception:
+            pass
+
     def _procesar_ui_queue(self):
         try:
             while True:
@@ -160,6 +184,11 @@ class ActualizadorCAD(ctk.CTk):
                     callback(*args, **kwargs)
                 except Exception as e:
                     self.logger.warning("Error UI callback: %s", e)
+                    record_incident(
+                        "interfaz_callback",
+                        "error",
+                        {"callback": getattr(callback, "__name__", repr(callback)), "error": str(e)},
+                    )
         except queue.Empty:
             pass
         finally:
@@ -180,53 +209,25 @@ class ActualizadorCAD(ctk.CTk):
         widget.configure(state="disabled")
 
     # ==========================================================
-    # LÓGICA DE WINDOWS (SYSTEM TRAY / AUTOSTART)
+    # CICLO DE VIDA DE LA APLICACIÓN
     # ==========================================================
-    def ocultar_a_bandeja(self):
+    def cerrar_aplicacion(self):
         if getattr(self, '_cerrando', False):
             return
-        self.withdraw()
-        if self.icono_bandeja:
-            self.tray_activo = True
-            return
-        try:
-            ruta_logo = runtime_ruta_recurso('logo.ico')
-            icono = Image.open(ruta_logo).convert("RGBA")
-        except Exception as e:
-            self.log_r(f"Error cargando ícono: {e}")
-            icono = Image.new('RGBA', (64, 64), color=(43, 43, 43, 255))
-
-        menu = pystray.Menu(
-            item('Abrir', self.mostrar_desde_bandeja),
-            item('Salir', self.salir_completamente)
-        )
-
-        self.icono_bandeja = pystray.Icon(
-            "SINCAL", icono, "SINCAL Suite", menu)
-        self.tray_activo = True
-        threading.Thread(target=self.icono_bandeja.run, daemon=True).start()
-
-    def mostrar_desde_bandeja(self, icon, item):
-        if self.icono_bandeja:
-            self.icono_bandeja.stop()
-            self.icono_bandeja = None
-        self.tray_activo = False
-        self._ui(self.deiconify)
-
-    def salir_completamente(self, icon, item):
         self._cerrando = True
-        if self.icono_bandeja:
-            self.icono_bandeja.stop()
-            self.icono_bandeja = None
-        self.tray_activo = False
-        self.destroy()
-
-    def mostrar_notificacion(self, titulo, mensaje):
-        if getattr(self, 'tray_activo', False) and self.icono_bandeja:
+        self.cancelar_comando_vivo = True
+        if self._resource_poll_job is not None:
             try:
-                self.icono_bandeja.notify(mensaje, titulo)
-            except:
+                self.after_cancel(self._resource_poll_job)
+            except Exception:
                 pass
+            self._resource_poll_job = None
+        self.logger.info("Cierre solicitado: SINCAL finalizará sin permanecer en segundo plano.")
+        record_incident("cierre_aplicacion", "ok")
+        try:
+            self.quit()
+        finally:
+            self.destroy()
 
     def setup_tab_armaduras(self):
         self.vista_armaduras = TabArmaduras(
@@ -367,6 +368,10 @@ class ActualizadorCAD(ctk.CTk):
         copiados = materialize_cad_resources()
         archivos_lisp = active_resource_paths(("lisps/", "startup/"))
         self.generar_archivos_lisp(archivos_lisp)
+        engine = ensure_cad_engine()
+        if engine:
+            self.cad_exe_path = engine.path
+            self.es_zwcad = engine.product == "ZWCAD"
         registros = registrar_ruta_cad_usuario()
         return copiados, registros
 
@@ -418,6 +423,7 @@ class ActualizadorCAD(ctk.CTk):
                 )
         except Exception as e:
             self.logger.warning("No se pudieron verificar los recursos CAD: %s", e)
+            record_incident("verificar_recursos", "error", {"error": str(e)})
             self.log(f"[!] No se pudieron verificar los recursos CAD; se conservarán las copias locales: {e}")
             if manual:
                 self._ui(
@@ -447,10 +453,6 @@ class ActualizadorCAD(ctk.CTk):
             "Se actualizarán LISPs, scripts, estilos, mapas o el master DWG; el ejecutable no será reemplazado.\n"
             "¿Deseas descargarla ahora?"
         )
-        self.mostrar_notificacion(
-            "Actualización SINCAL",
-            f"Hay {len(rutas)} recurso(s) CAD nuevo(s). Abre SINCAL para actualizar.",
-        )
         if messagebox.askyesno("Actualización de recursos SINCAL", mensaje, parent=self):
             self.btn_sync_resources.configure(state="disabled", text="Actualizando...")
             threading.Thread(target=self._hilo_aplicar_recursos, args=(plan,), daemon=True).start()
@@ -464,6 +466,7 @@ class ActualizadorCAD(ctk.CTk):
             resultado = apply_resource_updates(plan)
         except Exception as e:
             self.logger.exception("Falló la actualización de recursos CAD")
+            record_incident("actualizar_recursos", "error", {"error": str(e)})
             self.log(f"[X] No se pudo completar la actualización menor: {e}")
             self._ui(
                 messagebox.showerror,
@@ -509,6 +512,11 @@ class ActualizadorCAD(ctk.CTk):
         self.log(
             f"[OK] Actualización menor instalada: {len(resultado.updated)} archivo(s) actualizado(s)"
             f" y {len(resultado.removed)} eliminado(s): {', '.join(rutas_actualizadas)}"
+        )
+        record_incident(
+            "actualizar_recursos",
+            "ok",
+            {"updated": list(resultado.updated), "removed": list(resultado.removed)},
         )
         estado_cad = (
             f"Los comandos LISP se recargaron en {recargados} dibujo(s) abierto(s)."
@@ -798,11 +806,39 @@ class ActualizadorCAD(ctk.CTk):
             comando_ps,), daemon=True).start()
 
     def _hilo_script(self, comando_ps):
-        self.log_script(
-            f"> Directorio Activo: {self.ruta_renombre}\n> Comando: {comando_ps}\n" + "-"*60 + "\n")
+        engine = ensure_cad_engine()
+        if engine is None:
+            detail = "No se detectó un motor CAD. Abre Diagnóstico y soporte y selecciona uno."
+            self.log_script(f"[X] {detail}\n")
+            record_incident(
+                "procesamiento_masivo", "error", {"error": detail},
+                sensitive_paths=(self.ruta_renombre,),
+            )
+            return
 
-        comando = ["powershell", "-NoProfile",
+        powershell = shutil.which("powershell.exe") or shutil.which("powershell")
+        if not powershell:
+            detail = "No se encontró powershell.exe en el equipo."
+            self.log_script(f"[X] {detail}\n")
+            record_incident(
+                "procesamiento_masivo", "error", {"error": detail},
+                sensitive_paths=(self.ruta_renombre,),
+            )
+            return
+
+        self.log_script(
+            f"> Directorio Activo: {self.ruta_renombre}\n"
+            f"> Motor CAD: {engine.label}\n"
+            f"> Ejecutable: {engine.path}\n"
+            f"> Comando: {comando_ps}\n" + "-"*60 + "\n"
+        )
+
+        comando = [powershell, "-NoProfile", "-NonInteractive",
                    "-ExecutionPolicy", "Bypass", "-Command", comando_ps]
+        environment = os.environ.copy()
+        environment["SINCAL_CAD_ENGINE"] = engine.path
+        started = time.monotonic()
+        output_tail = []
 
         try:
             proceso = subprocess.Popen(
@@ -811,24 +847,61 @@ class ActualizadorCAD(ctk.CTk):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=environment,
                 creationflags=subprocess.CREATE_NO_WINDOW
             )
 
             for linea in iter(proceso.stdout.readline, ''):
                 self.log_script(linea)
+                output_tail.append(linea)
+                if len(output_tail) > 120:
+                    output_tail.pop(0)
 
             proceso.stdout.close()
             proceso.wait()
             if proceso.returncode == 0:
                 self.log_script(
                     f"\n[OK] Script finalizado (Código de salida: {proceso.returncode})\n")
+                record_incident(
+                    "procesamiento_masivo",
+                    "ok",
+                    {
+                        "engine": engine.to_dict(),
+                        "returncode": proceso.returncode,
+                        "seconds": round(time.monotonic() - started, 3),
+                    },
+                    sensitive_paths=(self.ruta_renombre,),
+                )
             else:
                 self.log_script(
                     f"\n[X] Script finalizado con error (Código de salida: {proceso.returncode})\n")
+                record_incident(
+                    "procesamiento_masivo",
+                    "error",
+                    {
+                        "engine": engine.to_dict(),
+                        "returncode": proceso.returncode,
+                        "seconds": round(time.monotonic() - started, 3),
+                        "output": "".join(output_tail)[-12000:],
+                    },
+                    sensitive_paths=(self.ruta_renombre,),
+                )
 
         except Exception as e:
             self.log_script(
                 f"\n[X] Fallo crítico al lanzar PowerShell:\n{e}\n")
+            record_incident(
+                "procesamiento_masivo",
+                "error",
+                {
+                    "engine": engine.to_dict(),
+                    "error": str(e),
+                    "seconds": round(time.monotonic() - started, 3),
+                },
+                sensitive_paths=(self.ruta_renombre,),
+            )
 
     def convertir_dxf_a_dwg(self):
         if not getattr(self, 'ruta_renombre', None):
@@ -995,10 +1068,16 @@ class ActualizadorCAD(ctk.CTk):
     def forzar_path_manual(self):
         try:
             copiados, registros = self._preparar_archivos_cad()
-            self.buscar_y_configurar_consolas()
+            engine = self.buscar_y_configurar_consolas()
             self.log(
                 f"[OK] Integración CAD preparada: {len(copiados)} recurso(s) materializado(s) y "
-                f"{len(registros)} ruta(s) de perfil actualizada(s)."
+                f"{len(registros)} ruta(s) de perfil actualizada(s). "
+                f"Motor: {engine.label if engine else 'no detectado'}."
+            )
+            record_incident(
+                "preparar_integracion_cad",
+                "ok" if engine else "warning",
+                {"engine": engine.to_dict() if engine else None, "copied": len(copiados)},
             )
             messagebox.showinfo(
                 "Integración CAD",
@@ -1007,6 +1086,7 @@ class ActualizadorCAD(ctk.CTk):
             )
         except Exception as e:
             self.logger.exception("No se pudo preparar la integración CAD")
+            record_incident("preparar_integracion_cad", "error", {"error": str(e)})
             messagebox.showerror("Integración CAD", f"No se pudo completar la preparación.\n\nDetalle: {e}")
 
     def iniciar_actualizacion_hilo(self):
@@ -1017,25 +1097,10 @@ class ActualizadorCAD(ctk.CTk):
         self.log("[!] La actualización en caliente está limitada a recursos CAD autorizados.")
 
     def buscar_y_configurar_consolas(self):
-        self.cad_exe_path = None
-        for p in [r"C:\Program Files\Autodesk", r"C:\Program Files\ZWSOFT"]:
-            if os.path.exists(p):
-                for root, dirs, files in os.walk(p):
-                    for f in files:
-                        if f.lower() in ["accoreconsole.exe", "zwcad.exe"]:
-                            self.cad_exe_path = os.path.join(root, f)
-                            if "zwcad" in f.lower():
-                                self.es_zwcad = True
-
-                            ruta_wrapper = ruta_runtime("cad_wrapper.bat")
-                            try:
-                                with open(ruta_wrapper, 'w', encoding='utf-8') as wf:
-                                    wf.write(
-                                        f'@echo off\n"{self.cad_exe_path}" %*\n')
-                            except Exception as e:
-                                self.log(f"[X] Error creando wrapper CAD: {e}")
-
-                            return
+        engine = ensure_cad_engine()
+        self.cad_exe_path = engine.path if engine else None
+        self.es_zwcad = bool(engine and engine.product == "ZWCAD")
+        return engine
 
     def actualizar_rutas_registro(self):
         self.log("[!] Integración automática de rutas CAD deshabilitada por seguridad.")

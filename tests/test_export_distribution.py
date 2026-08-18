@@ -18,6 +18,7 @@ class DistributionExportTests(unittest.TestCase):
         self._write("version.json", b'{"version":"v28.0.1"}')
         self._write("lisps/SINCAL.lsp", b"(princ)\n")
         self._write("masters/FORMATOS ANOTATIVOS ACAD_2025.dwg", b"AC1032master")
+        self._write("scripts/SINCAL_ENGINE.ps1", b"function Get-SincalCadEngine { 'test' }\n")
 
     def _write(self, relative, data):
         path = self.source / Path(*relative.split("/"))

@@ -28,6 +28,7 @@ class DocumentationTests(unittest.TestCase):
             "master-dwg", "inventario-recursos", "procesamiento-general",
             "renombrado", "comandos-vivo", "automatizacion-cerrada",
             "modulo-estructural", "modulo-ubicacion", "solucion-problemas",
+            "diagnostico-soporte",
         }
         self.assertTrue(expected.issubset(topic_ids))
 
@@ -55,7 +56,24 @@ class WebInstallerConfigurationTests(unittest.TestCase):
         self.assertIn("scripts/AUDIT.ps1", build_script)
         self.assertIn("mapas/mapas_calibrados.json", build_script)
         self.assertIn("mapas/ayuda_travesano.png", build_script)
+        self.assertIn("scripts/SINCAL_ENGINE.ps1", build_script)
         self.assertIn("^mapas/Region_.*\\.png$", build_script)
+
+
+class MassProcessingConfigurationTests(unittest.TestCase):
+    def test_scripts_resolve_selected_engine_directly(self):
+        script_names = (
+            "AUDIT.ps1", "BV.ps1", "DL2.ps1", "PAGESETUP-A1.ps1",
+            "PUBLISH-A1.ps1", "PURGEALL.ps1", "ZE.ps1",
+        )
+        for name in script_names:
+            script = (ROOT / "scripts" / name).read_text(encoding="utf-8")
+            self.assertIn("Get-SincalCadEngine", script, name)
+            self.assertIn("Start-Process -FilePath $enginePath", script, name)
+            self.assertNotIn("$wrapperPath", script, name)
+
+        purge = (ROOT / "scripts" / "PURGEALL.ps1").read_text(encoding="utf-8")
+        self.assertNotIn('Start-Process -FilePath "cmd.exe"', purge)
 
 
 if __name__ == "__main__":

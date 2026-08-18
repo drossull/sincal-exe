@@ -1,5 +1,6 @@
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "SINCAL_ENGINE.ps1")
 
 $dwgFiles = Get-ChildItem -Path .\ -Filter *.dwg
 if ($dwgFiles.Count -eq 0) {
@@ -7,15 +8,15 @@ if ($dwgFiles.Count -eq 0) {
     exit
 }
 
-$appDataPath = [Environment]::GetFolderPath("LocalApplicationData")
-$runtimePath = Join-Path $appDataPath "SINCAL\runtime"
-$wrapperPath = Join-Path $runtimePath "cad_wrapper.bat"
 $appPath = if ($PSScriptRoot) { Split-Path $PSScriptRoot -Parent } else { (Get-Location).Path }
 $scrPath = Join-Path $appPath "scripts\PUBLISH-A1.scr"
 
-if (-not (Test-Path $wrapperPath)) {
-    Write-Host "[ERROR] Consola CAD no detectada. Abre SINCAL y presiona 'Preparar integración CAD'." -ForegroundColor Red
-    exit
+try {
+    $enginePath = Get-SincalCadEngine
+}
+catch {
+    Write-Host "[ERROR] $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
 }
 
 if (-not (Test-Path $scrPath)) {
@@ -40,7 +41,7 @@ foreach ($file in $dwgFiles) {
     }
 
     $argList = "/i `"$($file.FullName)`" /s `"$scrPath`""
-    $proc = Start-Process -FilePath $wrapperPath -ArgumentList $argList -Wait -NoNewWindow -PassThru
+    $proc = Start-Process -FilePath $enginePath -ArgumentList $argList -Wait -NoNewWindow -PassThru
 
     if ($proc.ExitCode -ne 0) {
         Write-Host "  [ERROR] El proceso CAD terminó con código $($proc.ExitCode)." -ForegroundColor Red

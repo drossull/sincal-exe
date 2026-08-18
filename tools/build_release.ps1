@@ -67,10 +67,13 @@ function Invoke-PythonCompile([string]$ProjectRoot) {
         'sincal_runtime.py',
         'sincal_resource_sync.py',
         'sincal_cad_integration.py',
+        'sincal_cad_engine.py',
+        'sincal_diagnostics.py',
         'sincal_update_config.py',
         'tools\export_distribution.py',
         'modulos\tab_armaduras.py',
         'modulos\tab_docs.py',
+        'modulos\tab_diagnostico.py',
         'modulos\tab_ubicacion.py',
         'tests\selfcheck_runtime.py'
     ) | ForEach-Object { Join-Path $ProjectRoot $_ }
@@ -253,6 +256,7 @@ function Assert-AppPayloadContents([string]$Path) {
             'lisps/SINCAL.lsp',
             'startup/SINCAL_STARTUP.lsp',
             'scripts/AUDIT.ps1',
+            'scripts/SINCAL_ENGINE.ps1',
             'plotstyles/SINCAL_A1 (2025).ctb',
             'masters/FORMATOS ANOTATIVOS ACAD_2025.dwg',
             'mapas/mapas_calibrados.json',

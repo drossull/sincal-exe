@@ -54,8 +54,10 @@ class ResourceSyncTests(unittest.TestCase):
 
         self.sincal_lsp = b"(defun c:SINCAL () (princ))\n"
         self.master = b"AC1032" + b"master-data"
+        self.engine_helper = b"function Get-SincalCadEngine { 'test' }\n"
         self._write_installed("lisps/SINCAL.lsp", self.sincal_lsp)
         self._write_installed("masters/FORMATOS ANOTATIVOS ACAD_2025.dwg", self.master)
+        self._write_installed("scripts/SINCAL_ENGINE.ps1", self.engine_helper)
 
         patch.object(resource_sync, "RUTA_RECURSOS_USUARIO", self.cache).start()
         patch.object(resource_sync, "ruta_recurso_instalado", side_effect=self._installed_path).start()
@@ -94,6 +96,7 @@ class ResourceSyncTests(unittest.TestCase):
         entries = [
             self._tree_entry("lisps/SINCAL.lsp", self.sincal_lsp),
             self._tree_entry("masters/FORMATOS ANOTATIVOS ACAD_2025.dwg", self.master),
+            self._tree_entry("scripts/SINCAL_ENGINE.ps1", self.engine_helper),
             self._tree_entry("core_sincal.py", b"not-hot-updatable"),
         ]
         entries.extend(extra or [])

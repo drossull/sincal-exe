@@ -27,7 +27,10 @@ class CoreResourceUpdateTests(unittest.TestCase):
             tree_sha="a" * 40,
         )
 
-        with patch.object(core_sincal, "apply_resource_updates", return_value=result):
+        with (
+            patch.object(core_sincal, "apply_resource_updates", return_value=result),
+            patch.object(core_sincal, "record_incident"),
+        ):
             core_sincal.ActualizadorCAD._hilo_aplicar_recursos(app, object())
 
         messages = [call.args[0] for call in app.log.call_args_list]

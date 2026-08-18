@@ -6,7 +6,7 @@
       "categoria": "Inicio",
       "titulo": "Primer inicio y preparación",
       "tags": "instalar iniciar preparar autocad zwcad",
-      "contenido": "1. Instala SINCAL con el instalador web oficial y mantén conexión a Internet durante la descarga.\n2. Abre SINCAL desde el menú Inicio. El paquete ya contiene una copia funcional del master DWG, LISPs, startup, scripts, plumilla, calibración y ayuda estructural.\n3. Si existe una revisión posterior de esos recursos, SINCAL la ofrecerá automáticamente al iniciar o dentro del siguiente ciclo de un minuto.\n4. Pulsa Preparar integración CAD. SINCAL detectará AutoCAD o ZWCAD, creará el puente para procesos cerrados y registrará la ruta de confianza.\n5. Reinicia CAD una vez. Al abrir un dibujo debe aparecer el mensaje SINCAL STARTUP CARGADO EXITOSAMENTE.\n\nLos mapas regionales grandes no se descargan durante la instalación. El módulo Ubicación descarga solamente la región elegida cuando se usa por primera vez."
+      "contenido": "1. Instala SINCAL con el instalador web oficial y mantén conexión a Internet durante la descarga.\n2. Abre SINCAL desde el menú Inicio. El paquete ya contiene una copia funcional del master DWG, LISPs, startup, scripts, plumilla, calibración y ayuda estructural.\n3. Si existe una revisión posterior de esos recursos, SINCAL la ofrecerá automáticamente al iniciar o dentro del siguiente ciclo de un minuto.\n4. Abre Diagnóstico, revisa el motor CAD sugerido y selecciona otra versión si corresponde.\n5. Pulsa Preparar integración CAD para materializar recursos y registrar rutas de confianza.\n6. Reinicia CAD una vez. Al abrir un dibujo debe aparecer el mensaje SINCAL STARTUP CARGADO EXITOSAMENTE.\n\nLos mapas regionales grandes no se descargan durante la instalación. El módulo Ubicación descarga solamente la región elegida cuando se usa por primera vez. Al cerrar la ventana principal con X, SINCAL finaliza completamente y no permanece en la bandeja ni en segundo plano."
     },
     {
       "id": "actualizaciones",
@@ -20,7 +20,7 @@
       "categoria": "Recursos CAD",
       "titulo": "Integración con AutoCAD y ZWCAD",
       "tags": "acaddoc trustedpath wrapper appdata cad",
-      "contenido": "Preparar integración CAD materializa los recursos activos en %APPDATA%\\Estandar SINCAL, crea acaddoc.lsp y prepara %LOCALAPPDATA%\\SINCAL\\runtime\\cad_wrapper.bat. También intenta registrar la carpeta como ruta de soporte y confianza en los perfiles CAD encontrados.\n\nUsa esta acción después de una instalación nueva, de cambiar de versión de AutoCAD/ZWCAD o si los procesos masivos informan que no encuentran la consola CAD. Reinicia CAD después de prepararla."
+      "contenido": "Preparar integración CAD materializa los recursos activos en %APPDATA%\\Estandar SINCAL, crea acaddoc.lsp y guarda el motor seleccionado en %LOCALAPPDATA%\\SINCAL\\runtime\\cad_engine.json. También mantiene cad_wrapper.bat como compatibilidad e intenta registrar la carpeta como ruta de soporte y confianza en los perfiles CAD encontrados.\n\nUsa Diagnóstico para ver todos los motores detectados y elegir la versión que procesará planos cerrados. Luego prepara nuevamente la integración. Reinicia CAD después de cambiar rutas o recursos."
     },
     {
       "id": "startup",
@@ -48,7 +48,7 @@
       "categoria": "Procesamiento masivo",
       "titulo": "Flujo general y precauciones",
       "tags": "dwg dxf carpeta seleccionar respaldo cerrar cad",
-      "contenido": "1. Haz una copia de seguridad de la carpeta del proyecto.\n2. Pulsa Cargar Carpeta DWG/DXF y marca únicamente los archivos que deseas intervenir.\n3. Para renombrar o convertir DXF, la selección de casillas sí determina los archivos.\n4. Los botones de automatización cerrada procesan todos los DWG de la carpeta; cierra AutoCAD/ZWCAD antes de ejecutarlos.\n5. Lee la consola hasta ver código de salida 0 y revisa una muestra antes de continuar.\n\nNo interrumpas accoreconsole ni apagues el equipo durante un proceso. Usa nombres de archivo únicos y evita carpetas sincronizadas que estén bloqueando DWG."
+      "contenido": "1. Haz una copia de seguridad de la carpeta del proyecto.\n2. Abre Diagnóstico y confirma que CMD, PowerShell, permisos y motor CAD estén en estado correcto.\n3. Pulsa Cargar Carpeta DWG/DXF y marca únicamente los archivos que deseas intervenir.\n4. Para renombrar o convertir DXF, la selección de casillas sí determina los archivos.\n5. Los botones de automatización cerrada procesan todos los DWG de la carpeta; cierra AutoCAD/ZWCAD antes de ejecutarlos.\n6. Lee la consola hasta ver código de salida 0 y revisa una muestra antes de continuar.\n\nNo interrumpas accoreconsole ni apagues el equipo durante un proceso. Usa nombres de archivo únicos y evita carpetas sincronizadas que estén bloqueando DWG."
     },
     {
       "id": "renombrado",
@@ -69,7 +69,7 @@
       "categoria": "Procesamiento masivo",
       "titulo": "Automatización de planos cerrados",
       "tags": "audit purge zoom dl2 bv pagesetup publish pdf",
-      "contenido": "AUDITAR repara la base de datos de cada DWG.\nPURGAR ejecuta AUDIT, elimina elementos y aplicaciones registradas sin uso, encuadra y guarda.\nENCUADRAR VISTA aplica Zoom Extents y guarda.\nELIMINAR LAYOUT2 borra Layout2 y A1 cuando no están activos.\nBLOQUEAR VIEWPORTS protege las ventanas de presentación.\nCONFIGURAR EN A1 aplica impresora PDF, papel A1, escala 1:1, CTB, transparencia y 300 DPI.\nPLOTEO A1 configura y exporta PDF, comprobando archivos de salida.\n\nTodos requieren integración CAD preparada, CAD cerrado y permisos de escritura en la carpeta."
+      "contenido": "AUDITAR repara la base de datos de cada DWG.\nPURGAR ejecuta AUDIT, elimina elementos y aplicaciones registradas sin uso, encuadra y guarda.\nENCUADRAR VISTA aplica Zoom Extents y guarda.\nELIMINAR LAYOUT2 borra Layout2 y A1 cuando no están activos.\nBLOQUEAR VIEWPORTS protege las ventanas de presentación.\nCONFIGURAR EN A1 aplica impresora PDF, papel A1, escala 1:1, CTB, transparencia y 300 DPI.\nPLOTEO A1 configura y exporta PDF, comprobando archivos de salida.\n\nTodos requieren integración CAD preparada, CAD cerrado y permisos de escritura en la carpeta. SINCAL invoca directamente el motor guardado y registra versión, duración, código de salida y detalle final si ocurre un error."
     },
     {
       "id": "modulo-estructural",
@@ -86,11 +86,18 @@
       "contenido": "1. En Google Earth crea puntos para las estructuras y guarda el conjunto como KMZ.\n2. Pulsa Cargar KMZ; SINCAL lee doc.kml o el único KML disponible y lista los Placemark con geometría Point.\n3. Selecciona un enlace y verifica latitud/longitud.\n4. Elige el mapa MOP regional correspondiente.\n5. Usa microajuste solo si necesitas desplazar el marcador: X positivo al Este y Y positivo al Sur.\n6. Pulsa Generar croquis, acepta la descarga de la región si es la primera vez y elige el PNG de salida.\n\nEl KMZ admite hasta 10 MB y 10.000 puntos válidos. La coordenada debe caer dentro de la calibración del mapa seleccionado. Los mapas regionales se verifican antes de guardarse localmente."
     },
     {
+      "id": "diagnostico-soporte",
+      "categoria": "Ayuda",
+      "titulo": "Diagnóstico e informe de soporte",
+      "tags": "bug error soporte informe zip privacidad cmd powershell accoreconsole motor",
+      "contenido": "EJECUTAR DIAGNÓSTICO comprueba la versión de SINCAL, recursos esenciales, cantidad de LISPs, estado de sincronización, CMD, PowerShell, permisos de escritura, procesos CAD abiertos y motores AutoCAD/ZWCAD instalados.\n\nMOTOR CAD: el menú muestra cada ejecutable detectado. SINCAL recomienda AutoCAD Core Console 2025 cuando está disponible; selecciona otro sólo si el proyecto lo requiere y pulsa Usar este motor.\n\nGENERAR INFORME ZIP crea diagnostico.json, resumen.txt, una copia limitada de sincal.log y PRIVACIDAD.txt. No adjunta DWG ni credenciales. Sustituye usuario, nombre del equipo, correo y ruta del proyecto por marcadores anónimos. Describe los pasos que produjeron el error antes de generar el informe y envía el ZIP únicamente al responsable de soporte.\n\nLos incidentes se almacenan localmente en %LOCALAPPDATA%\\SINCAL\\diagnostics\\incidents.jsonl y nunca se transmiten de forma automática."
+    },
+    {
       "id": "solucion-problemas",
       "categoria": "Ayuda",
       "titulo": "Solución de problemas frecuentes",
       "tags": "error logs consola recursos cad mapa",
-      "contenido": "COMANDOS NO CARGAN: actualiza recursos, pulsa Preparar integración CAD y reinicia CAD.\nMASTER NO ENCONTRADO: reinstala la release oficial para recuperar la copia base o usa Actualizar recursos CAD para descargar la revisión publicada.\nPROCESO MASIVO FALLA: cierra CAD, verifica cad_wrapper.bat y prueba con un DWG de copia.\nMAPAS VACÍOS: actualiza recursos para recibir mapas_calibrados.json; vuelve a abrir el módulo.\nDESCARGA FALLA: revisa Internet, proxy/antivirus y vuelve a intentar.\n\nLos registros están en %LOCALAPPDATA%\\SINCAL\\logs\\sincal.log. El botón Consola muestra los mensajes de la sesión actual."
+      "contenido": "COMANDOS NO CARGAN: actualiza recursos, pulsa Preparar integración CAD y reinicia CAD.\nMASTER NO ENCONTRADO: reinstala la release oficial para recuperar la copia base o usa Actualizar recursos CAD para descargar la revisión publicada.\nPROCESO MASIVO FALLA: cierra CAD, abre Diagnóstico, comprueba motor, CMD, PowerShell y permisos, y genera un informe ZIP si persiste.\nMAPAS VACÍOS: actualiza recursos para recibir mapas_calibrados.json; vuelve a abrir el módulo.\nDESCARGA FALLA: revisa Internet, proxy/antivirus y vuelve a intentar.\n\nLos registros están en %LOCALAPPDATA%\\SINCAL\\logs\\sincal.log y los incidentes en %LOCALAPPDATA%\\SINCAL\\diagnostics. El botón Consola muestra los mensajes de la sesión actual."
     }
   ],
   "comandos_lisp": {

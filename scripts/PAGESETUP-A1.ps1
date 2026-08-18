@@ -1,9 +1,7 @@
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "SINCAL_ENGINE.ps1")
 
-$appDataPath = [Environment]::GetFolderPath('LocalApplicationData')
-$runtimePath = Join-Path $appDataPath "SINCAL\runtime"
-$wrapperPath = Join-Path $runtimePath "cad_wrapper.bat"
 $appPath = if ($PSScriptRoot) { Split-Path $PSScriptRoot -Parent } else { (Get-Location).Path }
 $scrPath = Join-Path $appPath "scripts\PAGESETUP-A1.scr"
 
@@ -12,9 +10,11 @@ Write-Host "  SINCAL - CONFIGURACION DE PAGINA A1" -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
 
 # 1. Validar que el programa base SINCAL este instalado
-if (-not (Test-Path $wrapperPath)) {
-    Write-Host "`n[X] ERROR FATAL: No se encontro el puente de CAD (cad_wrapper.bat)." -ForegroundColor Red
-    Write-Host "Por favor, abre SINCAL.exe y presiona 'Preparar integración CAD'." -ForegroundColor Yellow
+try {
+    $enginePath = Get-SincalCadEngine
+}
+catch {
+    Write-Host "`n[X] ERROR FATAL: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
 
@@ -41,7 +41,7 @@ foreach ($dwg in $archivos) {
     Write-Host "> Aplicando a: $($dwg.Name)..." -ForegroundColor White
     
     $argList = "/i `"$($dwg.FullName)`" /s `"$scrPath`""
-    $proc = Start-Process -FilePath $wrapperPath -ArgumentList $argList -Wait -NoNewWindow -PassThru
+    $proc = Start-Process -FilePath $enginePath -ArgumentList $argList -Wait -NoNewWindow -PassThru
     if ($proc.ExitCode -ne 0) {
         Write-Host "  [ERROR] Proceso CAD falló para $($dwg.Name) con código $($proc.ExitCode)." -ForegroundColor Red
         $errores++

@@ -1,5 +1,6 @@
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "SINCAL_ENGINE.ps1")
 
 $dwgFiles = Get-ChildItem -Path .\ -Filter *.dwg
 if ($dwgFiles.Count -eq 0) {
@@ -7,14 +8,12 @@ if ($dwgFiles.Count -eq 0) {
     exit
 }
 
-# Leer la ruta del wrapper desde la bóveda central de SINCAL en AppData
-$appDataPath = [Environment]::GetFolderPath("LocalApplicationData")
-$runtimePath = Join-Path $appDataPath "SINCAL\runtime"
-$wrapperPath = Join-Path $runtimePath "cad_wrapper.bat"
-
-if (-not (Test-Path $wrapperPath)) {
-    Write-Host "[ERROR] Consola CAD no detectada. Abre SINCAL y presiona 'Preparar integración CAD'." -ForegroundColor Red
-    exit
+try {
+    $enginePath = Get-SincalCadEngine
+}
+catch {
+    Write-Host "[ERROR] $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
 }
 
 Write-Host "===================================================" -ForegroundColor Cyan
@@ -42,11 +41,8 @@ Set-Content -Path $scriptPath -Value $scrContent -Encoding Ascii
 foreach ($file in $dwgFiles) {
     Write-Host "Limpiando: $($file.Name)" -ForegroundColor Green
     
-    # Ejecución controlada invocando el wrapper
-    # SOLUCIÓN: Se agregan comillas al principio y al final de todos los argumentos (`" ... `") 
-    # para evitar que cmd.exe elimine las comillas internas de las rutas con espacios.
-    $procArgs = "/c `"`"$wrapperPath`" /i `"$($file.FullName)`" /s `"$scriptPath`"`""
-    $proc = Start-Process -FilePath "cmd.exe" -ArgumentList $procArgs -Wait -NoNewWindow -PassThru
+    $argList = "/i `"$($file.FullName)`" /s `"$scriptPath`""
+    $proc = Start-Process -FilePath $enginePath -ArgumentList $argList -Wait -NoNewWindow -PassThru
     if ($proc.ExitCode -ne 0) {
         Write-Host "  [ERROR] Proceso CAD falló para $($file.Name) con código $($proc.ExitCode)." -ForegroundColor Red
         $errores++

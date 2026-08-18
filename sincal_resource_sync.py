@@ -29,6 +29,7 @@ MAX_TOTAL_UPDATE_BYTES = 250 * 1024 * 1024
 REQUIRED_RESOURCES = {
     "lisps/SINCAL.lsp",
     "masters/FORMATOS ANOTATIVOS ACAD_2025.dwg",
+    "scripts/SINCAL_ENGINE.ps1",
 }
 CAD_RESOURCE_PREFIXES = ("lisps/", "startup/", "scripts/", "plotstyles/", "masters/")
 TEXT_EXTENSIONS = {".lsp", ".ps1", ".bat", ".scr", ".json"}

@@ -1,10 +1,10 @@
 # SINCAL — Suite de Ingeniería y Estándares CAD
 
-**SINCAL Suite 1.0** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión del producto se mantiene como 1.0 y la secuencia técnica continúa en `v28.0.4` para conservar la actualización desde instalaciones históricas v27.
+**SINCAL Suite 1.0** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión del producto se mantiene como 1.0 y la secuencia técnica continúa en `v28.0.5` para conservar la actualización desde instalaciones históricas v27.
 
 ## Instalación web y distribución
 
-SINCAL se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v28.0.4.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
+SINCAL se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v28.0.5.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
 
 El programa base no incorpora los 125 MB de mapas regionales. El paquete web sí contiene una copia inicial del master DWG, LISPs, startup, scripts, plumilla, calibración y ayuda estructural para que el primer arranque sea funcional. GitHub mantiene esos recursos al día mediante actualizaciones menores. Cada mapa regional se descarga solamente cuando se selecciona por primera vez en el módulo Ubicación.
 
@@ -12,13 +12,16 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
 
 ## Primer inicio
 
-1. Ejecuta el instalador oficial de la release `v28.0.4`.
+1. Ejecuta el instalador oficial de la release `v28.0.5`.
 2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
-3. Pulsa **Preparar integración CAD**.
-4. Reinicia AutoCAD/ZWCAD una vez para activar el cargador y las rutas de confianza.
-5. Abre **Documentación** para consultar el manual buscable de comandos y módulos.
+3. Abre **Diagnóstico**, verifica el motor CAD sugerido y cámbialo si necesitas otra versión.
+4. Pulsa **Preparar integración CAD**.
+5. Reinicia AutoCAD/ZWCAD una vez para activar el cargador y las rutas de confianza.
+6. Abre **Documentación** para consultar el manual buscable de comandos y módulos.
 
 La copia base de los recursos esenciales queda junto a la aplicación. Las revisiones descargadas se almacenan en `%LOCALAPPDATA%\SINCAL\resources` y la integración CAD activa se materializa en `%APPDATA%\Estandar SINCAL`.
+
+Al cerrar la ventana principal con **X**, SINCAL finaliza su proceso. La aplicación no se oculta en la bandeja ni permanece abierta en segundo plano.
 
 ## Componentes principales
 
@@ -46,6 +49,8 @@ La pestaña permite cargar una carpeta DWG/DXF, marcar archivos, renombrarlos po
 
 Acciones disponibles sobre planos cerrados: Auditar, Purgar, Encuadrar vista, Eliminar Layout2/A1, Bloquear viewports, Configurar layouts A1 y Plotear PDF A1. Antes de ejecutarlas, guarda un respaldo, prepara la integración y cierra completamente AutoCAD/ZWCAD. Los botones de automatización cerrada recorren todos los DWG de la carpeta seleccionada.
 
+SINCAL registra en `%LOCALAPPDATA%\SINCAL\runtime\cad_engine.json` el ejecutable elegido y lo entrega directamente a PowerShell. `cad_wrapper.bat` se conserva sólo para compatibilidad. Cada proceso deja motor, versión, código de salida, duración y últimas líneas de error en el registro local de incidentes.
+
 ### Módulo estructural
 
 Genera vistas y despieces de armaduras mediante comandos temporales enviados al CAD abierto:
@@ -67,6 +72,12 @@ Lee puntos desde un KMZ de Google Earth, permite escoger un mapa MOP calibrado y
 5. Generar y guardar el croquis.
 
 La primera utilización de una región solicita descargar su mapa y lo valida antes de guardarlo localmente.
+
+### Diagnóstico y soporte
+
+La pestaña **Diagnóstico** comprueba recursos esenciales, LISPs, CMD, PowerShell, permisos de escritura, procesos CAD y todas las instalaciones AutoCAD/ZWCAD detectadas. Permite seleccionar explícitamente el motor usado por el procesamiento masivo.
+
+El botón **Generar informe ZIP** crea `diagnostico.json`, `resumen.txt`, una copia limitada del log y una declaración de privacidad. El informe no incorpora DWG ni credenciales y sustituye usuario, equipo, correo y ruta del proyecto por marcadores anónimos. Los informes permanecen locales hasta que el usuario decide enviarlos.
 
 ### Documentación integrada
 
@@ -93,10 +104,10 @@ El proceso valida código y pruebas, compila y firma el plugin y la aplicación,
 
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v28.0.4.exe`
-- `SINCAL_App_v28.0.4.zip`
-- `SINCAL_AutoCAD_v28.0.4.zip`
-- `release-manifest_v28.0.4.json`
+- `Setup_SINCAL_v28.0.5.exe`
+- `SINCAL_App_v28.0.5.zip`
+- `SINCAL_AutoCAD_v28.0.5.zip`
+- `release-manifest_v28.0.5.json`
 - `SHA256SUMS.txt`
 
 No renombres los paquetes después de compilar: el instalador usa URLs versionadas y hashes fijados en el momento del build.
@@ -105,4 +116,4 @@ No renombres los paquetes después de compilar: el instalador usa URLs versionad
 
 El repositorio de desarrollo puede ser privado. El canal público contiene únicamente recursos autorizados y binarios de release; no recibe fuentes Python/.NET ni secretos. Protege `main`, limita el acceso de escritura y conserva la revisión de los LISPs y scripts, ya que son código ejecutable.
 
-Los registros locales están en `%LOCALAPPDATA%\SINCAL\logs\sincal.log`. Si los comandos CAD no aparecen, actualiza recursos, vuelve a preparar la integración y reinicia CAD. Si una descarga falla, revisa conexión, proxy y antivirus antes de reintentar.
+Los registros locales están en `%LOCALAPPDATA%\SINCAL\logs\sincal.log` y los incidentes estructurados en `%LOCALAPPDATA%\SINCAL\diagnostics\incidents.jsonl`. Ninguno se transmite automáticamente. Si los comandos CAD no aparecen, actualiza recursos, ejecuta Diagnóstico, vuelve a preparar la integración y reinicia CAD. Si una descarga falla, revisa conexión, proxy y antivirus antes de reintentar.

@@ -25,6 +25,7 @@ MANIFEST_FILE = "manifest.json"
 REQUIRED_RESOURCES = {
     "lisps/SINCAL.lsp",
     "masters/FORMATOS ANOTATIVOS ACAD_2025.dwg",
+    "scripts/SINCAL_ENGINE.ps1",
 }
 
 

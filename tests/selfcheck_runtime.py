@@ -6,7 +6,13 @@ import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sincal_runtime import VERSION_ACTUAL, ruta_recurso, ruta_runtime, asegurar_directorios
+from sincal_runtime import (
+    VERSION_ACTUAL,
+    asegurar_directorios,
+    ruta_recurso,
+    ruta_recurso_instalado,
+    ruta_runtime,
+)
 from sincal_resource_sync import git_blob_sha
 from modulos.tab_ubicacion import _leer_kml_desde_kmz, _parsear_kml_puntos
 
@@ -21,6 +27,7 @@ def main() -> int:
         ruta_recurso("tutoriales.json"),
         ruta_recurso("scripts", "AUDIT.ps1"),
         ruta_recurso("scripts", "AUDIT.scr"),
+        ruta_recurso_instalado("scripts", "SINCAL_ENGINE.ps1"),
         ruta_recurso("mapas", "mapas_calibrados.json"),
         ruta_recurso("lisps", "SINCAL.lsp"),
         ruta_recurso("masters", "FORMATOS ANOTATIVOS ACAD_2025.dwg"),

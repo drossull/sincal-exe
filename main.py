@@ -2,12 +2,12 @@ import importlib
 import tkinter as tk
 from tkinter import messagebox
 from sincal_runtime import asegurar_directorios
+from sincal_diagnostics import record_incident
 
 # --- IMPORTACIONES FANTASMA PARA EL COMPILADOR (OBLIGATORIO) ---
 import customtkinter
 import win32com.client
 import pythoncom
-import pystray
 from PIL import Image
 # ----------------------------------------------------------------
 
@@ -27,6 +27,7 @@ def iniciar():
         importlib.reload(core_sincal)
         core_sincal.arrancar()
     except Exception as e:
+        record_incident("inicio_aplicacion", "error", {"error": str(e)})
         mostrar_error_critico("SINCAL - Error de Núcleo",
                               f"El núcleo gráfico falló al iniciar. Revisa el detalle técnico y reinstala SINCAL si faltan recursos locales.\n\nDetalle técnico:\n{e}")
 
