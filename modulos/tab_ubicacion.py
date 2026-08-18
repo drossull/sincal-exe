@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import threading
 import xml.etree.ElementTree as ET
 import zipfile
 from tkinter import filedialog, messagebox
@@ -9,6 +10,7 @@ import customtkinter as ctk
 from PIL import Image, ImageDraw
 
 from sincal_runtime import ruta_recurso
+from sincal_resource_sync import ensure_resource_available
 
 KMZ_MAX_BYTES = 10 * 1024 * 1024
 KML_MAX_BYTES = 5 * 1024 * 1024
@@ -140,6 +142,22 @@ class TabUbicacion(ctk.CTkFrame):
             except Exception as e:
                 self.parent_app.log(
                     f"[X] Error leyendo mapas_calibrados.json: {e}")
+
+    def recargar_recursos(self):
+        self.datos_mapas = {}
+        self.cargar_bd_mapas()
+        if not hasattr(self, "combo_mapas"):
+            return
+        lista_mapas = list(self.datos_mapas) if self.datos_mapas else [
+            "No hay mapas calibrados válidos"
+        ]
+        self.combo_mapas.configure(
+            values=lista_mapas,
+            state="normal" if self.datos_mapas else "disabled",
+        )
+        self.combo_mapas.set(
+            "Seleccione Mapa Base..." if self.datos_mapas else lista_mapas[0]
+        )
 
     @staticmethod
     def mapa_esta_calibrado(datos_calibracion):
@@ -325,8 +343,22 @@ class TabUbicacion(ctk.CTkFrame):
             ruta_mapa_base = ruta_recurso("mapas", datos_calibracion["archivo"])
 
             if not os.path.exists(ruta_mapa_base):
-                messagebox.showerror(
-                    "Archivo Faltante", f"No se encontró la imagen base:\n{ruta_mapa_base}\nReinstala SINCAL o prepara nuevamente el runtime local.", parent=ventana_principal)
+                if not messagebox.askyesno(
+                    "Descargar mapa regional",
+                    "La imagen de esta región todavía no está en el equipo.\n\n"
+                    "¿Deseas descargarla ahora desde el canal oficial de SINCAL?",
+                    parent=ventana_principal,
+                ):
+                    return
+                relativa = f"mapas/{datos_calibracion['archivo']}"
+                self.btn_generar_croquis.configure(
+                    state="disabled", text="Descargando mapa regional..."
+                )
+                threading.Thread(
+                    target=self._hilo_descargar_mapa,
+                    args=(relativa,),
+                    daemon=True,
+                ).start()
                 return
 
             nombre_limpio = "".join(
@@ -407,3 +439,28 @@ class TabUbicacion(ctk.CTkFrame):
             ventana = self.winfo_toplevel()
             messagebox.showerror(
                 "Error", f"Ocurrió un error inesperado al procesar:\n{str(e)}", parent=ventana)
+
+    def _hilo_descargar_mapa(self, relativa):
+        try:
+            ensure_resource_available(relativa)
+            self.parent_app.log(f"[OK] Mapa regional descargado: {relativa}")
+            self.parent_app._ui(self._mapa_descargado)
+        except Exception as e:
+            self.parent_app.log(f"[X] No se pudo descargar {relativa}: {e}")
+            self.parent_app._ui(self._mapa_descarga_fallida, str(e))
+
+    def _mapa_descargado(self):
+        self.btn_generar_croquis.configure(
+            state="normal", text="🗺️ GENERAR CROQUIS DE UBICACIÓN"
+        )
+        self.generar_croquis_png()
+
+    def _mapa_descarga_fallida(self, detalle):
+        self.btn_generar_croquis.configure(
+            state="normal", text="🗺️ GENERAR CROQUIS DE UBICACIÓN"
+        )
+        messagebox.showerror(
+            "Descarga incompleta",
+            "No fue posible descargar el mapa regional.\n\n" + detalle,
+            parent=self.winfo_toplevel(),
+        )

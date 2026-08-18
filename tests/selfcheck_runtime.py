@@ -51,8 +51,9 @@ def main() -> int:
 
     with open(ruta_recurso("SINCAL_Installer.iss"), encoding="utf-8") as archivo:
         instalador = archivo.read()
-    assert '__pycache__\\*;*.pyc' not in instalador, "Excludes de Inno debe separar patrones con comas"
-    assert 'Excludes: "__pycache__\\*,*.pyc' in instalador, "Falta excluir cachés Python del instalador"
+    assert instalador.count("external download extractarchive") == 2, "Faltan paquetes del instalador web"
+    assert 'Hash: "{#AppPayloadHash}"' in instalador, "Falta validar el paquete de aplicación"
+    assert 'Hash: "{#PluginPayloadHash}"' in instalador, "Falta validar el paquete del plugin"
 
     with tempfile.TemporaryDirectory() as tmp:
         kmz_ok = os.path.join(tmp, "ok.kmz")
@@ -89,7 +90,7 @@ def main() -> int:
         assert "Y" in estructuras_invalid
         assert ignorados_invalid == 1
 
-    print("OK: runtime local y recursos empaquetados válidos")
+    print("OK: runtime local, recursos y configuración web válidos")
     return 0
 
 

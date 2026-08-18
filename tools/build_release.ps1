@@ -35,6 +35,14 @@ function Assert-VersionConsistency([string]$ProjectRoot, [string]$Version) {
     if ($installer -notmatch '#error AppVersionTag must be supplied by the build script\.') {
         throw 'SINCAL_Installer.iss no está parametrizado para AppVersionTag.'
     }
+    foreach ($define in @(
+        'AppPayloadUrl', 'AppPayloadHash', 'AppPayloadSize',
+        'PluginPayloadUrl', 'PluginPayloadHash', 'PluginPayloadSize'
+    )) {
+        if ($installer -notmatch ("#error " + [regex]::Escape($define) + " must be supplied by the build script\.")) {
+            throw "SINCAL_Installer.iss no está parametrizado para $define."
+        }
+    }
 
     $bundle = Get-Content (Join-Path $ProjectRoot 'cad-packages\Autodesk\SINCAL.bundle\PackageContents.xml') -Raw
     if ($bundle -notmatch ('AppVersion="' + [regex]::Escape($normalizedVersion) + '"')) {
@@ -243,11 +251,94 @@ function Write-Checksums([string]$ProjectRoot, [string[]]$Paths) {
     return $outputPath
 }
 
+function New-ReleasePayloads(
+    [string]$ProjectRoot,
+    [string]$Version,
+    [string]$DistExe,
+    [string]$AppPayload,
+    [string]$PluginPayload,
+    [string]$StageRoot
+) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $appStage = Join-Path $StageRoot 'app'
+    $pluginStage = Join-Path $StageRoot 'plugin'
+    New-Item -ItemType Directory -Force -Path $appStage, $pluginStage | Out-Null
+
+    foreach ($relative in @('logo.ico', 'version.json', 'README.md', 'tutoriales.json')) {
+        Copy-Item (Join-Path $ProjectRoot $relative) (Join-Path $appStage $relative) -Force
+    }
+    Copy-Item $DistExe (Join-Path $appStage 'SINCAL.exe') -Force
+
+    $bundleSource = Join-Path $ProjectRoot 'cad-packages\Autodesk\SINCAL.bundle'
+    Copy-Item (Join-Path $bundleSource '*') $pluginStage -Recurse -Force
+
+    [System.IO.Compression.ZipFile]::CreateFromDirectory(
+        $appStage,
+        $AppPayload,
+        [System.IO.Compression.CompressionLevel]::Optimal,
+        $false
+    )
+    [System.IO.Compression.ZipFile]::CreateFromDirectory(
+        $pluginStage,
+        $PluginPayload,
+        [System.IO.Compression.CompressionLevel]::Optimal,
+        $false
+    )
+
+    return [pscustomobject]@{
+        AppHash = (Get-FileHash $AppPayload -Algorithm SHA256).Hash.ToLowerInvariant()
+        AppInstalledBytes = [int64](Get-ChildItem $appStage -Recurse -File | Measure-Object Length -Sum).Sum
+        PluginHash = (Get-FileHash $PluginPayload -Algorithm SHA256).Hash.ToLowerInvariant()
+        PluginInstalledBytes = [int64](Get-ChildItem $pluginStage -Recurse -File | Measure-Object Length -Sum).Sum
+    }
+}
+
+function Write-ReleaseManifest(
+    [string]$Path,
+    [string]$Version,
+    [string]$Installer,
+    [string]$AppPayload,
+    [string]$PluginPayload,
+    [string]$AppUrl,
+    [string]$PluginUrl
+) {
+    $manifest = [ordered]@{
+        schema = 1
+        product = 'SINCAL Suite 1.0'
+        release = $Version
+        assets = [ordered]@{
+            installer = [ordered]@{
+                name = [IO.Path]::GetFileName($Installer)
+                bytes = (Get-Item $Installer).Length
+                sha256 = (Get-FileHash $Installer -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+            application = [ordered]@{
+                name = [IO.Path]::GetFileName($AppPayload)
+                url = $AppUrl
+                bytes = (Get-Item $AppPayload).Length
+                sha256 = (Get-FileHash $AppPayload -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+            autocad_plugin = [ordered]@{
+                name = [IO.Path]::GetFileName($PluginPayload)
+                url = $PluginUrl
+                bytes = (Get-Item $PluginPayload).Length
+                sha256 = (Get-FileHash $PluginPayload -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+        }
+    }
+    $manifest | ConvertTo-Json -Depth 8 | Set-Content -Path $Path -Encoding UTF8
+    return $Path
+}
+
 $projectRoot = Get-ProjectRoot
 $version = Read-Version $projectRoot
 $distExe = Join-Path $projectRoot 'dist\SINCAL.exe'
 $pluginDll = Join-Path $projectRoot 'cad-packages\Autodesk\SINCAL.bundle\Contents\AutoCAD2025\Sincal.AutoCAD2025.dll'
 $installerExe = Join-Path $projectRoot ("installer_output\Setup_SINCAL_{0}.exe" -f $version)
+$appPayload = Join-Path $projectRoot ("installer_output\SINCAL_App_{0}.zip" -f $version)
+$pluginPayload = Join-Path $projectRoot ("installer_output\SINCAL_AutoCAD_{0}.zip" -f $version)
+$releaseManifest = Join-Path $projectRoot ("installer_output\release-manifest_{0}.json" -f $version)
+$payloadStage = Join-Path $projectRoot 'payload_stage'
 
 Write-Step "Validando versión"
 Assert-VersionConsistency -ProjectRoot $projectRoot -Version $version
@@ -264,6 +355,10 @@ Write-Step "Limpiando artefactos previos"
 Remove-ArtifactIfExists (Join-Path $projectRoot 'build')
 Remove-ArtifactIfExists $distExe
 Remove-ArtifactIfExists $installerExe
+Remove-ArtifactIfExists $appPayload
+Remove-ArtifactIfExists $pluginPayload
+Remove-ArtifactIfExists $releaseManifest
+Remove-ArtifactIfExists $payloadStage
 Remove-ArtifactIfExists (Join-Path $projectRoot 'installer_output\SHA256SUMS.txt')
 
 Write-Step "Compilando ejecutable"
@@ -292,12 +387,34 @@ if (-not $SkipSigning) {
     Sign-File -Path $pluginDll -Certificate $certificate
 }
 
+Write-Step "Creando paquetes remotos"
+$payloadInfo = New-ReleasePayloads `
+    -ProjectRoot $projectRoot `
+    -Version $version `
+    -DistExe $distExe `
+    -AppPayload $appPayload `
+    -PluginPayload $pluginPayload `
+    -StageRoot $payloadStage
+Remove-ArtifactIfExists $payloadStage
+$releaseBaseUrl = "https://github.com/drossull/sincal-updates/releases/download/$version"
+$appPayloadUrl = "$releaseBaseUrl/$([IO.Path]::GetFileName($appPayload))"
+$pluginPayloadUrl = "$releaseBaseUrl/$([IO.Path]::GetFileName($pluginPayload))"
+
 Write-Step "Compilando instalador"
 $iscc = Resolve-InnoSetupPath -Provided $InnoSetupPath
 $normalizedVersion = $version.TrimStart('v', 'V')
 Push-Location $projectRoot
 try {
-    & $iscc "/DAppVersion=$normalizedVersion" "/DAppVersionTag=$version" 'SINCAL_Installer.iss'
+    & $iscc `
+        "/DAppVersion=$normalizedVersion" `
+        "/DAppVersionTag=$version" `
+        "/DAppPayloadUrl=$appPayloadUrl" `
+        "/DAppPayloadHash=$($payloadInfo.AppHash)" `
+        "/DAppPayloadSize=$($payloadInfo.AppInstalledBytes)" `
+        "/DPluginPayloadUrl=$pluginPayloadUrl" `
+        "/DPluginPayloadHash=$($payloadInfo.PluginHash)" `
+        "/DPluginPayloadSize=$($payloadInfo.PluginInstalledBytes)" `
+        'SINCAL_Installer.iss'
     if ($LASTEXITCODE -ne 0) {
         throw 'ISCC terminó con error.'
     }
@@ -312,11 +429,26 @@ if (-not $SkipSigning) {
     Sign-File -Path $installerExe -Certificate $certificate
 }
 
+Write-Step "Generando manifiesto de release"
+Write-ReleaseManifest `
+    -Path $releaseManifest `
+    -Version $version `
+    -Installer $installerExe `
+    -AppPayload $appPayload `
+    -PluginPayload $pluginPayload `
+    -AppUrl $appPayloadUrl `
+    -PluginUrl $pluginPayloadUrl | Out-Null
+
 Write-Step "Generando checksums"
-$checksumFile = Write-Checksums -ProjectRoot $projectRoot -Paths @($installerExe)
+$checksumFile = Write-Checksums -ProjectRoot $projectRoot -Paths @(
+    $installerExe,
+    $appPayload,
+    $pluginPayload,
+    $releaseManifest
+)
 
 Write-Step "Resumen"
-Get-Item $distExe, $pluginDll, $installerExe, $checksumFile | Select-Object FullName,Length,LastWriteTime | Format-List
+Get-Item $distExe, $pluginDll, $installerExe, $appPayload, $pluginPayload, $releaseManifest, $checksumFile | Select-Object FullName,Length,LastWriteTime | Format-List
 if (-not $SkipSigning) {
     Get-AuthenticodeSignature $distExe, $pluginDll, $installerExe | Select-Object Path,Status,StatusMessage,@{n='Subject';e={$_.SignerCertificate.Subject}},@{n='NotAfter';e={$_.SignerCertificate.NotAfter}},@{n='Timestamp';e={$_.TimeStamperCertificate.Subject}} | Format-List
 }

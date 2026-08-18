@@ -1,70 +1,280 @@
 {
+  "schema": 2,
+  "temas": [
+    {
+      "id": "primer-inicio",
+      "categoria": "Inicio",
+      "titulo": "Primer inicio y preparación",
+      "tags": "instalar iniciar preparar autocad zwcad",
+      "contenido": "1. Instala SINCAL con el instalador web oficial y mantén conexión a Internet durante la descarga.\n2. Abre SINCAL desde el menú Inicio.\n3. Acepta la descarga inicial de recursos CAD: master DWG, LISPs, startup, scripts y plumilla.\n4. Pulsa Preparar integración CAD. SINCAL detectará AutoCAD o ZWCAD, creará el puente para procesos cerrados y registrará la ruta de confianza.\n5. Reinicia CAD una vez. Al abrir un dibujo debe aparecer el mensaje SINCAL STARTUP CARGADO EXITOSAMENTE.\n\nLos mapas regionales grandes no se descargan durante la instalación. El módulo Ubicación descarga solamente la región elegida cuando se usa por primera vez."
+    },
+    {
+      "id": "actualizaciones",
+      "categoria": "Inicio",
+      "titulo": "Actualizaciones del programa y recursos",
+      "tags": "update github release manifest minuto",
+      "contenido": "SINCAL separa dos tipos de actualización.\n\nPROGRAMA: cambios en Python, interfaz o plugin .NET requieren una release nueva. El botón Verificar nueva actualización abre el instalador oficial.\n\nRECURSOS: LISPs, startup, scripts, plumilla, mapas, tutoriales y master DWG llegan sin reinstalar. SINCAL revisa el manifiesto al iniciar y cada minuto; cuando detecta una publicación nueva, muestra un aviso.\n\nCada descarga se limita por tipo y tamaño y se valida contra el SHA publicado antes de activarse. Si pospones un aviso, puedes usar Actualizar recursos CAD."
+    },
+    {
+      "id": "integracion-cad",
+      "categoria": "Recursos CAD",
+      "titulo": "Integración con AutoCAD y ZWCAD",
+      "tags": "acaddoc trustedpath wrapper appdata cad",
+      "contenido": "Preparar integración CAD materializa los recursos activos en %APPDATA%\\Estandar SINCAL, crea acaddoc.lsp y prepara %LOCALAPPDATA%\\SINCAL\\runtime\\cad_wrapper.bat. También intenta registrar la carpeta como ruta de soporte y confianza en los perfiles CAD encontrados.\n\nUsa esta acción después de una instalación nueva, de cambiar de versión de AutoCAD/ZWCAD o si los procesos masivos informan que no encuentran la consola CAD. Reinicia CAD después de prepararla."
+    },
+    {
+      "id": "startup",
+      "categoria": "Recursos CAD",
+      "titulo": "Inicio automático SINCAL_STARTUP",
+      "tags": "startup mirrtext fieldeval dynmode escalas propiedades colores",
+      "contenido": "SINCAL_STARTUP.lsp se carga en cada dibujo mediante acaddoc.lsp. Ajusta MIRRTEXT=0, FIELDEVAL=31 y DYNMODE=3; crea y ordena las propiedades personalizadas de viñeta sin perder valores; agrega escalas oficiales para modelos dibujados en metros; y habilita los atajos C0 a C9.\n\nNo es necesario ejecutar el archivo manualmente. Si no aparece el mensaje de carga, vuelve a Preparar integración CAD, revisa las rutas de confianza y abre un dibujo nuevo."
+    },
+    {
+      "id": "master-dwg",
+      "categoria": "Recursos CAD",
+      "titulo": "Master DWG y estándares anotativos",
+      "tags": "formatos anotativos master bloques viñetas capas estilos",
+      "contenido": "FORMATOS ANOTATIVOS ACAD_2025.dwg es la fuente maestra de bloques, viñetas, capas y estilos. El comando SINCAL inserta y explota temporalmente el master para importar o redefinir sus definiciones, luego elimina la geometría insertada.\n\nPara publicar una modificación: edita una copia, valida bloques y atributos, guarda en la misma versión DWG, reemplaza el archivo del repositorio, haz commit y push. El canal público lo distribuye y SINCAL avisa dentro del siguiente ciclo de revisión. Mantén siempre un respaldo antes de editarlo."
+    },
+    {
+      "id": "inventario-recursos",
+      "categoria": "Recursos CAD",
+      "titulo": "Qué contiene cada carpeta",
+      "tags": "lisps startup scripts plotstyles mapas tutoriales",
+      "contenido": "lisps/: comandos interactivos cargados en los dibujos.\nstartup/: inicialización automática por documento.\nscripts/: BAT, PowerShell y SCR usados por la automatización masiva.\nplotstyles/: plumillas CTB; actualmente SINCAL_A1 (2025).ctb.\nmasters/: DWG central de formatos anotativos.\nmapas/: calibración, ayuda gráfica y mapas regionales descargables.\ntutoriales.json: contenido estructurado de esta biblioteca.\n\nLos recursos activos se guardan en %LOCALAPPDATA%\\SINCAL\\resources y se copian a la integración CAD cuando corresponde."
+    },
+    {
+      "id": "procesamiento-general",
+      "categoria": "Procesamiento masivo",
+      "titulo": "Flujo general y precauciones",
+      "tags": "dwg dxf carpeta seleccionar respaldo cerrar cad",
+      "contenido": "1. Haz una copia de seguridad de la carpeta del proyecto.\n2. Pulsa Cargar Carpeta DWG/DXF y marca únicamente los archivos que deseas intervenir.\n3. Para renombrar o convertir DXF, la selección de casillas sí determina los archivos.\n4. Los botones de automatización cerrada procesan todos los DWG de la carpeta; cierra AutoCAD/ZWCAD antes de ejecutarlos.\n5. Lee la consola hasta ver código de salida 0 y revisa una muestra antes de continuar.\n\nNo interrumpas accoreconsole ni apagues el equipo durante un proceso. Usa nombres de archivo únicos y evita carpetas sincronizadas que estén bloqueando DWG."
+    },
+    {
+      "id": "renombrado",
+      "categoria": "Procesamiento masivo",
+      "titulo": "Buscar, reemplazar y convertir DXF",
+      "tags": "rename reemplazar dxf dwg",
+      "contenido": "RENOMBRAR: carga la carpeta, marca archivos, escribe el fragmento exacto en Buscar y el nuevo texto en Reemplazar. Revisa que el resultado no coincida con un archivo existente y pulsa Aplicar Reemplazo.\n\nCONVERTIR DXF A DWG: marca los DXF y pulsa Convertir. SINCAL abre una instancia CAD en segundo plano y guarda cada archivo con extensión DWG. Cierra CAD antes de comenzar y confirma que cada DWG resultante tenga contenido."
+    },
+    {
+      "id": "comandos-vivo",
+      "categoria": "Procesamiento masivo",
+      "titulo": "Comandos en planos abiertos",
+      "tags": "com live sendcommand cancelar",
+      "contenido": "Esta herramienta envía el mismo comando a todos los dibujos abiertos accesibles en AutoCAD/ZWCAD. Escribe un comando completo, por ejemplo ZE o _QSAVE, y pulsa Ejecutar. SINCAL activa cada documento, cancela órdenes pendientes y envía el texto.\n\nNo envíes comandos que requieran clics o respuestas distintas por dibujo. Usa Cancelar para detener el recorrido; el comando que ya llegó a CAD puede necesitar ESC dentro del propio programa."
+    },
+    {
+      "id": "automatizacion-cerrada",
+      "categoria": "Procesamiento masivo",
+      "titulo": "Automatización de planos cerrados",
+      "tags": "audit purge zoom dl2 bv pagesetup publish pdf",
+      "contenido": "AUDITAR repara la base de datos de cada DWG.\nPURGAR ejecuta AUDIT, elimina elementos y aplicaciones registradas sin uso, encuadra y guarda.\nENCUADRAR VISTA aplica Zoom Extents y guarda.\nELIMINAR LAYOUT2 borra Layout2 y A1 cuando no están activos.\nBLOQUEAR VIEWPORTS protege las ventanas de presentación.\nCONFIGURAR EN A1 aplica impresora PDF, papel A1, escala 1:1, CTB, transparencia y 300 DPI.\nPLOTEO A1 configura y exporta PDF, comprobando archivos de salida.\n\nTodos requieren integración CAD preparada, CAD cerrado y permisos de escritura en la carpeta."
+    },
+    {
+      "id": "modulo-estructural",
+      "categoria": "Módulo estructural",
+      "titulo": "Armaduras de estribos y travesaños",
+      "tags": "zapata estribo travesaño vista despiece json bim",
+      "contenido": "El módulo genera geometría y despieces mediante comandos temporales enviados al dibujo CAD abierto.\n\nESTRIBOS: completa dimensiones de zapata, recubrimientos, diámetros y espaciamientos. Los botones Vista Frontal y Secciones A/B/C dibujan la vista; el botón D contiguo genera su despiece. Las pestañas Muros y Consola y Topes están reservadas para desarrollo y no generan elementos todavía.\n\nTRAVESAÑOS: define recubrimiento, espesor, esviaje, diámetros, largo de fierros de viga y cantidad. Selecciona Extremo Izquierdo/Derecho, Sobre Tope, Macizo o Viga; D genera despiece. Sigue los puntos solicitados en CAD y conserva unidades: geometría en cm, diámetros en mm y ángulo en grados.\n\nCARGAR JSON: importa campos compatibles del proyecto y convierte valores mapeados a cm/grados. Revisa siempre los parámetros antes de dibujar."
+    },
+    {
+      "id": "modulo-ubicacion",
+      "categoria": "Módulo de ubicación",
+      "titulo": "Croquis desde Google Earth KMZ",
+      "tags": "kmz kml gps latitud longitud mop png mapa región",
+      "contenido": "1. En Google Earth crea puntos para las estructuras y guarda el conjunto como KMZ.\n2. Pulsa Cargar KMZ; SINCAL lee doc.kml o el único KML disponible y lista los Placemark con geometría Point.\n3. Selecciona un enlace y verifica latitud/longitud.\n4. Elige el mapa MOP regional correspondiente.\n5. Usa microajuste solo si necesitas desplazar el marcador: X positivo al Este y Y positivo al Sur.\n6. Pulsa Generar croquis, acepta la descarga de la región si es la primera vez y elige el PNG de salida.\n\nEl KMZ admite hasta 10 MB y 10.000 puntos válidos. La coordenada debe caer dentro de la calibración del mapa seleccionado. Los mapas regionales se verifican antes de guardarse localmente."
+    },
+    {
+      "id": "solucion-problemas",
+      "categoria": "Ayuda",
+      "titulo": "Solución de problemas frecuentes",
+      "tags": "error logs consola recursos cad mapa",
+      "contenido": "COMANDOS NO CARGAN: actualiza recursos, pulsa Preparar integración CAD y reinicia CAD.\nMASTER NO ENCONTRADO: acepta la actualización inicial y comprueba que el archivo exista en %LOCALAPPDATA%\\SINCAL\\resources\\masters.\nPROCESO MASIVO FALLA: cierra CAD, verifica cad_wrapper.bat y prueba con un DWG de copia.\nMAPAS VACÍOS: actualiza recursos para recibir mapas_calibrados.json; vuelve a abrir el módulo.\nDESCARGA FALLA: revisa Internet, proxy/antivirus y vuelve a intentar.\n\nLos registros están en %LOCALAPPDATA%\\SINCAL\\logs\\sincal.log. El botón Consola muestra los mensajes de la sesión actual."
+    }
+  ],
+  "comandos_lisp": {
     "SINCAL": {
-        "titulo": "Importar Estándar SINCAL",
-        "descripcion": "El comando núcleo del estándar. Importa de forma masiva todas las capas oficiales, estilos de texto RomanD, dimensiones y bloques desde el archivo maestro central. Si el bloque o estilo ya existe, lo redefine para asegurar que el plano esté actualizado según la última normativa de la oficina."
+      "titulo": "Importar el estándar desde el master",
+      "descripcion": "Importa o redefine bloques, capas y estilos usando el master DWG activo y elimina la geometría temporal.",
+      "pasos": ["Abre el dibujo que deseas normalizar.", "Escribe SINCAL y presiona Enter.", "Espera el mensaje de éxito y revisa las definiciones importadas."],
+      "notas": ["Descarga primero el master desde Actualizar recursos CAD.", "Guarda una copia del DWG antes de redefinir estándares existentes."],
+      "tags": ["master", "bloques", "capas"]
     },
     "BV": {
-        "titulo": "Bloqueo de Viewports",
-        "descripcion": "Escanea el layout actual y bloquea la visualización de todas las ventanas gráficas. Es una medida de seguridad vital para evitar que el encuadre o la escala de impresión se pierdan accidentalmente al navegar por el plano."
+      "titulo": "Bloquear viewports",
+      "descripcion": "Bloquea todas las ventanas gráficas del layout actual, excepto la ventana de papel.",
+      "pasos": ["Activa el layout que deseas proteger.", "Escribe BV y presiona Enter."],
+      "notas": ["No funciona en Model.", "Para varios archivos usa Bloquear Viewports en Procesamiento masivo."],
+      "tags": ["layout", "viewport"]
     },
-    "COPY-PROPS / PASTE-PROPS": {
-        "titulo": "Clonar Propiedades entre Planos",
-        "descripcion": "Conjunto de comandos para copiar datos de viñetas entre archivos.\n\n• COPY-PROPS: Copia las 6 propiedades generales (Estructura, Revisión, Fechas y Ubicación) a la memoria.\n• PASTE-PROPS: Pega las propiedades copiadas en el archivo actual, te pregunta por los 2 datos específicos de esa hoja (Nombre del plano y Total de planos), y regenera la viñeta automáticamente."
+    "CEVIADA": {
+      "titulo": "Cotas para elementos esviados",
+      "descripcion": "Crea una cota alineada y muestra además la dimensión recta calculada con el coseno del ángulo de esviaje; admite cotas continuas.",
+      "pasos": ["Escribe CEVIADA.", "Define ángulo y precisión la primera vez o usa las opciones Angulo/Precision.", "Marca los dos puntos y ubica la cota.", "Continúa acotando o termina con Enter/ESC."],
+      "notas": ["El ángulo y la precisión se recuerdan durante la sesión."],
+      "tags": ["cota", "esviaje"]
     },
-    "CUSTOM-PROPS": {
-        "titulo": "Actualizador de Propiedades (DWGPROPS)",
-        "descripcion": "Inicia un asistente interactivo en la línea de comandos para rellenar o modificar los datos de la viñeta del archivo actual. Muestra los valores actuales y te permite sobrescribirlos paso a paso (presionando Enter para mantener el actual) o seleccionar editar solo una propiedad específica."
+    "CPOL": {
+      "titulo": "Polilínea centrada",
+      "descripcion": "Dibuja una polilínea simétrica pasando por un punto central y dos extremos opuestos.",
+      "pasos": ["Escribe CPOL.", "Selecciona el centro.", "Selecciona uno de los extremos."],
+      "notas": ["La distancia elegida se replica al lado opuesto."],
+      "tags": ["polilinea", "centro"]
+    },
+    "DIMEL": {
+      "titulo": "Acotado por línea de corte",
+      "descripcion": "Busca intersecciones a lo largo de una línea ortogonal y genera cotas consecutivas en la capa ES-ACOTADO.",
+      "pasos": ["Escribe DIMEL.", "Marca los extremos de la línea de corte.", "Indica la ubicación de la línea de cotas."],
+      "notas": ["Requiere al menos dos intersecciones válidas.", "Restaura capa, OSNAP y ORTHO al terminar."],
+      "tags": ["dimension", "intersecciones"]
     },
     "DL2": {
-        "titulo": "Eliminar Layout Sobrante",
-        "descripcion": "Elimina la pestaña 'Layout2' que suelen generar programas externos como Tekla. Esto limpia el archivo y acelera el proceso de ploteo por lote al tener solo las hojas necesarias."
+      "titulo": "Eliminar Layout2 y A1",
+      "descripcion": "Elimina las presentaciones llamadas Layout2 y A1 si existen.",
+      "pasos": ["Cambia a Model u otro layout que no vaya a eliminarse.", "Escribe DL2."],
+      "notas": ["No puede borrar el layout que está activo."],
+      "tags": ["layout2", "a1"]
+    },
+    "DUP / DUPLICAR": {
+      "titulo": "Duplicar en el mismo sitio",
+      "descripcion": "Copia la selección con origen y destino 0,0,0, dejando una copia exactamente superpuesta.",
+      "pasos": ["Preselecciona objetos o escribe DUP y selecciónalos.", "Confirma la selección."],
+      "notas": ["Los duplicados superpuestos pueden ser difíciles de detectar; úsalo con intención."],
+      "tags": ["copy", "duplicar"]
+    },
+    "EXTRIMOUT": {
+      "titulo": "Recortar y limpiar fuera de un círculo",
+      "descripcion": "Usa un círculo como límite, recorta cruces y elimina objetos completamente exteriores en el espacio actual.",
+      "pasos": ["Guarda el dibujo.", "Escribe EXTRIMOUT.", "Selecciona el círculo límite y espera la limpieza."],
+      "notas": ["Requiere Express Tools/EXTRIM.", "Revisa el resultado con UNDO disponible."],
+      "tags": ["trim", "circulo", "limpieza"]
     },
     "MC": {
-        "titulo": "Middle Center (Centrar Textos)",
-        "descripcion": "Cambia la justificación de textos simples (DText) y múltiples (MText) a 'Medio Centro' (Middle Center) usando el comando nativo JUSTIFYTEXT, lo que permite cambiar el punto de inserción sin alterar su posición visual en el plano."
+      "titulo": "Centrar textos",
+      "descripcion": "Cambia la justificación de TEXT y MTEXT seleccionados a Middle Center conservando su posición visual.",
+      "pasos": ["Escribe MC.", "Selecciona los textos y confirma."],
+      "notas": ["No modifica contenido ni altura."],
+      "tags": ["texto", "mtext", "justify"]
     },
     "MPEND": {
-        "titulo": "Inclinación de Pendiente (Multileader)",
-        "descripcion": "Alinea e inclina flechas de anotación (Multileaders) basándose en un porcentaje de pendiente ingresado por el usuario (ej. 2 o -2.5), calculando el ángulo matemático exacto de rotación de la directriz."
+      "titulo": "Orientar multileaders por pendiente",
+      "descripcion": "Rota directrices múltiples según un porcentaje de pendiente positivo o negativo.",
+      "pasos": ["Escribe MPEND.", "Ingresa la pendiente porcentual.", "Selecciona los multileaders."],
+      "notas": ["Comprueba el sentido de la flecha después de aplicar pendientes negativas."],
+      "tags": ["multileader", "pendiente"]
     },
     "P0": {
-        "titulo": "Pegar en Origen (0,0,0)",
-        "descripcion": "Pega el contenido del portapapeles como un bloque exactamente en las coordenadas 0,0,0 del espacio actual, ya sea en el Espacio Modelo o Layout, ignorando las referencias a objetos activas."
+      "titulo": "Pegar como bloque en el origen",
+      "descripcion": "Pega el contenido del portapapeles como bloque exactamente en 0,0,0 del espacio actual.",
+      "pasos": ["Copia objetos al portapapeles.", "Activa Model o el layout de destino.", "Escribe P0."],
+      "notas": ["Verifica unidades y sistema de coordenadas del origen."],
+      "tags": ["paste", "origen", "bloque"]
     },
     "PND": {
-        "titulo": "Calculadora de Pendiente",
-        "descripcion": "Calcula de forma automática y muestra en una ventana emergente la pendiente porcentual de cualquier línea o polilínea seleccionada en el dibujo."
+      "titulo": "Calcular pendiente",
+      "descripcion": "Calcula y muestra la pendiente porcentual de una línea o segmento válido.",
+      "pasos": ["Escribe PND.", "Selecciona la línea o polilínea solicitada."],
+      "notas": ["El signo depende del orden geométrico de los extremos."],
+      "tags": ["linea", "porcentaje"]
+    },
+    "PURGEALL": {
+      "titulo": "Limpieza profunda del dibujo",
+      "descripcion": "Ejecuta AUDIT, purga definiciones y aplicaciones registradas sin uso, encuadra y guarda.",
+      "pasos": ["Guarda una copia.", "Escribe PURGEALL y espera a que termine."],
+      "notas": ["Para carpetas completas usa el botón Purgar."],
+      "tags": ["purge", "audit", "limpiar"]
     },
     "RMLAY": {
-        "titulo": "Renombrar Layout",
-        "descripcion": "Permite renombrar la pestaña de presentación actual de forma ágil sin tener que hacer doble clic en ella. Soporta espacios y valida automáticamente que el nombre no esté duplicado."
+      "titulo": "Renombrar el layout actual",
+      "descripcion": "Cambia el nombre de la presentación activa con validación de duplicados.",
+      "pasos": ["Activa el layout.", "Escribe RMLAY.", "Escribe el nuevo nombre y confirma."],
+      "notas": ["No se permite repetir el nombre de otra presentación."],
+      "tags": ["layout", "nombre"]
     },
     "SETUP-A1": {
-        "titulo": "Configurar Layout a A1",
-        "descripcion": "Configura automáticamente todos los Layouts del archivo al formato estándar ISO A1 (841 x 594 mm). Asigna la impresora PDF de Alta Calidad (detecta automáticamente si usas AutoCAD o ZWCAD), establece la escala 1:1, carga la plumilla 'SINCAL_A1 (2025).ctb' y activa la transparencia de trazado y calidad a 300 DPI."
+      "titulo": "Configurar presentaciones A1",
+      "descripcion": "Aplica a todos los layouts impresora PDF, papel A1, escala 1:1, origen 0,0, CTB SINCAL, transparencia y 300 DPI.",
+      "pasos": ["Instala o actualiza la plumilla.", "Escribe SETUP-A1.", "Revisa Page Setup en una presentación."],
+      "notas": ["El nombre del plotter depende de AutoCAD o ZWCAD.", "No procesa Model."],
+      "tags": ["plot", "ctb", "papel"]
+    },
+    "SINCAL-ESCALAS": {
+      "titulo": "Crear escalas para modelo en metros",
+      "descripcion": "Recrea escalas desde 1:5 hasta 1:1000 calibradas para layouts en milímetros y modelo en metros.",
+      "pasos": ["Escribe SINCAL-ESCALAS.", "Asigna la escala deseada a los viewports."],
+      "notas": ["Startup ya intenta crear estas escalas al abrir cada dibujo."],
+      "tags": ["scale", "viewport", "metros"]
     },
     "ST0": {
-        "titulo": "Altura de Texto 0.0",
-        "descripcion": "Establece masivamente la altura de todos los estilos de texto a 0.0. Es necesario cuando los estilos tienen tamaños fijos que limitan la edición. El estándar promueve el uso de textos anotativos gestionados por las propiedades del objeto."
+      "titulo": "Altura fija cero en estilos",
+      "descripcion": "Establece la altura de todos los estilos de texto en 0.0 para permitir alturas por objeto.",
+      "pasos": ["Guarda una copia.", "Escribe ST0 y revisa los estilos."],
+      "notas": ["Afecta todos los estilos del dibujo."],
+      "tags": ["textstyle", "altura"]
+    },
+    "VRAP": {
+      "titulo": "Crear viewports desde áreas de Model",
+      "descripcion": "Registra varias ventanas rectangulares en Model y luego crea viewports independientes en Layout con el mismo encuadre.",
+      "pasos": ["Escribe VRAP y marca las esquinas de cada área en Model.", "Presiona Enter para pasar a Layout.", "Define el rectángulo físico de cada viewport en el mismo orden."],
+      "notas": ["El comando cambia entre Model y Layout automáticamente.", "Ajusta la escala de cada viewport después si corresponde."],
+      "tags": ["mview", "model", "layout"]
     },
     "W08": {
-        "titulo": "Factor de Ancho 0.8",
-        "descripcion": "Aplica de forma global un factor de compresión o ancho (Width Factor) de 0.8 a todos los estilos de texto para estandarizar la estética de los planos de ingeniería."
+      "titulo": "Factor de ancho 0.8",
+      "descripcion": "Aplica Width Factor 0.8 a todos los estilos de texto.",
+      "pasos": ["Guarda una copia.", "Escribe W08 y revisa textos representativos."],
+      "notas": ["Afecta todos los estilos del dibujo."],
+      "tags": ["textstyle", "width"]
     },
     "ZE": {
-        "titulo": "Zoom Extents Rápido",
-        "descripcion": "Atajo optimizado para encuadrar todo el dibujo en pantalla y limpiar la memoria visual de la tarjeta de video en un solo paso."
+      "titulo": "Zoom Extents",
+      "descripcion": "Encuadra todos los objetos visibles mediante Zoom Extents.",
+      "pasos": ["Escribe ZE."],
+      "notas": ["Para carpetas completas usa Encuadrar vista."],
+      "tags": ["zoom", "extents"]
     },
-    "AutoCrearPropiedad": {
-        "titulo": "Preparación de Propiedades",
-        "descripcion": "Este proceso se ejecuta automáticamente cada vez que abres un plano. Analiza la base de datos SummaryInfo del dibujo y se asegura de que existan los campos Nombre_Estructura, Provincia, Comuna, Revisión, entre otros. Si el archivo es antiguo o no tiene estas propiedades, el script las inyecta silenciosamente con valores predeterminados para evitar que los procesos masivos de viñetas fallen."
+    "CUSTOM-PROPS": {
+      "titulo": "Editar propiedades de viñeta",
+      "descripcion": "Recorre las propiedades SINCAL del dibujo, conserva el valor con Enter, actualiza campos y guarda.",
+      "pasos": ["Escribe CUSTOM-PROPS.", "Ingresa valores nuevos o presiona Enter para conservar cada uno.", "Espera la actualización de campos y guardado."],
+      "notas": ["Las coordenadas no se solicitan manualmente en este asistente."],
+      "tags": ["dwgprops", "viñeta", "campos"]
     },
-    "AUTO-DYNMODE": {
-        "titulo": "Entrada Dinámica (DYNMODE)",
-        "descripcion": "Configuración automática que fuerza el encendido de la entrada dinámica (DYNMODE = 3). Esto garantiza que las ayudas visuales y la línea de comandos flotante estén siempre disponibles al dibujar, estandarizando la forma en que el equipo interactúa con el cursor."
+    "COPY-PROPS": {
+      "titulo": "Copiar propiedades del proyecto",
+      "descripcion": "Guarda en el perfil del usuario las propiedades generales y coordenadas del dibujo activo.",
+      "pasos": ["Abre el plano de origen.", "Escribe COPY-PROPS."],
+      "notas": ["Los valores permanecen disponibles para PASTE-PROPS en otros dibujos del mismo usuario."],
+      "tags": ["propiedades", "copiar"]
     },
-    "Atajos de Color": {
-        "titulo": "Paleta de Colores ActiveX",
-        "descripcion": "Comandos rápidos para cambiar el color de los objetos seleccionados sin usar la interfaz lenta de AutoCAD.\n\nComandos: C1 (Rojo), C2 (Amarillo), C3 (Verde), C4 (Cian), C5 (Azul), C6 (Magenta), C7 (Blanco), C8 (Gris), C9 (Gris Claro) y C0 (Por Capa)."
+    "PASTE-PROPS": {
+      "titulo": "Pegar propiedades del proyecto",
+      "descripcion": "Aplica las propiedades copiadas, solicita Nombre_Plano, actualiza campos y guarda.",
+      "pasos": ["Ejecuta antes COPY-PROPS en el plano origen.", "Abre el destino y escribe PASTE-PROPS.", "Completa Nombre_Plano."],
+      "notas": ["Revisa revisión, fechas y nombre antes de cerrar."],
+      "tags": ["propiedades", "pegar"]
+    },
+    "REPARAR-PROPS": {
+      "titulo": "Eliminar propiedades duplicadas",
+      "descripcion": "Reconstruye el diccionario de propiedades personalizadas conservando la primera aparición de cada clave.",
+      "pasos": ["Guarda una copia.", "Escribe REPARAR-PROPS.", "Abre DWGPROPS y verifica el resultado."],
+      "notas": ["Úsalo cuando existan claves repetidas o desordenadas."],
+      "tags": ["reparar", "dwgprops"]
+    },
+    "C-INICIO / C-FIN": {
+      "titulo": "Capturar coordenadas de inicio y fin",
+      "descripcion": "Solicita un punto y guarda sus coordenadas Este/Norte en las propiedades personalizadas de inicio o fin.",
+      "pasos": ["Escribe C-INICIO o C-FIN.", "Selecciona el punto correspondiente en el dibujo."],
+      "notas": ["Comprueba el sistema de coordenadas y unidades del DWG."],
+      "tags": ["coordenadas", "este", "norte"]
+    },
+    "C0 … C9": {
+      "titulo": "Atajos de color",
+      "descripcion": "Cambia el color de la selección: C1 rojo, C2 amarillo, C3 verde, C4 cian, C5 azul, C6 magenta, C7 blanco, C8 gris, C9 gris claro y C0 PorCapa.",
+      "pasos": ["Preselecciona objetos o escribe el atajo y selecciónalos.", "Confirma la selección."],
+      "notas": ["C0 asigna color 256 (ByLayer)."],
+      "tags": ["color", "bylayer"]
     }
+  }
 }

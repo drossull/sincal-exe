@@ -461,6 +461,7 @@ class ActualizadorCAD(ctk.CTk):
             resultado = apply_resource_updates(plan)
             self._preparar_archivos_cad()
             recargados = self._recargar_lisps_cad_abierto()
+            self._ui(self._refrescar_interfaces_recursos)
             self.log(
                 f"[OK] Actualización menor instalada: {len(resultado.updated)} archivo(s) actualizado(s)"
                 f" y {len(resultado.removed)} eliminado(s)."
@@ -488,6 +489,12 @@ class ActualizadorCAD(ctk.CTk):
             )
         finally:
             self._ui(self.btn_sync_resources.configure, state="normal", text="Actualizar recursos CAD")
+
+    def _refrescar_interfaces_recursos(self):
+        if hasattr(self, "tab_ubicacion"):
+            self.tab_ubicacion.recargar_recursos()
+        if hasattr(self, "vista_docs"):
+            self.vista_docs.recargar_documentacion()
 
     def _recargar_lisps_cad_abierto(self):
         loader = ruta_cad_usuario("acaddoc.lsp").replace("\\", "/")

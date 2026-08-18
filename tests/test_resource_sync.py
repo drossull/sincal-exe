@@ -139,6 +139,20 @@ class ResourceSyncTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "revisión válida"):
             resource_sync.distribution_manifest_revision(session=session)
 
+    def test_downloads_regional_map_only_when_requested(self):
+        regional_map = b"\x89PNG\r\n\x1a\nregional-map"
+        relative = "mapas/Region_Test.png"
+        tree = self._tree([self._tree_entry(relative, regional_map)])
+        session = FakeSession(tree, {relative: regional_map})
+
+        plan = resource_sync.check_resource_updates(session=session)
+        self.assertNotIn(relative, [entry.path for entry in plan.changed])
+
+        downloaded = resource_sync.ensure_resource_available(relative, session=session)
+        self.assertEqual(downloaded, os.path.join(self.cache, "mapas", "Region_Test.png"))
+        with open(downloaded, "rb") as saved:
+            self.assertEqual(saved.read(), regional_map)
+
     def test_rejects_tampered_master(self):
         published = b"AC1032" + b"new-master"
         tampered = b"AC1032" + b"tampered!!"

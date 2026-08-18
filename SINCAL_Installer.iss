@@ -4,41 +4,61 @@
 #ifndef AppVersionTag
   #error AppVersionTag must be supplied by the build script.
 #endif
+#ifndef AppPayloadUrl
+  #error AppPayloadUrl must be supplied by the build script.
+#endif
+#ifndef AppPayloadHash
+  #error AppPayloadHash must be supplied by the build script.
+#endif
+#ifndef AppPayloadSize
+  #error AppPayloadSize must be supplied by the build script.
+#endif
+#ifndef PluginPayloadUrl
+  #error PluginPayloadUrl must be supplied by the build script.
+#endif
+#ifndef PluginPayloadHash
+  #error PluginPayloadHash must be supplied by the build script.
+#endif
+#ifndef PluginPayloadSize
+  #error PluginPayloadSize must be supplied by the build script.
+#endif
 
 [Setup]
 AppName=SINCAL Suite
 AppId=SINCAL Suite
 AppVersion={#AppVersion}
 AppPublisher=Gonzalo Mardones V.
+AppUpdatesURL=https://github.com/drossull/sincal-updates/releases
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DefaultDirName={autopf}\SINCAL
-UsePreviousAppDir=no
+UsePreviousAppDir=yes
 DefaultGroupName=SINCAL Suite
 OutputDir=.\installer_output
 OutputBaseFilename=Setup_SINCAL_{#AppVersionTag}
 SetupIconFile=logo.ico
 Compression=lzma
 SolidCompression=yes
+ArchiveExtraction=full
 PrivilegesRequired=admin
+CloseApplications=yes
+RestartApplications=no
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "dist\SINCAL.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "logo.ico"; DestDir: "{app}"; Flags: ignoreversion
-Source: "version.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "tutoriales.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "lisps\*"; DestDir: "{app}\lisps"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__\*,*.pyc"
-Source: "mapas\*"; DestDir: "{app}\mapas"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__\*,*.pyc"
-Source: "masters\*"; DestDir: "{app}\masters"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__\*,*.pyc"
-Source: "modulos\*"; DestDir: "{app}\modulos"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__\*,*.pyc"
-Source: "plotstyles\*"; DestDir: "{app}\plotstyles"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__\*,*.pyc"
-Source: "scripts\*"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__\*,*.pyc"
-Source: "startup\*"; DestDir: "{app}\startup"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__\*,*.pyc"
-Source: "cad-packages\Autodesk\SINCAL.bundle\*"; DestDir: "{commonpf}\Autodesk\ApplicationPlugins\SINCAL.bundle"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "__pycache__\*,*.pyc,*.pdb"
+Source: "{#AppPayloadUrl}"; DestDir: "{app}"; DestName: "SINCAL_App_{#AppVersionTag}.zip"; ExternalSize: {#AppPayloadSize}; Hash: "{#AppPayloadHash}"; Flags: external download extractarchive recursesubdirs createallsubdirs ignoreversion
+Source: "{#PluginPayloadUrl}"; DestDir: "{commonpf}\Autodesk\ApplicationPlugins\SINCAL.bundle"; DestName: "SINCAL_AutoCAD_{#AppVersionTag}.zip"; ExternalSize: {#PluginPayloadSize}; Hash: "{#PluginPayloadHash}"; Flags: external download extractarchive recursesubdirs createallsubdirs ignoreversion
+
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\lisps"
+Type: filesandordirs; Name: "{app}\mapas"
+Type: filesandordirs; Name: "{app}\masters"
+Type: filesandordirs; Name: "{app}\modulos"
+Type: filesandordirs; Name: "{app}\plotstyles"
+Type: filesandordirs; Name: "{app}\scripts"
+Type: filesandordirs; Name: "{app}\startup"
 
 [Icons]
 Name: "{group}\SINCAL Suite"; Filename: "{app}\SINCAL.exe"

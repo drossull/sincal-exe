@@ -1,61 +1,108 @@
-# 🏛️ SINCAL - Suite de Ingeniería y Estándares CAD
+# SINCAL — Suite de Ingeniería y Estándares CAD
 
-**SINCAL Suite 1.0** es una aplicación para Windows orientada a unificar estándares de dibujo (AutoCAD/ZWCAD), automatizar tareas repetitivas de ingeniería estructural y generar apoyo gráfico de ubicación a partir de archivos `.kmz`. La generación del producto se mantiene como 1.0; la secuencia técnica de distribución continúa en `v28.0.2` para que las instalaciones históricas v27 detecten correctamente la migración.
+**SINCAL Suite 1.0** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión del producto se mantiene como 1.0 y la secuencia técnica continúa en `v28.0.3` para conservar la actualización desde instalaciones históricas v27.
 
----
+## Instalación web y distribución
 
-## 🚀 Características Principales
+SINCAL se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v28.0.3.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
 
-* **Distribución por instalador firmado:** El ejecutable y los recursos se entregan como una instalación local autocontenida.
-* **Integración CAD local:** Prepara un cargador confiable en `%APPDATA%\Estandar SINCAL` para AutoCAD/ZWCAD y mantiene allí los recursos CAD activos.
-* **Actualizaciones menores desde un canal público separado:** Detecta automáticamente LISPs nuevos o editados, scripts, estilos, mapas y el master DWG publicados en `drossull/sincal-updates`. Comprueba el canal al iniciar y cada minuto mientras permanece abierto, mostrando el aviso al frente y en la bandeja. La revisión periódica usa un manifiesto liviano y consulta el árbol completo solamente cuando cambia la publicación; cada archivo se limita por tipo y tamaño y se valida contra el SHA del blob de Git antes de activarlo.
-* **Vista previa integrada en AutoCAD 2025:** El instalador incluye una primera pestaña Ribbon SINCAL y una paleta acoplable de prueba. La aplicación de escritorio sigue siendo la interfaz funcional principal durante la migración.
-* **Procesamiento Masivo Nativo (PowerShell):** Permite procesar decenas de planos de golpe directamente desde la carpeta de Windows sin abrir AutoCAD.
-* **Módulo Estructural (BIM 2D):** Generación inteligente de vistas de armaduras (Zapatas, Consolas, Muros), dibujo y despiece paramétrico, inyección de cotas matemáticas, y lectura de parámetros desde archivos JSON de proyecto.
-* **Generador de Croquis de Ubicación:** Lector nativo de archivos `.kmz` (Google Earth) que usa mapas MOP calibrados disponibles localmente para generar un PNG de apoyo.
-* **Comandos en Vivo (Conexión COM):** Ejecuta comandos de forma remota en AutoCAD directamente desde la interfaz del programa.
-* **Renombrado Avanzado:** Herramienta de interfaz para buscar, reemplazar y actualizar revisiones de planos DWG de forma masiva en milisegundos.
-* **Documentación (Wiki):** Biblioteca interactiva integrada con todos los comandos y manuales.
+El programa base no incorpora los 125 MB de mapas regionales. El master DWG, LISPs, startup, scripts, plumilla y calibración se descargan desde el canal público al iniciar. Cada mapa regional se descarga solamente cuando se selecciona por primera vez en el módulo Ubicación.
 
----
+Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `raw.githubusercontent.com`. Una vez descargados los componentes necesarios, las funciones instaladas continúan disponibles sin conexión.
 
-## 💻 Guía de Uso Rápido
+## Primer inicio
 
-1. **Instala SINCAL:** Usa el instalador oficial `Setup_SINCAL_*.exe`.
-2. **Ejecuta SINCAL:** La aplicación ya no necesita elevarse globalmente para iniciar.
-3. **Preparación CAD:** Ve a la pestaña "Sincronizador" y haz clic en **"Preparar integración CAD"** si necesitas regenerar el wrapper o los archivos de arranque local.
-4. **Actualizar estándares:** SINCAL consulta automáticamente los recursos CAD al iniciar y muestra un aviso si existen cambios. También puedes usar **"Actualizar recursos CAD"** para comprobarlos manualmente.
-5. **Módulos Activos:** * Visita la pestaña **"Módulo Estructural"** para detallar encapados y generar despieces.
-   * Visita la pestaña **"Ubicación"** para generar mapas regionales georreferenciados.
+1. Ejecuta el instalador oficial de la release `v28.0.3`.
+2. Abre SINCAL y acepta la actualización inicial de recursos CAD.
+3. Pulsa **Preparar integración CAD**.
+4. Reinicia AutoCAD/ZWCAD una vez para activar el cargador y las rutas de confianza.
+5. Abre **Documentación** para consultar el manual buscable de comandos y módulos.
 
-### Flujo para publicar un recurso CAD
+Los recursos se almacenan en `%LOCALAPPDATA%\SINCAL\resources` y la integración CAD activa se materializa en `%APPDATA%\Estandar SINCAL`.
 
-1. Agrega o edita el archivo dentro de una carpeta autorizada: `lisps`, `startup`, `scripts`, `plotstyles`, `mapas` o el master `masters/FORMATOS ANOTATIVOS ACAD_2025.dwg`.
-2. Valida el recurso localmente. Para el master, guarda una copia de respaldo y comprueba bloques, atributos y referencias externas con AutoCAD.
-3. Haz commit y push a la rama `main` del repositorio privado de desarrollo. El workflow `publish-distribution.yml` exporta únicamente la lista blanca a `drossull/sincal-updates`; un LISP nuevo no necesita incorporarse manualmente a un manifiesto.
-4. Al abrir SINCAL, acepta el aviso de actualización. Los archivos se guardan en `%LOCALAPPDATA%\SINCAL\resources` y los recursos CAD activos se materializan en `%APPDATA%\Estandar SINCAL`.
-5. Cierra y vuelve a abrir SINCAL para refrescar la interfaz. SINCAL intenta recargar automáticamente los LISPs en dibujos CAD abiertos; si el host no permite la recarga, abre un dibujo nuevo o reinicia AutoCAD/ZWCAD.
+## Componentes principales
 
-La sincronización no reemplaza `SINCAL.exe`, Python ni el plugin .NET. Esos cambios requieren un instalador oficial desde Releases. Como los LISPs y scripts sí son código ejecutable, la rama `main` debe tener protección, revisión y acceso de escritura limitado. La primera versión que incorpora este sistema debe instalarse una vez de manera convencional; las actualizaciones menores posteriores ya no requieren reinstalación.
+### Sincronizador
 
-El repositorio de desarrollo puede permanecer privado. El repositorio público de distribución no recibe código Python, fuentes .NET, archivos de proyecto ni secretos; `tools/export_distribution.py` aplica la misma política de rutas que el cliente y genera un manifiesto auditable.
+- Comprueba una nueva versión completa desde las Releases públicas.
+- Revisa recursos al iniciar y cada minuto mediante un manifiesto liviano.
+- Descarga LISPs, startup, scripts, CTB, master, tutoriales y mapas autorizados.
+- Valida tipo, tamaño y SHA de Git antes de activar cada archivo.
+- Prepara el cargador de AutoCAD/ZWCAD y la consola para procesos cerrados.
 
-### Preparar un entorno de compilación
+### Recursos CAD
+
+- `lisps/`: comandos interactivos de dibujo, cotas, viewports, propiedades y estandarización.
+- `startup/`: variables protegidas, propiedades de viñeta, escalas en metros y colores C0–C9.
+- `masters/FORMATOS ANOTATIVOS ACAD_2025.dwg`: bloques, viñetas, capas y estilos oficiales.
+- `scripts/`: automatización BAT, PowerShell y SCR.
+- `plotstyles/`: plumilla `SINCAL_A1 (2025).ctb`.
+- `mapas/`: calibración, ayuda y mapas regionales bajo demanda.
+- `tutoriales.json`: contenido estructurado del manual integrado.
+
+### Procesamiento masivo
+
+La pestaña permite cargar una carpeta DWG/DXF, marcar archivos, renombrarlos por búsqueda y reemplazo, convertir DXF a DWG, enviar comandos a dibujos abiertos y procesar DWG cerrados.
+
+Acciones disponibles sobre planos cerrados: Auditar, Purgar, Encuadrar vista, Eliminar Layout2/A1, Bloquear viewports, Configurar layouts A1 y Plotear PDF A1. Antes de ejecutarlas, guarda un respaldo, prepara la integración y cierra completamente AutoCAD/ZWCAD. Los botones de automatización cerrada recorren todos los DWG de la carpeta seleccionada.
+
+### Módulo estructural
+
+Genera vistas y despieces de armaduras mediante comandos temporales enviados al CAD abierto:
+
+- Estribos: geometría de zapata, recubrimientos, mallas y vistas Frontal/A/B/C.
+- Travesaños: extremos, cuadrantes sobre tope, macizos y viga; geometría y despiece.
+- JSON de proyecto: importa parámetros compatibles y los convierte a las unidades de la interfaz.
+
+Las pestañas **Muros** y **Consola y Topes** están reservadas actualmente y todavía no generan elementos. Verifica siempre dimensiones en cm, diámetros en mm y esviaje en grados.
+
+### Módulo de ubicación
+
+Lee puntos desde un KMZ de Google Earth, permite escoger un mapa MOP calibrado y genera un PNG con la posición marcada. El flujo es:
+
+1. Cargar KMZ.
+2. Seleccionar el Placemark.
+3. Elegir la región correspondiente.
+4. Aplicar microajuste opcional en píxeles.
+5. Generar y guardar el croquis.
+
+La primera utilización de una región solicita descargar su mapa y lo valida antes de guardarlo localmente.
+
+### Documentación integrada
+
+El tab **Documentación** ofrece búsqueda por comando, herramienta o palabra clave. Contiene este README, primer inicio, actualizaciones, integración CAD, startup, master DWG, inventario de recursos, todos los comandos LISP, procesamiento masivo, módulo estructural, módulo de ubicación y solución de problemas.
+
+## Publicar una actualización menor
+
+1. Modifica un recurso autorizado en el repositorio privado de desarrollo.
+2. Para el master, trabaja sobre una copia y valida bloques, atributos y referencias antes de reemplazarlo.
+3. Haz commit y push a `main`.
+4. El workflow `publish-distribution.yml` exportará únicamente la lista blanca a `drossull/sincal-updates` y actualizará `manifest.json`.
+5. SINCAL detectará la nueva revisión dentro del siguiente ciclo de un minuto y ofrecerá instalarla.
+
+Los cambios en Python, interfaz, plugin .NET o instalador requieren una release completa. Los recursos menores no reemplazan ejecutables.
+
+## Compilar una release web
 
 ```powershell
 python -m pip install -r requirements-build.txt
 pwsh -NoProfile -File tools/build_release.ps1
 ```
 
-El script valida Python, PowerShell, pruebas unitarias, plugin .NET, ejecutable, instalador, firma y checksums. Usa `-SkipSigning` únicamente para una compilación local de prueba.
+El proceso valida código y pruebas, compila y firma el plugin y la aplicación, crea los paquetes remotos, calcula hashes, compila el instalador web y genera el manifiesto y `SHA256SUMS.txt`. Para una compilación local no publicable se puede usar `-SkipSigning`.
 
----
+En la release pública deben adjuntarse juntos:
 
-## ⚙️ Uso de Comandos Masivos (PowerShell)
+- `Setup_SINCAL_v28.0.3.exe`
+- `SINCAL_App_v28.0.3.zip`
+- `SINCAL_AutoCAD_v28.0.3.zip`
+- `release-manifest_v28.0.3.json`
+- `SHA256SUMS.txt`
 
-SINCAL utiliza **PowerShell 7** para procesar docenas de planos `.dwg` a la vez. No necesitas abrir AutoCAD.
+No renombres los paquetes después de compilar: el instalador usa URLs versionadas y hashes fijados en el momento del build.
 
-1. Abre la carpeta de Windows donde están tus planos.
-2. Haz clic en la barra de direcciones superior (donde sale la ruta).
-3. Borra el texto, escribe `cmd` y presiona **Enter**.
-4. En la ventana negra, escribe directamente el nombre de la herramienta (ej. `PURGEALL`, `PAGESETUP-A1`, `PUBLISH`) y presiona **Enter**.
+## Seguridad y diagnóstico
+
+El repositorio de desarrollo puede ser privado. El canal público contiene únicamente recursos autorizados y binarios de release; no recibe fuentes Python/.NET ni secretos. Protege `main`, limita el acceso de escritura y conserva la revisión de los LISPs y scripts, ya que son código ejecutable.
+
+Los registros locales están en `%LOCALAPPDATA%\SINCAL\logs\sincal.log`. Si los comandos CAD no aparecen, actualiza recursos, vuelve a preparar la integración y reinicia CAD. Si una descarga falla, revisa conexión, proxy y antivirus antes de reintentar.

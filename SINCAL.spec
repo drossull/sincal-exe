@@ -5,19 +5,9 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[
-        ('logo.ico', '.'),
-        ('version.json', '.'),
-        ('README.md', '.'),
-        ('tutoriales.json', '.'),
-        ('lisps', 'lisps'),
-        ('mapas', 'mapas'),
-        ('masters', 'masters'),
-        ('modulos', 'modulos'),
-        ('plotstyles', 'plotstyles'),
-        ('scripts', 'scripts'),
-        ('startup', 'startup'),
-    ],
+    # Los datos operativos se instalan como archivos externos o se descargan
+    # desde el canal público. Incrustarlos aquí duplicaría los recursos.
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

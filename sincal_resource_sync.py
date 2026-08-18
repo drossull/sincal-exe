@@ -32,6 +32,7 @@ REQUIRED_RESOURCES = {
 }
 CAD_RESOURCE_PREFIXES = ("lisps/", "startup/", "scripts/", "plotstyles/", "masters/")
 TEXT_EXTENSIONS = {".lsp", ".ps1", ".bat", ".scr", ".json"}
+LAZY_MAP_PREFIX = "mapas/Region_"
 
 
 @dataclass(frozen=True)
@@ -261,6 +262,14 @@ def _effective_file_matches(entry: ResourceEntry, previous_resources: dict) -> b
         return False
 
 
+def _is_lazy_resource(path: str) -> bool:
+    return path.startswith(LAZY_MAP_PREFIX) and path.lower().endswith(".png")
+
+
+def _effective_resource_exists(entry: ResourceEntry) -> bool:
+    return os.path.isfile(ruta_recurso(*entry.path.split("/")))
+
+
 def check_resource_updates(session=None) -> ResourceUpdatePlan:
     client = _session_or_requests(session)
     response = client.get(_tree_url(), headers=_headers(), timeout=REQUEST_TIMEOUT)
@@ -287,10 +296,12 @@ def check_resource_updates(session=None) -> ResourceUpdatePlan:
 
     state = _load_state()
     previous_resources = state.get("resources") or {}
-    changed = [
-        entry for entry in entries
-        if not _effective_file_matches(entry, previous_resources)
-    ]
+    changed = []
+    for entry in entries:
+        if _is_lazy_resource(entry.path) and not _effective_resource_exists(entry):
+            continue
+        if not _effective_file_matches(entry, previous_resources):
+            changed.append(entry)
     removed = sorted(set(previous_resources) - paths)
     total = sum(entry.size for entry in changed)
     if total > MAX_TOTAL_UPDATE_BYTES:
@@ -383,6 +394,25 @@ def apply_resource_updates(plan: ResourceUpdatePlan, session=None) -> ResourceSy
         removed=plan.removed,
         tree_sha=plan.tree_sha,
     )
+
+
+def ensure_resource_available(path: str, session=None) -> str:
+    """Descarga y valida un recurso opcional cuando la interfaz lo necesita."""
+    normalized = _normalize_relative_path(path)
+    effective = ruta_recurso(*normalized.split("/"))
+    if os.path.isfile(effective):
+        return effective
+
+    client = _session_or_requests(session)
+    plan = check_resource_updates(session=client)
+    entry = next((item for item in plan.resources if item.path == normalized), None)
+    if entry is None:
+        raise FileNotFoundError(f"El recurso {normalized} no está publicado.")
+
+    data = _download_resource(entry, client)
+    destination = resource_cache_path(normalized)
+    _atomic_write(destination, data)
+    return destination
 
 
 def active_resource_paths(prefixes: tuple[str, ...] | None = None) -> list[str]:
