@@ -25,15 +25,18 @@ class FakeResponse:
 
 
 class FakeSession:
-    def __init__(self, tree, downloads=None):
+    def __init__(self, tree, downloads=None, manifest=None):
         self.tree = tree
         self.downloads = downloads or {}
+        self.manifest = manifest
         self.calls = []
 
     def get(self, url, **kwargs):
         self.calls.append((url, kwargs))
         if "/git/trees/" in url:
             return FakeResponse(payload=self.tree)
+        if url.endswith("/manifest.json") and self.manifest is not None:
+            return FakeResponse(payload=self.manifest)
         for path, content in self.downloads.items():
             if url.endswith(path.replace(" ", "%20")):
                 return FakeResponse(content=content)
@@ -116,6 +119,25 @@ class ResourceSyncTests(unittest.TestCase):
 
         second_plan = resource_sync.check_resource_updates(session=session)
         self.assertFalse(second_plan.has_changes)
+
+    def test_reads_lightweight_distribution_revision(self):
+        revision = "d" * 40
+        session = FakeSession({}, manifest={"source_commit": revision})
+
+        with patch.object(resource_sync.time, "time", return_value=125):
+            result = resource_sync.distribution_manifest_revision(session=session)
+
+        self.assertEqual(result, revision)
+        url, kwargs = session.calls[0]
+        self.assertEqual(url, resource_sync.DISTRIBUTION_MANIFEST_URL)
+        self.assertEqual(kwargs["params"], {"minute": 2})
+        self.assertEqual(kwargs["headers"]["Cache-Control"], "no-cache")
+
+    def test_rejects_invalid_distribution_revision(self):
+        session = FakeSession({}, manifest={"source_commit": "not-a-sha"})
+
+        with self.assertRaisesRegex(ValueError, "revisión válida"):
+            resource_sync.distribution_manifest_revision(session=session)
 
     def test_rejects_tampered_master(self):
         published = b"AC1032" + b"new-master"

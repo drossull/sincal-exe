@@ -8,6 +8,10 @@ DISTRIBUTION_REPOSITORY_URL = (
     f"https://github.com/{DISTRIBUTION_OWNER}/{DISTRIBUTION_REPOSITORY}"
 )
 DISTRIBUTION_RELEASES_URL = f"{DISTRIBUTION_REPOSITORY_URL}/releases"
+DISTRIBUTION_MANIFEST_URL = (
+    f"https://raw.githubusercontent.com/{DISTRIBUTION_OWNER}/"
+    f"{DISTRIBUTION_REPOSITORY}/{DISTRIBUTION_BRANCH}/manifest.json"
+)
 
 
 def api_url(path: str) -> str:

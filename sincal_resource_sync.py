@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import tempfile
+import time
 from dataclasses import dataclass
 from urllib.parse import quote
 
@@ -16,6 +17,7 @@ from sincal_runtime import (
 )
 from sincal_update_config import (
     DISTRIBUTION_BRANCH,
+    DISTRIBUTION_MANIFEST_URL,
     DISTRIBUTION_OWNER,
     DISTRIBUTION_REPOSITORY,
     api_url as distribution_api_url,
@@ -203,6 +205,27 @@ def _headers() -> dict[str, str]:
         "User-Agent": "SINCAL-Resource-Sync",
         "X-GitHub-Api-Version": "2022-11-28",
     }
+
+
+def distribution_manifest_revision(session=None) -> str:
+    """Obtiene una revisión liviana para decidir si hace falta consultar el árbol."""
+    client = _session_or_requests(session)
+    response = client.get(
+        DISTRIBUTION_MANIFEST_URL,
+        headers={
+            "Accept": "application/json",
+            "Cache-Control": "no-cache",
+            "User-Agent": _headers()["User-Agent"],
+        },
+        params={"minute": int(time.time() // 60)},
+        timeout=REQUEST_TIMEOUT,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    revision = str(payload.get("source_commit") or "").lower()
+    if re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+        raise ValueError("El manifiesto público no contiene una revisión válida.")
+    return revision
 
 
 def _entry_from_tree(raw: dict) -> ResourceEntry | None:

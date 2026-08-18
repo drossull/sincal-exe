@@ -26,6 +26,7 @@ from sincal_resource_sync import (
     active_resource_paths,
     apply_resource_updates,
     check_resource_updates,
+    distribution_manifest_revision,
     materialize_cad_resources,
     record_resource_state,
 )
@@ -48,6 +49,7 @@ from sincal_update_config import (
 
 # --- CONFIGURACIÓN GLOBALES ---
 URL_RELEASES = DISTRIBUTION_RELEASES_URL
+RESOURCE_POLL_INTERVAL_MS = 60 * 1000
 
 COLOR_FONDO, COLOR_TITULO, COLOR_TEXTO, COLOR_ACENTO = "#2B2B2B", "#FFBF00", "#CCCCCC", "#007FFF"
 FUENTE_TITULO, FUENTE_SUBTITULO, FUENTE_MENU, FUENTE_NORMAL, FUENTE_CONSOLA = [
@@ -100,6 +102,10 @@ class ActualizadorCAD(ctk.CTk):
         }, None, False, False
         self.ruta_renombre, self.checkboxes_archivos, self.tray_activo = "", [], False
         self.icono_bandeja = None
+        self._resource_check_running = False
+        self._last_resource_offer_tree = ""
+        self._resource_manifest_revision = ""
+        self._resource_poll_job = None
         self.protocol("WM_DELETE_WINDOW", self.ocultar_a_bandeja)
         self.after(50, self._procesar_ui_queue)
 
@@ -322,12 +328,40 @@ class ActualizadorCAD(ctk.CTk):
             self.frame_updates, width=850, height=160, font=FUENTE_NORMAL, fg_color="#1E1E1E", state="disabled")
         self.txt_updates.pack(pady=5)
 
-        threading.Thread(target=self._hilo_verificar_recursos, args=(False,), daemon=True).start()
+        self._iniciar_verificacion_recursos()
+        self._programar_monitoreo_recursos()
 
     def verificar_recursos_manual(self):
         self.log("\n[*] Buscando actualizaciones menores de recursos CAD en GitHub...")
         self.btn_sync_resources.configure(state="disabled", text="Verificando...")
-        threading.Thread(target=self._hilo_verificar_recursos, args=(True,), daemon=True).start()
+        if not self._iniciar_verificacion_recursos(manual=True):
+            self.log("[*] Ya hay una comprobación de recursos en curso.")
+            self.btn_sync_resources.configure(state="normal", text="Actualizar recursos CAD")
+
+    def _iniciar_verificacion_recursos(self, manual=False, periodic=False, manifest_only=False):
+        if self._resource_check_running or self._cerrando:
+            return False
+        self._resource_check_running = True
+        threading.Thread(
+            target=self._hilo_verificar_recursos,
+            args=(manual, periodic, manifest_only),
+            daemon=True,
+        ).start()
+        return True
+
+    def _programar_monitoreo_recursos(self):
+        if self._cerrando:
+            return
+        self._resource_poll_job = self.after(
+            RESOURCE_POLL_INTERVAL_MS,
+            self._verificar_recursos_periodicamente,
+        )
+
+    def _verificar_recursos_periodicamente(self):
+        if self._cerrando:
+            return
+        self._iniciar_verificacion_recursos(periodic=True, manifest_only=True)
+        self._programar_monitoreo_recursos()
 
     def _preparar_archivos_cad(self):
         copiados = materialize_cad_resources()
@@ -336,12 +370,32 @@ class ActualizadorCAD(ctk.CTk):
         registros = registrar_ruta_cad_usuario()
         return copiados, registros
 
-    def _hilo_verificar_recursos(self, manual):
+    def _hilo_verificar_recursos(self, manual, periodic=False, manifest_only=False):
         actualizacion_ofrecida = False
         try:
+            manifest_revision = ""
+            try:
+                manifest_revision = distribution_manifest_revision()
+            except Exception as e:
+                self.logger.warning("No se pudo consultar el manifiesto público: %s", e)
+                if manifest_only:
+                    return
+
+            if (
+                manifest_only
+                and self._resource_manifest_revision
+                and manifest_revision == self._resource_manifest_revision
+            ):
+                return
+
             plan = check_resource_updates()
+            if manifest_revision:
+                self._resource_manifest_revision = manifest_revision
             if plan.has_changes:
+                if not manual and plan.tree_sha == self._last_resource_offer_tree:
+                    return
                 actualizacion_ofrecida = True
+                self._last_resource_offer_tree = plan.tree_sha
                 self.log(
                     f"[!] Actualización menor disponible: {len(plan.changed)} archivo(s) nuevo(s) o modificado(s)"
                     f" y {len(plan.removed)} eliminado(s)."
@@ -351,7 +405,8 @@ class ActualizadorCAD(ctk.CTk):
 
             record_resource_state(plan)
             self._preparar_archivos_cad()
-            self.log("[OK] Los LISPs, scripts, estilos y el master DWG ya están actualizados.")
+            if not periodic:
+                self.log("[OK] Los LISPs, scripts, estilos y el master DWG ya están actualizados.")
             if manual:
                 self._ui(
                     messagebox.showinfo,
@@ -369,10 +424,16 @@ class ActualizadorCAD(ctk.CTk):
                     f"Detalle: {e}",
                 )
         finally:
+            self._resource_check_running = False
             if manual and not actualizacion_ofrecida:
                 self._ui(self.btn_sync_resources.configure, state="normal", text="Actualizar recursos CAD")
 
     def _ofrecer_actualizacion_recursos(self, plan, manual):
+        self.deiconify()
+        self.lift()
+        self.attributes("-topmost", True)
+        self.after(250, lambda: self.attributes("-topmost", False))
+        self.focus_force()
         rutas = [entry.path for entry in plan.changed] + [f"{path} (eliminado)" for path in plan.removed]
         vista = "\n".join(f"• {path}" for path in rutas[:12])
         if len(rutas) > 12:
@@ -383,7 +444,11 @@ class ActualizadorCAD(ctk.CTk):
             "Se actualizarán LISPs, scripts, estilos, mapas o el master DWG; el ejecutable no será reemplazado.\n"
             "¿Deseas descargarla ahora?"
         )
-        if messagebox.askyesno("Actualización de recursos SINCAL", mensaje):
+        self.mostrar_notificacion(
+            "Actualización SINCAL",
+            f"Hay {len(rutas)} recurso(s) CAD nuevo(s). Abre SINCAL para actualizar.",
+        )
+        if messagebox.askyesno("Actualización de recursos SINCAL", mensaje, parent=self):
             self.btn_sync_resources.configure(state="disabled", text="Actualizando...")
             threading.Thread(target=self._hilo_aplicar_recursos, args=(plan,), daemon=True).start()
         else:
