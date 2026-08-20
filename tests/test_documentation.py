@@ -26,7 +26,7 @@ class DocumentationTests(unittest.TestCase):
         expected = {
             "primer-inicio", "actualizaciones", "integracion-cad", "startup",
             "master-dwg", "inventario-recursos", "procesamiento-general",
-            "renombrado", "comandos-vivo", "automatizacion-cerrada",
+            "renombrado", "conversion-dxf", "comandos-vivo", "automatizacion-cerrada",
             "modulo-estructural", "modulo-ubicacion", "solucion-problemas",
             "diagnostico-soporte",
         }
@@ -57,6 +57,7 @@ class WebInstallerConfigurationTests(unittest.TestCase):
         self.assertIn("mapas/mapas_calibrados.json", build_script)
         self.assertIn("mapas/ayuda_travesano.png", build_script)
         self.assertIn("scripts/SINCAL_ENGINE.ps1", build_script)
+        self.assertIn("assets/fonts/Workbench.ttf", build_script)
         self.assertIn("^mapas/Region_.*\\.png$", build_script)
 
 

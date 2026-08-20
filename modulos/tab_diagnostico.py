@@ -8,6 +8,17 @@ import customtkinter as ctk
 from sincal_cad_engine import discover_cad_engines, save_engine_selection
 from sincal_diagnostics import collect_diagnostics, create_diagnostic_bundle, format_summary, record_incident
 from sincal_runtime import RUTA_DATOS_USUARIO
+from sincal_ui import (
+    COLOR_ACENTO,
+    COLOR_GRIS_BOTON,
+    COLOR_GRIS_BOTON_HOVER,
+    COLOR_MOSTAZA,
+    COLOR_PANEL,
+    COLOR_TEXTO,
+    FUENTE_NORMAL,
+    FUENTE_SUBTITULO,
+    FUENTE_TITULO,
+)
 
 
 class TabDiagnostico(ctk.CTkFrame):
@@ -20,11 +31,11 @@ class TabDiagnostico(ctk.CTkFrame):
         self.after(300, self.ejecutar_diagnostico)
 
     def _setup_ui(self):
-        title_font = ("Consolas", 20, "bold")
-        subtitle_font = ("Consolas", 15, "bold")
-        normal_font = ("Consolas", 12)
-        color_title = "#FFBF00"
-        color_text = "#CCCCCC"
+        title_font = FUENTE_TITULO
+        subtitle_font = FUENTE_SUBTITULO
+        normal_font = FUENTE_NORMAL
+        color_title = COLOR_MOSTAZA
+        color_text = COLOR_TEXTO
 
         container = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
         container.pack(fill="both", expand=True, padx=12, pady=12)
@@ -41,7 +52,7 @@ class TabDiagnostico(ctk.CTkFrame):
             font=normal_font, text_color=color_text, wraplength=850, justify="left",
         ).pack(anchor="w", padx=8, pady=(0, 12))
 
-        engine_frame = ctk.CTkFrame(container, fg_color="#1E1E1E", corner_radius=0)
+        engine_frame = ctk.CTkFrame(container, fg_color=COLOR_PANEL, corner_radius=0)
         engine_frame.pack(fill="x", padx=8, pady=6)
         ctk.CTkLabel(
             engine_frame, text="Motor para procesamiento masivo", font=subtitle_font,
@@ -69,12 +80,12 @@ class TabDiagnostico(ctk.CTkFrame):
         self.btn_run.pack(side="left", padx=(0, 8))
         self.btn_report = ctk.CTkButton(
             actions, text="Generar informe ZIP", font=normal_font, corner_radius=0,
-            fg_color="#007FFF", command=self.generar_informe,
+            fg_color=COLOR_ACENTO, command=self.generar_informe,
         )
         self.btn_report.pack(side="left", padx=(0, 8))
         ctk.CTkButton(
             actions, text="Abrir datos locales", font=normal_font, corner_radius=0,
-            fg_color="#444444", command=lambda: os.startfile(RUTA_DATOS_USUARIO),
+            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, command=lambda: os.startfile(RUTA_DATOS_USUARIO),
         ).pack(side="left")
 
         ctk.CTkLabel(
@@ -82,7 +93,7 @@ class TabDiagnostico(ctk.CTkFrame):
             text_color=color_title,
         ).pack(anchor="w", padx=8, pady=(10, 4))
         self.description = ctk.CTkTextbox(
-            container, height=80, font=normal_font, fg_color="#1E1E1E", corner_radius=0,
+            container, height=80, font=normal_font, fg_color=COLOR_PANEL, corner_radius=0,
         )
         self.description.pack(fill="x", padx=8, pady=(0, 8))
 
@@ -113,7 +124,7 @@ class TabDiagnostico(ctk.CTkFrame):
         if self._running:
             return
         self._set_running(True)
-        self.status.configure(text="Comprobando recursos, comandos y motores CAD...", text_color="#FFBF00")
+        self.status.configure(text="Comprobando recursos, comandos y motores CAD...", text_color=COLOR_MOSTAZA)
         threading.Thread(target=self._worker_diagnostico, daemon=True).start()
 
     def _worker_diagnostico(self):
@@ -174,7 +185,7 @@ class TabDiagnostico(ctk.CTkFrame):
             self.parent_app.es_zwcad = selected.product == "ZWCAD"
             record_incident("seleccion_motor_cad", "ok", {"engine": selected.to_dict()})
             messagebox.showinfo(
-                "Motor CAD",
+                "Workbench",
                 f"Motor guardado para procesamiento masivo:\n\n{selected.label}\n{selected.path}",
             )
             self.ejecutar_diagnostico()
@@ -195,7 +206,7 @@ class TabDiagnostico(ctk.CTkFrame):
         if not destination:
             return
         self._set_running(True)
-        self.status.configure(text="Generando informe anonimizado...", text_color="#FFBF00")
+        self.status.configure(text="Generando informe anonimizado...", text_color=COLOR_MOSTAZA)
         description = self.description.get("1.0", "end").strip()
         project_path = getattr(self.parent_app, "ruta_renombre", None) or None
         threading.Thread(
@@ -221,7 +232,7 @@ class TabDiagnostico(ctk.CTkFrame):
         self._set_running(False)
         self.status.configure(text=f"Informe {report_id} generado correctamente.", text_color="#57D163")
         messagebox.showinfo(
-            "Informe de soporte",
+            "Workbench",
             "Informe generado correctamente. Puedes enviarlo al responsable de SINCAL.\n\n"
             f"{path}",
         )

@@ -34,7 +34,7 @@ class DiagnosticsTests(unittest.TestCase):
         report = {
             "report_id": "ABC12345",
             "created_at": "2026-08-18T12:00:00-04:00",
-            "application": {"version": "v28.0.5"},
+            "application": {"version": "v29.0.0"},
             "findings": [{"level": "ok", "message": "Sin bloqueos"}],
             "cad": {"selected": None, "engines": [], "legacy_wrapper_exists": False},
             "resources": {"expected_lisp_count": 21, "active_lisp_count": 21},

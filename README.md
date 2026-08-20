@@ -1,10 +1,10 @@
 # SINCAL — Suite de Ingeniería y Estándares CAD
 
-**SINCAL Suite 1.0** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión del producto se mantiene como 1.0 y la secuencia técnica continúa en `v28.0.5` para conservar la actualización desde instalaciones históricas v27.
+**SINCAL 2.0** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La marca del producto es 2.0 y la secuencia técnica continúa en `v29.0.0` para conservar una actualización ordenada desde las instalaciones v28.
 
 ## Instalación web y distribución
 
-SINCAL se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v28.0.5.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
+SINCAL se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.0.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
 
 El programa base no incorpora los 125 MB de mapas regionales. El paquete web sí contiene una copia inicial del master DWG, LISPs, startup, scripts, plumilla, calibración y ayuda estructural para que el primer arranque sea funcional. GitHub mantiene esos recursos al día mediante actualizaciones menores. Cada mapa regional se descarga solamente cuando se selecciona por primera vez en el módulo Ubicación.
 
@@ -12,7 +12,7 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
 
 ## Primer inicio
 
-1. Ejecuta el instalador oficial de la release `v28.0.5`.
+1. Ejecuta el instalador oficial de la release `v29.0.0`.
 2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
 3. Abre **Diagnóstico**, verifica el motor CAD sugerido y cámbialo si necesitas otra versión.
 4. Pulsa **Preparar integración CAD**.
@@ -43,13 +43,21 @@ Al cerrar la ventana principal con **X**, SINCAL finaliza su proceso. La aplicac
 - `mapas/`: calibración, ayuda y mapas regionales bajo demanda.
 - `tutoriales.json`: contenido estructurado del manual integrado.
 
+### Interfaz Workbench
+
+La interfaz usa un menú lateral retráctil con tamaño **Compacto**, **Estándar** o **Amplio**. El orden de trabajo es Sincronizador, Documentación, Procesamiento masivo, Ubicación y Módulo estructural; Conversión DXF y Diagnóstico permanecen como herramientas complementarias. La consola se puede ocultar o acoplar al borde inferior o derecho desde la cabecera, y concentra todos los resultados de éxito, término y error.
+
 ### Procesamiento masivo
 
-La pestaña permite cargar una carpeta DWG/DXF, marcar archivos, renombrarlos por búsqueda y reemplazo, convertir DXF a DWG, enviar comandos a dibujos abiertos y procesar DWG cerrados.
+La pestaña permite cargar una carpeta DWG/DXF, marcar archivos, renombrarlos por búsqueda y reemplazo, enviar comandos a dibujos abiertos y procesar DWG cerrados. Ya no tiene una consola propia: los procesos escriben en la consola Workbench acoplable.
 
 Acciones disponibles sobre planos cerrados: Auditar, Purgar, Encuadrar vista, Eliminar Layout2/A1, Bloquear viewports, Configurar layouts A1 y Plotear PDF A1. Antes de ejecutarlas, guarda un respaldo, prepara la integración y cierra completamente AutoCAD/ZWCAD. Los botones de automatización cerrada recorren todos los DWG de la carpeta seleccionada.
 
 SINCAL registra en `%LOCALAPPDATA%\SINCAL\runtime\cad_engine.json` el ejecutable elegido y lo entrega directamente a PowerShell. `cad_wrapper.bat` se conserva sólo para compatibilidad. Cada proceso deja motor, versión, código de salida, duración y últimas líneas de error en el registro local de incidentes.
+
+### Conversión DXF
+
+**Conversión DXF** es un módulo independiente: selecciona una carpeta, marca solamente los DXF deseados y convierte cada uno a DWG mediante una instancia CAD temporal. Cierra AutoCAD/ZWCAD antes de iniciarlo, conserva un respaldo y revisa los resultados en la consola Workbench.
 
 ### Módulo estructural
 
@@ -81,7 +89,7 @@ El botón **Generar informe ZIP** crea `diagnostico.json`, `resumen.txt`, una co
 
 ### Documentación integrada
 
-El tab **Documentación** ofrece búsqueda por comando, herramienta o palabra clave. Contiene este README, primer inicio, actualizaciones, integración CAD, startup, master DWG, inventario de recursos, todos los comandos LISP, procesamiento masivo, módulo estructural, módulo de ubicación y solución de problemas.
+El tab **Documentación** ofrece búsqueda por comando, herramienta o palabra clave. Contiene primer inicio, actualizaciones, integración CAD, startup, master DWG, inventario de recursos, todos los comandos LISP, procesamiento masivo, conversión DXF, módulo estructural, módulo de ubicación, diagnóstico y solución de problemas.
 
 ## Publicar una actualización menor
 
@@ -104,10 +112,10 @@ El proceso valida código y pruebas, compila y firma el plugin y la aplicación,
 
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v28.0.5.exe`
-- `SINCAL_App_v28.0.5.zip`
-- `SINCAL_AutoCAD_v28.0.5.zip`
-- `release-manifest_v28.0.5.json`
+- `Setup_SINCAL_v29.0.0.exe`
+- `SINCAL_App_v29.0.0.zip`
+- `SINCAL_AutoCAD_v29.0.0.zip`
+- `release-manifest_v29.0.0.json`
 - `SHA256SUMS.txt`
 
 No renombres los paquetes después de compilar: el instalador usa URLs versionadas y hashes fijados en el momento del build.

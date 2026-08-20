@@ -55,7 +55,14 @@
       "categoria": "Procesamiento masivo",
       "titulo": "Buscar, reemplazar y convertir DXF",
       "tags": "rename reemplazar dxf dwg",
-      "contenido": "RENOMBRAR: carga la carpeta, marca archivos, escribe el fragmento exacto en Buscar y el nuevo texto en Reemplazar. Revisa que el resultado no coincida con un archivo existente y pulsa Aplicar Reemplazo.\n\nCONVERTIR DXF A DWG: marca los DXF y pulsa Convertir. SINCAL abre una instancia CAD en segundo plano y guarda cada archivo con extensión DWG. Cierra CAD antes de comenzar y confirma que cada DWG resultante tenga contenido."
+      "contenido": "RENOMBRAR: carga la carpeta, marca archivos, escribe el fragmento exacto en Buscar y el nuevo texto en Reemplazar. Revisa que el resultado no coincida con un archivo existente y pulsa Aplicar Reemplazo.\n\nLas conversiones DXF se realizan desde el menú Conversión DXF, separado de este flujo para evitar mezclar operaciones de archivo con automatización de planos."
+    },
+    {
+      "id": "conversion-dxf",
+      "categoria": "Conversión DXF",
+      "titulo": "Conversión DXF a DWG",
+      "tags": "dxf dwg convertir autocad zwcad carpeta",
+      "contenido": "Abre Conversión DXF en el menú lateral, selecciona la carpeta y marca los DXF que deseas convertir. Pulsa Convertir DXF seleccionados. SINCAL abre una instancia CAD en segundo plano y guarda cada archivo como DWG en la misma carpeta.\n\nCierra AutoCAD/ZWCAD antes de comenzar, conserva un respaldo y revisa los DWG generados. Si falla, abre la consola acoplable y luego Diagnóstico para generar un informe de soporte."
     },
     {
       "id": "comandos-vivo",

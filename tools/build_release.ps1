@@ -64,6 +64,7 @@ function Invoke-PythonCompile([string]$ProjectRoot) {
     $pythonFiles = @(
         'main.py',
         'core_sincal.py',
+        'sincal_ui.py',
         'sincal_runtime.py',
         'sincal_resource_sync.py',
         'sincal_cad_integration.py',
@@ -260,7 +261,10 @@ function Assert-AppPayloadContents([string]$Path) {
             'plotstyles/SINCAL_A1 (2025).ctb',
             'masters/FORMATOS ANOTATIVOS ACAD_2025.dwg',
             'mapas/mapas_calibrados.json',
-            'mapas/ayuda_travesano.png'
+            'mapas/ayuda_travesano.png',
+            'assets/fonts/Workbench.ttf',
+            'assets/fonts/PassionOne-Bold.ttf',
+            'assets/fonts/Lekton-Regular.ttf'
         )
         $missing = @($required | Where-Object { $_ -notin $entries })
         if ($missing.Count -gt 0) {
@@ -304,6 +308,7 @@ function New-ReleasePayloads(
         Copy-Item (Join-Path $ProjectRoot $relative) (Join-Path $appStage $relative) -Force
     }
     Copy-Item $DistExe (Join-Path $appStage 'SINCAL.exe') -Force
+    Copy-Item (Join-Path $ProjectRoot 'assets') (Join-Path $appStage 'assets') -Recurse -Force
 
     # La primera apertura debe ser funcional incluso antes de crear el estado de
     # sincronización. Se incluyen sólo los recursos esenciales y livianos; cada
@@ -367,7 +372,7 @@ function Write-ReleaseManifest(
 ) {
     $manifest = [ordered]@{
         schema = 1
-        product = 'SINCAL Suite 1.0'
+        product = 'SINCAL 2.0'
         release = $Version
         assets = [ordered]@{
             installer = [ordered]@{

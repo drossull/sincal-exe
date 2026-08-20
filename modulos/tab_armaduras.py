@@ -8,6 +8,18 @@ import customtkinter as ctk
 from PIL import Image
 
 from sincal_runtime import ruta_recurso, ruta_runtime
+from sincal_ui import (
+    COLOR_ACENTO,
+    COLOR_ACENTO_HOVER,
+    COLOR_BORDE,
+    COLOR_GRIS_BOTON,
+    COLOR_GRIS_BOTON_HOVER,
+    COLOR_MOSTAZA,
+    COLOR_PANEL,
+    COLOR_TEXTO_SUAVE,
+    FUENTE_NORMAL,
+    FUENTE_SUBTITULO,
+)
 
 RUTA_TEMPORAL = ruta_runtime()
 
@@ -21,27 +33,27 @@ class TabArmaduras(ctk.CTkFrame):
     def setup_ui(self):
         # --- Frame Superior: JSON ---
         frame_top = ctk.CTkFrame(
-            self, fg_color="#1E1E1E", border_width=1, border_color="#444444", corner_radius=0)
+            self, fg_color=COLOR_PANEL, border_width=1, border_color=COLOR_BORDE, corner_radius=0)
         frame_top.pack(fill="x", padx=20, pady=10)
 
-        fuente_subtitulo = ("Consolas", 18, "bold")
-        fuente_normal = ("Consolas", 12)
+        fuente_subtitulo = FUENTE_SUBTITULO
+        fuente_normal = FUENTE_NORMAL
 
         ctk.CTkLabel(frame_top, text="MÓDULO ESTRUCTURAL (ARMADURAS)",
-                     font=fuente_subtitulo, text_color="#FFBF00").pack(side="left", padx=15, pady=15)
+                     font=fuente_subtitulo, text_color=COLOR_MOSTAZA).pack(side="left", padx=15, pady=15)
 
         self.btn_cargar_json = ctk.CTkButton(frame_top, text="📁 Cargar JSON de Proyecto", font=fuente_normal,
-                                             fg_color="#444444", hover_color="#555555", corner_radius=0, command=self.cargar_json_bim)
+                                             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0, command=self.cargar_json_bim)
         self.btn_cargar_json.pack(side="right", padx=15, pady=15)
         self.lbl_json_status = ctk.CTkLabel(
-            frame_top, text="Archivo: Ninguno", font=fuente_normal, text_color="#888888")
+            frame_top, text="Archivo: Ninguno", font=fuente_normal, text_color=COLOR_TEXTO_SUAVE)
         self.lbl_json_status.pack(side="right", padx=(15, 0), pady=15)
 
         # =========================================================
         # TABVIEW MAESTRO (Elementos Estructurales)
         # =========================================================
         self.tab_maestro = ctk.CTkTabview(
-            self, width=800, height=520, fg_color="transparent", segmented_button_selected_color="#007FFF")
+            self, width=800, height=520, fg_color="transparent", segmented_button_selected_color=COLOR_ACENTO)
         self.tab_maestro.pack(padx=20, pady=5, fill="both", expand=True)
         self.tab_maestro._segmented_button.configure(font=fuente_normal)
 
@@ -52,7 +64,7 @@ class TabArmaduras(ctk.CTkFrame):
         # CONTENIDO: 1. ESTRIBOS
         # =========================================================
         self.tab_estribo = ctk.CTkTabview(
-            tab_estribos, fg_color="#1E1E1E", segmented_button_selected_color="#005BBF")
+            tab_estribos, fg_color=COLOR_PANEL, segmented_button_selected_color=COLOR_ACENTO)
         self.tab_estribo.pack(fill="both", expand=True)
         self.tab_estribo._segmented_button.configure(font=fuente_normal)
 
@@ -61,7 +73,7 @@ class TabArmaduras(ctk.CTkFrame):
         self.tab_estribo.add("Consola y Topes")
 
         # I. DIMENSIONES GENERALES (Estribos)
-        ctk.CTkLabel(tab_zap, text="I. DIMENSIONES GENERALES (cm):", font=fuente_subtitulo, text_color="#007FFF").grid(
+        ctk.CTkLabel(tab_zap, text="I. DIMENSIONES GENERALES (cm):", font=fuente_subtitulo, text_color=COLOR_ACENTO).grid(
             row=0, column=0, columnspan=2, sticky="w", padx=10, pady=(10, 0))
 
         ctk.CTkLabel(tab_zap, text="Largo:", font=fuente_normal).grid(
@@ -83,7 +95,7 @@ class TabArmaduras(ctk.CTkFrame):
         self.ent_z_alto.grid(row=1, column=5, padx=5, pady=5)
 
         # II. RECUBRIMIENTOS (Estribos)
-        ctk.CTkLabel(tab_zap, text="II. RECUBRIMIENTOS (cm):", font=fuente_subtitulo, text_color="#007FFF").grid(
+        ctk.CTkLabel(tab_zap, text="II. RECUBRIMIENTOS (cm):", font=fuente_subtitulo, text_color=COLOR_ACENTO).grid(
             row=2, column=0, columnspan=2, sticky="w", padx=10, pady=(15, 0))
 
         ctk.CTkLabel(tab_zap, text="Cara inferior:", font=fuente_normal).grid(
@@ -105,7 +117,7 @@ class TabArmaduras(ctk.CTkFrame):
         self.ent_rec_lat.grid(row=3, column=5, padx=5, pady=5)
 
         # III. ARMADURA (Estribos)
-        ctk.CTkLabel(tab_zap, text="III. ARMADURA:", font=fuente_subtitulo, text_color="#007FFF").grid(
+        ctk.CTkLabel(tab_zap, text="III. ARMADURA:", font=fuente_subtitulo, text_color=COLOR_ACENTO).grid(
             row=4, column=0, sticky="w", padx=10, pady=(15, 0))
 
         ctk.CTkLabel(tab_zap, text="Malla inferior:", font=fuente_normal).grid(
@@ -161,7 +173,7 @@ class TabArmaduras(ctk.CTkFrame):
                           sticky="ew", pady=(20, 0))
 
         ctk.CTkLabel(frame_vistas, text="GENERACIÓN DE VISTAS Y DESPIECES:",
-                     font=fuente_subtitulo, text_color="#FFBF00").pack(anchor="w", pady=(0, 10))
+                     font=fuente_subtitulo, text_color=COLOR_MOSTAZA).pack(anchor="w", pady=(0, 10))
 
         btn_container = ctk.CTkFrame(frame_vistas, fg_color="transparent")
         btn_container.pack(fill="x")
@@ -174,12 +186,12 @@ class TabArmaduras(ctk.CTkFrame):
             frame_btn.pack(side="left", expand=True, fill="x", padx=2)
 
             btn_v = ctk.CTkButton(frame_btn, text=txt, font=fuente_normal, corner_radius=0, height=40,
-                                  fg_color="transparent", border_width=1, border_color="#007FFF", text_color="#CCCCCC",
+                                  fg_color="transparent", border_width=1, border_color=COLOR_ACENTO, text_color="#CCCCCC",
                                   hover_color="#444444", command=lambda v=vista: self.generar_vista_cad(v))
             btn_v.pack(side="left", expand=True, fill="x")
 
             btn_d = ctk.CTkButton(frame_btn, text="D", font=fuente_subtitulo, corner_radius=0, height=40, width=30,
-                                  fg_color="#007FFF", hover_color="#0066CC", text_color="#FFFFFF",
+                                  fg_color=COLOR_ACENTO, hover_color=COLOR_ACENTO_HOVER, text_color="#FFFFFF",
                                   command=lambda v=vista: self.generar_despiece_cad(v))
             btn_d.pack(side="left", padx=(2, 0))
 
@@ -199,7 +211,7 @@ class TabArmaduras(ctk.CTkFrame):
         frame_params.pack(fill="x", padx=10, pady=10)
 
         ctk.CTkLabel(frame_params, text="I. PARÁMETROS GLOBALES:", font=fuente_subtitulo,
-                     text_color="#007FFF").grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 10))
+                     text_color=COLOR_ACENTO).grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 10))
 
         btn_ayuda = ctk.CTkButton(frame_params, text="❓ Abrir ayuda", font=fuente_normal, width=100, fg_color="#333333",
                                   hover_color="#555555", corner_radius=0, border_width=1, border_color="#555555", command=self.mostrar_ayuda_travesano)
@@ -267,14 +279,14 @@ class TabArmaduras(ctk.CTkFrame):
         frame_botones_t.pack(fill="x", padx=10, pady=15)
 
         ctk.CTkLabel(frame_botones_t, text="II. SELECCIÓN DE CUADRANTE (AutoCAD):", font=fuente_subtitulo,
-                     text_color="#007FFF").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+                     text_color=COLOR_ACENTO).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
 
         def crear_btn_cuadrante(parent, texto, comando_gen, comando_desp, fila, col, colspan=1, is_viga=False):
             frm = ctk.CTkFrame(parent, fg_color="transparent")
             frm.grid(row=fila, column=col, columnspan=colspan,
                      padx=5, pady=5, sticky="ew")
 
-            hover_c = "#FFBF00" if is_viga else "#007FFF"
+            hover_c = COLOR_MOSTAZA if is_viga else COLOR_ACENTO
             text_c = "#1E1E1E" if is_viga else "#DCE4EE"
 
             btn_gen = ctk.CTkButton(frm, text=texto, font=fuente_normal, fg_color="#444444",
@@ -282,7 +294,7 @@ class TabArmaduras(ctk.CTkFrame):
             btn_gen.pack(side="left", expand=True, fill="x")
 
             btn_desp = ctk.CTkButton(frm, text="D", font=fuente_subtitulo, corner_radius=0, width=30,
-                                     fg_color="#007FFF", hover_color="#0066CC", text_color="#FFFFFF",
+                                     fg_color=COLOR_ACENTO, hover_color=COLOR_ACENTO_HOVER, text_color="#FFFFFF",
                                      command=comando_desp)
             btn_desp.pack(side="right", padx=(2, 0))
             return frm
@@ -1689,9 +1701,9 @@ class TabArmaduras(ctk.CTkFrame):
 
             nombre_archivo = os.path.basename(ruta)
             self.lbl_json_status.configure(
-                text=f"Archivo: {nombre_archivo}", text_color="#007FFF")
+                text=f"Archivo: {nombre_archivo}", text_color=COLOR_ACENTO)
             self.parent_app.log_r(f"[*] JSON cargado: {nombre_archivo}")
             messagebox.showinfo(
-                "BIM", "Datos mapeados exitosamente en centímetros y grados.")
+                "Workbench", "Datos mapeados exitosamente en centímetros y grados.")
         except Exception as e:
             messagebox.showerror("Error JSON", f"Fallo al leer archivo:\n{e}")

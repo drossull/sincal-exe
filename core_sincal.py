@@ -47,16 +47,34 @@ from sincal_update_config import (
     DISTRIBUTION_RELEASES_URL,
     api_url as distribution_api_url,
 )
+from sincal_ui import (
+    COLOR_ACENTO,
+    COLOR_ACENTO_HOVER,
+    COLOR_BORDE,
+    COLOR_FONDO,
+    COLOR_GRIS_BOTON,
+    COLOR_GRIS_BOTON_HOVER,
+    COLOR_MOSTAZA,
+    COLOR_PANEL,
+    COLOR_PANEL_OSCURO,
+    COLOR_TEXTO,
+    COLOR_TEXTO_SUAVE,
+    FUENTE_CONSOLA,
+    FUENTE_MENU,
+    FUENTE_NORMAL,
+    FUENTE_NORMAL_PEQUENA,
+    FUENTE_SUBTITULO,
+    FUENTE_SUBTITULO_PEQUENO,
+    FUENTE_TITULO,
+    FUENTE_TITULO_PEQUENO,
+    registrar_fuentes,
+)
 
 # --- CONFIGURACIÓN GLOBALES ---
 URL_RELEASES = DISTRIBUTION_RELEASES_URL
 RESOURCE_POLL_INTERVAL_MS = 60 * 1000
 
-COLOR_FONDO, COLOR_TITULO, COLOR_TEXTO, COLOR_ACENTO = "#2B2B2B", "#FFBF00", "#CCCCCC", "#007FFF"
-FUENTE_TITULO, FUENTE_SUBTITULO, FUENTE_MENU, FUENTE_NORMAL, FUENTE_CONSOLA = [
-    ("Consolas", 24, "bold"), ("Consolas", 18,
-                               "bold"), ("Consolas", 13), ("Consolas", 12), ("Consolas", 11)
-]
+COLOR_TITULO = COLOR_MOSTAZA
 
 ctk.set_appearance_mode("dark")
 
@@ -85,13 +103,15 @@ def configurar_logging():
 class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
+        registrar_fuentes()
         asegurar_directorios()
         self.logger = configurar_logging()
         self.historial_logs = []
         self._cerrando = False
         self._ui_queue = queue.Queue()
-        self.title("SINCAL - Suite de Herramientas Professional")
-        self.geometry("1000x800")
+        self.title("SINCAL 2.0 — Workbench")
+        self.geometry("1280x820")
+        self.minsize(980, 640)
         self.configure(fg_color=COLOR_FONDO)
         try:
             self.iconbitmap(obtener_ruta_recurso("logo.ico"))
@@ -106,52 +126,231 @@ class ActualizadorCAD(ctk.CTk):
         self._last_resource_offer_tree = ""
         self._resource_manifest_revision = ""
         self._resource_poll_job = None
+        self._sidebar_collapsed = False
+        self._sidebar_widths = {"Compacto": 210, "Estándar": 270, "Amplio": 340}
+        self._sidebar_size = "Estándar"
+        self._console_mode = "Oculta"
+        self._sections = {}
+        self._nav_buttons = {}
         self.protocol("WM_DELETE_WINDOW", self.cerrar_aplicacion)
         self.after(50, self._procesar_ui_queue)
 
-        self.main_scroll = ctk.CTkScrollableFrame(
-            self, fg_color=COLOR_FONDO, corner_radius=0)
-        self.main_scroll.pack(fill="both", expand=True)
-
-        self.tabview = ctk.CTkTabview(self.main_scroll, width=950, height=750,
-                                      fg_color=COLOR_FONDO, segmented_button_selected_color=COLOR_ACENTO)
-        self.tabview.pack(padx=20, pady=10)
-        self.tabview._segmented_button.configure(font=FUENTE_NORMAL)
-
-        # --- CREACIÓN DE PESTAÑAS (ORDENADAS Y CON SEPARADOR VISUAL) ---
-        self.tab_main = self.tabview.add("Sincronizador / ")
-
-        tab_ubicacion_frame = self.tabview.add("Ubicación / ")
-        self.tab_ubicacion = TabUbicacion(tab_ubicacion_frame, parent_app=self)
-        self.tab_ubicacion.pack(expand=True, fill="both")
-
-        self.tab_armaduras = self.tabview.add("Módulo Estructural / ")
-
-        self.tab_renombrado = self.tabview.add("Procesamiento Masivo / ")
-
-        tab_diagnostico_frame = self.tabview.add("Diagnóstico / ")
-        self.tab_diagnostico = TabDiagnostico(
-            tab_diagnostico_frame, parent_app=self, fg_color="transparent"
-        )
-        self.tab_diagnostico.pack(expand=True, fill="both")
-
-        self.tab_docs = self.tabview.add("Documentación")
-
-        # --- INICIALIZACIÓN DEL CONTENIDO ---
+        self._construir_shell()
+        self._crear_secciones()
         self.setup_tab_sincronizador()
         self.setup_tab_renombrado()
+        self.setup_tab_conversion_dxf()
         self.setup_tab_armaduras()
-
         self.vista_docs = TabDocs(
             self.tab_docs, parent_app=self, fg_color="transparent")
         self.vista_docs.pack(fill="both", expand=True)
-
-        # --- CONSOLA FLOTANTE GLOBAL ---
-        self.btn_consola = ctk.CTkButton(self, text="💻 Consola", font=FUENTE_NORMAL, width=90, fg_color="#333333",
-                                         hover_color="#555555", border_width=1, border_color="#444444", corner_radius=5, command=self.mostrar_ventana_log)
-        self.btn_consola.place(relx=0.97, rely=0.03, anchor="ne")
+        self.seleccionar_seccion("sincronizador")
 
         threading.Thread(target=self.cargar_info_github, daemon=True).start()
+
+    def _construir_shell(self):
+        self.sidebar = ctk.CTkFrame(
+            self, width=self._sidebar_widths[self._sidebar_size], fg_color=COLOR_PANEL_OSCURO,
+            corner_radius=0, border_width=1, border_color=COLOR_BORDE,
+        )
+        self.sidebar.pack(side="left", fill="y")
+        self.sidebar.pack_propagate(False)
+
+        brand = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        brand.pack(fill="x", padx=14, pady=(18, 10))
+        self.brand_title = ctk.CTkLabel(
+            brand, text="SINCAL 2.0", font=FUENTE_TITULO_PEQUENO, text_color=COLOR_MOSTAZA,
+        )
+        self.brand_title.pack(side="left", anchor="w")
+        self.btn_retraer = ctk.CTkButton(
+            brand, text="‹", width=32, height=30, font=FUENTE_SUBTITULO_PEQUENO,
+            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
+            command=self.alternar_menu, corner_radius=0,
+        )
+        self.btn_retraer.pack(side="right")
+        self.brand_subtitle = ctk.CTkLabel(
+            self.sidebar, text="WORKBENCH DE INGENIERÍA", font=FUENTE_NORMAL_PEQUENA,
+            text_color=COLOR_TEXTO_SUAVE,
+        )
+        self.brand_subtitle.pack(anchor="w", padx=16, pady=(0, 18))
+
+        self.nav_container = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.nav_container.pack(fill="both", expand=True, padx=8)
+        self.nav_items = (
+            ("sincronizador", "⌂  Sincronizador", "Sincronizador"),
+            ("documentacion", "▤  Documentación", "Documentación"),
+            ("procesamiento", "▣  Procesamiento masivo", "Procesamiento masivo"),
+            ("ubicacion", "⌖  Ubicación", "Ubicación"),
+            ("estructural", "▦  Módulo estructural", "Módulo estructural"),
+            ("conversion", "⇄  Conversión DXF", "Conversión DXF"),
+            ("diagnostico", "◈  Diagnóstico", "Diagnóstico"),
+        )
+        for key, label, title in self.nav_items:
+            button = ctk.CTkButton(
+                self.nav_container, text=label, font=FUENTE_MENU, anchor="w",
+                fg_color="transparent", hover_color="#3A3A3A", text_color=COLOR_TEXTO,
+                corner_radius=0, height=38,
+                command=lambda selected=key: self.seleccionar_seccion(selected),
+            )
+            button.pack(fill="x", pady=2)
+            self._nav_buttons[key] = button
+
+        footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        footer.pack(fill="x", padx=12, pady=12)
+        self.lbl_menu_size = ctk.CTkLabel(
+            footer, text="Tamaño del menú", font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
+        )
+        self.lbl_menu_size.pack(anchor="w", pady=(0, 4))
+        self.menu_size = ctk.CTkOptionMenu(
+            footer, values=list(self._sidebar_widths), command=self.cambiar_ancho_menu,
+            font=FUENTE_NORMAL_PEQUENA, dropdown_font=FUENTE_NORMAL_PEQUENA,
+            fg_color=COLOR_GRIS_BOTON, button_color=COLOR_ACENTO, button_hover_color=COLOR_ACENTO_HOVER,
+            corner_radius=0,
+        )
+        self.menu_size.set(self._sidebar_size)
+        self.menu_size.pack(fill="x")
+
+        self.workspace = ctk.CTkFrame(self, fg_color=COLOR_FONDO, corner_radius=0)
+        self.workspace.pack(side="right", fill="both", expand=True)
+        header = ctk.CTkFrame(self.workspace, height=58, fg_color=COLOR_PANEL, corner_radius=0)
+        header.pack(fill="x")
+        header.pack_propagate(False)
+        self.section_title = ctk.CTkLabel(
+            header, text="Sincronizador", font=FUENTE_SUBTITULO, text_color=COLOR_MOSTAZA,
+        )
+        self.section_title.pack(side="left", padx=22, pady=10)
+        ctk.CTkLabel(
+            header, text="SINCAL 2.0", font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
+        ).pack(side="right", padx=(8, 18))
+        self.console_menu = ctk.CTkOptionMenu(
+            header, values=["Consola: oculta", "Consola: inferior", "Consola: derecha"],
+            command=self.cambiar_modo_consola, font=FUENTE_NORMAL_PEQUENA,
+            dropdown_font=FUENTE_NORMAL_PEQUENA, width=156, corner_radius=0,
+            fg_color=COLOR_GRIS_BOTON, button_color=COLOR_ACENTO, button_hover_color=COLOR_ACENTO_HOVER,
+        )
+        self.console_menu.set("Consola: oculta")
+        self.console_menu.pack(side="right", padx=10, pady=12)
+
+        self.content_host = ctk.CTkFrame(self.workspace, fg_color=COLOR_FONDO, corner_radius=0)
+        self.content_host.pack(fill="both", expand=True)
+        self.console_panel = ctk.CTkFrame(
+            self.workspace, fg_color=COLOR_PANEL_OSCURO, corner_radius=0,
+            border_width=1, border_color=COLOR_BORDE,
+        )
+        console_header = ctk.CTkFrame(self.console_panel, fg_color="transparent")
+        console_header.pack(fill="x", padx=12, pady=(8, 4))
+        ctk.CTkLabel(
+            console_header, text="CONSOLA", font=FUENTE_SUBTITULO_PEQUENO, text_color=COLOR_MOSTAZA,
+        ).pack(side="left")
+        ctk.CTkButton(
+            console_header, text="Limpiar", font=FUENTE_NORMAL_PEQUENA, width=70, height=26,
+            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
+            corner_radius=0, command=self.limpiar_consola_global,
+        ).pack(side="right")
+        self.txt_log_global = ctk.CTkTextbox(
+            self.console_panel, font=FUENTE_CONSOLA, fg_color="#090909", text_color="#C9FFC9",
+            corner_radius=0, state="disabled",
+        )
+        self.txt_log_global.pack(fill="both", expand=True, padx=12, pady=(2, 12))
+
+    def _crear_secciones(self):
+        definitions = (
+            ("sincronizador", "Sincronizador"),
+            ("documentacion", "Documentación"),
+            ("procesamiento", "Procesamiento masivo"),
+            ("ubicacion", "Ubicación"),
+            ("estructural", "Módulo estructural"),
+            ("conversion", "Conversión DXF"),
+            ("diagnostico", "Diagnóstico"),
+        )
+        for key, title in definitions:
+            frame = ctk.CTkFrame(self.content_host, fg_color=COLOR_FONDO, corner_radius=0)
+            self._sections[key] = (frame, title)
+        self.tab_main = self._sections["sincronizador"][0]
+        self.tab_docs = self._sections["documentacion"][0]
+        self.tab_renombrado = self._sections["procesamiento"][0]
+        self.tab_ubicacion = self._sections["ubicacion"][0]
+        self.tab_armaduras = self._sections["estructural"][0]
+        self.tab_conversion = self._sections["conversion"][0]
+        tab_diagnostico = self._sections["diagnostico"][0]
+        self.tab_ubicacion_widget = TabUbicacion(self.tab_ubicacion, parent_app=self)
+        self.tab_ubicacion_widget.pack(expand=True, fill="both")
+        self.tab_diagnostico = TabDiagnostico(tab_diagnostico, parent_app=self, fg_color="transparent")
+        self.tab_diagnostico.pack(expand=True, fill="both")
+
+    def seleccionar_seccion(self, key):
+        if key not in self._sections:
+            return
+        for frame, _title in self._sections.values():
+            frame.pack_forget()
+        frame, title = self._sections[key]
+        frame.pack(fill="both", expand=True)
+        self.section_title.configure(text=title)
+        for item_key, button in self._nav_buttons.items():
+            selected = item_key == key
+            button.configure(
+                fg_color=COLOR_ACENTO if selected else "transparent",
+                hover_color=COLOR_ACENTO_HOVER if selected else "#3A3A3A",
+                text_color="#FFFFFF" if selected else COLOR_TEXTO,
+            )
+
+    def alternar_menu(self):
+        self._sidebar_collapsed = not self._sidebar_collapsed
+        width = 70 if self._sidebar_collapsed else self._sidebar_widths[self._sidebar_size]
+        self.sidebar.configure(width=width)
+        self.brand_title.configure(text="S" if self._sidebar_collapsed else "SINCAL 2.0")
+        self.brand_subtitle.configure(text="" if self._sidebar_collapsed else "WORKBENCH DE INGENIERÍA")
+        self.btn_retraer.configure(text="›" if self._sidebar_collapsed else "‹")
+        for key, label, _title in self.nav_items:
+            self._nav_buttons[key].configure(text=label.split("  ")[0] if self._sidebar_collapsed else label, anchor="center" if self._sidebar_collapsed else "w")
+        if self._sidebar_collapsed:
+            self.lbl_menu_size.pack_forget()
+            self.menu_size.pack_forget()
+        else:
+            self.lbl_menu_size.pack(anchor="w", pady=(0, 4))
+            self.menu_size.pack(fill="x")
+
+    def cambiar_ancho_menu(self, size):
+        if size not in self._sidebar_widths:
+            return
+        self._sidebar_size = size
+        if not self._sidebar_collapsed:
+            self.sidebar.configure(width=self._sidebar_widths[size])
+
+    def cambiar_modo_consola(self, option):
+        modes = {
+            "Consola: oculta": "Oculta",
+            "Consola: inferior": "Inferior",
+            "Consola: derecha": "Derecha",
+        }
+        self._console_mode = modes.get(option, "Oculta")
+        self.content_host.pack_forget()
+        self.console_panel.pack_forget()
+        if self._console_mode == "Inferior":
+            self.content_host.pack(side="top", fill="both", expand=True)
+            self.console_panel.configure(height=210, width=1)
+            self.console_panel.pack(side="bottom", fill="x")
+            self.console_panel.pack_propagate(False)
+        elif self._console_mode == "Derecha":
+            self.console_panel.configure(width=390, height=1)
+            self.console_panel.pack(side="right", fill="y")
+            self.console_panel.pack_propagate(False)
+            self.content_host.pack(side="left", fill="both", expand=True)
+        else:
+            self.content_host.pack(fill="both", expand=True)
+        self._actualizar_consola_global()
+
+    def mostrar_ventana_log(self):
+        self.console_menu.set("Consola: inferior")
+        self.cambiar_modo_consola("Consola: inferior")
+
+    def limpiar_consola_global(self):
+        self.historial_logs.clear()
+        self._set_textbox_content(self.txt_log_global, "")
+
+    def _actualizar_consola_global(self):
+        if hasattr(self, "txt_log_global"):
+            self._set_textbox_content(self.txt_log_global, "\n".join(self.historial_logs) + ("\n" if self.historial_logs else ""))
 
     def _ui(self, callback, *args, **kwargs):
         if getattr(self, '_cerrando', False):
@@ -294,31 +493,39 @@ class ActualizadorCAD(ctk.CTk):
                 f"[!] Actualización a {nueva_version} pospuesta por el usuario.")
 
     def setup_tab_sincronizador(self):
-        lbl_titulo = ctk.CTkLabel(
-            self.tab_main, text="ESTÁNDAR SINCAL", font=FUENTE_TITULO, text_color=COLOR_TITULO)
-        lbl_titulo.pack(pady=10)
-        self.btn_actualizar = ctk.CTkButton(self.tab_main, text="Abrir instalador oficial", font=FUENTE_SUBTITULO, fg_color="transparent", border_width=2,
-                                            border_color=COLOR_ACENTO, corner_radius=0, hover_color="#444444", text_color=COLOR_TEXTO, border_spacing=8, command=lambda: webbrowser.open(URL_RELEASES))
-        self.btn_actualizar.pack(pady=5)
+        portada = ctk.CTkFrame(self.tab_main, fg_color="transparent")
+        portada.pack(fill="x", padx=40, pady=(38, 20))
+        ctk.CTkLabel(
+            portada, text="SINCAL 2.0", font=FUENTE_TITULO, text_color=COLOR_MOSTAZA,
+        ).pack(pady=(4, 12))
+        ctk.CTkLabel(
+            portada,
+            text=("Un workbench para estandarizar CAD, automatizar planos y concentrar las "
+                  "herramientas de ingeniería que acompañan cada proyecto."),
+            font=FUENTE_NORMAL, text_color=COLOR_TEXTO, justify="center", wraplength=720,
+        ).pack(padx=30)
+
+        self.btn_actualizar = ctk.CTkButton(
+            self.tab_main, text="Abrir instalador oficial", font=FUENTE_SUBTITULO_PEQUENO,
+            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
+            corner_radius=0, command=lambda: webbrowser.open(URL_RELEASES),
+        )
+        self.btn_actualizar.pack(pady=(0, 14))
 
         botones_sec_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         botones_sec_frame.pack(pady=5)
-        ctk.CTkButton(botones_sec_frame, text="Abrir carpeta local", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_ACENTO,
-                      corner_radius=0, text_color=COLOR_TEXTO, hover_color="#444444", command=self.abrir_carpeta_local).pack(side="left", padx=10)
-        ctk.CTkButton(botones_sec_frame, text="Preparar integración CAD", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_TITULO,
-                      corner_radius=0, text_color=COLOR_TITULO, hover_color="#444444", command=self.forzar_path_manual).pack(side="left", padx=10)
+        ctk.CTkButton(botones_sec_frame, text="Abrir carpeta local", font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON,
+                      corner_radius=0, text_color=COLOR_TEXTO, hover_color=COLOR_GRIS_BOTON_HOVER, command=self.abrir_carpeta_local).pack(side="left", padx=6)
+        ctk.CTkButton(botones_sec_frame, text="Preparar integración CAD", font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON,
+                      corner_radius=0, text_color=COLOR_TEXTO, hover_color=COLOR_GRIS_BOTON_HOVER, command=self.forzar_path_manual).pack(side="left", padx=6)
 
-        self.btn_sync_resources = ctk.CTkButton(botones_sec_frame, text="Actualizar recursos CAD", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color=COLOR_ACENTO,
-                                                corner_radius=0, text_color=COLOR_TEXTO, hover_color="#444444", command=self.verificar_recursos_manual)
-        self.btn_sync_resources.pack(side="left", padx=10)
+        self.btn_sync_resources = ctk.CTkButton(botones_sec_frame, text="Actualizar recursos CAD", font=FUENTE_NORMAL, fg_color=COLOR_ACENTO,
+                                                corner_radius=0, text_color="#FFFFFF", hover_color=COLOR_ACENTO_HOVER, command=self.verificar_recursos_manual)
+        self.btn_sync_resources.pack(side="left", padx=6)
 
-        self.btn_verificar_update = ctk.CTkButton(botones_sec_frame, text="Verificar nueva actualización", font=FUENTE_NORMAL, fg_color="transparent", border_width=1, border_color="#00FF00",
-                                                  corner_radius=0, text_color="#00FF00", hover_color="#444444", command=self.verificar_actualizacion_manual)
-        self.btn_verificar_update.pack(side="left", padx=10)
-
-        self.consola = ctk.CTkTextbox(self.tab_main, width=850, height=180, font=FUENTE_CONSOLA,
-                                      fg_color="#1E1E1E", text_color=COLOR_TEXTO, state="disabled")
-        self.consola.pack(pady=10)
+        self.btn_verificar_update = ctk.CTkButton(botones_sec_frame, text="Verificar nueva actualización", font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON,
+                                                  corner_radius=0, text_color=COLOR_TEXTO, hover_color=COLOR_GRIS_BOTON_HOVER, command=self.verificar_actualizacion_manual)
+        self.btn_verificar_update.pack(side="left", padx=6)
 
         self.frame_updates = ctk.CTkFrame(
             self.tab_main, fg_color="transparent")
@@ -326,7 +533,7 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkLabel(self.frame_updates, text="Historial de cambios",
                      font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(anchor="w")
         self.txt_updates = ctk.CTkTextbox(
-            self.frame_updates, width=850, height=160, font=FUENTE_NORMAL, fg_color="#1E1E1E", state="disabled")
+            self.frame_updates, width=850, height=220, font=FUENTE_NORMAL, fg_color=COLOR_PANEL, text_color=COLOR_TEXTO, state="disabled", corner_radius=0)
         self.txt_updates.pack(pady=5)
 
         self._iniciar_verificacion_recursos()
@@ -418,7 +625,7 @@ class ActualizadorCAD(ctk.CTk):
             if manual:
                 self._ui(
                     messagebox.showinfo,
-                    "Recursos CAD",
+                    "Workbench",
                     "Los recursos CAD ya coinciden con la rama main de GitHub.",
                 )
         except Exception as e:
@@ -532,14 +739,14 @@ class ActualizadorCAD(ctk.CTk):
             mensaje += "\n\n" + "\n".join(avisos)
         self._ui(
             messagebox.showwarning if avisos else messagebox.showinfo,
-            "Recursos actualizados" if avisos else "Actualización lista",
+            "Workbench",
             mensaje,
         )
         self._ui(self.btn_sync_resources.configure, state="normal", text="Actualizar recursos CAD")
 
     def _refrescar_interfaces_recursos(self):
-        if hasattr(self, "tab_ubicacion"):
-            self.tab_ubicacion.recargar_recursos()
+        if hasattr(self, "tab_ubicacion_widget"):
+            self.tab_ubicacion_widget.recargar_recursos()
         if hasattr(self, "vista_docs"):
             self.vista_docs.recargar_documentacion()
 
@@ -603,7 +810,7 @@ class ActualizadorCAD(ctk.CTk):
                 self.log(
                     "[OK] El sistema ya se encuentra en su última versión.")
                 self._ui(messagebox.showinfo,
-                         "Actualización", "El sistema ya se encuentra en su última versión.")
+                         "Workbench", "El sistema ya se encuentra en su última versión.")
         except Exception as e:
             self.log(f"[X] Fallo al verificar versión en GitHub: {e}")
         finally:
@@ -700,12 +907,16 @@ class ActualizadorCAD(ctk.CTk):
                                               hover_color="#C9302C", width=80, corner_radius=0, state="disabled", command=self.detener_comando_en_vivo)
         self.btn_cancelar_cmd.pack(side="left")
 
-        bottom_frame = ctk.CTkFrame(self.tab_renombrado, fg_color="#1E1E1E",
-                                    corner_radius=0, border_width=1, border_color="#444444")
+        bottom_frame = ctk.CTkFrame(self.tab_renombrado, fg_color=COLOR_PANEL,
+                                    corner_radius=0, border_width=1, border_color=COLOR_BORDE)
         bottom_frame.pack(fill="x", padx=20, pady=(10, 15))
 
-        ctk.CTkLabel(bottom_frame, text="4. Consola de Automatización (Inyectar a planos cerrados):",
+        ctk.CTkLabel(bottom_frame, text="4. Automatización de planos cerrados",
                      font=FUENTE_SUBTITULO, text_color=COLOR_TITULO).pack(anchor="w", padx=15, pady=(10, 5))
+        ctk.CTkLabel(
+            bottom_frame, text="Los resultados se muestran en la consola acoplable.",
+            font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
+        ).pack(anchor="w", padx=15, pady=(0, 4))
 
         btn_container = ctk.CTkFrame(bottom_frame, fg_color="transparent")
         btn_container.pack(fill="x", padx=15, pady=5)
@@ -718,27 +929,106 @@ class ActualizadorCAD(ctk.CTk):
             btn_container.grid_columnconfigure(
                 i, weight=1, uniform="botones_script")
 
-        ctk.CTkButton(btn_container, text="▶ Auditar", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555",
+        ctk.CTkButton(btn_container, text="▶ Auditar", font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
                       corner_radius=0, command=lambda: self.lanzar_script(cmd_ps("AUDIT"))).grid(row=0, column=0, padx=5, pady=5, sticky="ew")
-        ctk.CTkButton(btn_container, text="▶ Purgar", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", corner_radius=0,
+        ctk.CTkButton(btn_container, text="▶ Purgar", font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0,
                       command=lambda: self.lanzar_script(cmd_ps("PURGEALL"))).grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-        ctk.CTkButton(btn_container, text="▶ Encuadrar vista", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555",
+        ctk.CTkButton(btn_container, text="▶ Encuadrar vista", font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
                       corner_radius=0, command=lambda: self.lanzar_script(cmd_ps("ZE"))).grid(row=0, column=2, padx=5, pady=5, sticky="ew")
-        ctk.CTkButton(btn_container, text="▶ Eliminar Layout2", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555",
+        ctk.CTkButton(btn_container, text="▶ Eliminar Layout2", font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
                       corner_radius=0, command=lambda: self.lanzar_script(cmd_ps("DL2"))).grid(row=0, column=3, padx=5, pady=5, sticky="ew")
 
-        ctk.CTkButton(btn_container, text="▶ Bloquear Viewports", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555",
+        ctk.CTkButton(btn_container, text="▶ Bloquear Viewports", font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
                       corner_radius=0, command=lambda: self.lanzar_script(cmd_ps("BV"))).grid(row=1, column=0, padx=5, pady=5, sticky="ew")
-        ctk.CTkButton(btn_container, text="▶ Configurar en A1", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555",
+        ctk.CTkButton(btn_container, text="▶ Configurar en A1", font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
                       corner_radius=0, command=lambda: self.lanzar_script(cmd_ps("PAGESETUP-A1"))).grid(row=1, column=1, padx=5, pady=5, sticky="ew")
-        ctk.CTkButton(btn_container, text="▶ Ploteo A1", font=FUENTE_NORMAL, fg_color="#444444", hover_color="#555555", corner_radius=0,
+        ctk.CTkButton(btn_container, text="▶ Ploteo A1", font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0,
                       command=lambda: self.lanzar_script(cmd_ps("PUBLISH-A1"))).grid(row=1, column=2, padx=5, pady=5, sticky="ew")
-        ctk.CTkButton(btn_container, text="🔄 Convertir DXF a DWG", font=FUENTE_NORMAL, fg_color="#005BBF", hover_color="#004A9E",
-                      corner_radius=0, command=self.convertir_dxf_a_dwg).grid(row=1, column=3, padx=5, pady=5, sticky="ew")
+        ctk.CTkButton(btn_container, text="Abrir consola", font=FUENTE_NORMAL, fg_color=COLOR_ACENTO, hover_color=COLOR_ACENTO_HOVER, corner_radius=0,
+                      command=self.mostrar_ventana_log).grid(row=1, column=3, padx=5, pady=5, sticky="ew")
 
-        self.consola_scripts = ctk.CTkTextbox(bottom_frame, height=120, font=FUENTE_CONSOLA,
-                                              fg_color="#000000", text_color="#00FF00", state="disabled", corner_radius=0)
-        self.consola_scripts.pack(fill="x", padx=15, pady=(5, 15))
+    def setup_tab_conversion_dxf(self):
+        ctk.CTkLabel(
+            self.tab_conversion, text="CONVERSIÓN DXF A DWG", font=FUENTE_TITULO,
+            text_color=COLOR_MOSTAZA,
+        ).pack(pady=(30, 6))
+        ctk.CTkLabel(
+            self.tab_conversion,
+            text=("Convierte una selección de archivos DXF con una instancia CAD temporal. "
+                  "Cierra AutoCAD/ZWCAD antes de comenzar y revisa el resultado en la consola."),
+            font=FUENTE_NORMAL, text_color=COLOR_TEXTO, justify="center", wraplength=760,
+        ).pack(padx=30, pady=(0, 18))
+
+        controls = ctk.CTkFrame(self.tab_conversion, fg_color="transparent")
+        controls.pack(fill="x", padx=32, pady=6)
+        ctk.CTkButton(
+            controls, text="Seleccionar carpeta DXF", font=FUENTE_NORMAL,
+            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
+            corner_radius=0, command=self.cargar_archivos_conversion,
+        ).pack(side="left")
+        self.lbl_ruta_conversion = ctk.CTkLabel(
+            controls, text="Ruta: Ninguna", font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
+        )
+        self.lbl_ruta_conversion.pack(side="left", padx=14)
+
+        panel = ctk.CTkFrame(
+            self.tab_conversion, fg_color=COLOR_PANEL, corner_radius=0,
+            border_width=1, border_color=COLOR_BORDE,
+        )
+        panel.pack(fill="both", expand=True, padx=32, pady=(8, 20))
+        row = ctk.CTkFrame(panel, fg_color="transparent")
+        row.pack(fill="x", padx=16, pady=(14, 6))
+        ctk.CTkLabel(row, text="Archivos DXF seleccionados", font=FUENTE_SUBTITULO, text_color=COLOR_MOSTAZA).pack(side="left")
+        ctk.CTkButton(row, text="Marcar todos", font=FUENTE_NORMAL_PEQUENA, width=92, height=26,
+                      fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0,
+                      command=self.marcar_todos_dxf).pack(side="right", padx=(6, 0))
+        ctk.CTkButton(row, text="Desmarcar", font=FUENTE_NORMAL_PEQUENA, width=86, height=26,
+                      fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0,
+                      command=self.desmarcar_todos_dxf).pack(side="right")
+        self.scroll_dxf = ctk.CTkScrollableFrame(panel, fg_color=COLOR_FONDO, corner_radius=0)
+        self.scroll_dxf.pack(fill="both", expand=True, padx=16, pady=(0, 12))
+        self.checkboxes_dxf = []
+        self.ruta_conversion = ""
+        ctk.CTkButton(
+            panel, text="Convertir DXF a DWG", font=FUENTE_SUBTITULO_PEQUENO,
+            fg_color=COLOR_ACENTO, hover_color=COLOR_ACENTO_HOVER, corner_radius=0,
+            command=self.convertir_dxf_a_dwg,
+        ).pack(fill="x", padx=16, pady=(0, 16))
+
+    def cargar_archivos_conversion(self):
+        carpeta = filedialog.askdirectory(title="Seleccionar carpeta con archivos DXF")
+        if not carpeta:
+            return
+        self.ruta_conversion = carpeta
+        self.lbl_ruta_conversion.configure(text=f"Ruta: {carpeta}", text_color=COLOR_TEXTO)
+        self.refrescar_lista_conversion()
+
+    def refrescar_lista_conversion(self):
+        for widget in self.scroll_dxf.winfo_children():
+            widget.destroy()
+        self.checkboxes_dxf = []
+        if not self.ruta_conversion:
+            return
+        archivos = sorted(
+            nombre for nombre in os.listdir(self.ruta_conversion) if nombre.lower().endswith(".dxf")
+        )
+        for nombre in archivos:
+            checkbox = ctk.CTkCheckBox(
+                self.scroll_dxf, text=nombre, font=FUENTE_NORMAL, text_color=COLOR_TEXTO,
+                fg_color=COLOR_ACENTO, hover_color=COLOR_ACENTO_HOVER,
+            )
+            checkbox.pack(anchor="w", padx=8, pady=4)
+            checkbox.select()
+            self.checkboxes_dxf.append(checkbox)
+        self.log_script(f"[*] Conversión DXF: {len(archivos)} archivo(s) cargado(s).\n")
+
+    def marcar_todos_dxf(self):
+        for checkbox in self.checkboxes_dxf:
+            checkbox.select()
+
+    def desmarcar_todos_dxf(self):
+        for checkbox in self.checkboxes_dxf:
+            checkbox.deselect()
 
     def cargar_archivos_renombrado(self):
         c = filedialog.askdirectory(
@@ -798,9 +1088,8 @@ class ActualizadorCAD(ctk.CTk):
                 "Por favor, cierra AutoCAD o ZWCAD completamente antes de ejecutar rutinas masivas.\n\nEsto evita que los archivos estén bloqueados por el programa."
             )
 
-        self.consola_scripts.configure(state="normal")
-        self.consola_scripts.delete("1.0", "end")
-        self.consola_scripts.configure(state="disabled")
+        self.mostrar_ventana_log()
+        self.log_script("\n[PROCESAMIENTO MASIVO] Inicio de automatización.\n")
 
         threading.Thread(target=self._hilo_script, args=(
             comando_ps,), daemon=True).start()
@@ -904,11 +1193,12 @@ class ActualizadorCAD(ctk.CTk):
             )
 
     def convertir_dxf_a_dwg(self):
-        if not getattr(self, 'ruta_renombre', None):
-            return messagebox.showwarning("Sin ruta", "Por favor, carga una carpeta primero en el Paso 1.")
+        ruta = getattr(self, "ruta_conversion", "")
+        checkboxes = getattr(self, "checkboxes_dxf", [])
+        if not ruta:
+            return messagebox.showwarning("Sin ruta", "Selecciona primero una carpeta con archivos DXF.")
 
-        dxfs = [cb.cget("text") for cb in self.checkboxes_archivos if cb.get(
-        ) == 1 and cb.cget("text").lower().endswith('.dxf')]
+        dxfs = [checkbox.cget("text") for checkbox in checkboxes if checkbox.get() == 1]
 
         if not dxfs:
             return messagebox.showinfo("Nada que convertir", "No hay archivos DXF marcados en la lista.")
@@ -916,14 +1206,11 @@ class ActualizadorCAD(ctk.CTk):
         if self.cad_esta_ejecutandose():
             return messagebox.showwarning("CAD en Uso", "Por favor cierra AutoCAD/ZWCAD para que la conversión se haga en segundo plano sin interrupciones.")
 
-        self.consola_scripts.configure(state="normal")
-        self.consola_scripts.delete("1.0", "end")
-        self.consola_scripts.configure(state="disabled")
-
+        self.mostrar_ventana_log()
         threading.Thread(target=self._hilo_convertir_dxf,
-                         args=(dxfs,), daemon=True).start()
+                         args=(dxfs, ruta), daemon=True).start()
 
-    def _hilo_convertir_dxf(self, dxfs):
+    def _hilo_convertir_dxf(self, dxfs, ruta_conversion):
         self.log_script(
             f"[*] Encendiendo motor CAD en segundo plano...\n[*] Se convertirán {len(dxfs)} archivos.\n" + "-"*60 + "\n")
         import pythoncom
@@ -946,8 +1233,8 @@ class ActualizadorCAD(ctk.CTk):
                 pass
 
             for f in dxfs:
-                ruta_dxf = os.path.join(self.ruta_renombre, f)
-                ruta_dwg = os.path.join(self.ruta_renombre, f[:-4] + ".dwg")
+                ruta_dxf = os.path.join(ruta_conversion, f)
+                ruta_dwg = os.path.join(ruta_conversion, f[:-4] + ".dwg")
 
                 self.log_script(f"> Convirtiendo: {f} ... ")
                 try:
@@ -972,7 +1259,7 @@ class ActualizadorCAD(ctk.CTk):
 
             self.log_script(
                 "\n[!] Conversión finalizada. Actualizando lista...\n")
-            self._ui(self.refrescar_lista_archivos)
+            self._ui(self.refrescar_lista_conversion)
 
         except Exception as e:
             self.log_script(f"\n[X] Error fatal de COM: {e}\n")
@@ -1080,7 +1367,7 @@ class ActualizadorCAD(ctk.CTk):
                 {"engine": engine.to_dict() if engine else None, "copied": len(copiados)},
             )
             messagebox.showinfo(
-                "Integración CAD",
+                "Workbench",
                 "La integración quedó preparada. Reinicia AutoCAD/ZWCAD una vez para activar "
                 "las rutas de confianza y el cargador automático.",
             )
@@ -1142,8 +1429,6 @@ class ActualizadorCAD(ctk.CTk):
     # ==========================================================
     def log(self, m):
         self.logger.info(m)
-        if hasattr(self, 'consola'):
-            self._ui(self._append_textbox, self.consola, m + "\n")
         self.escribir_en_consola_global(m)
 
     def log_r(self, m):
@@ -1154,39 +1439,16 @@ class ActualizadorCAD(ctk.CTk):
 
     def log_script(self, texto):
         self.logger.info(texto.strip())
-        if hasattr(self, 'consola_scripts'):
-            self._ui(self._append_textbox, self.consola_scripts, texto)
         self.escribir_en_consola_global(texto.strip('\n'))
 
     def escribir_en_consola_global(self, m):
         self.historial_logs.append(m)
-        if hasattr(self, 'ventana_log') and hasattr(self, 'txt_log_global'):
+        if hasattr(self, 'txt_log_global'):
             self._ui(self._append_if_exists, self.txt_log_global, m + "\n")
 
     def _append_if_exists(self, widget, texto):
         if widget.winfo_exists():
             self._append_textbox(widget, texto)
-
-    def mostrar_ventana_log(self):
-        if hasattr(self, 'ventana_log') and self.ventana_log.winfo_exists():
-            self.ventana_log.focus()
-            return
-
-        self.ventana_log = ctk.CTkToplevel(self)
-        self.ventana_log.title("Consola de Diagnóstico - SINCAL")
-        self.ventana_log.geometry("750x450")
-        self.ventana_log.transient(self)
-
-        self.txt_log_global = ctk.CTkTextbox(
-            self.ventana_log, font=FUENTE_CONSOLA, fg_color="#000000", text_color="#00FF00", corner_radius=0)
-        self.txt_log_global.pack(fill="both", expand=True, padx=10, pady=10)
-
-        self.txt_log_global.configure(state="normal")
-        self.txt_log_global.insert(
-            "end", "\n".join(self.historial_logs) + "\n")
-        self.txt_log_global.see("end")
-        self.txt_log_global.configure(state="disabled")
-
 
 def arrancar():
     app = ActualizadorCAD()

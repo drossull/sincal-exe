@@ -3,6 +3,17 @@ import json
 import customtkinter as ctk
 
 from sincal_runtime import ruta_recurso
+from sincal_ui import (
+    COLOR_ACENTO,
+    COLOR_MOSTAZA,
+    COLOR_PANEL,
+    COLOR_TEXTO,
+    COLOR_TEXTO_SUAVE,
+    FUENTE_MENU,
+    FUENTE_NORMAL,
+    FUENTE_NORMAL_PEQUENA,
+    FUENTE_SUBTITULO,
+)
 
 
 class TabDocs(ctk.CTkFrame):
@@ -14,11 +25,11 @@ class TabDocs(ctk.CTkFrame):
         self.recargar_documentacion()
 
     def setup_ui(self):
-        self.fuente_subtitulo = ("Consolas", 18, "bold")
-        self.fuente_normal = ("Consolas", 12)
-        self.fuente_menu = ("Consolas", 12)
-        self.color_texto = "#CCCCCC"
-        self.color_titulo = "#FFBF00"
+        self.fuente_subtitulo = FUENTE_SUBTITULO
+        self.fuente_normal = FUENTE_NORMAL
+        self.fuente_menu = FUENTE_MENU
+        self.color_texto = COLOR_TEXTO
+        self.color_titulo = COLOR_MOSTAZA
 
         marco = ctk.CTkFrame(self, fg_color="transparent")
         marco.pack(fill="both", expand=True, padx=10, pady=10)
@@ -31,6 +42,10 @@ class TabDocs(ctk.CTkFrame):
             lateral, text="MANUAL SINCAL", font=self.fuente_subtitulo,
             text_color=self.color_titulo,
         ).pack(anchor="w", padx=8, pady=(5, 8))
+        ctk.CTkLabel(
+            lateral, text="Guías, recursos, módulos y comandos CAD.", font=FUENTE_NORMAL_PEQUENA,
+            text_color=COLOR_TEXTO_SUAVE, wraplength=245, justify="left",
+        ).pack(anchor="w", padx=8, pady=(0, 12))
 
         self.busqueda = ctk.CTkEntry(
             lateral, placeholder_text="Buscar comando o herramienta...",
@@ -58,12 +73,12 @@ class TabDocs(ctk.CTkFrame):
         self.lbl_wiki_title.pack(anchor="w", padx=20, pady=(10, 0))
 
         self.lbl_categoria = ctk.CTkLabel(
-            contenido, text="", font=("Consolas", 11), text_color="#007FFF"
+            contenido, text="", font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_ACENTO
         )
         self.lbl_categoria.pack(anchor="w", padx=20, pady=(2, 0))
 
         self.txt_wiki_content = ctk.CTkTextbox(
-            contenido, font=self.fuente_normal, fg_color="transparent",
+            contenido, font=self.fuente_normal, fg_color=COLOR_PANEL,
             text_color=self.color_texto, wrap="word", border_width=0,
         )
         self.txt_wiki_content.pack(fill="both", expand=True, padx=20, pady=10)
@@ -164,7 +179,7 @@ class TabDocs(ctk.CTkFrame):
                 categoria_actual = categoria
                 ctk.CTkLabel(
                     self.menu_container, text=categoria.upper(),
-                    font=("Consolas", 11, "bold"), text_color="#007FFF",
+                    font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_ACENTO,
                 ).pack(anchor="w", padx=8, pady=(12, 3))
             ctk.CTkButton(
                 self.menu_container, text=tema.get("titulo", "Tema"),

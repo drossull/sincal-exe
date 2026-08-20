@@ -63,7 +63,7 @@
     (alert
       (strcat
         "ERROR SINCAL:\nNo se encontro un master DWG valido.\n\n"
-        "Abra SINCAL Suite y use 'Sincronizar master DWG', o reinstale la aplicacion."
+        "Abra SINCAL 2.0 y use 'Sincronizar master DWG', o reinstale la aplicacion."
       )
     )
   )

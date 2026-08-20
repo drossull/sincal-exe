@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ApplicationPackage SchemaVersion="1.0"
                     AutodeskProduct="AutoCAD"
-                    Name="SINCAL Suite"
-                    Description="SINCAL Suite 1.0 para AutoCAD 2025 (release 28.0.5)"
-                    AppVersion="28.0.5"
+                    Name="SINCAL 2.0"
+                    Description="SINCAL 2.0 para AutoCAD 2025 (release 29.0.0)"
+                    AppVersion="29.0.0"
                     ProductCode="{2E8D9BA6-5E86-4FF0-9E09-4B0A36CBBF01}"
                     UpgradeCode="{4F2C4E0E-BC2F-49F8-A9C1-91E7C8272101}"
                     Author="Gonzalo Mardones V.">
   <CompanyDetails Name="SINCAL" UrlInfoAbout="https://github.com/drossull/sincal-updates" />
   <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R25.0" SeriesMax="R25.9" />
   <Components>
-    <ComponentEntry AppName="SINCAL Suite"
+    <ComponentEntry AppName="SINCAL 2.0"
                     ModuleName="./Contents/AutoCAD2025/Sincal.AutoCAD2025.dll"
-                    AppDescription="SINCAL Suite 1.0 (release 28.0.5)"
+                    AppDescription="SINCAL 2.0 (release 29.0.0)"
                     LoadOnAutoCADStartup="True" />
   </Components>
 </ApplicationPackage>

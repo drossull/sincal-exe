@@ -11,6 +11,19 @@ from PIL import Image, ImageDraw
 
 from sincal_runtime import ruta_recurso
 from sincal_resource_sync import ensure_resource_available
+from sincal_ui import (
+    COLOR_ACENTO,
+    COLOR_ACENTO_HOVER,
+    COLOR_BORDE,
+    COLOR_GRIS_BOTON,
+    COLOR_GRIS_BOTON_HOVER,
+    COLOR_MOSTAZA,
+    COLOR_PANEL,
+    COLOR_TEXTO,
+    COLOR_TEXTO_SUAVE,
+    FUENTE_NORMAL,
+    FUENTE_SUBTITULO,
+)
 
 KMZ_MAX_BYTES = 10 * 1024 * 1024
 KML_MAX_BYTES = 5 * 1024 * 1024
@@ -179,33 +192,33 @@ class TabUbicacion(ctk.CTkFrame):
         )
 
     def setup_ui(self):
-        fuente_subtitulo = ("Consolas", 18, "bold")
-        fuente_normal = ("Consolas", 12)
+        fuente_subtitulo = FUENTE_SUBTITULO
+        fuente_normal = FUENTE_NORMAL
 
         # --- 1. Panel Superior: Carga de Datos KMZ ---
         frame_top = ctk.CTkFrame(
-            self, fg_color="#1E1E1E", border_width=1, border_color="#444444", corner_radius=0)
+            self, fg_color=COLOR_PANEL, border_width=1, border_color=COLOR_BORDE, corner_radius=0)
         frame_top.pack(fill="x", padx=20, pady=10)
 
         ctk.CTkLabel(frame_top, text="CROQUIS DE UBICACIÓN GEOGRÁFICA",
-                     font=fuente_subtitulo, text_color="#FFBF00").pack(side="left", padx=15, pady=15)
+                     font=fuente_subtitulo, text_color=COLOR_MOSTAZA).pack(side="left", padx=15, pady=15)
 
         self.btn_cargar_kmz = ctk.CTkButton(frame_top, text="🌍 Cargar KMZ de Google Earth", font=fuente_normal,
-                                            fg_color="#444444", hover_color="#555555", corner_radius=0, command=self.cargar_kmz)
+                                            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0, command=self.cargar_kmz)
         self.btn_cargar_kmz.pack(side="right", padx=15, pady=15)
 
         self.lbl_kmz_status = ctk.CTkLabel(
-            frame_top, text="KMZ: No cargado", font=fuente_normal, text_color="#888888")
+            frame_top, text="KMZ: No cargado", font=fuente_normal, text_color=COLOR_TEXTO_SUAVE)
         self.lbl_kmz_status.pack(side="right", padx=(15, 0), pady=15)
 
         # --- 2. Panel Central: Selección Automatizada ---
         frame_main = ctk.CTkFrame(
-            self, fg_color="#1E1E1E", border_width=1, border_color="#444444", corner_radius=0)
+            self, fg_color=COLOR_PANEL, border_width=1, border_color=COLOR_BORDE, corner_radius=0)
         frame_main.pack(fill="both", expand=True, padx=20, pady=5)
 
         # A. Selector de Estructura (KMZ)
         ctk.CTkLabel(frame_main, text="1. Seleccionar Enlace (desde KMZ):", font=fuente_normal,
-                     text_color="#007FFF").grid(row=0, column=0, sticky="w", padx=20, pady=(20, 10))
+                     text_color=COLOR_ACENTO).grid(row=0, column=0, sticky="w", padx=20, pady=(20, 10))
         self.combo_estructuras = ctk.CTkComboBox(frame_main, font=fuente_normal, width=400, values=[
                                                  "Cargue un archivo KMZ..."], state="disabled", command=self.actualizar_coordenadas_ui)
         self.combo_estructuras.grid(
@@ -214,18 +227,18 @@ class TabUbicacion(ctk.CTkFrame):
         ctk.CTkLabel(frame_main, text="Latitud GPS:", font=fuente_normal).grid(
             row=1, column=0, sticky="w", padx=20, pady=5)
         self.lbl_lat_val = ctk.CTkLabel(
-            frame_main, text="---", font=fuente_normal, text_color="#CCCCCC")
+            frame_main, text="---", font=fuente_normal, text_color=COLOR_TEXTO)
         self.lbl_lat_val.grid(row=1, column=1, sticky="w", padx=10, pady=5)
 
         ctk.CTkLabel(frame_main, text="Longitud GPS:", font=fuente_normal).grid(
             row=1, column=2, sticky="w", padx=20, pady=5)
         self.lbl_lon_val = ctk.CTkLabel(
-            frame_main, text="---", font=fuente_normal, text_color="#CCCCCC")
+            frame_main, text="---", font=fuente_normal, text_color=COLOR_TEXTO)
         self.lbl_lon_val.grid(row=1, column=3, sticky="w", padx=10, pady=5)
 
         # B. Selector de Mapa Calibrado (JSON)
         ctk.CTkLabel(frame_main, text="2. Seleccionar Mapa Base MOP:", font=fuente_normal,
-                     text_color="#007FFF").grid(row=2, column=0, sticky="w", padx=20, pady=(25, 10))
+                     text_color=COLOR_ACENTO).grid(row=2, column=0, sticky="w", padx=20, pady=(25, 10))
 
         lista_mapas = list(self.datos_mapas.keys()) if self.datos_mapas else [
             "No hay mapas calibrados válidos"]
@@ -238,7 +251,7 @@ class TabUbicacion(ctk.CTkFrame):
 
         # --- NUEVO: C. Controles de Micro-Ajuste Manual ---
         ctk.CTkLabel(frame_main, text="3. Micro-Ajuste en Píxeles (Opcional):", font=fuente_normal,
-                     text_color="#007FFF").grid(row=3, column=0, sticky="w", padx=20, pady=(15, 5))
+                     text_color=COLOR_ACENTO).grid(row=3, column=0, sticky="w", padx=20, pady=(15, 5))
 
         frame_ajustes = ctk.CTkFrame(frame_main, fg_color="transparent")
         frame_ajustes.grid(row=4, column=0, columnspan=4,
@@ -261,8 +274,8 @@ class TabUbicacion(ctk.CTkFrame):
         self.ent_ajuste_y.insert(0, "0")
 
         # --- 3. Botón de Acción ---
-        self.btn_generar_croquis = ctk.CTkButton(self, text="🗺️ GENERAR CROQUIS DE UBICACIÓN", font=fuente_subtitulo, fg_color="#007FFF",
-                                                 hover_color="#0066CC", text_color="#FFFFFF", corner_radius=0, height=45, command=self.generar_croquis_png)
+        self.btn_generar_croquis = ctk.CTkButton(self, text="🗺️ GENERAR CROQUIS DE UBICACIÓN", font=fuente_subtitulo, fg_color=COLOR_ACENTO,
+                                                 hover_color=COLOR_ACENTO_HOVER, text_color="#FFFFFF", corner_radius=0, height=45, command=self.generar_croquis_png)
         self.btn_generar_croquis.pack(fill="x", padx=20, pady=(10, 20))
 
     def cargar_kmz(self):
@@ -288,7 +301,7 @@ class TabUbicacion(ctk.CTkFrame):
                 self.actualizar_coordenadas_ui(lista_nombres[0])
 
                 self.lbl_kmz_status.configure(
-                    text=f"KMZ: {os.path.basename(ruta_kmz)}", text_color="#007FFF")
+                    text=f"KMZ: {os.path.basename(ruta_kmz)}", text_color=COLOR_ACENTO)
                 if ignorados:
                     self.parent_app.log(
                         f"[!] KMZ cargado desde {kml_name}. Se ignoraron {ignorados} puntos inválidos.")
@@ -424,7 +437,7 @@ class TabUbicacion(ctk.CTkFrame):
                 img_rgba.save(ruta_salida, "PNG")
 
             messagebox.showinfo(
-                "Éxito", f"¡Croquis guardado correctamente en:\n{ruta_salida}", parent=ventana_principal)
+                "Workbench", f"Croquis guardado correctamente en:\n{ruta_salida}", parent=ventana_principal)
 
             # Uso limpio de la variable global os:
             os.startfile(os.path.dirname(ruta_salida))
