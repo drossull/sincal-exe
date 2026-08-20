@@ -32,8 +32,7 @@ class TabArmaduras(ctk.CTkFrame):
 
     def setup_ui(self):
         # --- Frame Superior: JSON ---
-        frame_top = ctk.CTkFrame(
-            self, fg_color=COLOR_PANEL, border_width=1, border_color=COLOR_BORDE, corner_radius=0)
+        frame_top = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
         frame_top.pack(fill="x", padx=20, pady=10)
 
         fuente_subtitulo = FUENTE_SUBTITULO
@@ -45,6 +44,10 @@ class TabArmaduras(ctk.CTkFrame):
         self.btn_cargar_json = ctk.CTkButton(frame_top, text="📁 Cargar JSON de Proyecto", font=fuente_normal,
                                              fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0, command=self.cargar_json_bim)
         self.btn_cargar_json.pack(side="right", padx=15, pady=15)
+        ctk.CTkButton(frame_top, text="Limpiar ruta", font=FUENTE_NORMAL_PEQUENA,
+                      fg_color="transparent", hover_color=COLOR_GRIS_BOTON,
+                      text_color=COLOR_TEXTO_SUAVE, corner_radius=0,
+                      command=self.limpiar_json_bim).pack(side="right", padx=(0, 6), pady=15)
         self.lbl_json_status = ctk.CTkLabel(
             frame_top, text="Archivo: Ninguno", font=fuente_normal, text_color=COLOR_TEXTO_SUAVE)
         self.lbl_json_status.pack(side="right", padx=(15, 0), pady=15)
@@ -199,7 +202,7 @@ class TabArmaduras(ctk.CTkFrame):
         # CONTENIDO: 2. TRAVESAÑOS
         # =========================================================
         self.tab_sub_travesanos = ctk.CTkTabview(
-            tab_travesanos, fg_color="#1E1E1E", segmented_button_selected_color="#005BBF")
+            tab_travesanos, fg_color=COLOR_PANEL, segmented_button_selected_color=COLOR_ACENTO)
         self.tab_sub_travesanos.pack(fill="both", expand=True)
         self.tab_sub_travesanos._segmented_button.configure(font=fuente_normal)
 
@@ -1707,3 +1710,6 @@ class TabArmaduras(ctk.CTkFrame):
                 "Workbench", "Datos mapeados exitosamente en centímetros y grados.")
         except Exception as e:
             messagebox.showerror("Error JSON", f"Fallo al leer archivo:\n{e}")
+
+    def limpiar_json_bim(self):
+        self.lbl_json_status.configure(text="Archivo: Ninguno", text_color=COLOR_TEXTO_SUAVE)

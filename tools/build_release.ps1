@@ -262,9 +262,7 @@ function Assert-AppPayloadContents([string]$Path) {
             'masters/FORMATOS ANOTATIVOS ACAD_2025.dwg',
             'mapas/mapas_calibrados.json',
             'mapas/ayuda_travesano.png',
-            'assets/fonts/Workbench.ttf',
-            'assets/fonts/PassionOne-Bold.ttf',
-            'assets/fonts/Lekton-Regular.ttf'
+            'assets/fonts/RobotoMono.ttf'
         )
         $missing = @($required | Where-Object { $_ -notin $entries })
         if ($missing.Count -gt 0) {
@@ -308,7 +306,11 @@ function New-ReleasePayloads(
         Copy-Item (Join-Path $ProjectRoot $relative) (Join-Path $appStage $relative) -Force
     }
     Copy-Item $DistExe (Join-Path $appStage 'SINCAL.exe') -Force
-    Copy-Item (Join-Path $ProjectRoot 'assets') (Join-Path $appStage 'assets') -Recurse -Force
+    $fontStage = Join-Path $appStage 'assets\fonts'
+    New-Item -ItemType Directory -Force -Path $fontStage | Out-Null
+    foreach ($relative in @('RobotoMono.ttf', 'OFL-RobotoMono.txt', 'README.md')) {
+        Copy-Item (Join-Path $ProjectRoot "assets\fonts\$relative") (Join-Path $fontStage $relative) -Force
+    }
 
     # La primera apertura debe ser funcional incluso antes de crear el estado de
     # sincronización. Se incluyen sólo los recursos esenciales y livianos; cada

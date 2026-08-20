@@ -45,19 +45,19 @@ Al cerrar la ventana principal con **X**, SINCAL finaliza su proceso. La aplicac
 
 ### Interfaz Workbench
 
-La interfaz usa un menú lateral retráctil con tamaño **Compacto**, **Estándar** o **Amplio**. El orden de trabajo es Sincronizador, Documentación, Procesamiento masivo, Ubicación y Módulo estructural; Conversión DXF y Diagnóstico permanecen como herramientas complementarias. La consola se puede ocultar o acoplar al borde inferior o derecho desde la cabecera, y concentra todos los resultados de éxito, término y error.
+La interfaz usa un menú lateral que puede ocultarse completamente y cuyo tamaño es **Compacto**, **Estándar** o **Amplio**. Incluye controles de tamaño de letra y tema oscuro, claro o del sistema. El historial inferior muestra releases y commits publicados. Comandos en vivo se accede inmediatamente bajo Sincronizador; la consola se puede ocultar o acoplar al borde inferior o derecho desde la cabecera.
 
-### Procesamiento masivo
+### Renombrado
 
-La pestaña permite cargar una carpeta DWG/DXF, marcar archivos, renombrarlos por búsqueda y reemplazo, enviar comandos a dibujos abiertos y procesar DWG cerrados. Ya no tiene una consola propia: los procesos escriben en la consola Workbench acoplable.
+La pestaña permite cargar una carpeta DWG/DXF, marcar archivos y renombrarlos por búsqueda y reemplazo. Se puede limpiar la ruta seleccionada en cualquier momento.
 
-Acciones disponibles sobre planos cerrados: Auditar, Purgar, Encuadrar vista, Eliminar Layout2/A1, Bloquear viewports, Configurar layouts A1 y Plotear PDF A1. Antes de ejecutarlas, guarda un respaldo, prepara la integración y cierra completamente AutoCAD/ZWCAD. Los botones de automatización cerrada recorren todos los DWG de la carpeta seleccionada.
+### Comandos en vivo
 
-SINCAL registra en `%LOCALAPPDATA%\SINCAL\runtime\cad_engine.json` el ejecutable elegido y lo entrega directamente a PowerShell. `cad_wrapper.bat` se conserva sólo para compatibilidad. Cada proceso deja motor, versión, código de salida, duración y últimas líneas de error en el registro local de incidentes.
+Este módulo envía un comando a los dibujos CAD abiertos. Escribe, por ejemplo, `ZE` o `_QSAVE`, ejecuta y usa Cancelar si necesitas detener el recorrido.
 
 ### Conversión DXF
 
-**Conversión DXF** es un módulo independiente: selecciona una carpeta, marca solamente los DXF deseados y convierte cada uno a DWG mediante una instancia CAD temporal. Cierra AutoCAD/ZWCAD antes de iniciarlo, conserva un respaldo y revisa los resultados en la consola Workbench.
+**Conversión DXF** es un módulo independiente: usa **Seleccionar DXF** para ver y escoger los archivos antes de cargarlos, o **Cargar carpeta** para listar todos los DXF de una ubicación. Marca solamente los deseados y conviértelos a DWG mediante una instancia CAD temporal. Cierra AutoCAD/ZWCAD antes de iniciarlo, conserva un respaldo y revisa los resultados en la consola Workbench.
 
 ### Módulo estructural
 

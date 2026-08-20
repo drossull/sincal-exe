@@ -196,24 +196,26 @@ class TabUbicacion(ctk.CTkFrame):
         fuente_normal = FUENTE_NORMAL
 
         # --- 1. Panel Superior: Carga de Datos KMZ ---
-        frame_top = ctk.CTkFrame(
-            self, fg_color=COLOR_PANEL, border_width=1, border_color=COLOR_BORDE, corner_radius=0)
+        frame_top = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
         frame_top.pack(fill="x", padx=20, pady=10)
 
         ctk.CTkLabel(frame_top, text="CROQUIS DE UBICACIÓN GEOGRÁFICA",
                      font=fuente_subtitulo, text_color=COLOR_MOSTAZA).pack(side="left", padx=15, pady=15)
 
-        self.btn_cargar_kmz = ctk.CTkButton(frame_top, text="🌍 Cargar KMZ de Google Earth", font=fuente_normal,
+        self.btn_cargar_kmz = ctk.CTkButton(frame_top, text="Cargar KMZ", font=fuente_normal,
                                             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0, command=self.cargar_kmz)
         self.btn_cargar_kmz.pack(side="right", padx=15, pady=15)
+        ctk.CTkButton(frame_top, text="Limpiar ruta", font=FUENTE_NORMAL_PEQUENA,
+                      fg_color="transparent", hover_color=COLOR_GRIS_BOTON,
+                      text_color=COLOR_TEXTO_SUAVE, corner_radius=0,
+                      command=self.limpiar_kmz).pack(side="right", padx=(0, 6), pady=15)
 
         self.lbl_kmz_status = ctk.CTkLabel(
             frame_top, text="KMZ: No cargado", font=fuente_normal, text_color=COLOR_TEXTO_SUAVE)
         self.lbl_kmz_status.pack(side="right", padx=(15, 0), pady=15)
 
         # --- 2. Panel Central: Selección Automatizada ---
-        frame_main = ctk.CTkFrame(
-            self, fg_color=COLOR_PANEL, border_width=1, border_color=COLOR_BORDE, corner_radius=0)
+        frame_main = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
         frame_main.pack(fill="both", expand=True, padx=20, pady=5)
 
         # A. Selector de Estructura (KMZ)
@@ -316,6 +318,14 @@ class TabUbicacion(ctk.CTkFrame):
                 pass
             messagebox.showerror(
                 "Error KMZ", f"Fallo al procesar:\n{e}", parent=ventana_principal)
+
+    def limpiar_kmz(self):
+        self.estructuras_gps = {}
+        self.combo_estructuras.configure(values=["Cargue un archivo KMZ..."], state="disabled")
+        self.combo_estructuras.set("Cargue un archivo KMZ...")
+        self.lbl_kmz_status.configure(text="KMZ: No cargado", text_color=COLOR_TEXTO_SUAVE)
+        self.lbl_lat_val.configure(text="---")
+        self.lbl_lon_val.configure(text="---")
 
     def actualizar_coordenadas_ui(self, nombre_seleccionado):
         if nombre_seleccionado in self.estructuras_gps:

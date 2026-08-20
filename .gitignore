@@ -23,6 +23,15 @@ cad-packages/**/Contents/**/*.pdb
 cad-packages/**/Contents/**/*.deps.json
 cad-packages/**/Contents/**/*.runtimeconfig.json
 
+# Fuentes descartadas durante el rediseño monoespaciado de SINCAL 2.0.
+assets/fonts/Workbench.ttf
+assets/fonts/PassionOne-Bold.ttf
+assets/fonts/Lekton-Regular.ttf
+assets/fonts/Lekton-Bold.ttf
+assets/fonts/OFL-Workbench.txt
+assets/fonts/OFL-PassionOne.txt
+assets/fonts/OFL-Lekton.txt
+
 # 4. Archivos de sistema operativo (Basura de Windows)
 Thumbs.db
 desktop.ini

@@ -45,14 +45,14 @@
     },
     {
       "id": "procesamiento-general",
-      "categoria": "Procesamiento masivo",
-      "titulo": "Flujo general y precauciones",
+      "categoria": "Renombrado",
+      "titulo": "Flujo de renombrado y precauciones",
       "tags": "dwg dxf carpeta seleccionar respaldo cerrar cad",
-      "contenido": "1. Haz una copia de seguridad de la carpeta del proyecto.\n2. Abre Diagnóstico y confirma que CMD, PowerShell, permisos y motor CAD estén en estado correcto.\n3. Pulsa Cargar Carpeta DWG/DXF y marca únicamente los archivos que deseas intervenir.\n4. Para renombrar o convertir DXF, la selección de casillas sí determina los archivos.\n5. Los botones de automatización cerrada procesan todos los DWG de la carpeta; cierra AutoCAD/ZWCAD antes de ejecutarlos.\n6. Lee la consola hasta ver código de salida 0 y revisa una muestra antes de continuar.\n\nNo interrumpas accoreconsole ni apagues el equipo durante un proceso. Usa nombres de archivo únicos y evita carpetas sincronizadas que estén bloqueando DWG."
+      "contenido": "1. Haz una copia de seguridad de la carpeta del proyecto.\n2. Pulsa Seleccionar carpeta DWG/DXF y marca únicamente los archivos que deseas renombrar.\n3. Escribe el texto a buscar y su reemplazo.\n4. Lee el resultado antes de continuar y verifica una muestra de archivos.\n\nUsa nombres únicos y evita carpetas sincronizadas que estén bloqueando archivos. Las acciones de comandos CAD están disponibles en el módulo Comandos en vivo."
     },
     {
       "id": "renombrado",
-      "categoria": "Procesamiento masivo",
+      "categoria": "Renombrado",
       "titulo": "Buscar, reemplazar y convertir DXF",
       "tags": "rename reemplazar dxf dwg",
       "contenido": "RENOMBRAR: carga la carpeta, marca archivos, escribe el fragmento exacto en Buscar y el nuevo texto en Reemplazar. Revisa que el resultado no coincida con un archivo existente y pulsa Aplicar Reemplazo.\n\nLas conversiones DXF se realizan desde el menú Conversión DXF, separado de este flujo para evitar mezclar operaciones de archivo con automatización de planos."
@@ -62,21 +62,14 @@
       "categoria": "Conversión DXF",
       "titulo": "Conversión DXF a DWG",
       "tags": "dxf dwg convertir autocad zwcad carpeta",
-      "contenido": "Abre Conversión DXF en el menú lateral, selecciona la carpeta y marca los DXF que deseas convertir. Pulsa Convertir DXF seleccionados. SINCAL abre una instancia CAD en segundo plano y guarda cada archivo como DWG en la misma carpeta.\n\nCierra AutoCAD/ZWCAD antes de comenzar, conserva un respaldo y revisa los DWG generados. Si falla, abre la consola acoplable y luego Diagnóstico para generar un informe de soporte."
+      "contenido": "Abre Conversión DXF en el menú lateral y usa Seleccionar DXF para ver y elegir archivos antes de cargarlos. También puedes cargar una carpeta completa. Marca los DXF deseados y pulsa Convertir DXF a DWG. SINCAL abre una instancia CAD temporal y guarda cada archivo como DWG en la misma carpeta.\n\nCierra AutoCAD/ZWCAD antes de comenzar, conserva un respaldo y revisa los DWG generados. Si falla, abre la consola acoplable y luego Diagnóstico para generar un informe de soporte."
     },
     {
       "id": "comandos-vivo",
-      "categoria": "Procesamiento masivo",
+      "categoria": "Comandos en vivo",
       "titulo": "Comandos en planos abiertos",
       "tags": "com live sendcommand cancelar",
       "contenido": "Esta herramienta envía el mismo comando a todos los dibujos abiertos accesibles en AutoCAD/ZWCAD. Escribe un comando completo, por ejemplo ZE o _QSAVE, y pulsa Ejecutar. SINCAL activa cada documento, cancela órdenes pendientes y envía el texto.\n\nNo envíes comandos que requieran clics o respuestas distintas por dibujo. Usa Cancelar para detener el recorrido; el comando que ya llegó a CAD puede necesitar ESC dentro del propio programa."
-    },
-    {
-      "id": "automatizacion-cerrada",
-      "categoria": "Procesamiento masivo",
-      "titulo": "Automatización de planos cerrados",
-      "tags": "audit purge zoom dl2 bv pagesetup publish pdf",
-      "contenido": "AUDITAR repara la base de datos de cada DWG.\nPURGAR ejecuta AUDIT, elimina elementos y aplicaciones registradas sin uso, encuadra y guarda.\nENCUADRAR VISTA aplica Zoom Extents y guarda.\nELIMINAR LAYOUT2 borra Layout2 y A1 cuando no están activos.\nBLOQUEAR VIEWPORTS protege las ventanas de presentación.\nCONFIGURAR EN A1 aplica impresora PDF, papel A1, escala 1:1, CTB, transparencia y 300 DPI.\nPLOTEO A1 configura y exporta PDF, comprobando archivos de salida.\n\nTodos requieren integración CAD preparada, CAD cerrado y permisos de escritura en la carpeta. SINCAL invoca directamente el motor guardado y registra versión, duración, código de salida y detalle final si ocurre un error."
     },
     {
       "id": "modulo-estructural",
@@ -119,7 +112,7 @@
       "titulo": "Bloquear viewports",
       "descripcion": "Bloquea todas las ventanas gráficas del layout actual, excepto la ventana de papel.",
       "pasos": ["Activa el layout que deseas proteger.", "Escribe BV y presiona Enter."],
-      "notas": ["No funciona en Model.", "Para varios archivos usa Bloquear Viewports en Procesamiento masivo."],
+      "notas": ["No funciona en Model.", "Revisa el resultado en los layouts antes de publicar."],
       "tags": ["layout", "viewport"]
     },
     "CEVIADA": {

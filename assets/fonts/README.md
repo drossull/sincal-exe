@@ -1,11 +1,9 @@
 # Tipografías de SINCAL 2.0
 
-SINCAL incorpora estas tipografías para que la interfaz sea consistente sin
-instalarlas de forma permanente en Windows:
+SINCAL incorpora esta tipografía para que la interfaz sea consistente sin
+instalarla de forma permanente en Windows:
 
-- Workbench — Jens Kutilek.
-- Passion One.
-- Lekton — ISIA Urbino.
+- Roboto Mono.
 
-Los archivos se distribuyen bajo la SIL Open Font License 1.1. Las copias de
-las licencias respectivas se incluyen en esta carpeta como `OFL-*.txt`.
+El archivo se distribuye bajo la SIL Open Font License 1.1. La licencia está
+incluida como `OFL-RobotoMono.txt`.
