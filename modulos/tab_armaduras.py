@@ -18,6 +18,7 @@ from sincal_ui import (
     COLOR_PANEL,
     COLOR_TEXTO_SUAVE,
     FUENTE_NORMAL,
+    FUENTE_NORMAL_PEQUENA,
     FUENTE_SUBTITULO,
 )
 

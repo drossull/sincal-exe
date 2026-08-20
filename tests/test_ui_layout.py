@@ -42,6 +42,11 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('("Consolas", 11)', theme)
         self.assertIn("RobotoMono.ttf", build)
 
+    def test_modules_import_the_small_body_font_when_using_it(self):
+        for relative in ("modulos/tab_armaduras.py", "modulos/tab_ubicacion.py"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            self.assertIn("FUENTE_NORMAL_PEQUENA,", source, relative)
+
 
 if __name__ == "__main__":
     unittest.main()
