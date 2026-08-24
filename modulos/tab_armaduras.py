@@ -7,6 +7,13 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from PIL import Image
 
+from sincal_rebar_model import (
+    Cover,
+    RebarRule,
+    ZapataGeometry,
+    build_zapata_schedule,
+    default_zapata_rules,
+)
 from sincal_runtime import ruta_recurso, ruta_runtime
 from sincal_ui import (
     COLOR_ACENTO,
@@ -29,6 +36,8 @@ class TabArmaduras(ctk.CTkFrame):
     def __init__(self, master, parent_app, **kwargs):
         super().__init__(master, **kwargs)
         self.parent_app = parent_app
+        self._zap_rule_widgets = {}
+        self._zap_schedule = None
         self.setup_ui()
 
     def setup_ui(self):
@@ -52,6 +61,12 @@ class TabArmaduras(ctk.CTkFrame):
         self.lbl_json_status = ctk.CTkLabel(
             frame_top, text="Archivo: Ninguno", font=fuente_normal, text_color=COLOR_TEXTO_SUAVE)
         self.lbl_json_status.pack(side="right", padx=(15, 0), pady=15)
+        self.ent_z_esviaje = ctk.CTkEntry(
+            frame_top, font=fuente_normal, width=58, corner_radius=0)
+        self.ent_z_esviaje.insert(0, "0")
+        self.ent_z_esviaje.pack(side="right", padx=(4, 0), pady=15)
+        ctk.CTkLabel(frame_top, text="Esviaje (°):", font=FUENTE_NORMAL_PEQUENA,
+                     text_color=COLOR_TEXTO_SUAVE).pack(side="right", padx=(12, 0), pady=15)
 
         # =========================================================
         # TABVIEW MAESTRO (Elementos Estructurales)
@@ -73,6 +88,7 @@ class TabArmaduras(ctk.CTkFrame):
         self.tab_estribo._segmented_button.configure(font=fuente_normal)
 
         tab_zap = self.tab_estribo.add("Geometría Zapata")
+        tab_revision = self.tab_estribo.add("Revisión y marcas")
         self.tab_estribo.add("Muros")
         self.tab_estribo.add("Consola y Topes")
 
@@ -182,8 +198,11 @@ class TabArmaduras(ctk.CTkFrame):
         btn_container = ctk.CTkFrame(frame_vistas, fg_color="transparent")
         btn_container.pack(fill="x")
 
-        vistas = [("1. Vista Frontal", "FRONTAL"), ("2. Sección A-A", "SEC_A"),
-                  ("3. Sección B-B", "SEC_B"), ("4. Sección C-C", "SEC_C")]
+        vistas = [
+            ("1. Vista Frontal", "FR"), ("2. Sección A-A", "AA"),
+            ("3. Sección B-B", "BB"), ("4. Sección C-C", "CC"),
+            ("5. Sección D-D", "DD"), ("6. Sección E-E", "EE"),
+        ]
 
         for txt, vista in vistas:
             frame_btn = ctk.CTkFrame(btn_container, fg_color="transparent")
@@ -198,6 +217,8 @@ class TabArmaduras(ctk.CTkFrame):
                                   fg_color=COLOR_ACENTO, hover_color=COLOR_ACENTO_HOVER, text_color="#FFFFFF",
                                   command=lambda v=vista: self.generar_despiece_cad(v))
             btn_d.pack(side="left", padx=(2, 0))
+
+        self._setup_zapata_revision(tab_revision)
 
         # =========================================================
         # CONTENIDO: 2. TRAVESAÑOS
@@ -325,6 +346,157 @@ class TabArmaduras(ctk.CTkFrame):
 
         frame_botones_t.grid_columnconfigure(0, weight=1)
         frame_botones_t.grid_columnconfigure(1, weight=1)
+
+    def _setup_zapata_revision(self, parent):
+        """Tabla editable previa a cualquier escritura en CAD."""
+        ctk.CTkLabel(
+            parent, text="REVISIÓN DE MARCAS — ZAPATA", font=FUENTE_SUBTITULO,
+            text_color=COLOR_MOSTAZA,
+        ).pack(anchor="w", padx=14, pady=(14, 2))
+        ctk.CTkLabel(
+            parent,
+            text=("Esta tabla calcula barras físicas una sola vez. FR, AA, BB, CC, DD y EE "
+                  "son representaciones; no vuelven a sumar acero."),
+            font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
+            justify="left", wraplength=880,
+        ).pack(anchor="w", padx=14, pady=(0, 10))
+
+        table = ctk.CTkScrollableFrame(parent, fg_color="transparent", corner_radius=0, height=215)
+        table.pack(fill="x", padx=14, pady=(0, 8))
+        headers = ("Grupo", "Marca", "Ø mm", "@ cm", "Gancho cm", "Activo")
+        for column, text in enumerate(headers):
+            ctk.CTkLabel(
+                table, text=text, font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_ACENTO,
+            ).grid(row=0, column=column, sticky="w", padx=5, pady=(0, 4))
+
+        for row, rule in enumerate(default_zapata_rules(), 1):
+            ctk.CTkLabel(table, text=rule.label, font=FUENTE_NORMAL, anchor="w").grid(
+                row=row, column=0, sticky="ew", padx=5, pady=3)
+            widgets = {}
+            for column, key, value, width in (
+                (1, "mark", rule.mark, 58),
+                (2, "diameter", f"{rule.diameter_mm:g}", 58),
+                (3, "spacing", f"{rule.spacing_cm:g}", 58),
+                (4, "hook", f"{rule.hook_cm:g}", 72),
+            ):
+                entry = ctk.CTkEntry(table, width=width, font=FUENTE_NORMAL, corner_radius=0)
+                entry.insert(0, value)
+                entry.grid(row=row, column=column, sticky="w", padx=5, pady=3)
+                widgets[key] = entry
+            enabled = ctk.BooleanVar(value=rule.enabled)
+            ctk.CTkCheckBox(table, text="", variable=enabled, width=24, corner_radius=0).grid(
+                row=row, column=5, sticky="w", padx=5, pady=3)
+            widgets["enabled"] = enabled
+            widgets["template"] = rule
+            self._zap_rule_widgets[rule.key] = widgets
+
+        controls = ctk.CTkFrame(parent, fg_color="transparent")
+        controls.pack(fill="x", padx=14, pady=(0, 8))
+        ctk.CTkButton(
+            controls, text="Actualizar revisión", font=FUENTE_NORMAL, corner_radius=0,
+            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
+            command=self.actualizar_revision_zapata,
+        ).pack(side="left")
+        ctk.CTkLabel(
+            controls, text="Los grupos lateral y suple requieren definición manual en la siguiente etapa.",
+            font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
+        ).pack(side="left", padx=12)
+
+        self.txt_zap_revision = ctk.CTkTextbox(
+            parent, font=FUENTE_NORMAL, fg_color=COLOR_PANEL, corner_radius=0,
+            border_width=0, height=150,
+        )
+        self.txt_zap_revision.pack(fill="both", expand=True, padx=14, pady=(0, 14))
+        self.actualizar_revision_zapata(notificar=False)
+
+    @staticmethod
+    def _entry_number(entry, label):
+        raw = entry.get().strip().replace(",", ".")
+        try:
+            return float(raw)
+        except ValueError as error:
+            raise ValueError(f"{label} debe ser numérico.") from error
+
+    def _read_zapata_rules(self):
+        rules = []
+        for widgets in self._zap_rule_widgets.values():
+            template = widgets["template"]
+            rules.append(RebarRule(
+                key=template.key,
+                label=template.label,
+                mark=widgets["mark"].get().strip(),
+                diameter_mm=self._entry_number(widgets["diameter"], f"Diámetro de {template.label}"),
+                spacing_cm=self._entry_number(widgets["spacing"], f"Espaciamiento de {template.label}"),
+                hook_cm=self._entry_number(widgets["hook"], f"Gancho de {template.label}"),
+                level=template.level,
+                direction=template.direction,
+                enabled=widgets["enabled"].get(),
+                automatic=template.automatic,
+            ))
+        return tuple(rules)
+
+    def actualizar_revision_zapata(self, notificar=True):
+        try:
+            geometry = ZapataGeometry.from_centimetres(
+                self._entry_number(self.ent_z_largo, "Largo"),
+                self._entry_number(self.ent_z_ancho, "Ancho"),
+                self._entry_number(self.ent_z_alto, "Alto"),
+                self._entry_number(self.ent_z_esviaje, "Esviaje"),
+            )
+            cover = Cover.from_centimetres(
+                self._entry_number(self.ent_rec_inf, "Recubrimiento inferior"),
+                self._entry_number(self.ent_rec_sup, "Recubrimiento superior"),
+                self._entry_number(self.ent_rec_lat, "Recubrimiento lateral"),
+            )
+            self._zap_schedule = build_zapata_schedule(geometry, cover, self._read_zapata_rules())
+        except ValueError as error:
+            self._zap_schedule = None
+            resumen = f"ERROR DE ENTRADA\n\n{error}"
+        else:
+            lines = [
+                "VISTA PREVIA — NO GENERA NI MODIFICA DWG", "",
+                "Marca | Cant. | Ø mm | Largo unit. cm | Largo total cm | kg",
+            ]
+            for mark in self._zap_schedule.marks:
+                lines.append(
+                    f"{mark.mark:>5} | {mark.quantity:>5} | {mark.diameter_mm:>4g} | "
+                    f"{mark.unit_length_cm:>14.1f} | {mark.total_length_cm:>14.1f} | {mark.kg_steel:>6.1f}"
+                )
+            lines.append(f"\nTOTAL PROVISIONAL: {self._zap_schedule.total_kg:.1f} kg")
+            if self._zap_schedule.issues:
+                lines.append("\nVALIDACIONES")
+                lines.extend(f"[{issue.severity.upper()}] {issue.message}" for issue in self._zap_schedule.issues)
+            resumen = "\n".join(lines)
+
+        self.txt_zap_revision.configure(state="normal")
+        self.txt_zap_revision.delete("1.0", "end")
+        self.txt_zap_revision.insert("1.0", resumen)
+        self.txt_zap_revision.configure(state="disabled")
+        if notificar and self._zap_schedule:
+            self.parent_app.log_r("[*] Revisión de marcas de zapata actualizada; aún no se modifica CAD.")
+        return self._zap_schedule
+
+    def generar_vista_cad(self, vista):
+        schedule = self.actualizar_revision_zapata(notificar=False)
+        if not schedule or not schedule.is_valid:
+            messagebox.showwarning("Workbench", "Corrige las validaciones de la revisión antes de preparar una vista.")
+            return
+        messagebox.showinfo(
+            "Workbench",
+            f"Vista {vista}: la geometría CAD se habilitará después de confirmar el moldaje {vista}_ZAP.\n\n"
+            "La revisión de marcas ya está lista y no ha modificado el DWG.",
+        )
+
+    def generar_despiece_cad(self, vista):
+        schedule = self.actualizar_revision_zapata(notificar=False)
+        if not schedule or not schedule.is_valid:
+            messagebox.showwarning("Workbench", "Corrige las validaciones antes de revisar el despiece.")
+            return
+        messagebox.showinfo(
+            "Workbench",
+            f"Despiece {vista}: {len(schedule.marks)} marcas físicas y {schedule.total_kg:.1f} kg provisionales.\n\n"
+            "La inserción de tabla CAD y la exportación Excel se incorporarán después de validar moldajes.",
+        )
 
     def mostrar_ayuda_travesano(self):
         visor = ctk.CTkToplevel(self)
@@ -1700,8 +1872,12 @@ class TabArmaduras(ctk.CTkFrame):
                 esviaje = datos["parametros_generales"].get(
                     "angulo_esviaje_puente")
                 if esviaje is not None:
+                    self.ent_z_esviaje.delete(0, 'end')
+                    self.ent_z_esviaje.insert(0, str(esviaje))
                     self.ent_t_esviaje.delete(0, 'end')
                     self.ent_t_esviaje.insert(0, str(esviaje))
+
+            self.actualizar_revision_zapata(notificar=False)
 
             nombre_archivo = os.path.basename(ruta)
             self.lbl_json_status.configure(

@@ -58,6 +58,14 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertNotIn("CON — Contrafuerte", glossary)
         self.assertIn("EE (planta de fundación)", topics["estribos-vistas-y-capas"]["contenido"])
 
+    def test_zapata_review_is_backed_by_the_parametric_rebar_model(self):
+        source = (ROOT / "modulos" / "tab_armaduras.py").read_text(encoding="utf-8")
+        self.assertIn('"Revisión y marcas"', source)
+        self.assertIn("default_zapata_rules", source)
+        self.assertIn("def actualizar_revision_zapata", source)
+        self.assertIn('("5. Sección D-D", "DD")', source)
+        self.assertIn('("6. Sección E-E", "EE")', source)
+
 
 if __name__ == "__main__":
     unittest.main()
