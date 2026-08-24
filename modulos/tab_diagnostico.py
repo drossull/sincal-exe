@@ -14,7 +14,9 @@ from sincal_ui import (
     COLOR_GRIS_BOTON_HOVER,
     COLOR_MOSTAZA,
     COLOR_PANEL,
+    COLOR_PANEL_OSCURO,
     COLOR_TEXTO,
+    COLOR_TEXTO_SUAVE,
     FUENTE_NORMAL,
     FUENTE_SUBTITULO,
     FUENTE_TITULO,
@@ -99,12 +101,12 @@ class TabDiagnostico(ctk.CTkFrame):
 
         self.status = ctk.CTkLabel(
             container, text="Preparando diagnóstico...", font=normal_font,
-            text_color="#AAAAAA",
+            text_color=COLOR_TEXTO_SUAVE,
         )
         self.status.pack(anchor="w", padx=8, pady=(6, 2))
         self.results = ctk.CTkTextbox(
-            container, height=310, font=normal_font, fg_color="#111111",
-            text_color="#DDDDDD", state="disabled", corner_radius=0,
+            container, height=310, font=normal_font, fg_color=COLOR_PANEL_OSCURO,
+            text_color=COLOR_TEXTO, state="disabled", corner_radius=0,
         )
         self.results.pack(fill="both", expand=True, padx=8, pady=(0, 10))
 

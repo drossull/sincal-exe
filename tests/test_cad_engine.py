@@ -48,6 +48,25 @@ class CadEngineTests(unittest.TestCase):
         self.assertEqual(state["selected"]["year"], 2027)
         self.assertIn(str(engine_path), wrapper)
 
+    def test_cmd_launchers_use_builtin_powershell_and_support_zwcad_com(self):
+        scripts = Path(__file__).resolve().parents[1] / "scripts"
+        for launcher in scripts.glob("*.bat"):
+            source = launcher.read_text(encoding="utf-8").lower()
+            self.assertIn("windowspowershell\\v1.0\\powershell.exe", source, launcher.name)
+            self.assertNotIn("\npwsh ", source, launcher.name)
+        engine_helper = (scripts / "SINCAL_ENGINE.ps1").read_text(encoding="utf-8")
+        self.assertIn("accoreconsole.exe", engine_helper)
+        self.assertIn("ZWCAD.Application", engine_helper)
+        self.assertIn("Invoke-SincalZwcadScript", engine_helper)
+        self.assertIn('$application.Visible = $false', engine_helper)
+        self.assertIn('Get-Process -Name ZWCAD', engine_helper)
+        self.assertIn('Stop-Process -Id $createdProcessId', engine_helper)
+        for script in scripts.glob("*.ps1"):
+            if script.name == "SINCAL_ENGINE.ps1":
+                continue
+            source = script.read_text(encoding="utf-8")
+            self.assertIn("Invoke-SincalCadScript", source, script.name)
+
 
 if __name__ == "__main__":
     unittest.main()

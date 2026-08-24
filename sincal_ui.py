@@ -8,38 +8,54 @@ import customtkinter as ctk
 from sincal_runtime import ruta_recurso_instalado
 
 
-COLOR_FONDO = "#1E1E1E"
-COLOR_PANEL = "#252526"
-COLOR_PANEL_OSCURO = "#181818"
-COLOR_BORDE = "#303030"
-COLOR_TEXTO = "#D4D4D4"
-COLOR_TEXTO_SUAVE = "#9D9D9D"
-COLOR_ACENTO = "#B89B4A"
-COLOR_ACENTO_HOVER = "#D0B25D"
+COLOR_FONDO = ("#F1E7D8", "#1E1E1E")
+COLOR_PANEL = ("#E7DAC7", "#252526")
+COLOR_PANEL_OSCURO = ("#DCCBB5", "#181818")
+COLOR_BORDE = ("#B7A58D", "#303030")
+COLOR_TEXTO = ("#352F29", "#D4D4D4")
+COLOR_TEXTO_SUAVE = ("#71675C", "#9D9D9D")
+COLOR_ACENTO = ("#8A6A1F", "#B89B4A")
+COLOR_ACENTO_HOVER = ("#A47F28", "#D0B25D")
 COLOR_MOSTAZA = COLOR_ACENTO
-COLOR_GRIS_BOTON = "#333333"
-COLOR_GRIS_BOTON_HOVER = "#454545"
+COLOR_GRIS_BOTON = ("#D2C2AD", "#333333")
+COLOR_GRIS_BOTON_HOVER = ("#C2AE94", "#454545")
 
-FUENTE_TITULO = ("Consolas", 28, "bold")
-FUENTE_TITULO_PEQUENO = ("Consolas", 20, "bold")
-FUENTE_SUBTITULO = ("Consolas", 18, "bold")
-FUENTE_SUBTITULO_PEQUENO = ("Consolas", 15, "bold")
-FUENTE_MENU = ("Roboto Mono", 13)
-FUENTE_NORMAL = ("Roboto Mono", 13)
-FUENTE_NORMAL_PEQUENA = ("Roboto Mono", 11)
+FAMILIA_PRESSURA = "GT Pressura"
+# El archivo Bold aportado se identifica ante Windows como una familia propia,
+# no como una variante de GT Pressura. Usarlo explícitamente evita que Tk
+# sintetice una negrita distinta o sustituya la fuente silenciosamente.
+FAMILIA_PRESSURA_BOLD = "GTPressura-Bold"
+FUENTE_TITULO = (FAMILIA_PRESSURA_BOLD, 28)
+FUENTE_TITULO_PEQUENO = (FAMILIA_PRESSURA_BOLD, 20)
+FUENTE_SUBTITULO = (FAMILIA_PRESSURA_BOLD, 18)
+FUENTE_SUBTITULO_PEQUENO = (FAMILIA_PRESSURA_BOLD, 15)
+FUENTE_MENU = (FAMILIA_PRESSURA, 13)
+FUENTE_NORMAL = (FAMILIA_PRESSURA, 13)
+FUENTE_NORMAL_PEQUENA = (FAMILIA_PRESSURA, 11)
 FUENTE_CONSOLA = ("Consolas", 11)
 
 
 def registrar_fuentes() -> None:
-    """Registra Roboto Mono para la sesión actual, sin instalarla en Windows."""
+    """Registra fuentes privadas incluidas, sin instalarlas permanentemente."""
     if os.name != "nt":
         return
     try:
         add_font = ctypes.windll.gdi32.AddFontResourceExW
     except Exception:
         return
-    path = ruta_recurso_instalado("assets", "fonts", "RobotoMono.ttf")
-    if os.path.isfile(path):
+    font_names = (
+        "GT Pressura Regular.ttf", "GT Pressura Regular.otf",
+        "GTPressura-Bold.ttf",
+        "GT Pressura Pro Bold.ttf", "GT Pressura Pro Bold.otf",
+        "GT-Pressura-Pro-Regular.ttf", "GT-Pressura-Pro-Regular.otf",
+        "GT-Pressura-Pro-Bold.ttf", "GT-Pressura-Pro-Bold.otf",
+        "GTPressuraPro-Regular.ttf", "GTPressuraPro-Regular.otf",
+        "GTPressuraPro-Bold.ttf", "GTPressuraPro-Bold.otf",
+    )
+    for name in font_names:
+        path = ruta_recurso_instalado("assets", "fonts", name)
+        if not os.path.isfile(path):
+            continue
         try:
             add_font(path, 0x10, 0)  # FR_PRIVATE: sólo visible para SINCAL.
         except Exception:
@@ -53,11 +69,19 @@ class Tooltip:
         self.widget = widget
         self.text = text
         self.window = None
+        self.show_job = None
+        self.hide_job = None
         widget.bind("<Enter>", self.show, add="+")
         widget.bind("<Leave>", self.hide, add="+")
         widget.bind("<ButtonPress>", self.hide, add="+")
 
     def show(self, _event=None):
+        if self.window or self.show_job or not self.text:
+            return
+        self.show_job = self.widget.after(350, self._show_now)
+
+    def _show_now(self):
+        self.show_job = None
         if self.window or not self.text:
             return
         try:
@@ -72,10 +96,24 @@ class Tooltip:
                 fg_color=COLOR_PANEL_OSCURO, text_color=COLOR_TEXTO,
                 corner_radius=4,
             ).pack(padx=7, pady=4)
+            self.window.bind("<Leave>", self.hide, add="+")
+            self.hide_job = self.widget.after(3500, self.hide)
         except Exception:
             self.window = None
 
     def hide(self, _event=None):
+        if self.show_job:
+            try:
+                self.widget.after_cancel(self.show_job)
+            except Exception:
+                pass
+            self.show_job = None
+        if self.hide_job:
+            try:
+                self.widget.after_cancel(self.hide_job)
+            except Exception:
+                pass
+            self.hide_job = None
         if self.window:
             try:
                 self.window.destroy()

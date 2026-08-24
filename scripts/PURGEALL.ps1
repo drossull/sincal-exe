@@ -1,4 +1,4 @@
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "SINCAL_ENGINE.ps1")
 
@@ -9,7 +9,7 @@ if ($dwgFiles.Count -eq 0) {
 }
 
 try {
-    $enginePath = Get-SincalCadEngine
+    $engine = Get-SincalCadEngine
 }
 catch {
     Write-Host "[ERROR] $($_.Exception.Message)" -ForegroundColor Red
@@ -41,10 +41,11 @@ Set-Content -Path $scriptPath -Value $scrContent -Encoding Ascii
 foreach ($file in $dwgFiles) {
     Write-Host "Limpiando: $($file.Name)" -ForegroundColor Green
     
-    $argList = "/i `"$($file.FullName)`" /s `"$scriptPath`""
-    $proc = Start-Process -FilePath $enginePath -ArgumentList $argList -Wait -NoNewWindow -PassThru
-    if ($proc.ExitCode -ne 0) {
-        Write-Host "  [ERROR] Proceso CAD falló para $($file.Name) con código $($proc.ExitCode)." -ForegroundColor Red
+    try {
+        Invoke-SincalCadScript -Engine $engine -DrawingPath $file.FullName -ScriptPath $scriptPath | Out-Null
+    }
+    catch {
+        Write-Host "  [ERROR] Proceso CAD falló para $($file.Name): $($_.Exception.Message)" -ForegroundColor Red
         $errores++
     }
 }

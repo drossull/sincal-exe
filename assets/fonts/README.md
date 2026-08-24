@@ -1,9 +1,11 @@
 # Tipografías de SINCAL 2.0
 
-SINCAL incorpora esta tipografía para que la interfaz sea consistente sin
-instalarla de forma permanente en Windows:
+SINCAL registra estas tipografías sólo para su sesión, sin instalarlas de forma
+permanente en Windows:
 
-- Roboto Mono.
+- GT Pressura Regular.
+- GTPressura Bold para títulos y subtítulos.
 
-El archivo se distribuye bajo la SIL Open Font License 1.1. La licencia está
-incluida como `OFL-RobotoMono.txt`.
+Los archivos fueron aportados por el responsable del proyecto. Antes de
+publicarlos debe comprobarse que la licencia adquirida permita incorporarlos y
+redistribuirlos dentro del instalador de SINCAL.

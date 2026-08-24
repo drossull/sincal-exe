@@ -57,7 +57,8 @@ class WebInstallerConfigurationTests(unittest.TestCase):
         self.assertIn("mapas/mapas_calibrados.json", build_script)
         self.assertIn("mapas/ayuda_travesano.png", build_script)
         self.assertIn("scripts/SINCAL_ENGINE.ps1", build_script)
-        self.assertIn("assets/fonts/RobotoMono.ttf", build_script)
+        self.assertIn("assets/fonts/GT Pressura Regular.ttf", build_script)
+        self.assertIn("assets/fonts/GTPressura-Bold.ttf", build_script)
         self.assertIn("^mapas/Region_.*\\.png$", build_script)
 
 
@@ -70,7 +71,7 @@ class MassProcessingConfigurationTests(unittest.TestCase):
         for name in script_names:
             script = (ROOT / "scripts" / name).read_text(encoding="utf-8")
             self.assertIn("Get-SincalCadEngine", script, name)
-            self.assertIn("Start-Process -FilePath $enginePath", script, name)
+            self.assertIn("Invoke-SincalCadScript", script, name)
             self.assertNotIn("$wrapperPath", script, name)
 
         purge = (ROOT / "scripts" / "PURGEALL.ps1").read_text(encoding="utf-8")

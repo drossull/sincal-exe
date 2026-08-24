@@ -1,4 +1,4 @@
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "SINCAL_ENGINE.ps1")
 
@@ -12,7 +12,7 @@ $appPath = if ($PSScriptRoot) { Split-Path $PSScriptRoot -Parent } else { (Get-L
 $scrPath = Join-Path $appPath "scripts\PUBLISH-A1.scr"
 
 try {
-    $enginePath = Get-SincalCadEngine
+    $engine = Get-SincalCadEngine
 }
 catch {
     Write-Host "[ERROR] $($_.Exception.Message)" -ForegroundColor Red
@@ -40,11 +40,11 @@ foreach ($file in $dwgFiles) {
         Remove-Item $statusPath -Force -ErrorAction SilentlyContinue
     }
 
-    $argList = "/i `"$($file.FullName)`" /s `"$scrPath`""
-    $proc = Start-Process -FilePath $enginePath -ArgumentList $argList -Wait -NoNewWindow -PassThru
-
-    if ($proc.ExitCode -ne 0) {
-        Write-Host "  [ERROR] El proceso CAD terminó con código $($proc.ExitCode)." -ForegroundColor Red
+    try {
+        Invoke-SincalCadScript -Engine $engine -DrawingPath $file.FullName -ScriptPath $scrPath | Out-Null
+    }
+    catch {
+        Write-Host "  [ERROR] El proceso CAD falló: $($_.Exception.Message)" -ForegroundColor Red
         $errores++
         continue
     }

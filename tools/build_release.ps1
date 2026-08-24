@@ -262,7 +262,8 @@ function Assert-AppPayloadContents([string]$Path) {
             'masters/FORMATOS ANOTATIVOS ACAD_2025.dwg',
             'mapas/mapas_calibrados.json',
             'mapas/ayuda_travesano.png',
-            'assets/fonts/RobotoMono.ttf'
+            'assets/fonts/GT Pressura Regular.ttf',
+            'assets/fonts/GTPressura-Bold.ttf'
         )
         $missing = @($required | Where-Object { $_ -notin $entries })
         if ($missing.Count -gt 0) {
@@ -308,8 +309,11 @@ function New-ReleasePayloads(
     Copy-Item $DistExe (Join-Path $appStage 'SINCAL.exe') -Force
     $fontStage = Join-Path $appStage 'assets\fonts'
     New-Item -ItemType Directory -Force -Path $fontStage | Out-Null
-    foreach ($relative in @('RobotoMono.ttf', 'OFL-RobotoMono.txt', 'README.md')) {
-        Copy-Item (Join-Path $ProjectRoot "assets\fonts\$relative") (Join-Path $fontStage $relative) -Force
+    foreach ($relative in @('GT Pressura Regular.ttf', 'GTPressura-Bold.ttf', 'README.md')) {
+        $fontSource = Join-Path $ProjectRoot "assets\fonts\$relative"
+        if (Test-Path -LiteralPath $fontSource -PathType Leaf) {
+            Copy-Item $fontSource (Join-Path $fontStage $relative) -Force
+        }
     }
 
     # La primera apertura debe ser funcional incluso antes de crear el estado de

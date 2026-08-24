@@ -1,3 +1,4 @@
+import ctypes
 import os
 import winreg
 
@@ -70,3 +71,32 @@ def registrar_ruta_cad_usuario() -> tuple[str, ...]:
                 except OSError:
                     continue
     return tuple(updated)
+
+
+def registrar_scripts_en_path() -> str:
+    """Expone AUDIT, ZE, PURGEALL, etc. a las nuevas ventanas de CMD."""
+    scripts = os.path.join(RUTA_CAD_USUARIO, "scripts")
+    if not os.path.isdir(scripts):
+        raise FileNotFoundError(f"No existe la carpeta de scripts materializados: {scripts}")
+
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Environment") as key:
+        try:
+            current, value_type = winreg.QueryValueEx(key, "Path")
+        except FileNotFoundError:
+            current, value_type = "", winreg.REG_EXPAND_SZ
+        segments = [segment.strip() for segment in str(current).split(";") if segment.strip()]
+        wanted = _normalized_path(scripts)
+        if not any(_normalized_path(segment) == wanted for segment in segments):
+            segments.append(scripts)
+            winreg.SetValueEx(key, "Path", 0, value_type, ";".join(segments))
+
+    process_segments = [segment for segment in os.environ.get("PATH", "").split(";") if segment]
+    if not any(_normalized_path(segment) == wanted for segment in process_segments):
+        os.environ["PATH"] = ";".join(process_segments + [scripts])
+
+    try:
+        ctypes.windll.user32.SendMessageTimeoutW(
+            0xFFFF, 0x001A, 0, "Environment", 0x0002, 5000, None)
+    except Exception:
+        pass
+    return scripts

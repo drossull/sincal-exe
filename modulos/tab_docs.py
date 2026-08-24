@@ -21,6 +21,8 @@ class TabDocs(ctk.CTkFrame):
         super().__init__(master, **kwargs)
         self.parent_app = parent_app
         self.temas = []
+        self._menu_buttons = []
+        self._panel_width = 300
         self.setup_ui()
         self.recargar_documentacion()
 
@@ -33,10 +35,15 @@ class TabDocs(ctk.CTkFrame):
 
         marco = ctk.CTkFrame(self, fg_color="transparent")
         marco.pack(fill="both", expand=True, padx=10, pady=10)
+        self.marco = marco
+        marco.grid_rowconfigure(0, weight=1)
+        marco.grid_columnconfigure(0, minsize=self._panel_width)
+        marco.grid_columnconfigure(2, weight=1)
 
-        lateral = ctk.CTkFrame(marco, width=280, fg_color="transparent")
-        lateral.pack(side="left", fill="y")
-        lateral.pack_propagate(False)
+        self.lateral = ctk.CTkFrame(marco, width=self._panel_width, fg_color="transparent")
+        self.lateral.grid(row=0, column=0, sticky="nsew")
+        self.lateral.grid_propagate(False)
+        lateral = self.lateral
 
         ctk.CTkLabel(
             lateral, text="MANUAL SINCAL", font=self.fuente_subtitulo,
@@ -59,12 +66,16 @@ class TabDocs(ctk.CTkFrame):
         )
         self.menu_container.pack(fill="both", expand=True)
 
-        ctk.CTkFrame(marco, width=1, fg_color="#555555").pack(
-            side="left", fill="y", padx=15
+        self.panel_grip = ctk.CTkFrame(
+            marco, width=7, fg_color=COLOR_PANEL, corner_radius=0,
+            cursor="sb_h_double_arrow",
         )
+        self.panel_grip.grid(row=0, column=1, sticky="ns", padx=8)
+        self.panel_grip.bind("<ButtonPress-1>", self._iniciar_redimension_panel)
+        self.panel_grip.bind("<B1-Motion>", self._redimensionar_panel)
 
         contenido = ctk.CTkFrame(marco, fg_color="transparent")
-        contenido.pack(side="right", fill="both", expand=True)
+        contenido.grid(row=0, column=2, sticky="nsew")
 
         self.lbl_wiki_title = ctk.CTkLabel(
             contenido, text="Documentación", font=self.fuente_subtitulo,
@@ -165,10 +176,11 @@ class TabDocs(ctk.CTkFrame):
     def _render_menu(self, temas):
         for widget in self.menu_container.winfo_children():
             widget.destroy()
+        self._menu_buttons = []
         if not temas:
             ctk.CTkLabel(
                 self.menu_container, text="No se encontraron temas.",
-                font=self.fuente_normal, text_color="#888888",
+                font=self.fuente_normal, text_color=COLOR_TEXTO_SUAVE,
             ).pack(anchor="w", padx=8, pady=10)
             return
 
@@ -181,12 +193,33 @@ class TabDocs(ctk.CTkFrame):
                     self.menu_container, text=categoria.upper(),
                     font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_ACENTO,
                 ).pack(anchor="w", padx=8, pady=(12, 3))
-            ctk.CTkButton(
+            button = ctk.CTkButton(
                 self.menu_container, text=tema.get("titulo", "Tema"),
-                font=self.fuente_menu, fg_color="transparent", hover_color="#3A3A3A",
-                text_color=self.color_texto, anchor="w", corner_radius=0,
+                font=self.fuente_menu, fg_color="transparent", hover_color=COLOR_PANEL,
+                text_color=self.color_texto, anchor="w", corner_radius=0, height=44,
                 command=lambda seleccionado=tema: self.mostrar_tema(seleccionado),
-            ).pack(fill="x", padx=4, pady=1)
+            )
+            button.pack(fill="x", padx=4, pady=1)
+            self._menu_buttons.append(button)
+        self.after_idle(self._actualizar_wrap_menu)
+
+    def _iniciar_redimension_panel(self, event):
+        self._drag_origin = event.x_root
+        self._drag_width = self._panel_width
+
+    def _redimensionar_panel(self, event):
+        delta = event.x_root - getattr(self, "_drag_origin", event.x_root)
+        self._panel_width = max(230, min(520, getattr(self, "_drag_width", 300) + delta))
+        self.lateral.configure(width=self._panel_width)
+        self.marco.grid_columnconfigure(0, minsize=self._panel_width)
+        self._actualizar_wrap_menu()
+
+    def _actualizar_wrap_menu(self):
+        wrap = max(170, self._panel_width - 54)
+        for button in self._menu_buttons:
+            label = getattr(button, "_text_label", None)
+            if label is not None:
+                label.configure(wraplength=wrap, justify="left")
 
     def mostrar_tema(self, tema):
         self.lbl_wiki_title.configure(text=tema.get("titulo", "Documentación").upper())

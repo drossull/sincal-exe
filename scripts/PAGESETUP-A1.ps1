@@ -1,4 +1,4 @@
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "SINCAL_ENGINE.ps1")
 
@@ -11,7 +11,7 @@ Write-Host "=========================================" -ForegroundColor Cyan
 
 # 1. Validar que el programa base SINCAL este instalado
 try {
-    $enginePath = Get-SincalCadEngine
+    $engine = Get-SincalCadEngine
 }
 catch {
     Write-Host "`n[X] ERROR FATAL: $($_.Exception.Message)" -ForegroundColor Red
@@ -40,10 +40,11 @@ $errores = 0
 foreach ($dwg in $archivos) {
     Write-Host "> Aplicando a: $($dwg.Name)..." -ForegroundColor White
     
-    $argList = "/i `"$($dwg.FullName)`" /s `"$scrPath`""
-    $proc = Start-Process -FilePath $enginePath -ArgumentList $argList -Wait -NoNewWindow -PassThru
-    if ($proc.ExitCode -ne 0) {
-        Write-Host "  [ERROR] Proceso CAD falló para $($dwg.Name) con código $($proc.ExitCode)." -ForegroundColor Red
+    try {
+        Invoke-SincalCadScript -Engine $engine -DrawingPath $dwg.FullName -ScriptPath $scrPath | Out-Null
+    }
+    catch {
+        Write-Host "  [ERROR] Proceso CAD falló para $($dwg.Name): $($_.Exception.Message)" -ForegroundColor Red
         $errores++
     }
 }

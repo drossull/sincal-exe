@@ -28,7 +28,7 @@ class CadEngine:
 
     @property
     def label(self) -> str:
-        mode = "consola" if self.headless else "aplicación"
+        mode = "consola nativa" if self.headless else "automatización COM invisible"
         year = f" {self.year}" if self.year else ""
         version = "" if self.version == str(self.year) else f" · {self.version}"
         return f"{self.product}{year}{version} · {mode}"
