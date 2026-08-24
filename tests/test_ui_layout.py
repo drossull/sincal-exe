@@ -66,6 +66,15 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('("5. Sección D-D", "DD")', source)
         self.assertIn('("6. Sección E-E", "EE")', source)
 
+    def test_zapata_moldajes_are_read_from_the_active_cad_document_only(self):
+        core = (ROOT / "core_sincal.py").read_text(encoding="utf-8")
+        structural = (ROOT / "modulos" / "tab_armaduras.py").read_text(encoding="utf-8")
+        self.assertIn("def enviar_comando_cad_activo", core)
+        self.assertIn("app.ActiveDocument", core)
+        self.assertIn("def detectar_moldajes_cad", structural)
+        self.assertIn("def confirmar_moldajes_cad", structural)
+        self.assertIn("INSUNITS", structural)
+
 
 if __name__ == "__main__":
     unittest.main()

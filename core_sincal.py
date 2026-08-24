@@ -1193,6 +1193,46 @@ class ActualizadorCAD(ctk.CTk):
         threading.Thread(target=self._hilo_comando_en_vivo,
                          args=(c.strip() + "\n",), daemon=True).start()
 
+    def enviar_comando_cad_activo(self, comando, descripcion="Comando estructural"):
+        """Envía una orden sólo al documento CAD activo.
+
+        Las herramientas de lectura estructural deben evitar aplicar comandos
+        sobre todas las pestañas abiertas: el usuario confirma primero el plano
+        activo y sus moldajes antes de generar cualquier resultado.
+        """
+        threading.Thread(
+            target=self._hilo_comando_cad_activo,
+            args=(comando, descripcion), daemon=True,
+        ).start()
+
+    def _hilo_comando_cad_activo(self, comando, descripcion):
+        pythoncom.CoInitialize()
+        try:
+            prog_ids = ["ZWCAD.Application", "AutoCAD.Application"]
+            for index in range(15, 36):
+                prog_ids.extend((f"ZWCAD.Application.{index}", f"AutoCAD.Application.{index}"))
+
+            visited = set()
+            for prog_id in prog_ids:
+                try:
+                    app = win32com.client.GetActiveObject(prog_id)
+                    doc = app.ActiveDocument
+                    identity = f"{doc.FullName}_{doc.Name}"
+                    if identity in visited:
+                        continue
+                    visited.add(identity)
+                    doc.SendCommand("\x03\x03")
+                    doc.SendCommand(comando)
+                    self.log(f"  > {descripcion} aplicado en el dibujo activo: {doc.Name}")
+                    return
+                except Exception:
+                    continue
+            self.log(f"\n[X] {descripcion}: no se detecta un dibujo CAD activo accesible.")
+        except Exception as error:
+            self.log(f"\n[X] {descripcion}: fallo COM: {error}")
+        finally:
+            pythoncom.CoUninitialize()
+
     def _hilo_comando_en_vivo(self, comando):
         pythoncom.CoInitialize()
         try:

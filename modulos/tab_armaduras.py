@@ -2,12 +2,15 @@ import json
 import math
 import os
 import threading
+import time
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 from PIL import Image
 
+from sincal_cad_moldajes import parse_moldaje_detection
 from sincal_rebar_model import (
+    CAPAS_ZAPATA,
     Cover,
     RebarRule,
     ZapataGeometry,
@@ -38,6 +41,10 @@ class TabArmaduras(ctk.CTkFrame):
         self.parent_app = parent_app
         self._zap_rule_widgets = {}
         self._zap_schedule = None
+        self._moldaje_option_vars = {}
+        self._moldaje_choices = {}
+        self._confirmed_moldajes = {}
+        self._moldajes_use_metres = False
         self.setup_ui()
 
     def setup_ui(self):
@@ -361,6 +368,44 @@ class TabArmaduras(ctk.CTkFrame):
             justify="left", wraplength=880,
         ).pack(anchor="w", padx=14, pady=(0, 10))
 
+        detector = ctk.CTkFrame(parent, fg_color="transparent")
+        detector.pack(fill="x", padx=14, pady=(0, 8))
+        ctk.CTkLabel(
+            detector, text="MOLDAJES CAD — DIBUJO ACTIVO", font=FUENTE_NORMAL_PEQUENA,
+            text_color=COLOR_ACENTO,
+        ).grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 4))
+        self.btn_detectar_moldajes = ctk.CTkButton(
+            detector, text="Detectar moldajes", font=FUENTE_NORMAL, corner_radius=0,
+            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
+            command=self.detectar_moldajes_cad,
+        )
+        self.btn_detectar_moldajes.grid(row=1, column=0, sticky="w", padx=(0, 10))
+        self.btn_confirmar_moldajes = ctk.CTkButton(
+            detector, text="Confirmar selección", font=FUENTE_NORMAL, corner_radius=0,
+            fg_color="transparent", border_width=1, border_color=COLOR_ACENTO,
+            hover_color=COLOR_GRIS_BOTON, command=self.confirmar_moldajes_cad,
+        )
+        self.btn_confirmar_moldajes.grid(row=1, column=1, sticky="w")
+        self.lbl_moldajes_status = ctk.CTkLabel(
+            detector, text="Sin lectura CAD.", font=FUENTE_NORMAL_PEQUENA,
+            text_color=COLOR_TEXTO_SUAVE,
+        )
+        self.lbl_moldajes_status.grid(row=1, column=2, columnspan=2, sticky="w", padx=12)
+
+        for index, layer in enumerate(CAPAS_ZAPATA):
+            row = 2 + index // 2
+            column = (index % 2) * 2
+            ctk.CTkLabel(detector, text=layer, font=FUENTE_NORMAL_PEQUENA).grid(
+                row=row, column=column, sticky="w", padx=(0, 5), pady=3)
+            value = ctk.StringVar(value="Sin detectar")
+            option = ctk.CTkOptionMenu(
+                detector, variable=value, values=["Sin detectar"], width=255,
+                font=FUENTE_NORMAL_PEQUENA, corner_radius=0,
+                fg_color=COLOR_GRIS_BOTON, button_color=COLOR_GRIS_BOTON_HOVER,
+            )
+            option.grid(row=row, column=column + 1, sticky="w", padx=(0, 15), pady=3)
+            self._moldaje_option_vars[layer] = (value, option)
+
         table = ctk.CTkScrollableFrame(parent, fg_color="transparent", corner_radius=0, height=215)
         table.pack(fill="x", padx=14, pady=(0, 8))
         headers = ("Grupo", "Marca", "Ø mm", "@ cm", "Gancho cm", "Activo")
@@ -416,6 +461,142 @@ class TabArmaduras(ctk.CTkFrame):
             return float(raw)
         except ValueError as error:
             raise ValueError(f"{label} debe ser numérico.") from error
+
+    @staticmethod
+    def _lisp_detector_moldajes(ruta_salida):
+        ruta_lisp = ruta_salida.replace("\\", "\\\\")
+        layers = " ".join(f'\"{layer}\"' for layer in CAPAS_ZAPATA)
+        return f'''(vl-load-com)
+(defun sincal:vertices (data)
+  (length (vl-remove-if-not '(lambda (pair) (= (car pair) 10)) data))
+)
+(defun sincal:cerrada-p (data)
+  (/= 0 (logand 1 (cdr (assoc 70 data))))
+)
+(defun sincal:arco-p (data / found)
+  (setq found nil)
+  (foreach pair data
+    (if (and (= (car pair) 42) (> (abs (cdr pair)) 0.0000001)) (setq found T))
+  )
+  found
+)
+(defun c:SINCAL-DETECTAR-ZAPATA (/ out layer ss index ent data status count obj area-result area)
+  (setq out (open "{ruta_lisp}" "w"))
+  (write-line "SINCAL_MOLDAJES_V1" out)
+  (write-line (strcat "META|INSUNITS|" (itoa (getvar "INSUNITS"))) out)
+  (foreach layer '({layers})
+    (setq ss (ssget "_X" (list (cons 0 "LWPOLYLINE") (cons 8 layer))))
+    (if ss
+      (progn
+        (setq index 0)
+        (repeat (sslength ss)
+          (setq ent (ssname ss index) data (entget ent) count (sincal:vertices data))
+          (cond
+            ((not (sincal:cerrada-p data)) (setq status "OPEN"))
+            ((sincal:arco-p data) (setq status "ARC"))
+            ((< count 3) (setq status "INVALID"))
+            (T (setq status "OK"))
+          )
+          (setq obj (vlax-ename->vla-object ent))
+          (setq area-result (vl-catch-all-apply 'vla-get-Area (list obj)))
+          (setq area (if (vl-catch-all-error-p area-result) 0.0 area-result))
+          (write-line
+            (strcat "CANDIDATE|" layer "|" (cdr (assoc 5 data)) "|" status "|"
+                    (itoa count) "|" (rtos area 2 6)) out)
+          (setq index (1+ index))
+        )
+      )
+      (write-line (strcat "CANDIDATE|" layer "||MISSING|0|0.0") out)
+    )
+  )
+  (close out)
+  (princ "\\n[SINCAL] Lectura de moldajes terminada. Vuelva a SINCAL para confirmar.")
+  (princ)
+)'''
+
+    def detectar_moldajes_cad(self):
+        if not hasattr(self.parent_app, "enviar_comando_cad_activo"):
+            messagebox.showerror("Workbench", "La versión actual no admite lectura del dibujo CAD activo.")
+            return
+        token = str(int(time.time() * 1000))
+        ruta_salida = ruta_runtime(f"moldajes_zapata_{token}.txt")
+        ruta_lisp = ruta_runtime(f"SINCAL_DETECTAR_ZAPATA_{token}.lsp")
+        try:
+            with open(ruta_lisp, "w", encoding="utf-8") as archivo:
+                archivo.write(self._lisp_detector_moldajes(ruta_salida))
+            if os.path.exists(ruta_salida):
+                os.remove(ruta_salida)
+        except OSError as error:
+            messagebox.showerror("Workbench", f"No se pudo preparar la lectura CAD:\n{error}")
+            return
+
+        self._confirmed_moldajes = {}
+        self._moldaje_result_path = ruta_salida
+        self._moldaje_deadline = time.monotonic() + 18
+        self.lbl_moldajes_status.configure(text="Leyendo dibujo activo…", text_color=COLOR_ACENTO)
+        ruta_cad = ruta_lisp.replace("\\", "\\\\")
+        comando = f'(load "{ruta_cad}") (c:SINCAL-DETECTAR-ZAPATA)\\n'
+        self.parent_app.enviar_comando_cad_activo(comando, "Lectura de moldajes de zapata")
+        self.after(400, self._esperar_moldajes_cad)
+
+    def _esperar_moldajes_cad(self):
+        ruta = getattr(self, "_moldaje_result_path", "")
+        if ruta and os.path.isfile(ruta):
+            try:
+                with open(ruta, "r", encoding="utf-8") as archivo:
+                    detection = parse_moldaje_detection(archivo.read())
+            except (OSError, ValueError) as error:
+                self.lbl_moldajes_status.configure(text=f"Error leyendo resultado: {error}", text_color="#D06A5D")
+                return
+            self._aplicar_moldajes_detectados(detection)
+            return
+        if time.monotonic() < getattr(self, "_moldaje_deadline", 0):
+            self.after(400, self._esperar_moldajes_cad)
+            return
+        self.lbl_moldajes_status.configure(
+            text="Sin respuesta CAD. Verifica que el dibujo esté abierto y accesible.", text_color="#D06A5D")
+
+    def _aplicar_moldajes_detectados(self, detection):
+        self._moldajes_use_metres = detection.uses_metres
+        self._moldaje_choices = {}
+        valid_count = 0
+        for layer, (variable, option) in self._moldaje_option_vars.items():
+            choices = {"Sin candidato": None}
+            for candidate in detection.for_layer(layer):
+                if candidate.is_valid:
+                    choices[candidate.label] = candidate
+            self._moldaje_choices[layer] = choices
+            option.configure(values=list(choices))
+            if len(choices) == 2:
+                variable.set(next(label for label in choices if label != "Sin candidato"))
+                valid_count += 1
+            else:
+                variable.set("Sin candidato")
+                valid_count += max(0, len(choices) - 1)
+
+        if not detection.uses_metres:
+            self.lbl_moldajes_status.configure(
+                text="INSUNITS no está en metros (6). Corrige unidades antes de confirmar.", text_color="#D06A5D")
+        else:
+            self.lbl_moldajes_status.configure(
+                text=f"{valid_count} moldaje(s) válido(s). Selecciona y confirma.", text_color=COLOR_ACENTO)
+
+    def confirmar_moldajes_cad(self):
+        if not self._moldajes_use_metres:
+            messagebox.showwarning("Workbench", "El dibujo debe declarar unidades en metros (INSUNITS = 6).")
+            return
+        confirmed = {}
+        for layer, (variable, _option) in self._moldaje_option_vars.items():
+            candidate = self._moldaje_choices.get(layer, {}).get(variable.get())
+            if candidate:
+                confirmed[layer] = candidate
+        if not confirmed:
+            messagebox.showwarning("Workbench", "No hay moldajes válidos seleccionados para confirmar.")
+            return
+        self._confirmed_moldajes = confirmed
+        self.lbl_moldajes_status.configure(
+            text=f"{len(confirmed)} moldaje(s) confirmado(s). El DWG no se ha modificado.", text_color=COLOR_ACENTO)
+        self.parent_app.log_r(f"[*] Moldajes de zapata confirmados: {', '.join(confirmed)}")
 
     def _read_zapata_rules(self):
         rules = []
@@ -481,10 +662,18 @@ class TabArmaduras(ctk.CTkFrame):
         if not schedule or not schedule.is_valid:
             messagebox.showwarning("Workbench", "Corrige las validaciones de la revisión antes de preparar una vista.")
             return
+        layer = f"{vista}_ZAP"
+        candidate = self._confirmed_moldajes.get(layer)
+        if not candidate:
+            messagebox.showwarning(
+                "Workbench",
+                f"Confirma primero un moldaje válido para {layer}. SINCAL no adivina ni modifica contornos.",
+            )
+            return
         messagebox.showinfo(
             "Workbench",
-            f"Vista {vista}: la geometría CAD se habilitará después de confirmar el moldaje {vista}_ZAP.\n\n"
-            "La revisión de marcas ya está lista y no ha modificado el DWG.",
+            f"Vista {vista}: moldaje {layer} confirmado (handle {candidate.handle}).\n\n"
+            "La revisión de marcas ya está lista. La generación gráfica será la siguiente etapa y no ha modificado el DWG.",
         )
 
     def generar_despiece_cad(self, vista):

@@ -63,7 +63,7 @@ Este módulo envía un comando a los dibujos CAD abiertos. Escribe, por ejemplo,
 
 Prepara vistas, despieces y cubicación de fierro mediante comandos temporales enviados al CAD abierto:
 
-- Estribos: fase 1 de zapata disponible. Permite editar mallas, recubrimientos, esviaje, marcas y ganchos en una revisión que calcula cantidades, largos y peso provisionales sin modificar CAD. El siguiente paso valida moldajes cerrados por vista antes de representar el mismo modelo de barras en Frontal, A-A, B-B, C-C, D-D y E-E sin duplicar la cubicación.
+- Estribos: fase 1 de zapata disponible. Permite editar mallas, recubrimientos, esviaje, marcas y ganchos en una revisión que calcula cantidades, largos y peso provisionales sin modificar CAD. Detecta y permite confirmar moldajes cerrados por vista en el dibujo activo (`FR_ZAP` a `EE_ZAP`), exigiendo `INSUNITS = 6` para trabajar en metros. El siguiente paso representará el mismo modelo de barras en Frontal, A-A, B-B, C-C, D-D y E-E sin duplicar la cubicación.
 - Travesaños: extremos, cuadrantes sobre tope, macizos y viga; geometría y despiece.
 - JSON de proyecto: importa parámetros compatibles y los convierte a las unidades de la interfaz.
 
