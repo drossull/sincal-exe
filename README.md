@@ -61,13 +61,13 @@ Este módulo envía un comando a los dibujos CAD abiertos. Escribe, por ejemplo,
 
 ### Módulo estructural
 
-Genera vistas y despieces de armaduras mediante comandos temporales enviados al CAD abierto:
+Prepara vistas, despieces y cubicación de fierro mediante comandos temporales enviados al CAD abierto:
 
-- Estribos: geometría de zapata, recubrimientos, mallas y vistas Frontal/A/B/C.
+- Estribos: desarrollo en curso desde la zapata. El flujo validará moldajes cerrados por vista, una tabla editable de armaduras y un modelo único de barras que se representa en Frontal, A-A, B-B, C-C, D-D y E-E sin duplicar la cubicación.
 - Travesaños: extremos, cuadrantes sobre tope, macizos y viga; geometría y despiece.
 - JSON de proyecto: importa parámetros compatibles y los convierte a las unidades de la interfaz.
 
-Las pestañas **Muros** y **Consola y Topes** están reservadas actualmente y todavía no generan elementos. Verifica siempre dimensiones en cm, diámetros en mm y esviaje en grados.
+Las pestañas **Muros** y **Consola y Topes** están reservadas actualmente y todavía no generan elementos. Consulta **Documentación → Módulo estructural** para el glosario de capas (`FR_ZAP`, `AA_ZAP`, `CTF`, etc.), lectura de vistas y flujo de revisión. Verifica siempre dimensiones en cm, diámetros en mm y esviaje en grados.
 
 ### Módulo de ubicación
 

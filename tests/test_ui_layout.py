@@ -47,6 +47,17 @@ class WorkbenchLayoutTests(unittest.TestCase):
             source = (ROOT / relative).read_text(encoding="utf-8")
             self.assertIn("FUENTE_NORMAL_PEQUENA,", source, relative)
 
+    def test_structural_documentation_defines_the_approved_glossary(self):
+        import json
+
+        docs = json.loads((ROOT / "tutoriales.json").read_text(encoding="utf-8"))
+        topics = {topic["id"]: topic for topic in docs["temas"]}
+        self.assertIn("estribos-glosario", topics)
+        glossary = topics["estribos-glosario"]["contenido"]
+        self.assertIn("CTF — Contrafuerte", glossary)
+        self.assertNotIn("CON — Contrafuerte", glossary)
+        self.assertIn("EE (planta de fundación)", topics["estribos-vistas-y-capas"]["contenido"])
+
 
 if __name__ == "__main__":
     unittest.main()
