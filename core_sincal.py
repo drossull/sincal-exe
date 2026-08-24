@@ -1362,11 +1362,11 @@ class ActualizadorCAD(ctk.CTk):
                     if identity in visited:
                         continue
                     visited.add(identity)
-                    doc.SendCommand("\x03\x03")
                     doc.SendCommand(comando)
                     self.log(f"  > {descripcion} aplicado en el dibujo activo: {doc.Name}")
                     return
-                except Exception:
+                except Exception as error:
+                    self.logger.debug("No se pudo usar %s para el comando activo: %s", prog_id, error)
                     continue
 
             # Algunas instalaciones registran AutoCAD en la tabla de objetos
@@ -1392,11 +1392,11 @@ class ActualizadorCAD(ctk.CTk):
                         if identity in visited:
                             continue
                         visited.add(identity)
-                        doc.SendCommand("\x03\x03")
                         doc.SendCommand(comando)
                         self.log(f"  > {descripcion} aplicado mediante ROT en el dibujo activo: {doc.Name}")
                         return
-                    except Exception:
+                    except Exception as error:
+                        self.logger.debug("Objeto ROT no utilizable para el comando activo: %s", error)
                         continue
             except Exception:
                 pass

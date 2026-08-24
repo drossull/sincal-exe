@@ -543,7 +543,7 @@ class TabArmaduras(ctk.CTkFrame):
         state["moldaje_deadline"] = time.monotonic() + 18
         state["moldaje_status"].configure(text="Leyendo dibujo activo…", text_color=COLOR_ACENTO)
         ruta_cad = ruta_lisp.replace("\\", "\\\\")
-        comando = f'(load "{ruta_cad}") (c:SINCAL-DETECTAR-ZAPATA)\\n'
+        comando = f'(progn (load "{ruta_cad}") (c:SINCAL-DETECTAR-ZAPATA))\n'
         self.parent_app.enviar_comando_cad_activo(
             comando, f"Lectura de moldajes de zapata ({state['title'].lower()})")
         self.after(400, lambda k=abutment_key: self._esperar_moldajes_cad(k))

@@ -109,6 +109,15 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn("def confirmar_moldajes_cad", structural)
         self.assertIn("INSUNITS", structural)
 
+    def test_active_moldaje_detection_keeps_a_valid_com_connection(self):
+        core = (ROOT / "core_sincal.py").read_text(encoding="utf-8")
+        structural = (ROOT / "modulos" / "tab_armaduras.py").read_text(encoding="utf-8")
+        active_worker = core.split("def _hilo_comando_cad_activo", 1)[1].split(
+            "def _hilo_comando_en_vivo", 1)[0]
+        self.assertNotIn('SendCommand("\\x03\\x03")', active_worker)
+        self.assertIn('(progn (load', structural)
+        self.assertIn('(c:SINCAL-DETECTAR-ZAPATA))\\n', structural)
+
 
 if __name__ == "__main__":
     unittest.main()
