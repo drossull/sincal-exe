@@ -1,6 +1,6 @@
 import unittest
 
-from sincal_cad_moldajes import parse_moldaje_detection
+from sincal.cad.moldajes import parse_moldaje_detection
 
 
 class MoldajeDetectionTests(unittest.TestCase):

@@ -1,9 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+
+project_root = os.path.abspath(os.path.join(SPECPATH, "..", ".."))
+
 
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    [os.path.join(project_root, 'main.py')],
+    pathex=[project_root],
     binaries=[],
     # Los datos operativos se instalan como archivos externos o se descargan
     # desde el canal público. Incrustarlos aquí duplicaría los recursos.
@@ -37,5 +41,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['logo.ico'],
+    icon=[os.path.join(project_root, 'assets', 'icons', 'logo.ico')],
 )

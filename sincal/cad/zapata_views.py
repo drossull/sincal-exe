@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import math
 
-from sincal_rebar_model import (
+from sincal.rebar.model import (
     LARGO_COMERCIAL_CM,
     automatic_hook_cm,
     bend_radius_cm,

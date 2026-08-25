@@ -15,18 +15,18 @@ from tkinter import messagebox
 import customtkinter as ctk
 import pythoncom
 import requests
+import ttkbootstrap as ttk
 import win32com.client
 from customtkinter import filedialog
-from ttkbootstrap import Style as BootstrapStyle
 
-from modulos.tab_armaduras import TabArmaduras
-from modulos.tab_diagnostico import TabDiagnostico
-from modulos.tab_docs import TabDocs
-from modulos.tab_ubicacion import TabUbicacion
-from sincal_cad_engine import ensure_cad_engine
-from sincal_cad_integration import registrar_ruta_cad_usuario, registrar_scripts_en_path
-from sincal_diagnostics import record_incident
-from sincal_resource_sync import (
+from sincal.ui.tabs.armaduras import TabArmaduras
+from sincal.ui.tabs.diagnostico import TabDiagnostico
+from sincal.ui.tabs.documentacion import TabDocs
+from sincal.ui.tabs.ubicacion import TabUbicacion
+from sincal.cad.engine import ensure_cad_engine
+from sincal.cad.integration import registrar_ruta_cad_usuario, registrar_scripts_en_path
+from sincal.diagnostics import record_incident
+from sincal.resources import (
     active_resource_paths,
     apply_resource_updates,
     check_resource_updates,
@@ -34,7 +34,7 @@ from sincal_resource_sync import (
     materialize_cad_resources,
     record_resource_state,
 )
-from sincal_runtime import (
+from sincal.runtime import (
     RUTA_DATOS_USUARIO,
     RUTA_LOGS,
     VERSION_ACTUAL,
@@ -42,15 +42,15 @@ from sincal_runtime import (
     is_newer_version,
     ruta_cad_usuario,
 )
-from sincal_icons import obtener_icono
-from sincal_runtime import (
+from sincal.ui.icons import obtener_icono
+from sincal.runtime import (
     ruta_recurso as runtime_ruta_recurso,
 )
-from sincal_update_config import (
+from sincal.update_config import (
     DISTRIBUTION_RELEASES_URL,
     api_url as distribution_api_url,
 )
-from sincal_ui import (
+from sincal.ui.theme import (
     COLOR_ACENTO,
     COLOR_ACENTO_HOVER,
     COLOR_BORDE,
@@ -75,6 +75,7 @@ from sincal_ui import (
     RADIO_PANEL,
     TTK_PRESET_CLARO,
     TTK_PRESET_OSCURO,
+    crear_estilo_bootstrap,
     agregar_tooltip,
     registrar_fuentes,
 )
@@ -112,7 +113,7 @@ def configurar_logging():
 class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.bootstrap_style = BootstrapStyle(theme=TTK_PRESET_OSCURO)
+        self.bootstrap_style = crear_estilo_bootstrap()
         registrar_fuentes()
         asegurar_directorios()
         self.logger = configurar_logging()
@@ -124,7 +125,7 @@ class ActualizadorCAD(ctk.CTk):
         self.minsize(980, 640)
         self.configure(fg_color=COLOR_FONDO)
         try:
-            self.iconbitmap(obtener_ruta_recurso("logo.ico"))
+            self.iconbitmap(obtener_ruta_recurso("assets", "icons", "logo.ico"))
         except:
             pass
 
@@ -222,12 +223,9 @@ class ActualizadorCAD(ctk.CTk):
             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
             corner_radius=RADIO_CONTROL, command=lambda: self.ajustar_tamano_letra(-0.05),
         ).pack(side="left")
-        self.font_slider = ctk.CTkSlider(
-            font_controls, from_=0.85, to=1.25, number_of_steps=8,
-            command=self.cambiar_tamano_letra, fg_color=COLOR_GRIS_BOTON,
-            progress_color=COLOR_ACENTO, button_color=COLOR_ACENTO,
-            button_hover_color=COLOR_ACENTO_HOVER,
-        )
+        self.font_slider = ttk.Scale(
+            font_controls, from_=0.85, to=1.25,
+            command=self.cambiar_tamano_letra, bootstyle="info")
         self.font_slider.set(self._font_scale)
         self.font_slider.pack(side="left", fill="x", expand=True, padx=6)
         ctk.CTkButton(
@@ -235,15 +233,11 @@ class ActualizadorCAD(ctk.CTk):
             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
             corner_radius=RADIO_CONTROL, command=lambda: self.ajustar_tamano_letra(0.05),
         ).pack(side="right")
-        self.theme_menu = ctk.CTkOptionMenu(
-            footer, values=["Tema oscuro", "Tema claro", "Tema del sistema"],
-            command=self.cambiar_tema, font=FUENTE_NORMAL_PEQUENA,
-            dropdown_font=FUENTE_NORMAL_PEQUENA, fg_color=COLOR_GRIS_BOTON,
-            button_color=COLOR_GRIS_BOTON_HOVER, button_hover_color=COLOR_GRIS_BOTON_HOVER,
-            corner_radius=RADIO_CONTROL,
-        )
-        self.theme_menu.set("Tema oscuro")
-        self.theme_menu.pack(fill="x", pady=(6, 0))
+        ctk.CTkLabel(
+            footer, text="CRÉDITOS\nCreado por Gonzalo Mardones V.",
+            font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
+            anchor="w", justify="left",
+        ).pack(fill="x", pady=(8, 0))
         self.workspace = ctk.CTkFrame(self, fg_color=COLOR_FONDO, corner_radius=0)
         self.workspace.pack(side="right", fill="both", expand=True)
         header = ctk.CTkFrame(self.workspace, height=58, fg_color=COLOR_PANEL, corner_radius=0)
@@ -256,22 +250,18 @@ class ActualizadorCAD(ctk.CTk):
         )
         self.btn_mostrar_menu.pack(side="left", padx=(10, 0), pady=12)
         agregar_tooltip(self.btn_mostrar_menu, "Mostrar u ocultar menú lateral")
-        self.section_title = ctk.CTkLabel(
-            header, text="Sincronizador", font=FUENTE_SUBTITULO, text_color=COLOR_TEXTO,
+        path_bar = ctk.CTkFrame(
+            header, fg_color=COLOR_PANEL_OSCURO, corner_radius=RADIO_CONTROL,
         )
-        self.section_title.pack(side="left", padx=22, pady=10)
+        path_bar.pack(side="left", fill="x", expand=True, padx=14, pady=10)
+        self.section_title = ctk.CTkLabel(
+            path_bar, text="Sincronizador", font=FUENTE_NORMAL,
+            text_color=COLOR_TEXTO, anchor="w",
+        )
+        self.section_title.pack(fill="x", padx=12, pady=7)
         ctk.CTkLabel(
             header, text="SINCAL 2.0", font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
         ).pack(side="right", padx=(8, 18))
-        self.console_menu = ctk.CTkOptionMenu(
-            header, values=["Consola: oculta", "Consola: inferior", "Consola: derecha"],
-            command=self.cambiar_modo_consola, font=FUENTE_NORMAL_PEQUENA,
-            dropdown_font=FUENTE_NORMAL_PEQUENA, width=156, corner_radius=RADIO_CONTROL,
-            fg_color=COLOR_GRIS_BOTON, button_color=COLOR_GRIS_BOTON_HOVER, button_hover_color=COLOR_GRIS_BOTON_HOVER,
-        )
-        self.console_menu.set("Consola: oculta")
-        self.console_menu.pack(side="right", padx=10, pady=12)
-
         self.content_host = ctk.CTkFrame(self.workspace, fg_color=COLOR_FONDO, corner_radius=0)
         self.content_host.pack(fill="both", expand=True)
         self.console_panel = ctk.CTkFrame(
@@ -333,7 +323,7 @@ class ActualizadorCAD(ctk.CTk):
             frame.pack_forget()
         frame, title = self._sections[key]
         frame.pack(fill="both", expand=True)
-        self.section_title.configure(text=title)
+        self.actualizar_ruta_interna(title)
         for item_key, button in self._nav_buttons.items():
             selected = item_key == key
             button.configure(
@@ -341,6 +331,13 @@ class ActualizadorCAD(ctk.CTk):
                 hover_color=COLOR_GRIS_BOTON_HOVER if selected else COLOR_GRIS_BOTON,
                 text_color=COLOR_TEXTO,
             )
+        if key == "estructural" and hasattr(self, "vista_armaduras"):
+            self.after_idle(self.vista_armaduras.actualizar_breadcrumb)
+
+    def actualizar_ruta_interna(self, *segments):
+        """Muestra la ubicación funcional actual como una ruta de exploración."""
+        route = " > ".join(str(segment) for segment in segments if segment)
+        self.section_title.configure(text=route or "SINCAL")
 
     def ocultar_menu_lateral(self):
         self.sidebar.pack_forget()
@@ -397,7 +394,23 @@ class ActualizadorCAD(ctk.CTk):
         modo = {"Tema oscuro": "dark", "Tema claro": "light", "Tema del sistema": "system"}.get(value, "dark")
         ctk.set_appearance_mode(modo)
         resolved_dark = ctk.get_appearance_mode() == "Dark"
-        self.bootstrap_style.theme_use(TTK_PRESET_OSCURO if resolved_dark else TTK_PRESET_CLARO)
+        ttk_theme = TTK_PRESET_OSCURO if resolved_dark else TTK_PRESET_CLARO
+        self.bootstrap_style.theme_use(ttk_theme)
+        if hasattr(self, "_ttk_theme_var"):
+            self._ttk_theme_var.set(ttk_theme)
+        self._actualizar_menu_nativo(modo)
+
+    def seleccionar_tema_ttk(self, theme_name):
+        """Aplica cualquier tema instalado de ttkbootstrap y armoniza CTk."""
+        try:
+            self.bootstrap_style.theme_use(theme_name)
+        except tk.TclError as error:
+            messagebox.showerror("Tema no disponible", str(error), parent=self)
+            return
+        definition = getattr(self.bootstrap_style, "_theme_definitions", {}).get(theme_name)
+        modo = "dark" if getattr(definition, "type", "light") == "dark" else "light"
+        ctk.set_appearance_mode(modo)
+        self._ttk_theme_var.set(theme_name)
         self._actualizar_menu_nativo(modo)
 
     def _construir_menu_superior(self):
@@ -428,6 +441,22 @@ class ActualizadorCAD(ctk.CTk):
         ver.add_command(label="Restablecer texto", command=self.restablecer_tamano_letra)
         ver.add_command(label="Aumentar texto", command=lambda: self.ajustar_tamano_letra(0.05))
         ver.add_separator()
+        self._ttk_theme_var = tk.StringVar(value=TTK_PRESET_OSCURO)
+        temas_ttk = tk.Menu(ver, tearoff=False)
+        temas_oscuros = tk.Menu(temas_ttk, tearoff=False)
+        temas_claros = tk.Menu(temas_ttk, tearoff=False)
+        definitions = getattr(self.bootstrap_style, "_theme_definitions", {})
+        for theme_name in sorted(self.bootstrap_style.theme_names(), key=str.casefold):
+            definition = definitions.get(theme_name)
+            submenu = temas_oscuros if getattr(definition, "type", "light") == "dark" else temas_claros
+            submenu.add_radiobutton(
+                label=theme_name, value=theme_name, variable=self._ttk_theme_var,
+                command=lambda selected=theme_name: self.seleccionar_tema_ttk(selected),
+            )
+        temas_ttk.add_cascade(label="Oscuros", menu=temas_oscuros)
+        temas_ttk.add_cascade(label="Claros", menu=temas_claros)
+        ver.add_cascade(label="Tema ttkbootstrap", menu=temas_ttk)
+        ver.add_separator()
         ver.add_command(label="Tema oscuro", command=lambda: self._seleccionar_tema("Tema oscuro"))
         ver.add_command(label="Tema claro cálido", command=lambda: self._seleccionar_tema("Tema claro"))
         ver.add_command(label="Tema del sistema", command=lambda: self._seleccionar_tema("Tema del sistema"))
@@ -445,11 +474,9 @@ class ActualizadorCAD(ctk.CTk):
         self._actualizar_menu_nativo("dark")
 
     def _seleccionar_consola(self, option):
-        self.console_menu.set(option)
         self.cambiar_modo_consola(option)
 
     def _seleccionar_tema(self, option):
-        self.theme_menu.set(option)
         self.cambiar_tema(option)
 
     def restablecer_tamano_letra(self):
@@ -468,9 +495,9 @@ class ActualizadorCAD(ctk.CTk):
         if not hasattr(self, "menu_superior"):
             return
         claro = modo == "light" or (modo == "system" and ctk.get_appearance_mode() == "Light")
-        fondo = "#EEE9E1" if claro else "#073642"
-        texto = "#3E3F3A" if claro else "#FFFFFF"
-        activo = "#D0C6B8" if claro else "#0B5162"
+        fondo = "#EEE9E1" if claro else "#2E3440"
+        texto = "#3E3F3A" if claro else "#ECEFF4"
+        activo = "#D0C6B8" if claro else "#4C566A"
         try:
             self.menu_superior.configure(bg=fondo, fg=texto, activebackground=activo, activeforeground=texto)
             for index in range(self.menu_superior.index("end") + 1):
@@ -524,7 +551,6 @@ class ActualizadorCAD(ctk.CTk):
             self.console_panel.configure(width=max(280, min(720, width)))
 
     def mostrar_ventana_log(self):
-        self.console_menu.set("Consola: inferior")
         self.cambiar_modo_consola("Consola: inferior")
 
     def limpiar_consola_global(self):

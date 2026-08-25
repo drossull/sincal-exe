@@ -1,10 +1,10 @@
 # SINCAL — Suite de Ingeniería y Estándares CAD
 
-**SINCAL 2.0** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La marca del producto es 2.0 y la secuencia técnica continúa en `v29.0.6` para conservar una actualización ordenada desde las instalaciones v28.
+**SINCAL 2.0** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La marca del producto es 2.0 y la secuencia técnica continúa en `v29.0.7` para conservar una actualización ordenada desde las instalaciones v28.
 
 ## Instalación web y distribución
 
-SINCAL se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.6.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
+SINCAL se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.7.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
 
 El programa base no incorpora los 125 MB de mapas regionales. El paquete web sí contiene una copia inicial del master DWG, LISPs, startup, scripts, plumilla, calibración y ayuda estructural para que el primer arranque sea funcional. GitHub mantiene esos recursos al día mediante actualizaciones menores. Cada mapa regional se descarga solamente cuando se selecciona por primera vez en el módulo Ubicación.
 
@@ -12,7 +12,7 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
 
 ## Primer inicio
 
-1. Ejecuta el instalador oficial de la release `v29.0.6`.
+1. Ejecuta el instalador oficial de la release `v29.0.7`.
 2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
 3. Abre **Diagnóstico**, verifica el motor CAD sugerido y cámbialo si necesitas otra versión.
 4. Pulsa **Preparar integración CAD**.
@@ -45,7 +45,7 @@ Al cerrar la ventana principal con **X**, SINCAL finaliza su proceso. La aplicac
 
 ### Interfaz Workbench
 
-La interfaz usa GT Pressura Regular y Bold sobre una base visual `ttkbootstrap`: **Solar** para el modo oscuro y una variante cálida de **Sandstone** para el modo claro. La iconografía es monocroma, consistente y escalable; los íconos de acción muestran su función al pasar el mouse.
+La interfaz usa GT Pressura Regular y Bold sobre una base visual `ttkbootstrap`: **Nord** es el tema oscuro corporativo y **Sandstone** mantiene una variante clara cálida. En **Ver → Tema ttkbootstrap** se puede escoger cualquiera de los temas disponibles en la versión instalada. La iconografía es monocroma, consistente y escalable; los íconos de acción muestran su función al pasar el mouse.
 
 El diseño responde al ancho disponible: el menú lateral se oculta automáticamente en ventanas angostas, las acciones principales se redistribuyen en varias filas y los encabezados reservan espacio para que las rutas largas no expulsen botones fuera de la pantalla. El menú, la consola, Documentación y los paneles de revisión estructural pueden redimensionarse arrastrando sus bordes. La barra `− / +` escala progresivamente toda la interfaz. El menú superior reúne **Archivo, Editar, Ver y Ayuda**; el historial de releases y commits está en Sincronizador y la consola única puede ocultarse o acoplarse abajo o a la derecha.
 
@@ -101,6 +101,21 @@ El botón **Generar informe ZIP** crea `diagnostico.json`, `resumen.txt`, una co
 
 El tab **Documentación** ofrece búsqueda por comando, herramienta o palabra clave. Contiene primer inicio, actualizaciones, integración CAD, startup, master DWG, inventario de recursos, todos los comandos LISP, procesamiento masivo, conversión DXF, módulo estructural, módulo de ubicación, diagnóstico y solución de problemas.
 
+## Organización del repositorio
+
+- `sincal/`: código de la aplicación.
+  - `cad/`: comunicación CAD, detección de moldajes y generadores.
+  - `rebar/`: modelo paramétrico y despiece de armaduras.
+  - `ui/`: tema, iconos y pestañas de interfaz.
+- `assets/`: fuentes e iconos incluidos en el paquete.
+- `lisps/`, `scripts/`, `startup/`, `masters/`, `plotstyles/` y `mapas/`: recursos CAD publicables.
+- `packaging/`: especificación PyInstaller, instalador Windows y certificado público.
+- `src/`: plugin compilado para AutoCAD.
+- `tests/`: pruebas automáticas y comprobación integral del runtime.
+- `tools/`: compilación de releases y exportación segura al canal público.
+
+`main.py`, `version.json` y `tutoriales.json` permanecen en la raíz como contratos estables de arranque, versión y actualización de recursos.
+
 ## Publicar una actualización menor
 
 1. Modifica un recurso autorizado en el repositorio privado de desarrollo.
@@ -122,10 +137,10 @@ El proceso valida código y pruebas, compila y firma el plugin y la aplicación,
 
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v29.0.6.exe`
-- `SINCAL_App_v29.0.6.zip`
-- `SINCAL_AutoCAD_v29.0.6.zip`
-- `release-manifest_v29.0.6.json`
+- `Setup_SINCAL_v29.0.7.exe`
+- `SINCAL_App_v29.0.7.zip`
+- `SINCAL_AutoCAD_v29.0.7.zip`
+- `release-manifest_v29.0.7.json`
 - `SHA256SUMS.txt`
 
 No renombres los paquetes después de compilar: el instalador usa URLs versionadas y hashes fijados en el momento del build.

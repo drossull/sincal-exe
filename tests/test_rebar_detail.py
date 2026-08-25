@@ -1,12 +1,12 @@
 import unittest
 from dataclasses import replace
 
-from sincal_rebar_detail import (
+from sincal.rebar.detail import (
     DETAIL_GROUP_ORDER,
     build_detail_groups,
     polyline_developed_length_m,
 )
-from sincal_rebar_model import Cover, ZapataGeometry, build_zapata_schedule, default_zapata_rules
+from sincal.rebar.model import Cover, ZapataGeometry, build_zapata_schedule, default_zapata_rules
 
 
 class RebarDetailTests(unittest.TestCase):

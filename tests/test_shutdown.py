@@ -2,7 +2,7 @@ import types
 import unittest
 from unittest.mock import Mock, patch
 
-import core_sincal
+from sincal import app as core_sincal
 
 
 class ShutdownTests(unittest.TestCase):

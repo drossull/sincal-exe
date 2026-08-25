@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sincal_rebar_model import CAPAS_ZAPATA
+from sincal.rebar.model import CAPAS_ZAPATA
 
 
 @dataclass(frozen=True)

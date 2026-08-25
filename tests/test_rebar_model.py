@@ -1,6 +1,6 @@
 import unittest
 
-from sincal_rebar_model import (
+from sincal.rebar.model import (
     Cover,
     RebarRule,
     ZapataGeometry,

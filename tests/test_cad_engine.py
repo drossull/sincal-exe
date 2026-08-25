@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import sincal_cad_engine as cad_engine
+from sincal.cad import engine as cad_engine
 
 
 class CadEngineTests(unittest.TestCase):

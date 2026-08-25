@@ -2,7 +2,7 @@ import ctypes
 import os
 import winreg
 
-from sincal_runtime import RUTA_CAD_USUARIO
+from sincal.runtime import RUTA_CAD_USUARIO
 
 REGISTRY_ROOTS = (
     r"Software\Autodesk\AutoCAD",

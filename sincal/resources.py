@@ -10,14 +10,14 @@ import time
 from dataclasses import dataclass
 from urllib.parse import quote
 
-from sincal_runtime import (
+from sincal.runtime import (
     RUTA_RECURSOS_USUARIO,
     es_recurso_actualizable,
     ruta_cad_usuario,
     ruta_recurso,
     ruta_recurso_instalado,
 )
-from sincal_update_config import (
+from sincal.update_config import (
     DISTRIBUTION_BRANCH,
     DISTRIBUTION_MANIFEST_URL,
     DISTRIBUTION_OWNER,

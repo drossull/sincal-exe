@@ -27,7 +27,7 @@ def is_newer_version(candidate: str, current: str) -> bool:
 def _ruta_instalacion() -> str:
     if getattr(sys, "frozen", False):
         return os.path.dirname(os.path.abspath(sys.executable))
-    return os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _ruta_base() -> str:

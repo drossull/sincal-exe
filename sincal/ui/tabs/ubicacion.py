@@ -9,10 +9,10 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from PIL import Image, ImageDraw
 
-from sincal_icons import obtener_icono
-from sincal_runtime import ruta_recurso
-from sincal_resource_sync import ensure_resource_available
-from sincal_ui import (
+from sincal.ui.icons import obtener_icono
+from sincal.runtime import ruta_recurso
+from sincal.resources import ensure_resource_available
+from sincal.ui.theme import (
     COLOR_ACENTO,
     COLOR_ACENTO_HOVER,
     COLOR_BORDE,

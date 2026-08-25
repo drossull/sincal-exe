@@ -4,16 +4,18 @@ import ctypes
 import os
 
 import customtkinter as ctk
+from ttkbootstrap import Style as BootstrapStyle
+from ttkbootstrap.style import Colors, ThemeDefinition
 
 try:
     from ttkbootstrap.themes.standard import STANDARD_THEMES
 except ImportError:  # Permite mostrar un diagnóstico legible en instalaciones antiguas.
     STANDARD_THEMES = {}
 
-from sincal_runtime import ruta_recurso_instalado
+from sincal.runtime import ruta_recurso_instalado
 
 
-TTK_PRESET_OSCURO = "solar"
+TTK_PRESET_OSCURO = "nord"
 TTK_PRESET_CLARO = "sandstone"
 
 
@@ -22,32 +24,55 @@ def _preset_colors(name, fallback):
     return dict(fallback, **definition.get("colors", {}))
 
 
-_SOLAR = _preset_colors(TTK_PRESET_OSCURO, {
-    "primary": "#bc951a", "secondary": "#94a2a4", "bg": "#002B36",
-    "fg": "#ffffff", "border": "#00252e", "inputfg": "#A9BDBD",
-    "inputbg": "#073642", "selectbg": "#0b5162", "active": "#002730",
+_NORD = {
+    "primary": "#88C0D0", "secondary": "#81A1C1", "success": "#A3BE8C",
+    "info": "#8FBCBB", "warning": "#EBCB8B", "danger": "#BF616A",
+    "light": "#ECEFF4", "dark": "#2E3440", "bg": "#2E3440",
+    "fg": "#ECEFF4", "selectbg": "#5E81AC", "selectfg": "#ECEFF4",
+    "border": "#4C566A", "inputfg": "#E5E9F0", "inputbg": "#3B4252",
+    "active": "#434C5E",
+}
+
+
+def crear_estilo_bootstrap():
+    """Registra Nord localmente para no depender del catálogo de ttkbootstrap."""
+    style = BootstrapStyle()
+    if TTK_PRESET_OSCURO not in style.theme_names():
+        style.register_theme(ThemeDefinition(
+            name=TTK_PRESET_OSCURO,
+            themetype="dark",
+            colors=Colors(**_NORD),
+        ))
+    style.theme_use(TTK_PRESET_OSCURO)
+    return style
+
+
+_NORD_COLORS = _preset_colors(TTK_PRESET_OSCURO, {
+    "primary": _NORD["primary"], "secondary": _NORD["secondary"],
+    "bg": _NORD["bg"], "fg": _NORD["fg"], "border": _NORD["border"],
+    "inputfg": _NORD["inputfg"], "inputbg": _NORD["inputbg"],
+    "selectbg": _NORD["selectbg"], "active": _NORD["active"],
 })
 _SANDSTONE = _preset_colors(TTK_PRESET_CLARO, {
     "secondary": "#8e8c84", "fg": "#3e3f3a", "inputfg": "#6E6D69",
     "border": "#ced4da", "light": "#F8F5F0",
 })
 
-# La variante clara parte de Sandstone pero evita blanco absoluto y reemplaza
-# su azul primario por el mostaza de Solar para conservar la marca SINCAL.
-COLOR_FONDO = ("#F8F5F0", _SOLAR["bg"])
-COLOR_PANEL = ("#EEE9E1", _SOLAR["inputbg"])
-COLOR_PANEL_OSCURO = ("#E4DDD3", _SOLAR["border"])
-COLOR_BORDE = (_SANDSTONE["secondary"], _SOLAR["selectbg"])
-COLOR_TEXTO = (_SANDSTONE["fg"], _SOLAR["fg"])
-COLOR_TEXTO_SUAVE = (_SANDSTONE["inputfg"], _SOLAR["inputfg"])
-COLOR_ACENTO = (_SOLAR["primary"], _SOLAR["primary"])
-COLOR_ACENTO_HOVER = ("#A98517", "#D0AA2C")
+# La variante clara conserva Sandstone cálido; la oscura usa la paleta Nord.
+COLOR_FONDO = ("#F8F5F0", _NORD_COLORS["bg"])
+COLOR_PANEL = ("#EEE9E1", _NORD_COLORS["inputbg"])
+COLOR_PANEL_OSCURO = ("#E4DDD3", _NORD_COLORS["border"])
+COLOR_BORDE = (_SANDSTONE["secondary"], _NORD_COLORS["selectbg"])
+COLOR_TEXTO = (_SANDSTONE["fg"], _NORD_COLORS["fg"])
+COLOR_TEXTO_SUAVE = (_SANDSTONE["inputfg"], _NORD_COLORS["inputfg"])
+COLOR_ACENTO = ("#B38B18", _NORD_COLORS["primary"])
+COLOR_ACENTO_HOVER = ("#967412", "#8FBCBB")
 COLOR_MOSTAZA = COLOR_ACENTO
-COLOR_GRIS_BOTON = ("#DED7CD", "#073E4B")
-COLOR_GRIS_BOTON_HOVER = ("#D0C6B8", _SOLAR["selectbg"])
-COLOR_SELECCION = ("#E7DDBE", "#124A56")
-COLOR_EXITO = ("#477A52", "#44ACA4")
-COLOR_ERROR = ("#A84842", "#D95092")
+COLOR_GRIS_BOTON = ("#DED7CD", _NORD_COLORS["inputbg"])
+COLOR_GRIS_BOTON_HOVER = ("#D0C6B8", _NORD_COLORS["active"])
+COLOR_SELECCION = ("#E7DDBE", _NORD_COLORS["selectbg"])
+COLOR_EXITO = ("#477A52", _NORD["success"])
+COLOR_ERROR = ("#A84842", _NORD["danger"])
 
 RADIO_CONTROL = 6
 RADIO_PANEL = 10

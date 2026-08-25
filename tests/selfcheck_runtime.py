@@ -6,15 +6,15 @@ import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sincal_runtime import (
+from sincal.runtime import (
     VERSION_ACTUAL,
     asegurar_directorios,
     ruta_recurso,
     ruta_recurso_instalado,
     ruta_runtime,
 )
-from sincal_resource_sync import git_blob_sha
-from modulos.tab_ubicacion import _leer_kml_desde_kmz, _parsear_kml_puntos
+from sincal.resources import git_blob_sha
+from sincal.ui.tabs.ubicacion import _leer_kml_desde_kmz, _parsear_kml_puntos
 
 
 def main() -> int:
@@ -56,7 +56,7 @@ def main() -> int:
     assert "Región de Valparaíso" in validos, "Falta el único mapa calibrado esperado"
     assert len(validos) >= 1, "No hay mapas calibrados válidos"
 
-    with open(ruta_recurso("SINCAL_Installer.iss"), encoding="utf-8") as archivo:
+    with open(ruta_recurso("packaging", "windows", "SINCAL_Installer.iss"), encoding="utf-8") as archivo:
         instalador = archivo.read()
     assert instalador.count("external download extractarchive") == 2, "Faltan paquetes del instalador web"
     assert 'Hash: "{#AppPayloadHash}"' in instalador, "Falta validar el paquete de aplicación"

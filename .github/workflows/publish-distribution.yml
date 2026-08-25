@@ -14,7 +14,7 @@ on:
       - "masters/FORMATOS ANOTATIVOS ACAD_2025.dwg"
       - "tutoriales.json"
       - "version.json"
-      - "sincal_runtime.py"
+      - "sincal/runtime.py"
       - "tools/export_distribution.py"
       - ".github/workflows/publish-distribution.yml"
 

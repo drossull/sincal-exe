@@ -13,14 +13,14 @@ import uuid
 import zipfile
 from datetime import datetime, timezone
 
-from sincal_cad_engine import (
+from sincal.cad.engine import (
     discover_cad_engines,
     engine_state_path,
     legacy_wrapper_path,
     load_engine_state,
 )
-from sincal_resource_sync import active_resource_paths, state_path
-from sincal_runtime import (
+from sincal.resources import active_resource_paths, state_path
+from sincal.runtime import (
     RUTA_DATOS_USUARIO,
     RUTA_INSTALACION,
     RUTA_LOGS,

@@ -6,7 +6,7 @@ import hashlib
 import json
 import math
 
-from sincal_rebar_model import automatic_hook_cm, lap_length_cm
+from sincal.rebar.model import automatic_hook_cm, lap_length_cm
 
 
 DETAIL_GROUP_ORDER = ("G12", "G3", "G3A", "G45", "G6")

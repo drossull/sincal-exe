@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import sincal_runtime
+from sincal import runtime as sincal_runtime
 
 
 class RuntimeResourceResolutionTests(unittest.TestCase):
@@ -43,8 +43,8 @@ class RuntimeResourceResolutionTests(unittest.TestCase):
                     os.path.join(cache, "lisps", "REMOVED.lsp"),
                 )
                 self.assertEqual(
-                    sincal_runtime.ruta_recurso("logo.ico"),
-                    os.path.join(installed, "logo.ico"),
+                    sincal_runtime.ruta_recurso("assets", "icons", "logo.ico"),
+                    os.path.join(installed, "assets", "icons", "logo.ico"),
                 )
 
 

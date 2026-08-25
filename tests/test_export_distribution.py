@@ -27,7 +27,7 @@ class DistributionExportTests(unittest.TestCase):
 
     def test_exports_only_allowed_resources_and_manifest(self):
         self._write("lisps/G45.lsp", b"(defun c:G45 () (princ))\n")
-        self._write("core_sincal.py", b"private source")
+        self._write("sincal/app.py", b"private source")
 
         result = export_distribution(
             self.source,
@@ -37,7 +37,7 @@ class DistributionExportTests(unittest.TestCase):
 
         self.assertIn("lisps/G45.lsp", result["copied"])
         self.assertTrue((self.destination / "lisps" / "G45.lsp").is_file())
-        self.assertFalse((self.destination / "core_sincal.py").exists())
+        self.assertFalse((self.destination / "sincal" / "app.py").exists())
         manifest = json.loads((self.destination / "manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(manifest["release"], "v28.0.1")
         self.assertEqual(manifest["source_commit"], "a" * 40)

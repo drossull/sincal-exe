@@ -7,7 +7,7 @@ import tempfile
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 
-from sincal_runtime import ruta_runtime
+from sincal.runtime import ruta_runtime
 
 
 ENGINE_STATE_SCHEMA = 1

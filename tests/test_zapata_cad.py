@@ -1,9 +1,9 @@
 import unittest
 import re
 
-from sincal_cad_moldajes import MoldajeCandidate
-from sincal_rebar_model import Cover, ZapataGeometry, default_zapata_rules
-from sincal_zapata_cad import ZapataCadError, build_zapata_lisp, inward_offset
+from sincal.cad.moldajes import MoldajeCandidate
+from sincal.rebar.model import Cover, ZapataGeometry, default_zapata_rules
+from sincal.cad.zapata_views import ZapataCadError, build_zapata_lisp, inward_offset
 
 
 class ZapataCadTests(unittest.TestCase):

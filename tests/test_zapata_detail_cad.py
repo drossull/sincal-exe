@@ -1,8 +1,8 @@
 import re
 import unittest
 
-from sincal_rebar_model import Cover, ZapataGeometry, build_zapata_schedule, default_zapata_rules
-from sincal_zapata_detail_cad import build_zapata_detail_lisp
+from sincal.rebar.model import Cover, ZapataGeometry, build_zapata_schedule, default_zapata_rules
+from sincal.cad.zapata_detail import build_zapata_detail_lisp
 
 
 class ZapataDetailCadTests(unittest.TestCase):

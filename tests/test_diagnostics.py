@@ -5,7 +5,7 @@ import unittest
 import zipfile
 from unittest.mock import patch
 
-import sincal_diagnostics as diagnostics
+from sincal import diagnostics
 
 
 class DiagnosticsTests(unittest.TestCase):

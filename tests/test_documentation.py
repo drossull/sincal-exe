@@ -25,6 +25,7 @@ class DocumentationTests(unittest.TestCase):
         topic_ids = {topic["id"] for topic in data["temas"]}
         expected = {
             "primer-inicio", "actualizaciones", "integracion-cad", "startup",
+            "interfaz-accesibilidad",
             "master-dwg", "inventario-recursos", "procesamiento-general",
             "renombrado", "conversion-dxf", "comandos-vivo",
             "modulo-estructural", "modulo-ubicacion", "solucion-problemas",
@@ -40,13 +41,13 @@ class DocumentationTests(unittest.TestCase):
 
 class WebInstallerConfigurationTests(unittest.TestCase):
     def test_pyinstaller_does_not_embed_hot_resources(self):
-        spec = (ROOT / "SINCAL.spec").read_text(encoding="utf-8")
+        spec = (ROOT / "packaging" / "windows" / "SINCAL.spec").read_text(encoding="utf-8")
         self.assertIn("datas=[]", spec)
         self.assertNotIn("('mapas', 'mapas')", spec)
         self.assertNotIn("('masters', 'masters')", spec)
 
     def test_installer_downloads_hash_pinned_payloads(self):
-        installer = (ROOT / "SINCAL_Installer.iss").read_text(encoding="utf-8")
+        installer = (ROOT / "packaging" / "windows" / "SINCAL_Installer.iss").read_text(encoding="utf-8")
         self.assertEqual(installer.count("external download extractarchive"), 2)
         self.assertIn('Hash: "{#AppPayloadHash}"', installer)
         self.assertIn('Hash: "{#PluginPayloadHash}"', installer)

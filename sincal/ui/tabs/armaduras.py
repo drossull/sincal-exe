@@ -7,11 +7,14 @@ from dataclasses import replace
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
+import ttkbootstrap as ttk
 from PIL import Image
+from ttkbootstrap.widgets import ToolTip
+from ttkbootstrap.widgets.tableview import Tableview
 
-from sincal_icons import obtener_icono
-from sincal_cad_moldajes import parse_moldaje_detection
-from sincal_rebar_model import (
+from sincal.ui.icons import obtener_icono
+from sincal.cad.moldajes import parse_moldaje_detection
+from sincal.rebar.model import (
     CAPAS_ZAPATA,
     Cover,
     RebarRule,
@@ -19,10 +22,10 @@ from sincal_rebar_model import (
     build_zapata_schedule,
     default_zapata_rules,
 )
-from sincal_zapata_cad import ZapataCadError, build_zapata_lisp
-from sincal_zapata_detail_cad import build_zapata_detail_lisp
-from sincal_runtime import ruta_recurso, ruta_runtime
-from sincal_ui import (
+from sincal.cad.zapata_views import ZapataCadError, build_zapata_lisp
+from sincal.cad.zapata_detail import build_zapata_detail_lisp
+from sincal.runtime import ruta_recurso, ruta_runtime
+from sincal.ui.theme import (
     COLOR_ACENTO,
     COLOR_ACENTO_HOVER,
     COLOR_BORDE,
@@ -40,6 +43,15 @@ from sincal_ui import (
 )
 
 RUTA_TEMPORAL = ruta_runtime()
+
+SIGLAS_ZAPATA = {
+    "FR_ZAP": "Vista frontal del moldaje de zapata.",
+    "AA_ZAP": "Sección longitudinal A-A por el centro del estribo.",
+    "BB_ZAP": "Sección B-B observada desde el extremo izquierdo.",
+    "CC_ZAP": "Sección C-C observada desde el extremo derecho.",
+    "DD_ZAP": "Sección horizontal D-D por los muros del estribo.",
+    "EE_ZAP": "Sección E-E: planta de la fundación.",
+}
 
 
 class TabArmaduras(ctk.CTkFrame):
@@ -81,50 +93,44 @@ class TabArmaduras(ctk.CTkFrame):
             project_row, text="Archivo: Ninguno", font=fuente_normal,
             text_color=COLOR_TEXTO_SUAVE, anchor="w", justify="left", wraplength=430)
         self.lbl_json_status.grid(row=0, column=2, sticky="ew", padx=(14, 4))
-        self.ent_z_esviaje = ctk.CTkEntry(
-            project_row, font=fuente_normal, width=64, corner_radius=RADIO_CONTROL)
+        self.ent_z_esviaje = ttk.Spinbox(
+            project_row, from_=-89, to=89, increment=0.5, width=7,
+            font=fuente_normal, bootstyle="secondary")
         self.ent_z_esviaje.insert(0, "0")
         self.ent_z_esviaje.grid(row=0, column=1, sticky="w", padx=(4, 0))
         ctk.CTkLabel(project_row, text="Esviaje (°):", font=FUENTE_NORMAL_PEQUENA,
                      text_color=COLOR_TEXTO_SUAVE).grid(row=0, column=0, sticky="w")
 
         # =========================================================
-        # TABVIEW MAESTRO (Elementos Estructurales)
+        # NOTEBOOK MAESTRO (Elementos Estructurales)
         # =========================================================
-        self.tab_maestro = ctk.CTkTabview(
-            self, width=800, height=520, fg_color="transparent",
-            corner_radius=RADIO_PANEL, segmented_button_selected_color=COLOR_ACENTO)
+        self.tab_maestro = ttk.Notebook(self, bootstyle="primary")
         self.tab_maestro.pack(padx=20, pady=5, fill="both", expand=True)
-        self.tab_maestro._segmented_button.configure(font=fuente_normal)
-
-        tab_estribos = self.tab_maestro.add("1. Estribos")
-        tab_travesanos = self.tab_maestro.add("2. Travesaños")
+        tab_estribos = ctk.CTkFrame(self.tab_maestro, fg_color=COLOR_FONDO, corner_radius=0)
+        tab_travesanos = ctk.CTkFrame(self.tab_maestro, fg_color=COLOR_FONDO, corner_radius=0)
+        self.tab_maestro.add(tab_estribos, text="1. Estribos")
+        self.tab_maestro.add(tab_travesanos, text="2. Travesaños")
 
         # =========================================================
         # CONTENIDO: 1. ESTRIBOS
         # =========================================================
-        self.tab_estribo = ctk.CTkTabview(
-            tab_estribos, fg_color=COLOR_PANEL, corner_radius=RADIO_PANEL,
-            segmented_button_selected_color=COLOR_ACENTO)
+        self.tab_estribo = ttk.Notebook(tab_estribos, bootstyle="secondary")
         self.tab_estribo.pack(fill="both", expand=True)
-        self.tab_estribo._segmented_button.configure(font=fuente_normal)
-
-        tab_entrada = self.tab_estribo.add("Estribo de entrada")
-        tab_salida = self.tab_estribo.add("Estribo de salida")
+        tab_entrada = ctk.CTkFrame(self.tab_estribo, fg_color=COLOR_PANEL, corner_radius=0)
+        tab_salida = ctk.CTkFrame(self.tab_estribo, fg_color=COLOR_PANEL, corner_radius=0)
+        self.tab_estribo.add(tab_entrada, text="Estribo de entrada")
+        self.tab_estribo.add(tab_salida, text="Estribo de salida")
         self._setup_abutment_page(tab_entrada, "entrada", "ESTRIBO DE ENTRADA")
         self._setup_abutment_page(tab_salida, "salida", "ESTRIBO DE SALIDA")
 
         # =========================================================
         # CONTENIDO: 2. TRAVESAÑOS
         # =========================================================
-        self.tab_sub_travesanos = ctk.CTkTabview(
-            tab_travesanos, fg_color=COLOR_PANEL, corner_radius=RADIO_PANEL,
-            segmented_button_selected_color=COLOR_ACENTO)
+        self.tab_sub_travesanos = ttk.Notebook(tab_travesanos, bootstyle="secondary")
         self.tab_sub_travesanos.pack(fill="both", expand=True)
-        self.tab_sub_travesanos._segmented_button.configure(font=fuente_normal)
-
-        tab_trav_main = self.tab_sub_travesanos.add(
-            "Configuración y Generación")
+        tab_trav_main = ctk.CTkFrame(
+            self.tab_sub_travesanos, fg_color=COLOR_PANEL, corner_radius=0)
+        self.tab_sub_travesanos.add(tab_trav_main, text="Configuración y generación")
 
         # --- I. PARÁMETROS GLOBALES ---
         frame_params = ctk.CTkFrame(tab_trav_main, fg_color="transparent")
@@ -142,57 +148,65 @@ class TabArmaduras(ctk.CTkFrame):
 
         ctk.CTkLabel(frame_params, text="Recubrimiento general (cm):", font=fuente_normal).grid(
             row=1, column=0, sticky="w", padx=5, pady=5)
-        self.ent_t_rec = ctk.CTkEntry(
-            frame_params, font=fuente_normal, width=60, corner_radius=0)
+        self.ent_t_rec = ttk.Spinbox(
+            frame_params, from_=0, to=30, increment=0.5, width=7,
+            font=fuente_normal, bootstyle="secondary")
         self.ent_t_rec.grid(row=1, column=1, padx=5, pady=5)
         self.ent_t_rec.insert(0, "2.5")
 
         ctk.CTkLabel(frame_params, text="Espesor del travesaño (cm):", font=fuente_normal).grid(
             row=1, column=2, sticky="w", padx=20, pady=5)
-        self.ent_t_espesor = ctk.CTkEntry(
-            frame_params, font=fuente_normal, width=60, corner_radius=0)
+        self.ent_t_espesor = ttk.Spinbox(
+            frame_params, from_=1, to=1000, increment=1, width=7,
+            font=fuente_normal, bootstyle="secondary")
         self.ent_t_espesor.grid(row=1, column=3, padx=5, pady=5)
         self.ent_t_espesor.insert(0, "25")
 
         ctk.CTkLabel(frame_params, text="Ángulo de esviaje (°):", font=fuente_normal).grid(
             row=1, column=4, sticky="w", padx=20, pady=5)
-        self.ent_t_esviaje = ctk.CTkEntry(
-            frame_params, font=fuente_normal, width=60, corner_radius=0)
+        self.ent_t_esviaje = ttk.Spinbox(
+            frame_params, from_=-89, to=89, increment=0.5, width=7,
+            font=fuente_normal, bootstyle="secondary")
         self.ent_t_esviaje.grid(row=1, column=5, padx=5, pady=5)
         self.ent_t_esviaje.insert(0, "0")
 
         ctk.CTkLabel(frame_params, text="Ø Fierros externos (mm):", font=fuente_normal).grid(
             row=2, column=0, sticky="w", padx=5, pady=5)
-        self.ent_t_phi_ext = ctk.CTkEntry(
-            frame_params, font=fuente_normal, width=60, corner_radius=0)
+        self.ent_t_phi_ext = ttk.Spinbox(
+            frame_params, values=(12, 16, 18, 22, 25, 28, 32, 36), width=7,
+            font=fuente_normal, bootstyle="secondary")
         self.ent_t_phi_ext.grid(row=2, column=1, padx=5, pady=5)
         self.ent_t_phi_ext.insert(0, "22")
 
         ctk.CTkLabel(frame_params, text="Ø Fierros horizontales (mm):", font=fuente_normal).grid(
             row=2, column=2, sticky="w", padx=20, pady=5)
-        self.ent_t_phi_horiz = ctk.CTkEntry(
-            frame_params, font=fuente_normal, width=60, corner_radius=0)
+        self.ent_t_phi_horiz = ttk.Spinbox(
+            frame_params, values=(12, 16, 18, 22, 25, 28, 32, 36), width=7,
+            font=fuente_normal, bootstyle="secondary")
         self.ent_t_phi_horiz.grid(row=2, column=3, padx=5, pady=5)
         self.ent_t_phi_horiz.insert(0, "12")
 
         ctk.CTkLabel(frame_params, text="Ø Estribos (mm):", font=fuente_normal).grid(
             row=2, column=4, sticky="w", padx=20, pady=5)
-        self.ent_t_phi_estr = ctk.CTkEntry(
-            frame_params, font=fuente_normal, width=60, corner_radius=0)
+        self.ent_t_phi_estr = ttk.Spinbox(
+            frame_params, values=(12, 16, 18, 22, 25, 28, 32, 36), width=7,
+            font=fuente_normal, bootstyle="secondary")
         self.ent_t_phi_estr.grid(row=2, column=5, padx=5, pady=5)
         self.ent_t_phi_estr.insert(0, "12")
 
         ctk.CTkLabel(frame_params, text="Longitud fierros viga (cm):", font=fuente_normal).grid(
             row=3, column=0, sticky="w", padx=5, pady=5)
-        self.ent_viga_largo = ctk.CTkEntry(
-            frame_params, font=fuente_normal, width=60, corner_radius=0)
+        self.ent_viga_largo = ttk.Spinbox(
+            frame_params, from_=1, to=1200, increment=1, width=7,
+            font=fuente_normal, bootstyle="secondary")
         self.ent_viga_largo.grid(row=3, column=1, padx=5, pady=5)
         self.ent_viga_largo.insert(0, "200")
 
         ctk.CTkLabel(frame_params, text="Cantidad de travesaños:", font=fuente_normal).grid(
             row=3, column=2, sticky="w", padx=20, pady=5)
-        self.ent_t_cantidad = ctk.CTkEntry(
-            frame_params, font=fuente_normal, width=60, corner_radius=0)
+        self.ent_t_cantidad = ttk.Spinbox(
+            frame_params, from_=1, to=100, increment=1, width=7,
+            font=fuente_normal, bootstyle="secondary")
         self.ent_t_cantidad.grid(row=3, column=3, padx=5, pady=5)
         self.ent_t_cantidad.insert(0, "1")
 
@@ -243,9 +257,27 @@ class TabArmaduras(ctk.CTkFrame):
 
         frame_botones_t.grid_columnconfigure(0, weight=1)
         frame_botones_t.grid_columnconfigure(1, weight=1)
+        for notebook in (self.tab_maestro, self.tab_estribo, self.tab_sub_travesanos):
+            notebook.bind("<<NotebookTabChanged>>", self.actualizar_breadcrumb, add="+")
+        self.after_idle(self.actualizar_breadcrumb)
+
+    def actualizar_breadcrumb(self, _event=None):
+        """Sincroniza la ruta superior con los notebooks estructurales."""
+        try:
+            main_text = self.tab_maestro.tab(self.tab_maestro.select(), "text")
+        except Exception:
+            return
+        if main_text.startswith("1."):
+            detail = self.tab_estribo.tab(self.tab_estribo.select(), "text")
+            segments = ("Módulo estructural", "Estribos", detail)
+        else:
+            detail = self.tab_sub_travesanos.tab(self.tab_sub_travesanos.select(), "text")
+            segments = ("Módulo estructural", "Travesaños", detail)
+        if self.parent_app._sections.get("estructural", (None,))[0].winfo_manager():
+            self.parent_app.actualizar_ruta_interna(*segments)
 
     def _setup_abutment_page(self, parent, key, title):
-        """Construye un estribo independiente con revisión y configuración vertical."""
+        """Construye un estribo independiente en un panel redimensionable."""
         state = {
             "key": key,
             "title": title,
@@ -256,67 +288,49 @@ class TabArmaduras(ctk.CTkFrame):
             "moldaje_choices": {},
             "confirmed_moldajes": {},
             "moldajes_use_metres": False,
-            "panel_width": 460,
         }
         self._abutments[key] = state
 
-        parent.grid_rowconfigure(0, weight=1)
-        parent.grid_columnconfigure(0, minsize=state["panel_width"])
-        parent.grid_columnconfigure(2, weight=1)
-
-        revision = ctk.CTkFrame(
-            parent, width=state["panel_width"], fg_color="transparent", corner_radius=0)
-        revision.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=10)
-        revision.grid_propagate(False)
-        grip = ctk.CTkFrame(
-            parent, width=7, fg_color=COLOR_BORDE, corner_radius=0,
-            cursor="sb_h_double_arrow",
-        )
-        grip.grid(row=0, column=1, sticky="ns", pady=10)
-        grip.bind(
-            "<ButtonPress-1>",
-            lambda event, s=state: self._iniciar_redimension_estribo(event, s),
-        )
-        grip.bind(
-            "<B1-Motion>",
-            lambda event, s=state: self._redimensionar_estribo(event, s),
+        split = ttk.Panedwindow(parent, orient="horizontal", bootstyle="secondary")
+        split.pack(fill="both", expand=True, padx=10, pady=10)
+        revision = ctk.CTkFrame(split, width=500, fg_color="transparent", corner_radius=0)
+        configuration_pane = ctk.CTkFrame(
+            split, fg_color="transparent", corner_radius=0,
         )
         configuration = ctk.CTkScrollableFrame(
-            parent, fg_color="transparent", corner_radius=0,
+            configuration_pane, fg_color="transparent", corner_radius=0,
             scrollbar_button_color=COLOR_GRIS_BOTON,
             scrollbar_button_hover_color=COLOR_GRIS_BOTON_HOVER,
         )
-        configuration.grid(row=0, column=2, sticky="nsew", padx=(5, 10), pady=10)
+        configuration.pack(fill="both", expand=True)
+        split.add(revision, weight=2)
+        split.add(configuration_pane, weight=3)
         state["parent"] = parent
         state["revision_panel"] = revision
+        state["configuration_panel"] = configuration_pane
+        state["panedwindow"] = split
 
         self._setup_zapata_revision(revision, state)
         self._setup_abutment_configuration(configuration, state)
         self.actualizar_revision_zapata(key, notificar=False)
 
     @staticmethod
-    def _iniciar_redimension_estribo(event, state):
-        state["drag_origin"] = event.x_root
-        state["drag_width"] = state["panel_width"]
-
-    @staticmethod
-    def _redimensionar_estribo(event, state):
-        delta = event.x_root - state.get("drag_origin", event.x_root)
-        width = max(360, min(760, state.get("drag_width", 460) + delta))
-        state["panel_width"] = width
-        state["revision_panel"].configure(width=width)
-        state["parent"].grid_columnconfigure(0, minsize=width)
-
-    @staticmethod
     def _section_heading(parent, text):
-        ctk.CTkLabel(
+        ttk.Separator(parent, orient="horizontal", bootstyle="secondary").pack(
+            fill="x", padx=8, pady=(14, 2))
+        label = ctk.CTkLabel(
             parent, text=text, font=FUENTE_SUBTITULO, text_color=COLOR_MOSTAZA,
-        ).pack(anchor="w", padx=8, pady=(18, 6))
+        )
+        label.pack(anchor="w", padx=8, pady=(4, 6))
+        if "CONTRAFUERTE" in text:
+            ToolTip(label, text="CTF: contrafuerte del estribo.", bootstyle="info-inverse")
 
     def _labeled_entry(self, parent, state, key, label, default, row, column):
         ctk.CTkLabel(parent, text=label, font=FUENTE_NORMAL).grid(
             row=row, column=column, sticky="w", padx=(0, 6), pady=4)
-        entry = ctk.CTkEntry(parent, font=FUENTE_NORMAL, width=82, corner_radius=0)
+        entry = ttk.Spinbox(
+            parent, from_=0, to=100000, increment=0.5, width=10,
+            font=FUENTE_NORMAL, bootstyle="secondary")
         entry.insert(0, default)
         entry.grid(row=row, column=column + 1, sticky="w", padx=(0, 14), pady=4)
         state["entries"][key] = entry
@@ -355,17 +369,14 @@ class TabArmaduras(ctk.CTkFrame):
         for index, (text, view) in enumerate(views):
             row = 5 + index // 3
             column = index % 3
-            ctk.CTkButton(
-                geometry, text=text, width=100, font=FUENTE_NORMAL, corner_radius=0,
-                fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
+            ttk.Button(
+                geometry, text=text, width=12, bootstyle="secondary-outline",
                 command=lambda v=view, k=state["key"]: self.generar_vista_cad(v, k),
             ).grid(row=row, column=column, sticky="ew", padx=(0, 3), pady=3)
         for column in range(3):
             geometry.grid_columnconfigure(column, weight=1)
-        ctk.CTkButton(
-            geometry, text="Generar despiece general de zapata", font=FUENTE_NORMAL,
-            corner_radius=RADIO_CONTROL, fg_color=COLOR_MOSTAZA,
-            hover_color=COLOR_ACENTO_HOVER,
+        ttk.Button(
+            geometry, text="Generar despiece general de zapata", bootstyle="warning",
             command=lambda k=state["key"]: self.generar_despiece_zapata(k),
         ).grid(row=7, column=0, columnspan=3, sticky="ew", pady=(10, 3))
 
@@ -425,8 +436,12 @@ class TabArmaduras(ctk.CTkFrame):
         for index, layer in enumerate(CAPAS_ZAPATA):
             row = 2 + index
             column = 0
-            ctk.CTkLabel(detector, text=layer, font=FUENTE_NORMAL_PEQUENA).grid(
-                row=row, column=column, sticky="w", padx=(0, 5), pady=3)
+            layer_label = ctk.CTkLabel(
+                detector, text=layer, font=FUENTE_NORMAL_PEQUENA)
+            layer_label.grid(row=row, column=column, sticky="w", padx=(0, 5), pady=3)
+            ToolTip(
+                layer_label, text=SIGLAS_ZAPATA[layer], wraplength=320,
+                bootstyle="info-inverse")
             value = ctk.StringVar(value="Sin detectar")
             option = ctk.CTkOptionMenu(
                 detector, variable=value, values=["Sin detectar"], width=300,
@@ -440,33 +455,58 @@ class TabArmaduras(ctk.CTkFrame):
         table.pack(fill="x", padx=14, pady=(0, 8))
         headers = ("Grupo", "Marca base", "Ø mm", "@ cm", "Gancho cm", "Origen", "Activo")
         for column, text in enumerate(headers):
-            ctk.CTkLabel(
+            header = ctk.CTkLabel(
                 table, text=text, font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_ACENTO,
-            ).grid(row=0, column=column, sticky="w", padx=5, pady=(0, 4))
+            )
+            header.grid(row=0, column=column, sticky="w", padx=5, pady=(0, 4))
+            if text == "Ø mm":
+                ToolTip(header, text="Diámetro nominal del fierro en milímetros.", bootstyle="info-inverse")
+            elif text == "@ cm":
+                ToolTip(header, text="Separación entre fierros, medida en centímetros.", bootstyle="info-inverse")
 
         for row, rule in enumerate(default_zapata_rules(), 1):
             ctk.CTkLabel(table, text=rule.label, font=FUENTE_NORMAL, anchor="w").grid(
                 row=row, column=0, sticky="ew", padx=5, pady=3)
             widgets = {}
-            for column, key, value, width in (
-                (1, "mark", rule.mark, 58),
-                (2, "diameter", f"{rule.diameter_mm:g}", 58),
-                (3, "spacing", f"{rule.spacing_cm:g}", 58),
-                (4, "hook", f"{rule.hook_cm:g}", 72),
-            ):
-                entry = ctk.CTkEntry(table, width=width, font=FUENTE_NORMAL, corner_radius=0)
-                entry.insert(0, value)
-                entry.grid(row=row, column=column, sticky="w", padx=5, pady=3)
-                widgets[key] = entry
+            mark_entry = ttk.Entry(table, width=8, font=FUENTE_NORMAL, bootstyle="secondary")
+            mark_entry.insert(0, rule.mark)
+            mark_entry.grid(row=row, column=1, sticky="w", padx=5, pady=3)
+            widgets["mark"] = mark_entry
+            diameter = ttk.Spinbox(
+                table, values=(12, 16, 18, 22, 25, 28, 32, 36), width=6,
+                font=FUENTE_NORMAL, bootstyle="secondary")
+            diameter.insert(0, f"{rule.diameter_mm:g}")
+            diameter.grid(row=row, column=2, sticky="w", padx=5, pady=3)
+            widgets["diameter"] = diameter
+            spacing = ttk.Spinbox(
+                table, from_=5, to=100, increment=5, width=6,
+                font=FUENTE_NORMAL, bootstyle="secondary")
+            spacing.insert(0, f"{rule.spacing_cm:g}")
+            spacing.grid(row=row, column=3, sticky="w", padx=5, pady=3)
+            widgets["spacing"] = spacing
+            hook = ttk.Spinbox(
+                table, from_=0, to=500, increment=10, width=8,
+                font=FUENTE_NORMAL, bootstyle="secondary")
+            hook.insert(0, f"{rule.hook_cm:g}")
+            hook.grid(row=row, column=4, sticky="w", padx=5, pady=3)
+            widgets["hook"] = hook
             enabled = ctk.BooleanVar(value=rule.enabled)
             origin = ctk.StringVar(value=rule.origin.title())
-            ctk.CTkOptionMenu(
-                table, variable=origin, values=["Inicio", "Final"], width=78,
-                font=FUENTE_NORMAL_PEQUENA, corner_radius=0,
-                fg_color=COLOR_GRIS_BOTON, button_color=COLOR_GRIS_BOTON_HOVER,
-            ).grid(row=row, column=5, sticky="w", padx=5, pady=3)
-            ctk.CTkCheckBox(table, text="", variable=enabled, width=24, corner_radius=0).grid(
-                row=row, column=6, sticky="w", padx=5, pady=3)
+            origin_frame = ttk.Frame(table)
+            origin_frame.grid(row=row, column=5, sticky="w", padx=5, pady=3)
+            start_radio = ttk.Radiobutton(
+                origin_frame, text="I", value="Inicio", variable=origin,
+                bootstyle="info-toolbutton")
+            end_radio = ttk.Radiobutton(
+                origin_frame, text="F", value="Final", variable=origin,
+                bootstyle="info-toolbutton")
+            start_radio.pack(side="left")
+            end_radio.pack(side="left", padx=(2, 0))
+            ToolTip(start_radio, text="Distribuir desde el inicio topológico.", bootstyle="info-inverse")
+            ToolTip(end_radio, text="Distribuir desde el final topológico.", bootstyle="info-inverse")
+            ttk.Checkbutton(
+                table, text="", variable=enabled, bootstyle="success-round-toggle").grid(
+                    row=row, column=6, sticky="w", padx=5, pady=3)
             widgets["enabled"] = enabled
             widgets["origin"] = origin
             widgets["template"] = rule
@@ -474,21 +514,29 @@ class TabArmaduras(ctk.CTkFrame):
 
         controls = ctk.CTkFrame(parent, fg_color="transparent")
         controls.pack(fill="x", padx=14, pady=(0, 8))
-        ctk.CTkButton(
-            controls, text="Actualizar revisión", font=FUENTE_NORMAL, corner_radius=0,
-            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
+        ttk.Button(
+            controls, text="Actualizar revisión", bootstyle="secondary",
             command=lambda k=state["key"]: self.actualizar_revision_zapata(k),
         ).pack(side="left")
+        ttk.Button(
+            controls, text="Vista previa completa", bootstyle="info-outline",
+            command=lambda k=state["key"]: self.mostrar_vista_previa_marcas(k),
+        ).pack(side="left", padx=(8, 0))
         ctk.CTkLabel(
             controls, text="Gancho 0 = automático. Suple 3-A es opcional.",
             font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
         ).pack(side="left", padx=12)
 
-        state["revision_text"] = ctk.CTkTextbox(
-            parent, font=FUENTE_NORMAL, fg_color=COLOR_PANEL, corner_radius=0,
-            border_width=0, height=150,
+        state["review_progress"] = ttk.Progressbar(
+            parent, mode="determinate", maximum=100, value=0,
+            bootstyle="success-striped")
+        state["review_progress"].pack(fill="x", padx=14, pady=(2, 6))
+        state["revision_status"] = ctk.CTkLabel(
+            parent, text="Sin calcular.", font=FUENTE_NORMAL,
+            text_color=COLOR_TEXTO_SUAVE, justify="left", anchor="nw",
+            wraplength=620,
         )
-        state["revision_text"].pack(fill="both", expand=True, padx=14, pady=(0, 14))
+        state["revision_status"].pack(fill="both", expand=True, padx=14, pady=(0, 14))
         state["moldaje_status"] = moldaje_status
 
     @staticmethod
@@ -678,6 +726,8 @@ class TabArmaduras(ctk.CTkFrame):
     def actualizar_revision_zapata(self, abutment_key="entrada", notificar=True):
         state = self._abutments[abutment_key]
         entries = state["entries"]
+        state["review_progress"].configure(value=15, bootstyle="info-striped")
+        self.update_idletasks()
         try:
             geometry = ZapataGeometry.from_centimetres(
                 self._entry_number(entries["largo"], "Largo"),
@@ -694,34 +744,88 @@ class TabArmaduras(ctk.CTkFrame):
                 geometry, cover, self._read_zapata_rules(abutment_key))
         except ValueError as error:
             state["schedule"] = None
-            resumen = f"ERROR DE ENTRADA\n\n{error}"
+            resumen = f"Error de entrada: {error}"
+            state["review_progress"].configure(value=0, bootstyle="danger-striped")
         else:
-            lines = [
-                "VISTA PREVIA — NO GENERA NI MODIFICA DWG", "",
-                "Marca | Cant. | Ø mm | Largo unit. cm | Largo total cm | kg",
-            ]
-            for mark in state["schedule"].marks:
-                lines.append(
-                    f"{mark.mark:>5} | {mark.quantity:>5} | {mark.diameter_mm:>4g} | "
-                    f"{mark.unit_length_cm:>14.1f} | {mark.total_length_cm:>14.1f} | {mark.kg_steel:>6.1f}"
-                )
-            lines.append(f"\nTOTAL PROVISIONAL: {state['schedule'].total_kg:.1f} kg")
+            resumen = (
+                f"{len(state['schedule'].marks)} marcas calculadas · "
+                f"{state['schedule'].total_kg:.1f} kg provisionales. "
+                "Usa Vista previa completa para revisar todas las magnitudes."
+            )
             if state["schedule"].issues:
-                lines.append("\nVALIDACIONES")
-                lines.extend(
+                resumen += "\n" + "\n".join(
                     f"[{issue.severity.upper()}] {issue.message}"
                     for issue in state["schedule"].issues)
-            resumen = "\n".join(lines)
+            state["review_progress"].configure(
+                value=100,
+                bootstyle="success-striped" if state["schedule"].is_valid else "warning-striped",
+            )
 
-        revision = state["revision_text"]
-        revision.configure(state="normal")
-        revision.delete("1.0", "end")
-        revision.insert("1.0", resumen)
-        revision.configure(state="disabled")
+        state["revision_status"].configure(text=resumen)
         if notificar and state["schedule"]:
             self.parent_app.log_r(
                 f"[*] Revisión de marcas actualizada para {state['title'].lower()}; aún no se modifica CAD.")
         return state["schedule"]
+
+    def mostrar_vista_previa_marcas(self, abutment_key="entrada"):
+        """Abre una tabla amplia y no destructiva con toda la cubicación provisional."""
+        state = self._abutments[abutment_key]
+        schedule = self.actualizar_revision_zapata(abutment_key, notificar=False)
+        if not schedule:
+            messagebox.showwarning(
+                "Vista previa de marcas", "Corrige los parámetros antes de abrir la tabla.")
+            return
+
+        window = ctk.CTkToplevel(self)
+        window.title(f"Vista previa de marcas — {state['title'].title()}")
+        window.geometry("1240x680")
+        window.minsize(980, 520)
+        window.transient(self.winfo_toplevel())
+
+        header = ctk.CTkFrame(window, fg_color="transparent", corner_radius=0)
+        header.pack(fill="x", padx=18, pady=(16, 8))
+        ctk.CTkLabel(
+            header, text=f"MARCAS · {state['title']}",
+            font=FUENTE_SUBTITULO, text_color=COLOR_MOSTAZA,
+        ).pack(side="left")
+        ctk.CTkLabel(
+            header, text=f"Total provisional: {schedule.total_kg:.1f} kg",
+            font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE,
+        ).pack(side="right")
+        ttk.Separator(window, orient="horizontal", bootstyle="secondary").pack(
+            fill="x", padx=18, pady=(0, 8))
+
+        columns = (
+            "Marca", "Grupo / ubicación", "Cantidad", "Ø mm", "@ cm",
+            "Largo unit. cm", "Largo total cm", "Área cm²", "kg",
+            "Vistas", "Rol constructivo",
+        )
+        rows = [
+            (
+                mark.mark, mark.location, mark.quantity, f"{mark.diameter_mm:g}",
+                f"{state['rule_widgets'][mark.key]['spacing'].get()}",
+                f"{mark.unit_length_cm:.0f}", f"{mark.total_length_cm:.0f}",
+                f"{mark.area_m2 * 10000:.3f}", f"{mark.kg_steel:.1f}",
+                ", ".join(mark.views), mark.piece_role,
+            )
+            for mark in schedule.marks
+        ]
+        table = Tableview(
+            window, coldata=columns, rowdata=rows, searchable=True,
+            paginated=True, pagesize=15, yscrollbar=True, autofit=True,
+            autoalign=True, bootstyle="primary", height=16,
+        )
+        table.pack(fill="both", expand=True, padx=18, pady=(0, 8))
+
+        issues = "Sin observaciones de validación."
+        if schedule.issues:
+            issues = " · ".join(
+                f"{issue.severity.upper()}: {issue.message}" for issue in schedule.issues)
+        ctk.CTkLabel(
+            window, text=issues, font=FUENTE_NORMAL_PEQUENA,
+            text_color=COLOR_TEXTO_SUAVE, anchor="w", justify="left",
+            wraplength=1180,
+        ).pack(fill="x", padx=18, pady=(0, 12))
 
     def generar_vista_cad(self, vista, abutment_key="entrada"):
         state = self._abutments[abutment_key]

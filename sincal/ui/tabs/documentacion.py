@@ -2,8 +2,8 @@ import json
 
 import customtkinter as ctk
 
-from sincal_runtime import ruta_recurso
-from sincal_ui import (
+from sincal.runtime import ruta_recurso
+from sincal.ui.theme import (
     COLOR_ACENTO,
     COLOR_MOSTAZA,
     COLOR_PANEL,

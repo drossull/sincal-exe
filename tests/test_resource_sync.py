@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import sincal_resource_sync as resource_sync
+from sincal import resources as resource_sync
 
 
 class FakeResponse:
@@ -97,7 +97,7 @@ class ResourceSyncTests(unittest.TestCase):
             self._tree_entry("lisps/SINCAL.lsp", self.sincal_lsp),
             self._tree_entry("masters/FORMATOS ANOTATIVOS ACAD_2025.dwg", self.master),
             self._tree_entry("scripts/SINCAL_ENGINE.ps1", self.engine_helper),
-            self._tree_entry("core_sincal.py", b"not-hot-updatable"),
+            self._tree_entry("sincal/app.py", b"not-hot-updatable"),
         ]
         entries.extend(extra or [])
         return {"sha": "a" * 40, "truncated": False, "tree": entries}
@@ -109,7 +109,7 @@ class ResourceSyncTests(unittest.TestCase):
 
         plan = resource_sync.check_resource_updates(session=session)
         self.assertEqual([entry.path for entry in plan.changed], ["lisps/G45.lsp"])
-        self.assertNotIn("core_sincal.py", [entry.path for entry in plan.resources])
+        self.assertNotIn("sincal/app.py", [entry.path for entry in plan.resources])
 
         result = resource_sync.apply_resource_updates(plan, session=session)
         self.assertEqual(result.updated, ("lisps/G45.lsp",))

@@ -1,7 +1,7 @@
 import unittest
 
-import sincal_resource_sync
-from sincal_update_config import (
+from sincal import resources as sincal_resource_sync
+from sincal.update_config import (
     DISTRIBUTION_BRANCH,
     DISTRIBUTION_OWNER,
     DISTRIBUTION_RELEASES_URL,

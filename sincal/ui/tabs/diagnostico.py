@@ -5,10 +5,10 @@ from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
-from sincal_cad_engine import discover_cad_engines, save_engine_selection
-from sincal_diagnostics import collect_diagnostics, create_diagnostic_bundle, format_summary, record_incident
-from sincal_runtime import RUTA_DATOS_USUARIO
-from sincal_ui import (
+from sincal.cad.engine import discover_cad_engines, save_engine_selection
+from sincal.diagnostics import collect_diagnostics, create_diagnostic_bundle, format_summary, record_incident
+from sincal.runtime import RUTA_DATOS_USUARIO
+from sincal.ui.theme import (
     COLOR_ACENTO,
     COLOR_GRIS_BOTON,
     COLOR_GRIS_BOTON_HOVER,

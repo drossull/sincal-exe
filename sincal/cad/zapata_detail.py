@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import math
 
-from sincal_rebar_detail import DETAIL_GROUP_ORDER, build_detail_groups
+from sincal.rebar.detail import DETAIL_GROUP_ORDER, build_detail_groups
 
 
 DETAIL_SLOT_PITCH_M = 3.0

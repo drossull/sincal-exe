@@ -1,0 +1,2 @@
+"""Componentes visuales de SINCAL."""
+

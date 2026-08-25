@@ -24,16 +24,17 @@ function Read-Version([string]$ProjectRoot) {
 }
 
 function Assert-VersionConsistency([string]$ProjectRoot, [string]$Version) {
-    $installer = Get-Content (Join-Path $ProjectRoot 'SINCAL_Installer.iss') -Raw
+    $installerPath = Join-Path $ProjectRoot 'packaging\windows\SINCAL_Installer.iss'
+    $installer = Get-Content $installerPath -Raw
     $normalizedVersion = $Version.TrimStart('v', 'V')
     if ($Version -notmatch '^v\d+\.\d+\.\d+$') {
         throw "La versión '$Version' no cumple el formato vMAJOR.MINOR.PATCH."
     }
     if ($installer -notmatch '#error AppVersion must be supplied by the build script\.') {
-        throw 'SINCAL_Installer.iss no está parametrizado para AppVersion.'
+        throw 'packaging/windows/SINCAL_Installer.iss no está parametrizado para AppVersion.'
     }
     if ($installer -notmatch '#error AppVersionTag must be supplied by the build script\.') {
-        throw 'SINCAL_Installer.iss no está parametrizado para AppVersionTag.'
+        throw 'packaging/windows/SINCAL_Installer.iss no está parametrizado para AppVersionTag.'
     }
     foreach ($define in @(
         'AppPayloadUrl', 'AppPayloadHash', 'AppPayloadSize',
@@ -54,7 +55,7 @@ function Assert-VersionConsistency([string]$ProjectRoot, [string]$Version) {
         throw "PluginEntry.cs no muestra la versión técnica $normalizedVersion."
     }
 
-    $updateConfig = Get-Content (Join-Path $ProjectRoot 'sincal_update_config.py') -Raw
+    $updateConfig = Get-Content (Join-Path $ProjectRoot 'sincal\update_config.py') -Raw
     if ($updateConfig -notmatch 'DISTRIBUTION_REPOSITORY\s*=\s*"sincal-updates"') {
         throw 'El canal público no apunta a drossull/sincal-updates.'
     }
@@ -62,28 +63,10 @@ function Assert-VersionConsistency([string]$ProjectRoot, [string]$Version) {
 
 function Invoke-PythonCompile([string]$ProjectRoot) {
     $pythonFiles = @(
-        'main.py',
-        'core_sincal.py',
-        'sincal_icons.py',
-        'sincal_ui.py',
-        'sincal_runtime.py',
-        'sincal_resource_sync.py',
-        'sincal_cad_integration.py',
-        'sincal_cad_engine.py',
-        'sincal_diagnostics.py',
-        'sincal_update_config.py',
-        'sincal_rebar_model.py',
-        'sincal_rebar_detail.py',
-        'sincal_cad_moldajes.py',
-        'sincal_zapata_cad.py',
-        'sincal_zapata_detail_cad.py',
-        'tools\export_distribution.py',
-        'modulos\tab_armaduras.py',
-        'modulos\tab_docs.py',
-        'modulos\tab_diagnostico.py',
-        'modulos\tab_ubicacion.py',
-        'tests\selfcheck_runtime.py'
-    ) | ForEach-Object { Join-Path $ProjectRoot $_ }
+        (Join-Path $ProjectRoot 'main.py'),
+        (Join-Path $ProjectRoot 'tools\export_distribution.py'),
+        (Join-Path $ProjectRoot 'tests\selfcheck_runtime.py')
+    ) + @(Get-ChildItem (Join-Path $ProjectRoot 'sincal') -Recurse -Filter *.py | ForEach-Object FullName)
 
     & python -m py_compile @pythonFiles
     if ($LASTEXITCODE -ne 0) {
@@ -268,6 +251,7 @@ function Assert-AppPayloadContents([string]$Path) {
             'masters/FORMATOS ANOTATIVOS ACAD_2025.dwg',
             'mapas/mapas_calibrados.json',
             'mapas/ayuda_travesano.png',
+            'assets/icons/logo.ico',
             'assets/fonts/GT Pressura Regular.ttf',
             'assets/fonts/GTPressura-Bold.ttf'
         )
@@ -309,9 +293,12 @@ function New-ReleasePayloads(
     $pluginStage = Join-Path $StageRoot 'plugin'
     New-Item -ItemType Directory -Force -Path $appStage, $pluginStage | Out-Null
 
-    foreach ($relative in @('logo.ico', 'version.json', 'README.md', 'tutoriales.json')) {
+    foreach ($relative in @('version.json', 'README.md', 'tutoriales.json')) {
         Copy-Item (Join-Path $ProjectRoot $relative) (Join-Path $appStage $relative) -Force
     }
+    $iconStage = Join-Path $appStage 'assets\icons'
+    New-Item -ItemType Directory -Force -Path $iconStage | Out-Null
+    Copy-Item (Join-Path $ProjectRoot 'assets\icons\logo.ico') (Join-Path $iconStage 'logo.ico') -Force
     Copy-Item $DistExe (Join-Path $appStage 'SINCAL.exe') -Force
     $fontStage = Join-Path $appStage 'assets\fonts'
     New-Item -ItemType Directory -Force -Path $fontStage | Out-Null
@@ -444,7 +431,7 @@ Remove-ArtifactIfExists (Join-Path $projectRoot 'installer_output\SHA256SUMS.txt
 Write-Step "Compilando ejecutable"
 Push-Location $projectRoot
 try {
-    & python -m PyInstaller --noconfirm 'SINCAL.spec'
+    & python -m PyInstaller --noconfirm 'packaging\windows\SINCAL.spec'
     if ($LASTEXITCODE -ne 0) {
         throw 'PyInstaller terminó con error.'
     }
@@ -495,7 +482,7 @@ try {
         "/DPluginPayloadUrl=$pluginPayloadUrl" `
         "/DPluginPayloadHash=$($payloadInfo.PluginHash)" `
         "/DPluginPayloadSize=$($payloadInfo.PluginInstalledBytes)" `
-        'SINCAL_Installer.iss'
+        'packaging\windows\SINCAL_Installer.iss'
     if ($LASTEXITCODE -ne 0) {
         throw 'ISCC terminó con error.'
     }

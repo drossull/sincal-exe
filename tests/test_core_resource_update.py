@@ -2,8 +2,8 @@ import types
 import unittest
 from unittest.mock import Mock, patch
 
-import core_sincal
-from sincal_resource_sync import ResourceSyncResult
+from sincal import app as core_sincal
+from sincal.resources import ResourceSyncResult
 
 
 class CoreResourceUpdateTests(unittest.TestCase):

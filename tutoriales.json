@@ -16,6 +16,13 @@
       "contenido": "SINCAL separa dos tipos de actualización.\n\nPROGRAMA: cambios en Python, interfaz o plugin .NET requieren una release nueva. El botón Verificar nueva actualización abre el instalador oficial.\n\nRECURSOS: LISPs, startup, scripts, plumilla, mapas, tutoriales y master DWG llegan sin reinstalar. SINCAL revisa el manifiesto al iniciar y cada minuto; cuando detecta una publicación nueva, muestra un aviso.\n\nCada descarga se limita por tipo y tamaño y se valida contra el SHA publicado antes de activarse. Si pospones un aviso, puedes usar Actualizar recursos CAD."
     },
     {
+      "id": "interfaz-accesibilidad",
+      "categoria": "Inicio",
+      "titulo": "Temas y accesibilidad visual",
+      "tags": "tema nord ttkbootstrap claro oscuro fuente tamaño accesibilidad",
+      "contenido": "SINCAL inicia con el tema oscuro Nord. El selector lateral permite alternar rápidamente entre modo oscuro, claro cálido y el modo del sistema. Para escoger otro aspecto abre Ver → Tema ttkbootstrap: los submenús Oscuros y Claros muestran todos los temas disponibles en la biblioteca instalada.\n\nLa barra − / + del menú lateral cambia la escala de texto y controles de toda la aplicación. El menú lateral, la consola, Documentación y los paneles estructurales también pueden redimensionarse arrastrando sus bordes."
+    },
+    {
       "id": "integracion-cad",
       "categoria": "Recursos CAD",
       "titulo": "Integración con AutoCAD y ZWCAD",
