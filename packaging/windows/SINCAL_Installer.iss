@@ -22,6 +22,9 @@
 #ifndef PluginPayloadSize
   #error PluginPayloadSize must be supplied by the build script.
 #endif
+#ifndef ReleaseOutputDir
+  #error ReleaseOutputDir must be supplied by the build script.
+#endif
 
 [Setup]
 AppName=SINCAL 2.0
@@ -34,7 +37,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 DefaultDirName={autopf}\SINCAL
 UsePreviousAppDir=yes
 DefaultGroupName=SINCAL 2.0
-OutputDir=..\..\installer_output
+OutputDir={#ReleaseOutputDir}
 OutputBaseFilename=Setup_SINCAL_{#AppVersionTag}
 SetupIconFile=..\..\assets\icons\logo.ico
 Compression=lzma

@@ -52,6 +52,13 @@ class WebInstallerConfigurationTests(unittest.TestCase):
         self.assertIn('Hash: "{#AppPayloadHash}"', installer)
         self.assertIn('Hash: "{#PluginPayloadHash}"', installer)
 
+    def test_release_artifacts_are_grouped_by_version(self):
+        build_script = (ROOT / "tools" / "build_release.ps1").read_text(encoding="utf-8")
+        installer = (ROOT / "packaging" / "windows" / "SINCAL_Installer.iss").read_text(encoding="utf-8")
+        self.assertIn('installer_output\\{0}', build_script)
+        self.assertIn('/DReleaseOutputDir=', build_script)
+        self.assertIn('OutputDir={#ReleaseOutputDir}', installer)
+
     def test_web_payload_bundles_core_resources_but_not_regional_maps(self):
         build_script = (ROOT / "tools" / "build_release.ps1").read_text(encoding="utf-8")
         self.assertIn("scripts/AUDIT.ps1", build_script)

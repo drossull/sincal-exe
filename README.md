@@ -133,7 +133,7 @@ python -m pip install -r requirements-build.txt
 pwsh -NoProfile -File tools/build_release.ps1
 ```
 
-El proceso valida código y pruebas, compila y firma el plugin y la aplicación, crea los paquetes remotos, calcula hashes, compila el instalador web y genera el manifiesto y `SHA256SUMS.txt`. Para una compilación local no publicable se puede usar `-SkipSigning`.
+El proceso valida código y pruebas, compila y firma el plugin y la aplicación, crea los paquetes remotos, calcula hashes, compila el instalador web y genera el manifiesto y `SHA256SUMS.txt`. Cada compilación queda aislada en `installer_output/vXX.X.X/`; las versiones anteriores no se mezclan ni se eliminan. Para una compilación local no publicable se puede usar `-SkipSigning`.
 
 En la release pública deben adjuntarse juntos:
 

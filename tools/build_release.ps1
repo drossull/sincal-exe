@@ -270,8 +270,8 @@ function Assert-AppPayloadContents([string]$Path) {
     }
 }
 
-function Write-Checksums([string]$ProjectRoot, [string[]]$Paths) {
-    $outputPath = Join-Path $ProjectRoot 'installer_output\SHA256SUMS.txt'
+function Write-Checksums([string]$OutputDirectory, [string[]]$Paths) {
+    $outputPath = Join-Path $OutputDirectory 'SHA256SUMS.txt'
     $lines = foreach ($path in $Paths) {
         $hash = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
         "$hash *$([IO.Path]::GetFileName($path))"
@@ -401,11 +401,13 @@ $projectRoot = Get-ProjectRoot
 $version = Read-Version $projectRoot
 $distExe = Join-Path $projectRoot 'dist\SINCAL.exe'
 $pluginDll = Join-Path $projectRoot 'cad-packages\Autodesk\SINCAL.bundle\Contents\AutoCAD2025\Sincal.AutoCAD2025.dll'
-$installerExe = Join-Path $projectRoot ("installer_output\Setup_SINCAL_{0}.exe" -f $version)
-$appPayload = Join-Path $projectRoot ("installer_output\SINCAL_App_{0}.zip" -f $version)
-$pluginPayload = Join-Path $projectRoot ("installer_output\SINCAL_AutoCAD_{0}.zip" -f $version)
-$releaseManifest = Join-Path $projectRoot ("installer_output\release-manifest_{0}.json" -f $version)
+$releaseOutputDir = Join-Path $projectRoot ("installer_output\{0}" -f $version)
+$installerExe = Join-Path $releaseOutputDir ("Setup_SINCAL_{0}.exe" -f $version)
+$appPayload = Join-Path $releaseOutputDir ("SINCAL_App_{0}.zip" -f $version)
+$pluginPayload = Join-Path $releaseOutputDir ("SINCAL_AutoCAD_{0}.zip" -f $version)
+$releaseManifest = Join-Path $releaseOutputDir ("release-manifest_{0}.json" -f $version)
 $payloadStage = Join-Path $projectRoot 'payload_stage'
+New-Item -ItemType Directory -Force -Path $releaseOutputDir | Out-Null
 
 Write-Step "Validando versión"
 Assert-VersionConsistency -ProjectRoot $projectRoot -Version $version
@@ -426,7 +428,7 @@ Remove-ArtifactIfExists $appPayload
 Remove-ArtifactIfExists $pluginPayload
 Remove-ArtifactIfExists $releaseManifest
 Remove-ArtifactIfExists $payloadStage
-Remove-ArtifactIfExists (Join-Path $projectRoot 'installer_output\SHA256SUMS.txt')
+Remove-ArtifactIfExists (Join-Path $releaseOutputDir 'SHA256SUMS.txt')
 
 Write-Step "Compilando ejecutable"
 Push-Location $projectRoot
@@ -476,6 +478,7 @@ try {
     & $iscc `
         "/DAppVersion=$normalizedVersion" `
         "/DAppVersionTag=$version" `
+        "/DReleaseOutputDir=$releaseOutputDir" `
         "/DAppPayloadUrl=$appPayloadUrl" `
         "/DAppPayloadHash=$($payloadInfo.AppHash)" `
         "/DAppPayloadSize=$($payloadInfo.AppInstalledBytes)" `
@@ -508,7 +511,7 @@ Write-ReleaseManifest `
     -PluginUrl $pluginPayloadUrl | Out-Null
 
 Write-Step "Generando checksums"
-$checksumFile = Write-Checksums -ProjectRoot $projectRoot -Paths @(
+$checksumFile = Write-Checksums -OutputDirectory $releaseOutputDir -Paths @(
     $installerExe,
     $appPayload,
     $pluginPayload,
