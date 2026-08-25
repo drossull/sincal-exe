@@ -1,5 +1,5 @@
 {
-  "version": "v29.0.5",
+  "version": "v29.0.6",
   "product_version": "2.0",
   "archivos": [
     "main.py",
@@ -11,6 +11,9 @@
     "sincal_cad_engine.py",
     "sincal_diagnostics.py",
     "sincal_update_config.py",
+    "sincal_rebar_model.py",
+    "sincal_cad_moldajes.py",
+    "sincal_zapata_cad.py",
     "modulos/tab_ubicacion.py",
     "modulos/tab_armaduras.py",
     "modulos/tab_docs.py",

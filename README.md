@@ -1,10 +1,10 @@
 # SINCAL — Suite de Ingeniería y Estándares CAD
 
-**SINCAL 2.0** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La marca del producto es 2.0 y la secuencia técnica continúa en `v29.0.5` para conservar una actualización ordenada desde las instalaciones v28.
+**SINCAL 2.0** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La marca del producto es 2.0 y la secuencia técnica continúa en `v29.0.6` para conservar una actualización ordenada desde las instalaciones v28.
 
 ## Instalación web y distribución
 
-SINCAL se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.5.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
+SINCAL se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.6.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
 
 El programa base no incorpora los 125 MB de mapas regionales. El paquete web sí contiene una copia inicial del master DWG, LISPs, startup, scripts, plumilla, calibración y ayuda estructural para que el primer arranque sea funcional. GitHub mantiene esos recursos al día mediante actualizaciones menores. Cada mapa regional se descarga solamente cuando se selecciona por primera vez en el módulo Ubicación.
 
@@ -12,7 +12,7 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
 
 ## Primer inicio
 
-1. Ejecuta el instalador oficial de la release `v29.0.5`.
+1. Ejecuta el instalador oficial de la release `v29.0.6`.
 2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
 3. Abre **Diagnóstico**, verifica el motor CAD sugerido y cámbialo si necesitas otra versión.
 4. Pulsa **Preparar integración CAD**.
@@ -118,10 +118,10 @@ El proceso valida código y pruebas, compila y firma el plugin y la aplicación,
 
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v29.0.5.exe`
-- `SINCAL_App_v29.0.5.zip`
-- `SINCAL_AutoCAD_v29.0.5.zip`
-- `release-manifest_v29.0.5.json`
+- `Setup_SINCAL_v29.0.6.exe`
+- `SINCAL_App_v29.0.6.zip`
+- `SINCAL_AutoCAD_v29.0.6.zip`
+- `release-manifest_v29.0.6.json`
 - `SHA256SUMS.txt`
 
 No renombres los paquetes después de compilar: el instalador usa URLs versionadas y hashes fijados en el momento del build.
