@@ -45,7 +45,9 @@ Al cerrar la ventana principal con **X**, SINCAL finaliza su proceso. La aplicac
 
 ### Interfaz Workbench
 
-La interfaz usa GT Pressura Regular y Bold, un menú lateral ocultable y paneles cuyo borde puede arrastrarse para cambiar su tamaño. La barra `− / +` ajusta progresivamente toda la interfaz. El tema claro utiliza beige y tonos hueso; también existen tema oscuro y tema del sistema. El menú superior reúne **Archivo, Editar, Ver y Ayuda**. El historial de releases y commits está en Sincronizador. La consola única se puede ocultar o acoplar abajo o a la derecha y redimensionarse desde su borde.
+La interfaz usa GT Pressura Regular y Bold sobre una base visual `ttkbootstrap`: **Solar** para el modo oscuro y una variante cálida de **Sandstone** para el modo claro. La iconografía es monocroma, consistente y escalable; los íconos de acción muestran su función al pasar el mouse.
+
+El diseño responde al ancho disponible: el menú lateral se oculta automáticamente en ventanas angostas, las acciones principales se redistribuyen en varias filas y los encabezados reservan espacio para que las rutas largas no expulsen botones fuera de la pantalla. El menú, la consola, Documentación y los paneles de revisión estructural pueden redimensionarse arrastrando sus bordes. La barra `− / +` escala progresivamente toda la interfaz. El menú superior reúne **Archivo, Editar, Ver y Ayuda**; el historial de releases y commits está en Sincronizador y la consola única puede ocultarse o acoplarse abajo o a la derecha.
 
 ### Renombrado
 
@@ -72,6 +74,8 @@ Prepara vistas, despieces y cubicación de fierro mediante comandos temporales e
 - Estribos: separa **Estribo de entrada** y **Estribo de salida**, cada uno con su propio set de marcas, moldajes confirmados y cálculo. La revisión editable queda a la izquierda; a la derecha, una sola página desplazable ordena Zapata, Muros, Consolas, Topes y Contrafuerte. La zapata calcula las marcas 1–6, el suple 3-A opcional, empalmes 1–2/4–5 y las variantes excepcionales 2-A/5-A. Los diámetros, espaciamientos, origen de distribución, marcas y ganchos se editan únicamente en **Revisión y marcas**, mientras la geometría y los recubrimientos se declaran una sola vez en su elemento. La detección lee moldajes cerrados por vista (`FR_ZAP` a `EE_ZAP`), conserva sus vértices y exige `INSUNITS = 6`.
 - Travesaños: extremos, cuadrantes sobre tope, macizos y viga; geometría y despiece.
 - JSON de proyecto: importa parámetros compatibles y los convierte a las unidades de la interfaz.
+
+Las vistas de zapata generan cotas coordinadas con `MARK`, `GSG_COTAS` y `GSG_MLEADER`. El **despiece general de zapata** se inserta en Model, agrupa los empalmes, acota parciales con `GSG_ARM-COTAS` y describe cada pieza con RomanD a 2,5 mm de papel. Cada grupo queda identificado de manera independiente; cuando sus parámetros cambian, AutoCAD/ZWCAD permite actualizarlo, conservarlo, aceptar todos los cambios o cancelar desde la línea de comandos.
 
 Los apartados **Muros**, **Consolas**, **Topes** y **Contrafuerte** ya forman parte de la página continua de cada estribo, aunque su generación geométrica permanece reservada para las etapas siguientes. Consulta **Documentación → Módulo estructural** para el glosario de capas (`FR_ZAP`, `AA_ZAP`, `CTF`, etc.), lectura de vistas y flujo de revisión. Verifica siempre dimensiones en cm, diámetros en mm y esviaje en grados.
 

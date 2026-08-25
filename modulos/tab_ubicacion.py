@@ -9,6 +9,7 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from PIL import Image, ImageDraw
 
+from sincal_icons import obtener_icono
 from sincal_runtime import ruta_recurso
 from sincal_resource_sync import ensure_resource_available
 from sincal_ui import (
@@ -277,7 +278,7 @@ class TabUbicacion(ctk.CTkFrame):
         self.ent_ajuste_y.insert(0, "0")
 
         # --- 3. Botón de Acción ---
-        self.btn_generar_croquis = ctk.CTkButton(self, text="🗺️ GENERAR CROQUIS DE UBICACIÓN", font=fuente_subtitulo, fg_color=COLOR_ACENTO,
+        self.btn_generar_croquis = ctk.CTkButton(self, text="GENERAR CROQUIS DE UBICACIÓN", image=obtener_icono("pin", 19), compound="left", font=fuente_subtitulo, fg_color=COLOR_ACENTO,
                                                  hover_color=COLOR_ACENTO_HOVER, text_color="#FFFFFF", corner_radius=0, height=45, command=self.generar_croquis_png)
         self.btn_generar_croquis.pack(fill="x", padx=20, pady=(10, 20))
 
@@ -475,13 +476,13 @@ class TabUbicacion(ctk.CTkFrame):
 
     def _mapa_descargado(self):
         self.btn_generar_croquis.configure(
-            state="normal", text="🗺️ GENERAR CROQUIS DE UBICACIÓN"
+            state="normal", text="GENERAR CROQUIS DE UBICACIÓN"
         )
         self.generar_croquis_png()
 
     def _mapa_descarga_fallida(self, detalle):
         self.btn_generar_croquis.configure(
-            state="normal", text="🗺️ GENERAR CROQUIS DE UBICACIÓN"
+            state="normal", text="GENERAR CROQUIS DE UBICACIÓN"
         )
         messagebox.showerror(
             "Descarga incompleta",

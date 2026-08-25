@@ -1,5 +1,6 @@
 customtkinter==6.0.0
-Pillow==12.3.0
+Pillow==11.3.0
+ttkbootstrap==1.18.2
 pyinstaller==6.22.2
 pywin32==312
 requests==2.34.2

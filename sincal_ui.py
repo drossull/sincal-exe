@@ -5,20 +5,52 @@ import os
 
 import customtkinter as ctk
 
+try:
+    from ttkbootstrap.themes.standard import STANDARD_THEMES
+except ImportError:  # Permite mostrar un diagnóstico legible en instalaciones antiguas.
+    STANDARD_THEMES = {}
+
 from sincal_runtime import ruta_recurso_instalado
 
 
-COLOR_FONDO = ("#F1E7D8", "#1E1E1E")
-COLOR_PANEL = ("#E7DAC7", "#252526")
-COLOR_PANEL_OSCURO = ("#DCCBB5", "#181818")
-COLOR_BORDE = ("#B7A58D", "#303030")
-COLOR_TEXTO = ("#352F29", "#D4D4D4")
-COLOR_TEXTO_SUAVE = ("#71675C", "#9D9D9D")
-COLOR_ACENTO = ("#8A6A1F", "#B89B4A")
-COLOR_ACENTO_HOVER = ("#A47F28", "#D0B25D")
+TTK_PRESET_OSCURO = "solar"
+TTK_PRESET_CLARO = "sandstone"
+
+
+def _preset_colors(name, fallback):
+    definition = STANDARD_THEMES.get(name, {})
+    return dict(fallback, **definition.get("colors", {}))
+
+
+_SOLAR = _preset_colors(TTK_PRESET_OSCURO, {
+    "primary": "#bc951a", "secondary": "#94a2a4", "bg": "#002B36",
+    "fg": "#ffffff", "border": "#00252e", "inputfg": "#A9BDBD",
+    "inputbg": "#073642", "selectbg": "#0b5162", "active": "#002730",
+})
+_SANDSTONE = _preset_colors(TTK_PRESET_CLARO, {
+    "secondary": "#8e8c84", "fg": "#3e3f3a", "inputfg": "#6E6D69",
+    "border": "#ced4da", "light": "#F8F5F0",
+})
+
+# La variante clara parte de Sandstone pero evita blanco absoluto y reemplaza
+# su azul primario por el mostaza de Solar para conservar la marca SINCAL.
+COLOR_FONDO = ("#F8F5F0", _SOLAR["bg"])
+COLOR_PANEL = ("#EEE9E1", _SOLAR["inputbg"])
+COLOR_PANEL_OSCURO = ("#E4DDD3", _SOLAR["border"])
+COLOR_BORDE = (_SANDSTONE["secondary"], _SOLAR["selectbg"])
+COLOR_TEXTO = (_SANDSTONE["fg"], _SOLAR["fg"])
+COLOR_TEXTO_SUAVE = (_SANDSTONE["inputfg"], _SOLAR["inputfg"])
+COLOR_ACENTO = (_SOLAR["primary"], _SOLAR["primary"])
+COLOR_ACENTO_HOVER = ("#A98517", "#D0AA2C")
 COLOR_MOSTAZA = COLOR_ACENTO
-COLOR_GRIS_BOTON = ("#D2C2AD", "#333333")
-COLOR_GRIS_BOTON_HOVER = ("#C2AE94", "#454545")
+COLOR_GRIS_BOTON = ("#DED7CD", "#073E4B")
+COLOR_GRIS_BOTON_HOVER = ("#D0C6B8", _SOLAR["selectbg"])
+COLOR_SELECCION = ("#E7DDBE", "#124A56")
+COLOR_EXITO = ("#477A52", "#44ACA4")
+COLOR_ERROR = ("#A84842", "#D95092")
+
+RADIO_CONTROL = 6
+RADIO_PANEL = 10
 
 FAMILIA_PRESSURA = "GT Pressura"
 # El archivo Bold aportado se identifica ante Windows como una familia propia,

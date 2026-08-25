@@ -38,7 +38,8 @@ class ZapataScheduleTests(unittest.TestCase):
         self.assertEqual(marks["1"].quantity, marks["2"].quantity)
         self.assertEqual(marks["4"].quantity, marks["5"].quantity)
         self.assertNotIn("DD", marks["1"].views)
-        self.assertNotIn("AA", marks["6"].views)
+        self.assertNotIn("FR", marks["4"].views)
+        self.assertEqual(marks["6"].views, ("FR", "EE"))
         self.assertGreater(schedule.total_kg, 0)
 
     def test_single_piece_keeps_base_mark_and_two_hooks(self):

@@ -17,6 +17,7 @@ import pythoncom
 import requests
 import win32com.client
 from customtkinter import filedialog
+from ttkbootstrap import Style as BootstrapStyle
 
 from modulos.tab_armaduras import TabArmaduras
 from modulos.tab_diagnostico import TabDiagnostico
@@ -41,6 +42,7 @@ from sincal_runtime import (
     is_newer_version,
     ruta_cad_usuario,
 )
+from sincal_icons import obtener_icono
 from sincal_runtime import (
     ruta_recurso as runtime_ruta_recurso,
 )
@@ -58,6 +60,7 @@ from sincal_ui import (
     COLOR_MOSTAZA,
     COLOR_PANEL,
     COLOR_PANEL_OSCURO,
+    COLOR_SELECCION,
     COLOR_TEXTO,
     COLOR_TEXTO_SUAVE,
     FUENTE_CONSOLA,
@@ -68,6 +71,10 @@ from sincal_ui import (
     FUENTE_SUBTITULO_PEQUENO,
     FUENTE_TITULO,
     FUENTE_TITULO_PEQUENO,
+    RADIO_CONTROL,
+    RADIO_PANEL,
+    TTK_PRESET_CLARO,
+    TTK_PRESET_OSCURO,
     agregar_tooltip,
     registrar_fuentes,
 )
@@ -105,6 +112,7 @@ def configurar_logging():
 class ActualizadorCAD(ctk.CTk):
     def __init__(self):
         super().__init__()
+        self.bootstrap_style = BootstrapStyle(theme=TTK_PRESET_OSCURO)
         registrar_fuentes()
         asegurar_directorios()
         self.logger = configurar_logging()
@@ -129,12 +137,15 @@ class ActualizadorCAD(ctk.CTk):
         self._resource_manifest_revision = ""
         self._resource_poll_job = None
         self._sidebar_width = 270
+        self._sidebar_auto_hidden = False
+        self._sidebar_user_hidden = False
         self._font_scale = 1.0
         self._console_mode = "Oculta"
         self._sections = {}
         self._nav_buttons = {}
         self.protocol("WM_DELETE_WINDOW", self.cerrar_aplicacion)
         self.after(50, self._procesar_ui_queue)
+        self.bind("<Configure>", self._adaptar_layout_principal, add="+")
 
         self._construir_shell()
         self._crear_secciones()
@@ -174,23 +185,24 @@ class ActualizadorCAD(ctk.CTk):
         self.nav_container = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.nav_container.pack(fill="both", expand=True, padx=8)
         self.nav_items = (
-            ("sincronizador", "⌂  Sincronizador", "Sincronizador"),
-            ("comandos", "⌘  Comandos en vivo", "Comandos en vivo"),
-            ("documentacion", "▤  Documentación", "Documentación"),
-            ("procesamiento", "▣  Renombrado", "Renombrado"),
-            ("ubicacion", "⌖  Ubicación", "Ubicación"),
-            ("estructural", "▦  Módulo estructural", "Módulo estructural"),
-            ("conversion", "⇄  Conversión DXF", "Conversión DXF"),
-            ("diagnostico", "◈  Diagnóstico", "Diagnóstico"),
+            ("sincronizador", "home", "Sincronizador", "Sincronizador"),
+            ("comandos", "terminal", "Comandos en vivo", "Comandos en vivo"),
+            ("documentacion", "book", "Documentación", "Documentación"),
+            ("procesamiento", "rename", "Renombrado", "Renombrado"),
+            ("ubicacion", "pin", "Ubicación", "Ubicación"),
+            ("estructural", "structure", "Módulo estructural", "Módulo estructural"),
+            ("conversion", "convert", "Conversión DXF", "Conversión DXF"),
+            ("diagnostico", "diagnostic", "Diagnóstico", "Diagnóstico"),
         )
-        for key, label, title in self.nav_items:
+        for key, icon_name, label, title in self.nav_items:
             button = ctk.CTkButton(
                 self.nav_container, text=label, font=FUENTE_MENU, anchor="w",
+                image=obtener_icono(icon_name, 18), compound="left",
                 fg_color="transparent", hover_color=COLOR_GRIS_BOTON, text_color=COLOR_TEXTO,
-                corner_radius=0, height=38,
+                corner_radius=RADIO_CONTROL, height=42,
                 command=lambda selected=key: self.seleccionar_seccion(selected),
             )
-            button.pack(fill="x", pady=2)
+            button.pack(fill="x", pady=2, padx=2)
             self._nav_buttons[key] = button
 
         self.sidebar_grip = ctk.CTkFrame(
@@ -208,7 +220,7 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkButton(
             font_controls, text="−", width=30, height=28, font=FUENTE_SUBTITULO_PEQUENO,
             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
-            corner_radius=0, command=lambda: self.ajustar_tamano_letra(-0.05),
+            corner_radius=RADIO_CONTROL, command=lambda: self.ajustar_tamano_letra(-0.05),
         ).pack(side="left")
         self.font_slider = ctk.CTkSlider(
             font_controls, from_=0.85, to=1.25, number_of_steps=8,
@@ -221,14 +233,14 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkButton(
             font_controls, text="+", width=30, height=28, font=FUENTE_SUBTITULO_PEQUENO,
             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
-            corner_radius=0, command=lambda: self.ajustar_tamano_letra(0.05),
+            corner_radius=RADIO_CONTROL, command=lambda: self.ajustar_tamano_letra(0.05),
         ).pack(side="right")
         self.theme_menu = ctk.CTkOptionMenu(
             footer, values=["Tema oscuro", "Tema claro", "Tema del sistema"],
             command=self.cambiar_tema, font=FUENTE_NORMAL_PEQUENA,
             dropdown_font=FUENTE_NORMAL_PEQUENA, fg_color=COLOR_GRIS_BOTON,
             button_color=COLOR_GRIS_BOTON_HOVER, button_hover_color=COLOR_GRIS_BOTON_HOVER,
-            corner_radius=0,
+            corner_radius=RADIO_CONTROL,
         )
         self.theme_menu.set("Tema oscuro")
         self.theme_menu.pack(fill="x", pady=(6, 0))
@@ -238,8 +250,8 @@ class ActualizadorCAD(ctk.CTk):
         header.pack(fill="x")
         header.pack_propagate(False)
         self.btn_mostrar_menu = ctk.CTkButton(
-            header, text="☰", width=34, height=30, font=("Segoe UI Symbol", 16),
-            fg_color="transparent", hover_color=COLOR_GRIS_BOTON, corner_radius=0,
+            header, text="", image=obtener_icono("menu", 19), width=36, height=34,
+            fg_color="transparent", hover_color=COLOR_GRIS_BOTON, corner_radius=RADIO_CONTROL,
             command=self.alternar_menu_lateral,
         )
         self.btn_mostrar_menu.pack(side="left", padx=(10, 0), pady=12)
@@ -254,7 +266,7 @@ class ActualizadorCAD(ctk.CTk):
         self.console_menu = ctk.CTkOptionMenu(
             header, values=["Consola: oculta", "Consola: inferior", "Consola: derecha"],
             command=self.cambiar_modo_consola, font=FUENTE_NORMAL_PEQUENA,
-            dropdown_font=FUENTE_NORMAL_PEQUENA, width=156, corner_radius=0,
+            dropdown_font=FUENTE_NORMAL_PEQUENA, width=156, corner_radius=RADIO_CONTROL,
             fg_color=COLOR_GRIS_BOTON, button_color=COLOR_GRIS_BOTON_HOVER, button_hover_color=COLOR_GRIS_BOTON_HOVER,
         )
         self.console_menu.set("Consola: oculta")
@@ -279,7 +291,7 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkButton(
             console_header, text="Limpiar", font=FUENTE_NORMAL_PEQUENA, width=70, height=26,
             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
-            corner_radius=0, command=self.limpiar_consola_global,
+            corner_radius=RADIO_CONTROL, command=self.limpiar_consola_global,
         ).pack(side="right")
         self.txt_log_global = ctk.CTkTextbox(
             self.console_panel, font=FUENTE_CONSOLA, fg_color="#090909", text_color="#C9FFC9",
@@ -325,7 +337,7 @@ class ActualizadorCAD(ctk.CTk):
         for item_key, button in self._nav_buttons.items():
             selected = item_key == key
             button.configure(
-                fg_color=COLOR_GRIS_BOTON if selected else "transparent",
+                fg_color=COLOR_SELECCION if selected else "transparent",
                 hover_color=COLOR_GRIS_BOTON_HOVER if selected else COLOR_GRIS_BOTON,
                 text_color=COLOR_TEXTO,
             )
@@ -338,8 +350,24 @@ class ActualizadorCAD(ctk.CTk):
 
     def alternar_menu_lateral(self):
         if self.sidebar.winfo_manager():
+            self._sidebar_user_hidden = True
+            self._sidebar_auto_hidden = False
             self.ocultar_menu_lateral()
         else:
+            self._sidebar_user_hidden = False
+            self._sidebar_auto_hidden = False
+            self.mostrar_menu_lateral()
+
+    def _adaptar_layout_principal(self, event):
+        """Libera espacio de trabajo automáticamente en ventanas angostas."""
+        if event.widget is not self:
+            return
+        width = event.width
+        if width < 1080 and self.sidebar.winfo_manager() and not self._sidebar_user_hidden:
+            self._sidebar_auto_hidden = True
+            self.ocultar_menu_lateral()
+        elif width >= 1160 and self._sidebar_auto_hidden and not self._sidebar_user_hidden:
+            self._sidebar_auto_hidden = False
             self.mostrar_menu_lateral()
 
     def _iniciar_redimension_menu(self, event):
@@ -368,6 +396,8 @@ class ActualizadorCAD(ctk.CTk):
     def cambiar_tema(self, value):
         modo = {"Tema oscuro": "dark", "Tema claro": "light", "Tema del sistema": "system"}.get(value, "dark")
         ctk.set_appearance_mode(modo)
+        resolved_dark = ctk.get_appearance_mode() == "Dark"
+        self.bootstrap_style.theme_use(TTK_PRESET_OSCURO if resolved_dark else TTK_PRESET_CLARO)
         self._actualizar_menu_nativo(modo)
 
     def _construir_menu_superior(self):
@@ -438,9 +468,9 @@ class ActualizadorCAD(ctk.CTk):
         if not hasattr(self, "menu_superior"):
             return
         claro = modo == "light" or (modo == "system" and ctk.get_appearance_mode() == "Light")
-        fondo = "#E7DAC7" if claro else "#252526"
-        texto = "#352F29" if claro else "#D4D4D4"
-        activo = "#C2AE94" if claro else "#454545"
+        fondo = "#EEE9E1" if claro else "#073642"
+        texto = "#3E3F3A" if claro else "#FFFFFF"
+        activo = "#D0C6B8" if claro else "#0B5162"
         try:
             self.menu_superior.configure(bg=fondo, fg=texto, activebackground=activo, activeforeground=texto)
             for index in range(self.menu_superior.index("end") + 1):
@@ -669,46 +699,63 @@ class ActualizadorCAD(ctk.CTk):
         ).pack(padx=30)
 
         botones_sec_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
-        botones_sec_frame.pack(pady=(4, 18))
+        botones_sec_frame.pack(fill="x", padx=46, pady=(4, 18))
+        self._home_action_buttons = []
 
         def boton_accion(icono, ayuda, comando):
             boton = ctk.CTkButton(
-                botones_sec_frame, text=icono, width=46, height=42, font=("Segoe UI Symbol", 18),
+                botones_sec_frame, text="", image=obtener_icono(icono, 20), width=50, height=44,
                 fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
-                text_color=COLOR_TEXTO, corner_radius=4, command=comando,
+                text_color=COLOR_TEXTO, corner_radius=RADIO_CONTROL, command=comando,
             )
-            boton.pack(side="left", padx=5)
             agregar_tooltip(boton, ayuda)
+            self._home_action_buttons.append(boton)
             return boton
 
-        boton_accion("⇧", "Abrir instalador oficial", lambda: webbrowser.open(URL_RELEASES))
-        boton_accion("▣", "Abrir carpeta local", self.abrir_carpeta_local)
-        boton_accion("⚙", "Preparar integración CAD", self.forzar_path_manual)
-        self.btn_sync_resources = boton_accion("↻", "Actualizar recursos CAD", self.verificar_recursos_manual)
-        self.btn_verificar_update = boton_accion("◌", "Verificar nueva actualización", self.verificar_actualizacion_manual)
+        boton_accion("download", "Abrir instalador oficial", lambda: webbrowser.open(URL_RELEASES))
+        boton_accion("folder", "Abrir carpeta local", self.abrir_carpeta_local)
+        boton_accion("settings", "Preparar integración CAD", self.forzar_path_manual)
+        self.btn_sync_resources = boton_accion("refresh", "Actualizar recursos CAD", self.verificar_recursos_manual)
+        self.btn_verificar_update = boton_accion("update", "Verificar nueva actualización", self.verificar_actualizacion_manual)
+        botones_sec_frame.bind("<Configure>", self._reordenar_acciones_inicio, add="+")
+        self.after_idle(lambda: self._reordenar_acciones_inicio(None))
 
-        history_panel = ctk.CTkFrame(self.tab_main, fg_color="transparent", corner_radius=0)
+        history_panel = ctk.CTkFrame(
+            self.tab_main, fg_color=COLOR_PANEL, corner_radius=RADIO_PANEL,
+            border_width=1, border_color=COLOR_BORDE,
+        )
         history_panel.pack(fill="both", expand=True, padx=46, pady=(4, 24))
         ctk.CTkLabel(
             history_panel, text="HISTORIAL DE CAMBIOS", font=FUENTE_SUBTITULO_PEQUENO,
             text_color=COLOR_MOSTAZA,
-        ).pack(anchor="w", pady=(0, 6))
+        ).pack(anchor="w", padx=16, pady=(14, 6))
         self.txt_history = ctk.CTkTextbox(
             history_panel, height=190, font=FUENTE_NORMAL_PEQUENA,
             fg_color=COLOR_PANEL, text_color=COLOR_TEXTO_SUAVE,
-            state="disabled", corner_radius=0, wrap="word",
+            state="disabled", corner_radius=RADIO_CONTROL, wrap="word",
         )
-        self.txt_history.pack(fill="both", expand=True)
+        self.txt_history.pack(fill="both", expand=True, padx=14, pady=(0, 14))
 
         self._iniciar_verificacion_recursos()
         self._programar_monitoreo_recursos()
+
+    def _reordenar_acciones_inicio(self, event):
+        """Refluye las acciones principales según el ancho disponible."""
+        if not getattr(self, "_home_action_buttons", None):
+            return
+        width = event.width if event is not None else 600
+        columns = 5 if width >= 500 else 3 if width >= 310 else 2
+        for column in range(5):
+            self._home_action_buttons[0].master.grid_columnconfigure(column, weight=1 if column < columns else 0)
+        for index, button in enumerate(self._home_action_buttons):
+            button.grid(row=index // columns, column=index % columns, padx=5, pady=5, sticky="ew")
 
     def verificar_recursos_manual(self):
         self.log("\n[*] Buscando actualizaciones menores de recursos CAD en GitHub...")
         self.btn_sync_resources.configure(state="disabled", text="…")
         if not self._iniciar_verificacion_recursos(manual=True):
             self.log("[*] Ya hay una comprobación de recursos en curso.")
-            self.btn_sync_resources.configure(state="normal", text="↻")
+            self.btn_sync_resources.configure(state="normal", text="")
 
     def _iniciar_verificacion_recursos(self, manual=False, periodic=False, manifest_only=False):
         if self._resource_check_running or self._cerrando:
@@ -808,7 +855,7 @@ class ActualizadorCAD(ctk.CTk):
         finally:
             self._resource_check_running = False
             if manual and not actualizacion_ofrecida:
-                self._ui(self.btn_sync_resources.configure, state="normal", text="↻")
+                self._ui(self.btn_sync_resources.configure, state="normal", text="")
 
     def _ofrecer_actualizacion_recursos(self, plan, manual):
         self.deiconify()
@@ -832,7 +879,7 @@ class ActualizadorCAD(ctk.CTk):
         else:
             self.log("[!] Actualización menor pospuesta por el usuario.")
             if manual:
-                self.btn_sync_resources.configure(state="normal", text="↻")
+                self.btn_sync_resources.configure(state="normal", text="")
 
     def _hilo_aplicar_recursos(self, plan):
         try:
@@ -847,7 +894,7 @@ class ActualizadorCAD(ctk.CTk):
                 "No se aplicó completamente la actualización. SINCAL volverá a intentarlo al iniciar.\n\n"
                 f"Detalle: {e}",
             )
-            self._ui(self.btn_sync_resources.configure, state="normal", text="↻")
+            self._ui(self.btn_sync_resources.configure, state="normal", text="")
             return
 
         avisos = []
@@ -908,7 +955,7 @@ class ActualizadorCAD(ctk.CTk):
             "Workbench",
             mensaje,
         )
-        self._ui(self.btn_sync_resources.configure, state="normal", text="↻")
+        self._ui(self.btn_sync_resources.configure, state="normal", text="")
 
     def _refrescar_interfaces_recursos(self):
         if hasattr(self, "tab_ubicacion_widget"):
@@ -981,7 +1028,7 @@ class ActualizadorCAD(ctk.CTk):
             self.log(f"[X] Fallo al verificar versión en GitHub: {e}")
         finally:
             self._ui(self.btn_verificar_update.configure,
-                     state="normal", text="◌")
+                     state="normal", text="")
 
     def setup_tab_renombrado(self):
         lbl_titulo = ctk.CTkLabel(

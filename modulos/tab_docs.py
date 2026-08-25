@@ -13,6 +13,8 @@ from sincal_ui import (
     FUENTE_NORMAL,
     FUENTE_NORMAL_PEQUENA,
     FUENTE_SUBTITULO,
+    RADIO_CONTROL,
+    RADIO_PANEL,
 )
 
 
@@ -40,7 +42,10 @@ class TabDocs(ctk.CTkFrame):
         marco.grid_columnconfigure(0, minsize=self._panel_width)
         marco.grid_columnconfigure(2, weight=1)
 
-        self.lateral = ctk.CTkFrame(marco, width=self._panel_width, fg_color="transparent")
+        self.lateral = ctk.CTkFrame(
+            marco, width=self._panel_width, fg_color=COLOR_PANEL,
+            corner_radius=RADIO_PANEL, border_width=1, border_color=COLOR_PANEL,
+        )
         self.lateral.grid(row=0, column=0, sticky="nsew")
         self.lateral.grid_propagate(False)
         lateral = self.lateral
@@ -56,13 +61,13 @@ class TabDocs(ctk.CTkFrame):
 
         self.busqueda = ctk.CTkEntry(
             lateral, placeholder_text="Buscar comando o herramienta...",
-            font=self.fuente_normal, corner_radius=0,
+            font=self.fuente_normal, corner_radius=RADIO_CONTROL,
         )
         self.busqueda.pack(fill="x", padx=8, pady=(0, 8))
         self.busqueda.bind("<KeyRelease>", self._filtrar_menu)
 
         self.menu_container = ctk.CTkScrollableFrame(
-            lateral, fg_color="transparent", corner_radius=0
+            lateral, fg_color="transparent", corner_radius=RADIO_CONTROL
         )
         self.menu_container.pack(fill="both", expand=True)
 
@@ -74,7 +79,7 @@ class TabDocs(ctk.CTkFrame):
         self.panel_grip.bind("<ButtonPress-1>", self._iniciar_redimension_panel)
         self.panel_grip.bind("<B1-Motion>", self._redimensionar_panel)
 
-        contenido = ctk.CTkFrame(marco, fg_color="transparent")
+        contenido = ctk.CTkFrame(marco, fg_color="transparent", corner_radius=RADIO_PANEL)
         contenido.grid(row=0, column=2, sticky="nsew")
 
         self.lbl_wiki_title = ctk.CTkLabel(
@@ -90,7 +95,8 @@ class TabDocs(ctk.CTkFrame):
 
         self.txt_wiki_content = ctk.CTkTextbox(
             contenido, font=self.fuente_normal, fg_color=COLOR_PANEL,
-            text_color=self.color_texto, wrap="word", border_width=0,
+            text_color=self.color_texto, wrap="word", border_width=1,
+            border_color=COLOR_PANEL, corner_radius=RADIO_PANEL,
         )
         self.txt_wiki_content.pack(fill="both", expand=True, padx=20, pady=10)
 
@@ -196,7 +202,7 @@ class TabDocs(ctk.CTkFrame):
             button = ctk.CTkButton(
                 self.menu_container, text=tema.get("titulo", "Tema"),
                 font=self.fuente_menu, fg_color="transparent", hover_color=COLOR_PANEL,
-                text_color=self.color_texto, anchor="w", corner_radius=0, height=44,
+                text_color=self.color_texto, anchor="w", corner_radius=RADIO_CONTROL, height=44,
                 command=lambda seleccionado=tema: self.mostrar_tema(seleccionado),
             )
             button.pack(fill="x", padx=4, pady=1)

@@ -191,8 +191,8 @@ _VIEW_NOTES = {
     "mesh_x": {"FR": "longitud real", "AA": "bloque transversal", "BB": "bloque transversal", "CC": "bloque transversal", "EE": "longitud real; representa malla superior"},
     "mesh_y": {"FR": "bloque transversal", "AA": "longitud real", "BB": "longitud real", "CC": "longitud real", "EE": "longitud real; representa malla superior"},
     "suple": {"FR": "bloque transversal", "AA": "longitud real", "BB": "longitud real", "CC": "longitud real", "EE": "longitud real"},
-    "lateral_x": {"FR": "longitud real", "AA": "bloque transversal", "BB": "bloque transversal", "CC": "bloque transversal", "EE": "longitud real"},
-    "lateral_y": {"FR": "bloque transversal", "BB": "longitud real", "CC": "longitud real", "EE": "longitud real"},
+    "lateral_x": {"AA": "círculo transversal", "BB": "círculo transversal", "CC": "círculo transversal", "EE": "longitud real"},
+    "lateral_y": {"FR": "círculo transversal", "EE": "longitud real"},
 }
 
 

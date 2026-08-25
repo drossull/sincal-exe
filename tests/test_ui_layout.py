@@ -9,12 +9,12 @@ class WorkbenchLayoutTests(unittest.TestCase):
     def test_primary_navigation_is_ordered_and_not_tabview_based(self):
         source = (ROOT / "core_sincal.py").read_text(encoding="utf-8")
         expected = [
-            '"sincronizador", "⌂  Sincronizador"',
-            '"comandos", "⌘  Comandos en vivo"',
-            '"documentacion", "▤  Documentación"',
-            '"procesamiento", "▣  Renombrado"',
-            '"ubicacion", "⌖  Ubicación"',
-            '"estructural", "▦  Módulo estructural"',
+            '"sincronizador", "home", "Sincronizador"',
+            '"comandos", "terminal", "Comandos en vivo"',
+            '"documentacion", "book", "Documentación"',
+            '"procesamiento", "rename", "Renombrado"',
+            '"ubicacion", "pin", "Ubicación"',
+            '"estructural", "structure", "Módulo estructural"',
         ]
         positions = [source.index(item) for item in expected]
         self.assertEqual(positions, sorted(positions))
@@ -28,7 +28,7 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('"Consola: inferior"', source)
         self.assertIn('"Consola: derecha"', source)
         self.assertIn("def setup_tab_conversion_dxf", source)
-        self.assertIn('"conversion", "⇄  Conversión DXF"', source)
+        self.assertIn('"conversion", "convert", "Conversión DXF"', source)
         self.assertIn("def ocultar_menu_lateral", source)
         self.assertIn("def cambiar_tamano_letra", source)
         self.assertIn("def cambiar_tema", source)
@@ -48,9 +48,23 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('(FAMILIA_PRESSURA, 13)', theme)
         self.assertIn('("Consolas", 11)', theme)
         self.assertIn("GT Pressura Regular.ttf", build)
-        self.assertIn('COLOR_FONDO = ("#F1E7D8", "#1E1E1E")', theme)
+        self.assertIn('TTK_PRESET_OSCURO = "solar"', theme)
+        self.assertIn('TTK_PRESET_CLARO = "sandstone"', theme)
+        self.assertIn('COLOR_FONDO = ("#F8F5F0", _SOLAR["bg"])', theme)
         self.assertTrue((ROOT / "assets" / "fonts" / "GT Pressura Regular.ttf").is_file())
         self.assertTrue((ROOT / "assets" / "fonts" / "GTPressura-Bold.ttf").is_file())
+
+    def test_bootstrap_preset_icons_and_responsive_shell_are_integrated(self):
+        core = (ROOT / "core_sincal.py").read_text(encoding="utf-8")
+        icons = (ROOT / "sincal_icons.py").read_text(encoding="utf-8")
+        requirements = (ROOT / "requirements-build.txt").read_text(encoding="utf-8")
+        self.assertIn("BootstrapStyle(theme=TTK_PRESET_OSCURO)", core)
+        self.assertIn("def _adaptar_layout_principal", core)
+        self.assertIn("def _reordenar_acciones_inicio", core)
+        self.assertIn("width < 1080", core)
+        self.assertIn("obtener_icono(icon_name, 18)", core)
+        self.assertIn("def obtener_icono", icons)
+        self.assertIn("ttkbootstrap==1.18.2", requirements)
 
     def test_responsive_panels_and_single_console(self):
         core = (ROOT / "core_sincal.py").read_text(encoding="utf-8")
@@ -94,6 +108,11 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn("default_zapata_rules", source)
         self.assertIn("def actualizar_revision_zapata", source)
         self.assertIn("build_zapata_lisp", source)
+        self.assertIn("build_zapata_detail_lisp", source)
+        self.assertIn("def generar_despiece_zapata", source)
+        self.assertIn('text="Generar despiece general de zapata"', source)
+        self.assertNotIn("def generar_despiece_cad", source)
+        self.assertIn('"FORMATOS ANOTATIVOS ACAD_2025.dwg"', source)
         self.assertIn("SINCAL-ZAPATA-GENERAR", source)
         self.assertIn('("D-D", "DD")', source)
         self.assertIn('("E-E", "EE")', source)

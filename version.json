@@ -4,6 +4,7 @@
   "archivos": [
     "main.py",
     "core_sincal.py",
+    "sincal_icons.py",
     "sincal_ui.py",
     "sincal_runtime.py",
     "sincal_resource_sync.py",
@@ -12,8 +13,10 @@
     "sincal_diagnostics.py",
     "sincal_update_config.py",
     "sincal_rebar_model.py",
+    "sincal_rebar_detail.py",
     "sincal_cad_moldajes.py",
     "sincal_zapata_cad.py",
+    "sincal_zapata_detail_cad.py",
     "modulos/tab_ubicacion.py",
     "modulos/tab_armaduras.py",
     "modulos/tab_docs.py",

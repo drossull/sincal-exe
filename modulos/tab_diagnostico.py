@@ -20,6 +20,8 @@ from sincal_ui import (
     FUENTE_NORMAL,
     FUENTE_SUBTITULO,
     FUENTE_TITULO,
+    RADIO_CONTROL,
+    RADIO_PANEL,
 )
 
 
@@ -39,7 +41,7 @@ class TabDiagnostico(ctk.CTkFrame):
         color_title = COLOR_MOSTAZA
         color_text = COLOR_TEXTO
 
-        container = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
+        container = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=RADIO_PANEL)
         container.pack(fill="both", expand=True, padx=12, pady=12)
 
         ctk.CTkLabel(
@@ -54,7 +56,7 @@ class TabDiagnostico(ctk.CTkFrame):
             font=normal_font, text_color=color_text, wraplength=850, justify="left",
         ).pack(anchor="w", padx=8, pady=(0, 12))
 
-        engine_frame = ctk.CTkFrame(container, fg_color=COLOR_PANEL, corner_radius=0)
+        engine_frame = ctk.CTkFrame(container, fg_color=COLOR_PANEL, corner_radius=RADIO_PANEL)
         engine_frame.pack(fill="x", padx=8, pady=6)
         ctk.CTkLabel(
             engine_frame, text="Motor para procesamiento masivo", font=subtitle_font,
@@ -64,11 +66,11 @@ class TabDiagnostico(ctk.CTkFrame):
         engine_row.pack(fill="x", padx=12, pady=(0, 10))
         self.engine_menu = ctk.CTkOptionMenu(
             engine_row, values=["Buscando motores CAD..."], font=normal_font,
-            dropdown_font=normal_font, corner_radius=0,
+            dropdown_font=normal_font, corner_radius=RADIO_CONTROL,
         )
         self.engine_menu.pack(side="left", fill="x", expand=True, padx=(0, 8))
         self.btn_save_engine = ctk.CTkButton(
-            engine_row, text="Usar este motor", font=normal_font, corner_radius=0,
+            engine_row, text="Usar este motor", font=normal_font, corner_radius=RADIO_CONTROL,
             command=self.guardar_motor, state="disabled",
         )
         self.btn_save_engine.pack(side="right")
@@ -76,17 +78,17 @@ class TabDiagnostico(ctk.CTkFrame):
         actions = ctk.CTkFrame(container, fg_color="transparent")
         actions.pack(fill="x", padx=8, pady=6)
         self.btn_run = ctk.CTkButton(
-            actions, text="Ejecutar diagnóstico", font=normal_font, corner_radius=0,
+            actions, text="Ejecutar diagnóstico", font=normal_font, corner_radius=RADIO_CONTROL,
             command=self.ejecutar_diagnostico,
         )
         self.btn_run.pack(side="left", padx=(0, 8))
         self.btn_report = ctk.CTkButton(
-            actions, text="Generar informe ZIP", font=normal_font, corner_radius=0,
+            actions, text="Generar informe ZIP", font=normal_font, corner_radius=RADIO_CONTROL,
             fg_color=COLOR_ACENTO, command=self.generar_informe,
         )
         self.btn_report.pack(side="left", padx=(0, 8))
         ctk.CTkButton(
-            actions, text="Abrir datos locales", font=normal_font, corner_radius=0,
+            actions, text="Abrir datos locales", font=normal_font, corner_radius=RADIO_CONTROL,
             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, command=lambda: os.startfile(RUTA_DATOS_USUARIO),
         ).pack(side="left")
 
@@ -95,7 +97,7 @@ class TabDiagnostico(ctk.CTkFrame):
             text_color=color_title,
         ).pack(anchor="w", padx=8, pady=(10, 4))
         self.description = ctk.CTkTextbox(
-            container, height=80, font=normal_font, fg_color=COLOR_PANEL, corner_radius=0,
+            container, height=80, font=normal_font, fg_color=COLOR_PANEL, corner_radius=RADIO_CONTROL,
         )
         self.description.pack(fill="x", padx=8, pady=(0, 8))
 
@@ -106,7 +108,7 @@ class TabDiagnostico(ctk.CTkFrame):
         self.status.pack(anchor="w", padx=8, pady=(6, 2))
         self.results = ctk.CTkTextbox(
             container, height=310, font=normal_font, fg_color=COLOR_PANEL_OSCURO,
-            text_color=COLOR_TEXTO, state="disabled", corner_radius=0,
+            text_color=COLOR_TEXTO, state="disabled", corner_radius=RADIO_PANEL,
         )
         self.results.pack(fill="both", expand=True, padx=8, pady=(0, 10))
 

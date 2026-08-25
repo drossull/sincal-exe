@@ -9,6 +9,7 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from PIL import Image
 
+from sincal_icons import obtener_icono
 from sincal_cad_moldajes import parse_moldaje_detection
 from sincal_rebar_model import (
     CAPAS_ZAPATA,
@@ -19,6 +20,7 @@ from sincal_rebar_model import (
     default_zapata_rules,
 )
 from sincal_zapata_cad import ZapataCadError, build_zapata_lisp
+from sincal_zapata_detail_cad import build_zapata_detail_lisp
 from sincal_runtime import ruta_recurso, ruta_runtime
 from sincal_ui import (
     COLOR_ACENTO,
@@ -33,6 +35,8 @@ from sincal_ui import (
     FUENTE_NORMAL,
     FUENTE_NORMAL_PEQUENA,
     FUENTE_SUBTITULO,
+    RADIO_CONTROL,
+    RADIO_PANEL,
 )
 
 RUTA_TEMPORAL = ruta_runtime()
@@ -48,36 +52,48 @@ class TabArmaduras(ctk.CTkFrame):
     def setup_ui(self):
         # --- Frame Superior: JSON ---
         frame_top = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
-        frame_top.pack(fill="x", padx=20, pady=10)
+        frame_top.pack(fill="x", padx=20, pady=(12, 6))
+        frame_top.grid_columnconfigure(0, weight=1)
 
         fuente_subtitulo = FUENTE_SUBTITULO
         fuente_normal = FUENTE_NORMAL
 
         ctk.CTkLabel(frame_top, text="MÓDULO ESTRUCTURAL (ARMADURAS)",
-                     font=fuente_subtitulo, text_color=COLOR_MOSTAZA).pack(side="left", padx=15, pady=15)
+                     font=fuente_subtitulo, text_color=COLOR_MOSTAZA).grid(
+                         row=0, column=0, sticky="w", padx=8, pady=(2, 10))
 
-        self.btn_cargar_json = ctk.CTkButton(frame_top, text="📁 Cargar JSON de Proyecto", font=fuente_normal,
-                                             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0, command=self.cargar_json_bim)
-        self.btn_cargar_json.pack(side="right", padx=15, pady=15)
-        ctk.CTkButton(frame_top, text="Limpiar ruta", font=FUENTE_NORMAL_PEQUENA,
+        project_row = ctk.CTkFrame(frame_top, fg_color="transparent", corner_radius=0)
+        project_row.grid(row=1, column=0, sticky="ew")
+        project_row.grid_columnconfigure(2, weight=1)
+
+        self.btn_cargar_json = ctk.CTkButton(
+            project_row, text="Cargar JSON", image=obtener_icono("folder", 17),
+            compound="left", font=fuente_normal, fg_color=COLOR_GRIS_BOTON,
+            hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=RADIO_CONTROL,
+            command=self.cargar_json_bim,
+        )
+        self.btn_cargar_json.grid(row=0, column=4, sticky="e", padx=(8, 0))
+        ctk.CTkButton(project_row, text="Limpiar", font=FUENTE_NORMAL_PEQUENA,
                       fg_color="transparent", hover_color=COLOR_GRIS_BOTON,
-                      text_color=COLOR_TEXTO_SUAVE, corner_radius=0,
-                      command=self.limpiar_json_bim).pack(side="right", padx=(0, 6), pady=15)
+                      text_color=COLOR_TEXTO_SUAVE, corner_radius=RADIO_CONTROL,
+                      command=self.limpiar_json_bim).grid(row=0, column=3, sticky="e", padx=(6, 0))
         self.lbl_json_status = ctk.CTkLabel(
-            frame_top, text="Archivo: Ninguno", font=fuente_normal, text_color=COLOR_TEXTO_SUAVE)
-        self.lbl_json_status.pack(side="right", padx=(15, 0), pady=15)
+            project_row, text="Archivo: Ninguno", font=fuente_normal,
+            text_color=COLOR_TEXTO_SUAVE, anchor="w", justify="left", wraplength=430)
+        self.lbl_json_status.grid(row=0, column=2, sticky="ew", padx=(14, 4))
         self.ent_z_esviaje = ctk.CTkEntry(
-            frame_top, font=fuente_normal, width=58, corner_radius=0)
+            project_row, font=fuente_normal, width=64, corner_radius=RADIO_CONTROL)
         self.ent_z_esviaje.insert(0, "0")
-        self.ent_z_esviaje.pack(side="right", padx=(4, 0), pady=15)
-        ctk.CTkLabel(frame_top, text="Esviaje (°):", font=FUENTE_NORMAL_PEQUENA,
-                     text_color=COLOR_TEXTO_SUAVE).pack(side="right", padx=(12, 0), pady=15)
+        self.ent_z_esviaje.grid(row=0, column=1, sticky="w", padx=(4, 0))
+        ctk.CTkLabel(project_row, text="Esviaje (°):", font=FUENTE_NORMAL_PEQUENA,
+                     text_color=COLOR_TEXTO_SUAVE).grid(row=0, column=0, sticky="w")
 
         # =========================================================
         # TABVIEW MAESTRO (Elementos Estructurales)
         # =========================================================
         self.tab_maestro = ctk.CTkTabview(
-            self, width=800, height=520, fg_color="transparent", segmented_button_selected_color=COLOR_ACENTO)
+            self, width=800, height=520, fg_color="transparent",
+            corner_radius=RADIO_PANEL, segmented_button_selected_color=COLOR_ACENTO)
         self.tab_maestro.pack(padx=20, pady=5, fill="both", expand=True)
         self.tab_maestro._segmented_button.configure(font=fuente_normal)
 
@@ -88,7 +104,8 @@ class TabArmaduras(ctk.CTkFrame):
         # CONTENIDO: 1. ESTRIBOS
         # =========================================================
         self.tab_estribo = ctk.CTkTabview(
-            tab_estribos, fg_color=COLOR_PANEL, segmented_button_selected_color=COLOR_ACENTO)
+            tab_estribos, fg_color=COLOR_PANEL, corner_radius=RADIO_PANEL,
+            segmented_button_selected_color=COLOR_ACENTO)
         self.tab_estribo.pack(fill="both", expand=True)
         self.tab_estribo._segmented_button.configure(font=fuente_normal)
 
@@ -101,7 +118,8 @@ class TabArmaduras(ctk.CTkFrame):
         # CONTENIDO: 2. TRAVESAÑOS
         # =========================================================
         self.tab_sub_travesanos = ctk.CTkTabview(
-            tab_travesanos, fg_color=COLOR_PANEL, segmented_button_selected_color=COLOR_ACENTO)
+            tab_travesanos, fg_color=COLOR_PANEL, corner_radius=RADIO_PANEL,
+            segmented_button_selected_color=COLOR_ACENTO)
         self.tab_sub_travesanos.pack(fill="both", expand=True)
         self.tab_sub_travesanos._segmented_button.configure(font=fuente_normal)
 
@@ -238,7 +256,7 @@ class TabArmaduras(ctk.CTkFrame):
             "moldaje_choices": {},
             "confirmed_moldajes": {},
             "moldajes_use_metres": False,
-            "panel_width": 520,
+            "panel_width": 460,
         }
         self._abutments[key] = state
 
@@ -284,7 +302,7 @@ class TabArmaduras(ctk.CTkFrame):
     @staticmethod
     def _redimensionar_estribo(event, state):
         delta = event.x_root - state.get("drag_origin", event.x_root)
-        width = max(400, min(760, state.get("drag_width", 520) + delta))
+        width = max(360, min(760, state.get("drag_width", 460) + delta))
         state["panel_width"] = width
         state["revision_panel"].configure(width=width)
         state["parent"].grid_columnconfigure(0, minsize=width)
@@ -336,17 +354,20 @@ class TabArmaduras(ctk.CTkFrame):
         )
         for index, (text, view) in enumerate(views):
             row = 5 + index // 3
-            column = (index % 3) * 2
+            column = index % 3
             ctk.CTkButton(
                 geometry, text=text, width=100, font=FUENTE_NORMAL, corner_radius=0,
                 fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
                 command=lambda v=view, k=state["key"]: self.generar_vista_cad(v, k),
             ).grid(row=row, column=column, sticky="ew", padx=(0, 3), pady=3)
-            ctk.CTkButton(
-                geometry, text="D", width=28, font=FUENTE_NORMAL, corner_radius=0,
-                fg_color=COLOR_MOSTAZA, hover_color=COLOR_ACENTO_HOVER,
-                command=lambda v=view, k=state["key"]: self.generar_despiece_cad(v, k),
-            ).grid(row=row, column=column + 1, sticky="w", padx=(0, 8), pady=3)
+        for column in range(3):
+            geometry.grid_columnconfigure(column, weight=1)
+        ctk.CTkButton(
+            geometry, text="Generar despiece general de zapata", font=FUENTE_NORMAL,
+            corner_radius=RADIO_CONTROL, fg_color=COLOR_MOSTAZA,
+            hover_color=COLOR_ACENTO_HOVER,
+            command=lambda k=state["key"]: self.generar_despiece_zapata(k),
+        ).grid(row=7, column=0, columnspan=3, sticky="ew", pady=(10, 3))
 
         pending_sections = (
             ("2. MUROS", "Muro frontal, muro espaldar y alas."),
@@ -730,7 +751,12 @@ class TabArmaduras(ctk.CTkFrame):
                 self._entry_number(entries["rec_lat"], "Recubrimiento lateral"),
             )
             rules = self._read_zapata_rules(abutment_key)
-            lisp = build_zapata_lisp(vista, candidate, geometry, cover, rules, abutment_key)
+            master_path = ruta_recurso(
+                "masters", "FORMATOS ANOTATIVOS ACAD_2025.dwg")
+            lisp = build_zapata_lisp(
+                vista, candidate, geometry, cover, rules, abutment_key,
+                master_path=master_path,
+            )
             token = str(int(time.time() * 1000))
             ruta_lisp = ruta_runtime(f"SINCAL_ZAPATA_{abutment_key}_{vista}_{token}.lsp")
             with open(ruta_lisp, "w", encoding="utf-8") as archivo:
@@ -748,17 +774,42 @@ class TabArmaduras(ctk.CTkFrame):
             "sólo se reemplazan entidades SINCAL de esa vista."
         )
 
-    def generar_despiece_cad(self, vista, abutment_key="entrada"):
+    def generar_despiece_zapata(self, abutment_key="entrada"):
         state = self._abutments[abutment_key]
         schedule = self.actualizar_revision_zapata(abutment_key, notificar=False)
         if not schedule or not schedule.is_valid:
             messagebox.showwarning("Workbench", "Corrige las validaciones antes de revisar el despiece.")
             return
-        messagebox.showinfo(
-            "Workbench",
-            f"{state['title'].title()} · despiece {vista}: {len(schedule.marks)} marcas físicas "
-            f"y {schedule.total_kg:.1f} kg provisionales.\n\n"
-            "La inserción de tabla CAD y la exportación Excel se incorporarán después de validar moldajes.",
+        entries = state["entries"]
+        try:
+            geometry = ZapataGeometry.from_centimetres(
+                self._entry_number(entries["largo"], "Largo"),
+                self._entry_number(entries["ancho"], "Ancho"),
+                self._entry_number(entries["alto"], "Alto"),
+                self._entry_number(self.ent_z_esviaje, "Esviaje"),
+            )
+            rules = self._read_zapata_rules(abutment_key)
+            master_path = ruta_recurso(
+                "masters", "FORMATOS ANOTATIVOS ACAD_2025.dwg")
+            lisp = build_zapata_detail_lisp(
+                schedule, rules, geometry, abutment_key, master_path)
+            token = str(int(time.time() * 1000))
+            ruta_lisp = ruta_runtime(
+                f"SINCAL_DESPIECE_ZAPATA_{abutment_key}_{token}.lsp")
+            with open(ruta_lisp, "w", encoding="utf-8") as archivo:
+                archivo.write(lisp)
+        except (OSError, ValueError) as error:
+            messagebox.showerror(
+                "Workbench", f"No se pudo preparar el despiece de zapata:\n{error}")
+            return
+        ruta_cad = ruta_lisp.replace("\\", "\\\\")
+        self.parent_app.enviar_comando_cad_activo(
+            f'(progn (load "{ruta_cad}") (c:SINCAL-ZAPATA-DESPIECE))\n',
+            f"Despiece general de zapata · {state['title'].lower()}",
+        )
+        self.parent_app.log_r(
+            f"[*] Despiece general enviado a CAD para {state['title'].lower()}; "
+            "AutoCAD/ZWCAD solicitará el punto o confirmará los grupos modificados."
         )
 
     def mostrar_ayuda_travesano(self):
