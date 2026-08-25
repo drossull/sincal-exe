@@ -7,21 +7,23 @@ import zipfile
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
+import ttkbootstrap as ttk
 from PIL import Image, ImageDraw
 
-from sincal.ui.icons import obtener_icono
 from sincal.runtime import ruta_recurso
 from sincal.resources import ensure_resource_available
 from sincal.ui.theme import (
     COLOR_ACENTO,
     COLOR_ACENTO_HOVER,
     COLOR_BORDE,
+    COLOR_FONDO,
     COLOR_GRIS_BOTON,
     COLOR_GRIS_BOTON_HOVER,
     COLOR_MOSTAZA,
     COLOR_PANEL,
     COLOR_TEXTO,
     COLOR_TEXTO_SUAVE,
+    FUENTE_CAMPO,
     FUENTE_NORMAL,
     FUENTE_NORMAL_PEQUENA,
     FUENTE_SUBTITULO,
@@ -129,8 +131,9 @@ def _parsear_kml_puntos(kml_data):
     return estructuras, ignorados
 
 
-class TabUbicacion(ctk.CTkFrame):
+class TabUbicacion(ctk.CTkScrollableFrame):
     def __init__(self, master, parent_app, **kwargs):
+        kwargs["fg_color"] = COLOR_FONDO
         super().__init__(master, **kwargs)
         self.parent_app = parent_app
         self.estructuras_gps = {}
@@ -197,75 +200,91 @@ class TabUbicacion(ctk.CTkFrame):
         fuente_subtitulo = FUENTE_SUBTITULO
         fuente_normal = FUENTE_NORMAL
 
-        # --- 1. Panel Superior: Carga de Datos KMZ ---
-        frame_top = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
-        frame_top.pack(fill="x", padx=20, pady=10)
+        frame_top = ctk.CTkFrame(self, fg_color=COLOR_FONDO, corner_radius=0)
+        frame_top.pack(fill="x", padx=20, pady=(14, 8))
 
         ctk.CTkLabel(frame_top, text="CROQUIS DE UBICACIÓN GEOGRÁFICA",
-                     font=fuente_subtitulo, text_color=COLOR_MOSTAZA).pack(side="left", padx=15, pady=15)
+                     font=fuente_subtitulo, text_color=COLOR_MOSTAZA).pack(side="left")
 
-        self.btn_cargar_kmz = ctk.CTkButton(frame_top, text="Cargar KMZ", font=fuente_normal,
-                                            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0, command=self.cargar_kmz)
-        self.btn_cargar_kmz.pack(side="right", padx=15, pady=15)
-        ctk.CTkButton(frame_top, text="Limpiar ruta", font=FUENTE_NORMAL_PEQUENA,
+        ttk.Separator(self, orient="horizontal", bootstyle="secondary").pack(
+            fill="x", padx=20, pady=(0, 10))
+
+        data_group = ttk.Labelframe(
+            self, text="1. DATOS DEL PROYECTO", bootstyle="secondary")
+        self.data_group = data_group
+        data_group.pack(fill="x", padx=20, pady=(0, 10))
+        data_row = ctk.CTkFrame(data_group, fg_color=COLOR_FONDO, corner_radius=0)
+        data_row.pack(fill="x", padx=10, pady=10)
+
+        self.btn_cargar_kmz = ctk.CTkButton(
+            data_row, text="Cargar KMZ", font=fuente_normal, fg_color=COLOR_GRIS_BOTON,
+            hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0,
+            command=self.cargar_kmz)
+        self.btn_cargar_kmz.pack(side="right")
+        ctk.CTkButton(data_row, text="Limpiar ruta", font=FUENTE_NORMAL_PEQUENA,
                       fg_color="transparent", hover_color=COLOR_GRIS_BOTON,
                       text_color=COLOR_TEXTO_SUAVE, corner_radius=0,
-                      command=self.limpiar_kmz).pack(side="right", padx=(0, 6), pady=15)
+                      command=self.limpiar_kmz).pack(side="right", padx=(0, 6))
 
         self.lbl_kmz_status = ctk.CTkLabel(
-            frame_top, text="KMZ: No cargado", font=fuente_normal, text_color=COLOR_TEXTO_SUAVE)
-        self.lbl_kmz_status.pack(side="right", padx=(15, 0), pady=15)
+            data_row, text="KMZ: No cargado", font=fuente_normal,
+            text_color=COLOR_TEXTO_SUAVE, anchor="w")
+        self.lbl_kmz_status.pack(side="left", fill="x", expand=True)
 
-        # --- 2. Panel Central: Selección Automatizada ---
-        frame_main = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
-        frame_main.pack(fill="both", expand=True, padx=20, pady=5)
+        selection_group = ttk.Labelframe(
+            self, text="2. UBICACIÓN Y MAPA BASE", bootstyle="secondary")
+        self.selection_group = selection_group
+        selection_group.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+        frame_main = ctk.CTkFrame(
+            selection_group, fg_color=COLOR_FONDO, corner_radius=0)
+        frame_main.pack(fill="both", expand=True, padx=10, pady=10)
+        frame_main.grid_columnconfigure(1, weight=1)
+        frame_main.grid_columnconfigure(3, weight=1)
 
-        # A. Selector de Estructura (KMZ)
-        ctk.CTkLabel(frame_main, text="1. Seleccionar Enlace (desde KMZ):", font=fuente_normal,
-                     text_color=COLOR_ACENTO).grid(row=0, column=0, sticky="w", padx=20, pady=(20, 10))
-        self.combo_estructuras = ctk.CTkComboBox(frame_main, font=fuente_normal, width=400, values=[
+        ctk.CTkLabel(frame_main, text="Enlace desde KMZ:", font=fuente_normal,
+                     text_color=COLOR_ACENTO).grid(row=0, column=0, sticky="w", padx=(0, 12), pady=8)
+        self.combo_estructuras = ctk.CTkComboBox(frame_main, font=FUENTE_CAMPO, width=400, values=[
                                                  "Cargue un archivo KMZ..."], state="disabled", command=self.actualizar_coordenadas_ui)
         self.combo_estructuras.grid(
-            row=0, column=1, columnspan=3, sticky="w", padx=10, pady=(20, 10))
+            row=0, column=1, columnspan=3, sticky="ew", pady=8)
 
         ctk.CTkLabel(frame_main, text="Latitud GPS:", font=fuente_normal).grid(
-            row=1, column=0, sticky="w", padx=20, pady=5)
+            row=1, column=0, sticky="w", padx=(0, 12), pady=8)
         self.lbl_lat_val = ctk.CTkLabel(
             frame_main, text="---", font=fuente_normal, text_color=COLOR_TEXTO)
-        self.lbl_lat_val.grid(row=1, column=1, sticky="w", padx=10, pady=5)
+        self.lbl_lat_val.grid(row=1, column=1, sticky="w", pady=8)
 
         ctk.CTkLabel(frame_main, text="Longitud GPS:", font=fuente_normal).grid(
-            row=1, column=2, sticky="w", padx=20, pady=5)
+            row=1, column=2, sticky="w", padx=(20, 12), pady=8)
         self.lbl_lon_val = ctk.CTkLabel(
             frame_main, text="---", font=fuente_normal, text_color=COLOR_TEXTO)
-        self.lbl_lon_val.grid(row=1, column=3, sticky="w", padx=10, pady=5)
+        self.lbl_lon_val.grid(row=1, column=3, sticky="w", pady=8)
 
-        # B. Selector de Mapa Calibrado (JSON)
-        ctk.CTkLabel(frame_main, text="2. Seleccionar Mapa Base MOP:", font=fuente_normal,
-                     text_color=COLOR_ACENTO).grid(row=2, column=0, sticky="w", padx=20, pady=(25, 10))
+        ttk.Separator(frame_main, orient="horizontal", bootstyle="secondary").grid(
+            row=2, column=0, columnspan=4, sticky="ew", pady=10)
+        ctk.CTkLabel(frame_main, text="Mapa base MOP:", font=fuente_normal,
+                     text_color=COLOR_ACENTO).grid(row=3, column=0, sticky="w", padx=(0, 12), pady=8)
 
         lista_mapas = list(self.datos_mapas.keys()) if self.datos_mapas else [
             "No hay mapas calibrados válidos"]
         self.combo_mapas = ctk.CTkComboBox(
-            frame_main, font=fuente_normal, width=400, values=lista_mapas)
-        self.combo_mapas.grid(row=2, column=1, columnspan=3,
-                              sticky="w", padx=10, pady=(25, 10))
+            frame_main, font=FUENTE_CAMPO, width=400, values=lista_mapas)
+        self.combo_mapas.grid(row=3, column=1, columnspan=3, sticky="ew", pady=8)
         if not self.datos_mapas:
             self.combo_mapas.configure(state="disabled")
 
-        # --- NUEVO: C. Controles de Micro-Ajuste Manual ---
-        ctk.CTkLabel(frame_main, text="3. Micro-Ajuste en Píxeles (Opcional):", font=fuente_normal,
-                     text_color=COLOR_ACENTO).grid(row=3, column=0, sticky="w", padx=20, pady=(15, 5))
-
-        frame_ajustes = ctk.CTkFrame(frame_main, fg_color="transparent")
-        frame_ajustes.grid(row=4, column=0, columnspan=4,
-                           sticky="w", padx=20, pady=(0, 20))
+        ttk.Separator(frame_main, orient="horizontal", bootstyle="secondary").grid(
+            row=4, column=0, columnspan=4, sticky="ew", pady=10)
+        ctk.CTkLabel(frame_main, text="Microajuste opcional (px):", font=fuente_normal,
+                     text_color=COLOR_ACENTO).grid(row=5, column=0, sticky="w", padx=(0, 12), pady=8)
+        frame_ajustes = ctk.CTkFrame(frame_main, fg_color=COLOR_FONDO)
+        frame_ajustes.grid(row=5, column=1, columnspan=3, sticky="w", pady=8)
 
         # Ajuste X (Este / Oeste)
         ctk.CTkLabel(frame_ajustes, text="Este (+) / Oeste (-):",
                      font=fuente_normal).pack(side="left", padx=(0, 10))
         self.ent_ajuste_x = ctk.CTkEntry(
-            frame_ajustes, font=fuente_normal, width=60, corner_radius=0)
+            frame_ajustes, font=FUENTE_CAMPO, width=60, corner_radius=0)
         self.ent_ajuste_x.pack(side="left", padx=(0, 30))
         self.ent_ajuste_x.insert(0, "0")
 
@@ -273,14 +292,30 @@ class TabUbicacion(ctk.CTkFrame):
         ctk.CTkLabel(frame_ajustes, text="Sur (+) / Norte (-):",
                      font=fuente_normal).pack(side="left", padx=(0, 10))
         self.ent_ajuste_y = ctk.CTkEntry(
-            frame_ajustes, font=fuente_normal, width=60, corner_radius=0)
+            frame_ajustes, font=FUENTE_CAMPO, width=60, corner_radius=0)
         self.ent_ajuste_y.pack(side="left", padx=(0, 20))
         self.ent_ajuste_y.insert(0, "0")
 
-        # --- 3. Botón de Acción ---
-        self.btn_generar_croquis = ctk.CTkButton(self, text="GENERAR CROQUIS DE UBICACIÓN", image=obtener_icono("pin", 19), compound="left", font=fuente_subtitulo, fg_color=COLOR_ACENTO,
-                                                 hover_color=COLOR_ACENTO_HOVER, text_color="#FFFFFF", corner_radius=0, height=45, command=self.generar_croquis_png)
+        self.btn_generar_croquis = ctk.CTkButton(
+            self, text="GENERAR CROQUIS DE UBICACIÓN",
+            font=fuente_subtitulo,
+            fg_color=COLOR_ACENTO, hover_color=COLOR_ACENTO_HOVER,
+            text_color=COLOR_FONDO, corner_radius=0, height=45,
+            command=self.generar_croquis_png)
         self.btn_generar_croquis.pack(fill="x", padx=20, pady=(10, 20))
+
+    def ir_a_seccion(self, anchor):
+        target = {
+            "datos": getattr(self, "data_group", None),
+            "mapa": getattr(self, "selection_group", None),
+            "generar": getattr(self, "btn_generar_croquis", None),
+        }.get(anchor)
+        if target is None:
+            return
+        self.update_idletasks()
+        total = max(1, self.winfo_reqheight())
+        self._parent_canvas.yview_moveto(
+            max(0.0, min(1.0, target.winfo_y() / total)))
 
     def cargar_kmz(self):
         # Obtenemos la ventana madre real para evitar crasheos silenciosos de Tkinter

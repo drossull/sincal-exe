@@ -5,6 +5,7 @@ import customtkinter as ctk
 from sincal.runtime import ruta_recurso
 from sincal.ui.theme import (
     COLOR_ACENTO,
+    COLOR_BORDE,
     COLOR_MOSTAZA,
     COLOR_PANEL,
     COLOR_TEXTO,
@@ -35,55 +36,11 @@ class TabDocs(ctk.CTkFrame):
         self.color_texto = COLOR_TEXTO
         self.color_titulo = COLOR_MOSTAZA
 
-        marco = ctk.CTkFrame(self, fg_color="transparent")
-        marco.pack(fill="both", expand=True, padx=10, pady=10)
-        self.marco = marco
-        marco.grid_rowconfigure(0, weight=1)
-        marco.grid_columnconfigure(0, minsize=self._panel_width)
-        marco.grid_columnconfigure(2, weight=1)
-
-        self.lateral = ctk.CTkFrame(
-            marco, width=self._panel_width, fg_color=COLOR_PANEL,
-            corner_radius=RADIO_PANEL, border_width=1, border_color=COLOR_PANEL,
-        )
-        self.lateral.grid(row=0, column=0, sticky="nsew")
-        self.lateral.grid_propagate(False)
-        lateral = self.lateral
-
-        ctk.CTkLabel(
-            lateral, text="MANUAL SINCAL", font=self.fuente_subtitulo,
-            text_color=self.color_titulo,
-        ).pack(anchor="w", padx=8, pady=(5, 8))
-        ctk.CTkLabel(
-            lateral, text="Guías, recursos, módulos y comandos CAD.", font=FUENTE_NORMAL_PEQUENA,
-            text_color=COLOR_TEXTO_SUAVE, wraplength=245, justify="left",
-        ).pack(anchor="w", padx=8, pady=(0, 12))
-
-        self.busqueda = ctk.CTkEntry(
-            lateral, placeholder_text="Buscar comando o herramienta...",
-            font=self.fuente_normal, corner_radius=RADIO_CONTROL,
-        )
-        self.busqueda.pack(fill="x", padx=8, pady=(0, 8))
-        self.busqueda.bind("<KeyRelease>", self._filtrar_menu)
-
-        self.menu_container = ctk.CTkScrollableFrame(
-            lateral, fg_color="transparent", corner_radius=RADIO_CONTROL
-        )
-        self.menu_container.pack(fill="both", expand=True)
-
-        self.panel_grip = ctk.CTkFrame(
-            marco, width=7, fg_color=COLOR_PANEL, corner_radius=0,
-            cursor="sb_h_double_arrow",
-        )
-        self.panel_grip.grid(row=0, column=1, sticky="ns", padx=8)
-        self.panel_grip.bind("<ButtonPress-1>", self._iniciar_redimension_panel)
-        self.panel_grip.bind("<B1-Motion>", self._redimensionar_panel)
-
-        contenido = ctk.CTkFrame(marco, fg_color="transparent", corner_radius=RADIO_PANEL)
-        contenido.grid(row=0, column=2, sticky="nsew")
+        contenido = ctk.CTkFrame(self, fg_color=COLOR_PANEL, corner_radius=0)
+        contenido.pack(fill="both", expand=True, padx=20, pady=14)
 
         self.lbl_wiki_title = ctk.CTkLabel(
-            contenido, text="Documentación", font=self.fuente_subtitulo,
+            contenido, text="DOCUMENTACIÓN", font=self.fuente_subtitulo,
             text_color=self.color_titulo,
         )
         self.lbl_wiki_title.pack(anchor="w", padx=20, pady=(10, 0))
@@ -96,15 +53,25 @@ class TabDocs(ctk.CTkFrame):
         self.txt_wiki_content = ctk.CTkTextbox(
             contenido, font=self.fuente_normal, fg_color=COLOR_PANEL,
             text_color=self.color_texto, wrap="word", border_width=1,
-            border_color=COLOR_PANEL, corner_radius=RADIO_PANEL,
+            border_color=COLOR_BORDE, corner_radius=0,
         )
         self.txt_wiki_content.pack(fill="both", expand=True, padx=20, pady=10)
 
     def recargar_documentacion(self):
         self.temas = self._cargar_temas()
-        self._render_menu(self.temas)
         if self.temas:
             self.mostrar_tema(self.temas[0])
+
+    def obtener_navegacion(self):
+        return tuple(
+            (tema.get("titulo", "Tema"), tema.get("id", ""))
+            for tema in self.temas if tema.get("id"))
+
+    def mostrar_tema_por_id(self, topic_id):
+        for tema in self.temas:
+            if tema.get("id") == topic_id:
+                self.mostrar_tema(tema)
+                return
 
     def _leer_texto(self, *partes):
         ruta = ruta_recurso(*partes)
@@ -168,65 +135,6 @@ class TabDocs(ctk.CTkFrame):
             ))
         return "\n\n".join(bloques)
 
-    def _filtrar_menu(self, _evento=None):
-        consulta = self.busqueda.get().strip().lower()
-        filtrados = self.temas if not consulta else [
-            tema for tema in self.temas
-            if consulta in " ".join([
-                str(tema.get("titulo", "")), str(tema.get("categoria", "")),
-                str(tema.get("tags", "")), str(tema.get("contenido", "")),
-            ]).lower()
-        ]
-        self._render_menu(filtrados)
-
-    def _render_menu(self, temas):
-        for widget in self.menu_container.winfo_children():
-            widget.destroy()
-        self._menu_buttons = []
-        if not temas:
-            ctk.CTkLabel(
-                self.menu_container, text="No se encontraron temas.",
-                font=self.fuente_normal, text_color=COLOR_TEXTO_SUAVE,
-            ).pack(anchor="w", padx=8, pady=10)
-            return
-
-        categoria_actual = None
-        for tema in temas:
-            categoria = tema.get("categoria", "Otros")
-            if categoria != categoria_actual:
-                categoria_actual = categoria
-                ctk.CTkLabel(
-                    self.menu_container, text=categoria.upper(),
-                    font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_ACENTO,
-                ).pack(anchor="w", padx=8, pady=(12, 3))
-            button = ctk.CTkButton(
-                self.menu_container, text=tema.get("titulo", "Tema"),
-                font=self.fuente_menu, fg_color="transparent", hover_color=COLOR_PANEL,
-                text_color=self.color_texto, anchor="w", corner_radius=RADIO_CONTROL, height=44,
-                command=lambda seleccionado=tema: self.mostrar_tema(seleccionado),
-            )
-            button.pack(fill="x", padx=4, pady=1)
-            self._menu_buttons.append(button)
-        self.after_idle(self._actualizar_wrap_menu)
-
-    def _iniciar_redimension_panel(self, event):
-        self._drag_origin = event.x_root
-        self._drag_width = self._panel_width
-
-    def _redimensionar_panel(self, event):
-        delta = event.x_root - getattr(self, "_drag_origin", event.x_root)
-        self._panel_width = max(230, min(520, getattr(self, "_drag_width", 300) + delta))
-        self.lateral.configure(width=self._panel_width)
-        self.marco.grid_columnconfigure(0, minsize=self._panel_width)
-        self._actualizar_wrap_menu()
-
-    def _actualizar_wrap_menu(self):
-        wrap = max(170, self._panel_width - 54)
-        for button in self._menu_buttons:
-            label = getattr(button, "_text_label", None)
-            if label is not None:
-                label.configure(wraplength=wrap, justify="left")
-
     def mostrar_tema(self, tema):
         self.lbl_wiki_title.configure(text=tema.get("titulo", "Documentación").upper())
         self.lbl_categoria.configure(text=tema.get("categoria", ""))
@@ -235,3 +143,5 @@ class TabDocs(ctk.CTkFrame):
         self.txt_wiki_content.insert("1.0", tema.get("contenido", ""))
         self.txt_wiki_content.configure(state="disabled")
         self.txt_wiki_content.yview_moveto(0)
+        if hasattr(self.parent_app, "marcar_navegacion_pagina"):
+            self.parent_app.marcar_navegacion_pagina(tema.get("id", ""))

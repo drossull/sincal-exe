@@ -8,8 +8,8 @@ import customtkinter as ctk
 from PIL import Image, ImageDraw
 
 
-LIGHT_ICON = "#3E3F3A"
-DARK_ICON = "#A9BDBD"
+LIGHT_ICON = "#3A2F2B"
+DARK_ICON = "#F2F5F8"
 
 
 def _draw_icon(name: str, size: int, color: str) -> Image.Image:

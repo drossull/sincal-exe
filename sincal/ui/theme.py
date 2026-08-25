@@ -7,89 +7,124 @@ import customtkinter as ctk
 from ttkbootstrap import Style as BootstrapStyle
 from ttkbootstrap.style import Colors, ThemeDefinition
 
-try:
-    from ttkbootstrap.themes.standard import STANDARD_THEMES
-except ImportError:  # Permite mostrar un diagnóstico legible en instalaciones antiguas.
-    STANDARD_THEMES = {}
-
 from sincal.runtime import ruta_recurso_instalado
 
 
-TTK_PRESET_OSCURO = "nord"
-TTK_PRESET_CLARO = "sandstone"
+TTK_PRESET_OSCURO = "sincal-dark"
+TTK_PRESET_CLARO = "sincal-light"
 
-
-def _preset_colors(name, fallback):
-    definition = STANDARD_THEMES.get(name, {})
-    return dict(fallback, **definition.get("colors", {}))
-
-
-_NORD = {
-    "primary": "#88C0D0", "secondary": "#81A1C1", "success": "#A3BE8C",
-    "info": "#8FBCBB", "warning": "#EBCB8B", "danger": "#BF616A",
-    "light": "#ECEFF4", "dark": "#2E3440", "bg": "#2E3440",
-    "fg": "#ECEFF4", "selectbg": "#5E81AC", "selectfg": "#ECEFF4",
-    "border": "#4C566A", "inputfg": "#E5E9F0", "inputbg": "#3B4252",
-    "active": "#434C5E",
+# Paletas corporativas cerradas. No se introducen fondos negros ni blancos puros.
+PALETA_OSCURA = {
+    "fondo": "#1E1F25", "panel": "#3B3F4A", "acento": "#FFB000",
+    "texto": "#F2F5F8",
+}
+PALETA_CLARA = {
+    "acento": "#B1482C", "activo": "#E36F4A", "suave": "#FFB38A",
+    "fondo": "#F7E6D6", "texto": "#3A2F2B",
 }
 
 
+def _bootstrap_colors(palette, dark=False):
+    """Convierte una paleta SINCAL en los roles exigidos por ttkbootstrap."""
+    if dark:
+        return {
+            "primary": palette["acento"], "secondary": palette["panel"],
+            "success": palette["acento"], "info": palette["texto"],
+            "warning": palette["acento"], "danger": palette["acento"],
+            "light": palette["texto"], "dark": palette["fondo"],
+            "bg": palette["fondo"], "fg": palette["texto"],
+            "selectbg": palette["panel"], "selectfg": palette["texto"],
+            "border": palette["panel"], "inputfg": palette["texto"],
+            "inputbg": palette["panel"], "active": palette["panel"],
+        }
+    return {
+        "primary": palette["acento"], "secondary": palette["suave"],
+        "success": palette["acento"], "info": palette["activo"],
+        "warning": palette["activo"], "danger": palette["acento"],
+        "light": palette["fondo"], "dark": palette["texto"],
+        "bg": palette["fondo"], "fg": palette["texto"],
+        "selectbg": palette["suave"], "selectfg": palette["texto"],
+        "border": palette["activo"], "inputfg": palette["texto"],
+        "inputbg": palette["fondo"], "active": palette["suave"],
+    }
+
+
 def crear_estilo_bootstrap():
-    """Registra Nord localmente para no depender del catálogo de ttkbootstrap."""
+    """Registra únicamente los temas corporativos oscuro y claro."""
     style = BootstrapStyle()
-    if TTK_PRESET_OSCURO not in style.theme_names():
-        style.register_theme(ThemeDefinition(
-            name=TTK_PRESET_OSCURO,
-            themetype="dark",
-            colors=Colors(**_NORD),
-        ))
+    definitions = (
+        (TTK_PRESET_OSCURO, "dark", _bootstrap_colors(PALETA_OSCURA, dark=True)),
+        (TTK_PRESET_CLARO, "light", _bootstrap_colors(PALETA_CLARA)),
+    )
+    for name, theme_type, colors in definitions:
+        if name not in style.theme_names():
+            style.register_theme(ThemeDefinition(
+                name=name, themetype=theme_type, colors=Colors(**colors)))
     style.theme_use(TTK_PRESET_OSCURO)
+    armonizar_estilos_ttk(style, dark=True)
     return style
 
 
-_NORD_COLORS = _preset_colors(TTK_PRESET_OSCURO, {
-    "primary": _NORD["primary"], "secondary": _NORD["secondary"],
-    "bg": _NORD["bg"], "fg": _NORD["fg"], "border": _NORD["border"],
-    "inputfg": _NORD["inputfg"], "inputbg": _NORD["inputbg"],
-    "selectbg": _NORD["selectbg"], "active": _NORD["active"],
-})
-_SANDSTONE = _preset_colors(TTK_PRESET_CLARO, {
-    "secondary": "#8e8c84", "fg": "#3e3f3a", "inputfg": "#6E6D69",
-    "border": "#ced4da", "light": "#F8F5F0",
-})
+def armonizar_estilos_ttk(style, dark=True):
+    """Evita marcos ajenos a la paleta en Notebook, PanedWindow y LabelFrame."""
+    palette = PALETA_OSCURA if dark else PALETA_CLARA
+    background = palette["fondo"]
+    panel = palette.get("panel", palette.get("suave"))
+    accent = palette["acento"]
+    foreground = palette["texto"]
+    style.configure(
+        ".", background=background, foreground=foreground,
+        font=FUENTE_NORMAL, fieldbackground=background)
+    style.configure("TFrame", background=background)
+    style.configure("TPanedwindow", background=background)
+    for prefix in ("", "primary.", "secondary."):
+        style.configure(
+            f"{prefix}TLabelframe", background=background,
+            bordercolor=panel, lightcolor=panel, darkcolor=panel)
+        style.configure(
+            f"{prefix}TLabelframe.Label", background=background,
+            foreground=foreground, font=FUENTE_NORMAL)
+        style.configure(f"{prefix}TNotebook", background=background, borderwidth=0)
+        style.configure(
+            f"{prefix}TNotebook.Tab", background=panel,
+            foreground=foreground, font=FUENTE_NORMAL, padding=(10, 6))
+        style.map(
+            f"{prefix}TNotebook.Tab",
+            background=[("selected", accent), ("active", panel)],
+            foreground=[("selected", background), ("active", foreground)])
 
-# La variante clara conserva Sandstone cálido; la oscura usa la paleta Nord.
-COLOR_FONDO = ("#F8F5F0", _NORD_COLORS["bg"])
-COLOR_PANEL = ("#EEE9E1", _NORD_COLORS["inputbg"])
-COLOR_PANEL_OSCURO = ("#E4DDD3", _NORD_COLORS["border"])
-COLOR_BORDE = (_SANDSTONE["secondary"], _NORD_COLORS["selectbg"])
-COLOR_TEXTO = (_SANDSTONE["fg"], _NORD_COLORS["fg"])
-COLOR_TEXTO_SUAVE = (_SANDSTONE["inputfg"], _NORD_COLORS["inputfg"])
-COLOR_ACENTO = ("#B38B18", _NORD_COLORS["primary"])
-COLOR_ACENTO_HOVER = ("#967412", "#8FBCBB")
+
+COLOR_FONDO = (PALETA_CLARA["fondo"], PALETA_OSCURA["fondo"])
+COLOR_PANEL = COLOR_FONDO
+COLOR_PANEL_OSCURO = COLOR_FONDO
+COLOR_BORDE = (PALETA_CLARA["activo"], PALETA_OSCURA["panel"])
+COLOR_TEXTO = (PALETA_CLARA["texto"], PALETA_OSCURA["texto"])
+COLOR_TEXTO_SUAVE = (PALETA_CLARA["texto"], PALETA_OSCURA["texto"])
+COLOR_ACENTO = (PALETA_CLARA["acento"], PALETA_OSCURA["acento"])
+COLOR_ACENTO_HOVER = (PALETA_CLARA["activo"], PALETA_OSCURA["acento"])
 COLOR_MOSTAZA = COLOR_ACENTO
-COLOR_GRIS_BOTON = ("#DED7CD", _NORD_COLORS["inputbg"])
-COLOR_GRIS_BOTON_HOVER = ("#D0C6B8", _NORD_COLORS["active"])
-COLOR_SELECCION = ("#E7DDBE", _NORD_COLORS["selectbg"])
-COLOR_EXITO = ("#477A52", _NORD["success"])
-COLOR_ERROR = ("#A84842", _NORD["danger"])
+COLOR_GRIS_BOTON = (PALETA_CLARA["suave"], PALETA_OSCURA["panel"])
+COLOR_GRIS_BOTON_HOVER = (PALETA_CLARA["activo"], PALETA_OSCURA["acento"])
+COLOR_SELECCION = (PALETA_CLARA["suave"], PALETA_OSCURA["panel"])
+COLOR_EXITO = COLOR_ACENTO
+COLOR_ERROR = COLOR_ACENTO
 
 RADIO_CONTROL = 6
 RADIO_PANEL = 10
 
 FAMILIA_PRESSURA = "GT Pressura"
-# El archivo Bold aportado se identifica ante Windows como una familia propia,
-# no como una variante de GT Pressura. Usarlo explícitamente evita que Tk
-# sintetice una negrita distinta o sustituya la fuente silenciosamente.
+# Se conserva el nombre para diagnosticar el archivo distribuido, pero toda la
+# interfaz usa una sola familia. Así números y letras comparten métricas.
 FAMILIA_PRESSURA_BOLD = "GTPressura-Bold"
-FUENTE_TITULO = (FAMILIA_PRESSURA_BOLD, 28)
-FUENTE_TITULO_PEQUENO = (FAMILIA_PRESSURA_BOLD, 20)
-FUENTE_SUBTITULO = (FAMILIA_PRESSURA_BOLD, 18)
-FUENTE_SUBTITULO_PEQUENO = (FAMILIA_PRESSURA_BOLD, 15)
+FUENTE_TITULO = (FAMILIA_PRESSURA, 28, "bold")
+FUENTE_TITULO_PEQUENO = (FAMILIA_PRESSURA, 20, "bold")
+FUENTE_SUBTITULO = (FAMILIA_PRESSURA, 18, "bold")
+FUENTE_SUBTITULO_PEQUENO = (FAMILIA_PRESSURA, 15, "bold")
 FUENTE_MENU = (FAMILIA_PRESSURA, 13)
 FUENTE_NORMAL = (FAMILIA_PRESSURA, 13)
-FUENTE_NORMAL_PEQUENA = (FAMILIA_PRESSURA, 11)
-FUENTE_CONSOLA = ("Consolas", 11)
+FUENTE_NORMAL_PEQUENA = FUENTE_NORMAL
+FUENTE_CAMPO = (FAMILIA_PRESSURA, 11)
+FUENTE_CONSOLA = ("Consolas", 13)
 
 
 def registrar_fuentes() -> None:

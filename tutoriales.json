@@ -19,8 +19,8 @@
       "id": "interfaz-accesibilidad",
       "categoria": "Inicio",
       "titulo": "Temas y accesibilidad visual",
-      "tags": "tema nord ttkbootstrap claro oscuro fuente tamaño accesibilidad",
-      "contenido": "SINCAL inicia con el tema oscuro Nord. El selector lateral permite alternar rápidamente entre modo oscuro, claro cálido y el modo del sistema. Para escoger otro aspecto abre Ver → Tema ttkbootstrap: los submenús Oscuros y Claros muestran todos los temas disponibles en la biblioteca instalada.\n\nLa barra − / + del menú lateral cambia la escala de texto y controles de toda la aplicación. El menú lateral, la consola, Documentación y los paneles estructurales también pueden redimensionarse arrastrando sus bordes."
+      "tags": "tema corporativo ttkbootstrap claro oscuro sistema fuente tamaño accesibilidad",
+      "contenido": "SINCAL inicia con el tema corporativo oscuro, con un único fondo gris y realces mostaza. En Ver → Tema puedes escoger Oscuro, Claro cálido o Sistema; el modo claro usa beige y terracota sin blanco absoluto.\n\nLa barra − / + del menú lateral y Ver → Zoom texto cambian la escala de texto y controles. El ajuste se aplica después de soltar el control para mantener la interfaz fluida. La aplicación se organiza en un menú lateral retráctil, contenido central desplazable y un índice contextual En esta página. La consola única se muestra u oculta desde Ver y siempre se acopla abajo."
     },
     {
       "id": "integracion-cad",

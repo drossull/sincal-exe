@@ -12,7 +12,6 @@ from PIL import Image
 from ttkbootstrap.widgets import ToolTip
 from ttkbootstrap.widgets.tableview import Tableview
 
-from sincal.ui.icons import obtener_icono
 from sincal.cad.moldajes import parse_moldaje_detection
 from sincal.rebar.model import (
     CAPAS_ZAPATA,
@@ -35,6 +34,7 @@ from sincal.ui.theme import (
     COLOR_MOSTAZA,
     COLOR_PANEL,
     COLOR_TEXTO_SUAVE,
+    FUENTE_CAMPO,
     FUENTE_NORMAL,
     FUENTE_NORMAL_PEQUENA,
     FUENTE_SUBTITULO,
@@ -79,8 +79,7 @@ class TabArmaduras(ctk.CTkFrame):
         project_row.grid_columnconfigure(2, weight=1)
 
         self.btn_cargar_json = ctk.CTkButton(
-            project_row, text="Cargar JSON", image=obtener_icono("folder", 17),
-            compound="left", font=fuente_normal, fg_color=COLOR_GRIS_BOTON,
+            project_row, text="Cargar JSON", font=fuente_normal, fg_color=COLOR_GRIS_BOTON,
             hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=RADIO_CONTROL,
             command=self.cargar_json_bim,
         )
@@ -93,9 +92,8 @@ class TabArmaduras(ctk.CTkFrame):
             project_row, text="Archivo: Ninguno", font=fuente_normal,
             text_color=COLOR_TEXTO_SUAVE, anchor="w", justify="left", wraplength=430)
         self.lbl_json_status.grid(row=0, column=2, sticky="ew", padx=(14, 4))
-        self.ent_z_esviaje = ttk.Spinbox(
-            project_row, from_=-89, to=89, increment=0.5, width=7,
-            font=fuente_normal, bootstyle="secondary")
+        self.ent_z_esviaje = ttk.Entry(
+            project_row, width=7, font=FUENTE_CAMPO, bootstyle="secondary")
         self.ent_z_esviaje.insert(0, "0")
         self.ent_z_esviaje.grid(row=0, column=1, sticky="w", padx=(4, 0))
         ctk.CTkLabel(project_row, text="Esviaje (°):", font=FUENTE_NORMAL_PEQUENA,
@@ -110,6 +108,10 @@ class TabArmaduras(ctk.CTkFrame):
         tab_travesanos = ctk.CTkFrame(self.tab_maestro, fg_color=COLOR_FONDO, corner_radius=0)
         self.tab_maestro.add(tab_estribos, text="1. Estribos")
         self.tab_maestro.add(tab_travesanos, text="2. Travesaños")
+        ttk.Separator(tab_estribos, orient="horizontal", bootstyle="secondary").pack(
+            fill="x", padx=8, pady=(8, 4))
+        ttk.Separator(tab_travesanos, orient="horizontal", bootstyle="secondary").pack(
+            fill="x", padx=8, pady=(8, 4))
 
         # =========================================================
         # CONTENIDO: 1. ESTRIBOS
@@ -150,7 +152,7 @@ class TabArmaduras(ctk.CTkFrame):
             row=1, column=0, sticky="w", padx=5, pady=5)
         self.ent_t_rec = ttk.Spinbox(
             frame_params, from_=0, to=30, increment=0.5, width=7,
-            font=fuente_normal, bootstyle="secondary")
+            font=FUENTE_CAMPO, bootstyle="secondary")
         self.ent_t_rec.grid(row=1, column=1, padx=5, pady=5)
         self.ent_t_rec.insert(0, "2.5")
 
@@ -158,15 +160,14 @@ class TabArmaduras(ctk.CTkFrame):
             row=1, column=2, sticky="w", padx=20, pady=5)
         self.ent_t_espesor = ttk.Spinbox(
             frame_params, from_=1, to=1000, increment=1, width=7,
-            font=fuente_normal, bootstyle="secondary")
+            font=FUENTE_CAMPO, bootstyle="secondary")
         self.ent_t_espesor.grid(row=1, column=3, padx=5, pady=5)
         self.ent_t_espesor.insert(0, "25")
 
         ctk.CTkLabel(frame_params, text="Ángulo de esviaje (°):", font=fuente_normal).grid(
             row=1, column=4, sticky="w", padx=20, pady=5)
-        self.ent_t_esviaje = ttk.Spinbox(
-            frame_params, from_=-89, to=89, increment=0.5, width=7,
-            font=fuente_normal, bootstyle="secondary")
+        self.ent_t_esviaje = ttk.Entry(
+            frame_params, width=7, font=FUENTE_CAMPO, bootstyle="secondary")
         self.ent_t_esviaje.grid(row=1, column=5, padx=5, pady=5)
         self.ent_t_esviaje.insert(0, "0")
 
@@ -174,7 +175,7 @@ class TabArmaduras(ctk.CTkFrame):
             row=2, column=0, sticky="w", padx=5, pady=5)
         self.ent_t_phi_ext = ttk.Spinbox(
             frame_params, values=(12, 16, 18, 22, 25, 28, 32, 36), width=7,
-            font=fuente_normal, bootstyle="secondary")
+            font=FUENTE_CAMPO, bootstyle="secondary")
         self.ent_t_phi_ext.grid(row=2, column=1, padx=5, pady=5)
         self.ent_t_phi_ext.insert(0, "22")
 
@@ -182,7 +183,7 @@ class TabArmaduras(ctk.CTkFrame):
             row=2, column=2, sticky="w", padx=20, pady=5)
         self.ent_t_phi_horiz = ttk.Spinbox(
             frame_params, values=(12, 16, 18, 22, 25, 28, 32, 36), width=7,
-            font=fuente_normal, bootstyle="secondary")
+            font=FUENTE_CAMPO, bootstyle="secondary")
         self.ent_t_phi_horiz.grid(row=2, column=3, padx=5, pady=5)
         self.ent_t_phi_horiz.insert(0, "12")
 
@@ -190,7 +191,7 @@ class TabArmaduras(ctk.CTkFrame):
             row=2, column=4, sticky="w", padx=20, pady=5)
         self.ent_t_phi_estr = ttk.Spinbox(
             frame_params, values=(12, 16, 18, 22, 25, 28, 32, 36), width=7,
-            font=fuente_normal, bootstyle="secondary")
+            font=FUENTE_CAMPO, bootstyle="secondary")
         self.ent_t_phi_estr.grid(row=2, column=5, padx=5, pady=5)
         self.ent_t_phi_estr.insert(0, "12")
 
@@ -198,7 +199,7 @@ class TabArmaduras(ctk.CTkFrame):
             row=3, column=0, sticky="w", padx=5, pady=5)
         self.ent_viga_largo = ttk.Spinbox(
             frame_params, from_=1, to=1200, increment=1, width=7,
-            font=fuente_normal, bootstyle="secondary")
+            font=FUENTE_CAMPO, bootstyle="secondary")
         self.ent_viga_largo.grid(row=3, column=1, padx=5, pady=5)
         self.ent_viga_largo.insert(0, "200")
 
@@ -206,7 +207,7 @@ class TabArmaduras(ctk.CTkFrame):
             row=3, column=2, sticky="w", padx=20, pady=5)
         self.ent_t_cantidad = ttk.Spinbox(
             frame_params, from_=1, to=100, increment=1, width=7,
-            font=fuente_normal, bootstyle="secondary")
+            font=FUENTE_CAMPO, bootstyle="secondary")
         self.ent_t_cantidad.grid(row=3, column=3, padx=5, pady=5)
         self.ent_t_cantidad.insert(0, "1")
 
@@ -276,6 +277,24 @@ class TabArmaduras(ctk.CTkFrame):
         if self.parent_app._sections.get("estructural", (None,))[0].winfo_manager():
             self.parent_app.actualizar_ruta_interna(*segments)
 
+    def ir_a_seccion(self, anchor):
+        """Desplaza la página del estribo actual desde el índice contextual."""
+        if not self.tab_maestro.tab(self.tab_maestro.select(), "text").startswith("1."):
+            return
+        key = "entrada" if self.tab_estribo.index("current") == 0 else "salida"
+        state = self._abutments[key]
+        target = {
+            "dimensiones": state.get("configuration_panel"),
+            "revision": state.get("revision_panel"),
+            "despiece": state.get("geometry_group"),
+        }.get(anchor)
+        page = state.get("page")
+        if target is None or page is None:
+            return
+        page.update_idletasks()
+        total = max(1, page.winfo_reqheight())
+        page._parent_canvas.yview_moveto(max(0.0, min(1.0, target.winfo_y() / total)))
+
     def _setup_abutment_page(self, parent, key, title):
         """Construye un estribo independiente en un panel redimensionable."""
         state = {
@@ -291,27 +310,33 @@ class TabArmaduras(ctk.CTkFrame):
         }
         self._abutments[key] = state
 
-        split = ttk.Panedwindow(parent, orient="horizontal", bootstyle="secondary")
-        split.pack(fill="both", expand=True, padx=10, pady=10)
-        revision = ctk.CTkFrame(split, width=500, fg_color="transparent", corner_radius=0)
-        configuration_pane = ctk.CTkFrame(
-            split, fg_color="transparent", corner_radius=0,
-        )
-        configuration = ctk.CTkScrollableFrame(
-            configuration_pane, fg_color="transparent", corner_radius=0,
+        ttk.Separator(parent, orient="horizontal", bootstyle="secondary").pack(
+            fill="x", padx=10, pady=(8, 0))
+        page = ctk.CTkScrollableFrame(
+            parent, fg_color=COLOR_FONDO, corner_radius=0,
             scrollbar_button_color=COLOR_GRIS_BOTON,
-            scrollbar_button_hover_color=COLOR_GRIS_BOTON_HOVER,
+            scrollbar_button_hover_color=COLOR_GRIS_BOTON_HOVER)
+        page.pack(fill="both", expand=True, padx=10, pady=10)
+        configuration_pane = ttk.Labelframe(
+            page, text="1. DIMENSIONES Y CONFIGURACIÓN", bootstyle="secondary")
+        configuration_pane.pack(fill="x", padx=2, pady=(2, 10))
+        revision_pane = ttk.Labelframe(
+            page, text="2. REVISIÓN Y MARCAS", bootstyle="secondary")
+        revision_pane.pack(fill="x", padx=2, pady=(0, 10))
+        configuration = ctk.CTkFrame(
+            configuration_pane, fg_color=COLOR_FONDO, corner_radius=0,
         )
         configuration.pack(fill="both", expand=True)
-        split.add(revision, weight=2)
-        split.add(configuration_pane, weight=3)
+        revision = ctk.CTkFrame(
+            revision_pane, fg_color=COLOR_FONDO, corner_radius=0)
+        revision.pack(fill="both", expand=True)
         state["parent"] = parent
-        state["revision_panel"] = revision
+        state["page"] = page
+        state["revision_panel"] = revision_pane
         state["configuration_panel"] = configuration_pane
-        state["panedwindow"] = split
 
-        self._setup_zapata_revision(revision, state)
         self._setup_abutment_configuration(configuration, state)
+        self._setup_zapata_revision(revision, state)
         self.actualizar_revision_zapata(key, notificar=False)
 
     @staticmethod
@@ -330,7 +355,7 @@ class TabArmaduras(ctk.CTkFrame):
             row=row, column=column, sticky="w", padx=(0, 6), pady=4)
         entry = ttk.Spinbox(
             parent, from_=0, to=100000, increment=0.5, width=10,
-            font=FUENTE_NORMAL, bootstyle="secondary")
+            font=FUENTE_CAMPO, bootstyle="secondary")
         entry.insert(0, default)
         entry.grid(row=row, column=column + 1, sticky="w", padx=(0, 14), pady=4)
         state["entries"][key] = entry
@@ -348,9 +373,13 @@ class TabArmaduras(ctk.CTkFrame):
             justify="left", wraplength=640,
         ).pack(anchor="w", padx=8, pady=(2, 8))
 
-        self._section_heading(parent, "1. ZAPATA")
-        geometry = ctk.CTkFrame(parent, fg_color="transparent", corner_radius=0)
-        geometry.pack(fill="x", padx=8)
+        geometry_group = ttk.Labelframe(
+            parent, text="1. ZAPATA", bootstyle="secondary")
+        state["geometry_group"] = geometry_group
+        geometry_group.pack(fill="x", padx=8, pady=(8, 4))
+        geometry = ctk.CTkFrame(
+            geometry_group, fg_color=COLOR_FONDO, corner_radius=0)
+        geometry.pack(fill="x", padx=8, pady=8)
         self._labeled_entry(geometry, state, "largo", "Largo (cm):", "750", 0, 0)
         self._labeled_entry(geometry, state, "ancho", "Ancho (cm):", "1159.6", 0, 2)
         self._labeled_entry(geometry, state, "alto", "Alto (cm):", "150", 1, 0)
@@ -370,7 +399,7 @@ class TabArmaduras(ctk.CTkFrame):
             row = 5 + index // 3
             column = index % 3
             ttk.Button(
-                geometry, text=text, width=12, bootstyle="secondary-outline",
+                geometry, text=text, width=12, bootstyle="secondary",
                 command=lambda v=view, k=state["key"]: self.generar_vista_cad(v, k),
             ).grid(row=row, column=column, sticky="ew", padx=(0, 3), pady=3)
         for column in range(3):
@@ -387,17 +416,20 @@ class TabArmaduras(ctk.CTkFrame):
             ("5. CONTRAFUERTE", "Contrafuerte opcional (CTF)."),
         )
         for title, description in pending_sections:
-            self._section_heading(parent, title)
+            group = ttk.Labelframe(parent, text=title, bootstyle="secondary")
+            group.pack(fill="x", padx=8, pady=5)
+            ttk.Separator(group, orient="horizontal", bootstyle="secondary").pack(
+                fill="x", padx=8, pady=(5, 2))
             ctk.CTkLabel(
-                parent, text=f"{description} Configuración pendiente de la lógica de armaduras.",
+                group, text=f"{description} Configuración pendiente de la lógica de armaduras.",
                 font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE,
                 justify="left", wraplength=640,
-            ).pack(anchor="w", padx=8, pady=(0, 10))
+            ).pack(anchor="w", padx=8, pady=(2, 10))
 
     def _setup_zapata_revision(self, parent, state):
         """Tabla editable y única de armadura para un estribo."""
         ctk.CTkLabel(
-            parent, text="REVISIÓN Y MARCAS", font=FUENTE_SUBTITULO,
+            parent, text="ARMADURAS Y MARCAS", font=FUENTE_SUBTITULO,
             text_color=COLOR_MOSTAZA,
         ).pack(anchor="w", padx=14, pady=(14, 2))
         ctk.CTkLabel(
@@ -408,33 +440,33 @@ class TabArmaduras(ctk.CTkFrame):
             justify="left", wraplength=600,
         ).pack(anchor="w", padx=14, pady=(0, 10))
 
-        detector = ctk.CTkFrame(parent, fg_color="transparent")
-        detector.pack(fill="x", padx=14, pady=(0, 8))
-        ctk.CTkLabel(
-            detector, text="MOLDAJES CAD — DIBUJO ACTIVO", font=FUENTE_NORMAL_PEQUENA,
-            text_color=COLOR_ACENTO,
-        ).grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 4))
+        detector_group = ttk.Labelframe(
+            parent, text="MOLDAJES CAD — DIBUJO ACTIVO", bootstyle="secondary")
+        detector_group.pack(fill="x", padx=14, pady=(0, 8))
+        detector = ctk.CTkFrame(
+            detector_group, fg_color=COLOR_FONDO, corner_radius=0)
+        detector.pack(fill="x", padx=8, pady=8)
         detect_button = ctk.CTkButton(
             detector, text="Detectar moldajes", font=FUENTE_NORMAL, corner_radius=0,
             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
             command=lambda k=state["key"]: self.detectar_moldajes_cad(k),
         )
-        detect_button.grid(row=1, column=0, sticky="w", padx=(0, 10))
+        detect_button.grid(row=0, column=0, sticky="w", padx=(0, 10))
         confirm_button = ctk.CTkButton(
             detector, text="Confirmar selección", font=FUENTE_NORMAL, corner_radius=0,
             fg_color="transparent", border_width=1, border_color=COLOR_ACENTO,
             hover_color=COLOR_GRIS_BOTON,
             command=lambda k=state["key"]: self.confirmar_moldajes_cad(k),
         )
-        confirm_button.grid(row=1, column=1, sticky="w")
+        confirm_button.grid(row=0, column=1, sticky="w")
         moldaje_status = ctk.CTkLabel(
             detector, text="Sin lectura CAD.", font=FUENTE_NORMAL_PEQUENA,
             text_color=COLOR_TEXTO_SUAVE,
         )
-        moldaje_status.grid(row=1, column=2, columnspan=2, sticky="w", padx=12)
+        moldaje_status.grid(row=0, column=2, columnspan=2, sticky="w", padx=12)
 
         for index, layer in enumerate(CAPAS_ZAPATA):
-            row = 2 + index
+            row = 1 + index
             column = 0
             layer_label = ctk.CTkLabel(
                 detector, text=layer, font=FUENTE_NORMAL_PEQUENA)
@@ -451,8 +483,12 @@ class TabArmaduras(ctk.CTkFrame):
             option.grid(row=row, column=column + 1, columnspan=3, sticky="ew", padx=(0, 5), pady=3)
             state["moldaje_option_vars"][layer] = (value, option)
 
-        table = ctk.CTkScrollableFrame(parent, fg_color="transparent", corner_radius=0, height=215)
-        table.pack(fill="x", padx=14, pady=(0, 8))
+        table_group = ttk.Labelframe(
+            parent, text="PARÁMETROS DE ARMADURA", bootstyle="secondary")
+        table_group.pack(fill="x", padx=14, pady=(0, 8))
+        table = ctk.CTkScrollableFrame(
+            table_group, fg_color=COLOR_FONDO, corner_radius=0, height=215)
+        table.pack(fill="x", padx=8, pady=8)
         headers = ("Grupo", "Marca base", "Ø mm", "@ cm", "Gancho cm", "Origen", "Activo")
         for column, text in enumerate(headers):
             header = ctk.CTkLabel(
@@ -468,25 +504,23 @@ class TabArmaduras(ctk.CTkFrame):
             ctk.CTkLabel(table, text=rule.label, font=FUENTE_NORMAL, anchor="w").grid(
                 row=row, column=0, sticky="ew", padx=5, pady=3)
             widgets = {}
-            mark_entry = ttk.Entry(table, width=8, font=FUENTE_NORMAL, bootstyle="secondary")
+            mark_entry = ttk.Entry(table, width=8, font=FUENTE_CAMPO, bootstyle="secondary")
             mark_entry.insert(0, rule.mark)
             mark_entry.grid(row=row, column=1, sticky="w", padx=5, pady=3)
             widgets["mark"] = mark_entry
-            diameter = ttk.Spinbox(
+            diameter = ttk.Combobox(
                 table, values=(12, 16, 18, 22, 25, 28, 32, 36), width=6,
-                font=FUENTE_NORMAL, bootstyle="secondary")
-            diameter.insert(0, f"{rule.diameter_mm:g}")
+                font=FUENTE_CAMPO, bootstyle="secondary", state="readonly")
+            diameter.set(f"{rule.diameter_mm:g}")
             diameter.grid(row=row, column=2, sticky="w", padx=5, pady=3)
             widgets["diameter"] = diameter
-            spacing = ttk.Spinbox(
-                table, from_=5, to=100, increment=5, width=6,
-                font=FUENTE_NORMAL, bootstyle="secondary")
+            spacing = ttk.Entry(
+                table, width=6, font=FUENTE_CAMPO, bootstyle="secondary")
             spacing.insert(0, f"{rule.spacing_cm:g}")
             spacing.grid(row=row, column=3, sticky="w", padx=5, pady=3)
             widgets["spacing"] = spacing
-            hook = ttk.Spinbox(
-                table, from_=0, to=500, increment=10, width=8,
-                font=FUENTE_NORMAL, bootstyle="secondary")
+            hook = ttk.Entry(
+                table, width=8, font=FUENTE_CAMPO, bootstyle="secondary")
             hook.insert(0, f"{rule.hook_cm:g}")
             hook.grid(row=row, column=4, sticky="w", padx=5, pady=3)
             widgets["hook"] = hook
@@ -496,10 +530,10 @@ class TabArmaduras(ctk.CTkFrame):
             origin_frame.grid(row=row, column=5, sticky="w", padx=5, pady=3)
             start_radio = ttk.Radiobutton(
                 origin_frame, text="I", value="Inicio", variable=origin,
-                bootstyle="info-toolbutton")
+                bootstyle="primary-toolbutton")
             end_radio = ttk.Radiobutton(
                 origin_frame, text="F", value="Final", variable=origin,
-                bootstyle="info-toolbutton")
+                bootstyle="primary-toolbutton")
             start_radio.pack(side="left")
             end_radio.pack(side="left", padx=(2, 0))
             ToolTip(start_radio, text="Distribuir desde el inicio topológico.", bootstyle="info-inverse")
