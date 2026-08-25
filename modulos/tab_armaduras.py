@@ -3,6 +3,7 @@ import math
 import os
 import threading
 import time
+from dataclasses import replace
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
@@ -17,6 +18,7 @@ from sincal_rebar_model import (
     build_zapata_schedule,
     default_zapata_rules,
 )
+from sincal_zapata_cad import ZapataCadError, build_zapata_lisp
 from sincal_runtime import ruta_recurso, ruta_runtime
 from sincal_ui import (
     COLOR_ACENTO,
@@ -415,7 +417,7 @@ class TabArmaduras(ctk.CTkFrame):
 
         table = ctk.CTkScrollableFrame(parent, fg_color="transparent", corner_radius=0, height=215)
         table.pack(fill="x", padx=14, pady=(0, 8))
-        headers = ("Grupo", "Marca", "Ø mm", "@ cm", "Gancho cm", "Activo")
+        headers = ("Grupo", "Marca base", "Ø mm", "@ cm", "Gancho cm", "Origen", "Activo")
         for column, text in enumerate(headers):
             ctk.CTkLabel(
                 table, text=text, font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_ACENTO,
@@ -436,9 +438,16 @@ class TabArmaduras(ctk.CTkFrame):
                 entry.grid(row=row, column=column, sticky="w", padx=5, pady=3)
                 widgets[key] = entry
             enabled = ctk.BooleanVar(value=rule.enabled)
+            origin = ctk.StringVar(value=rule.origin.title())
+            ctk.CTkOptionMenu(
+                table, variable=origin, values=["Inicio", "Final"], width=78,
+                font=FUENTE_NORMAL_PEQUENA, corner_radius=0,
+                fg_color=COLOR_GRIS_BOTON, button_color=COLOR_GRIS_BOTON_HOVER,
+            ).grid(row=row, column=5, sticky="w", padx=5, pady=3)
             ctk.CTkCheckBox(table, text="", variable=enabled, width=24, corner_radius=0).grid(
-                row=row, column=5, sticky="w", padx=5, pady=3)
+                row=row, column=6, sticky="w", padx=5, pady=3)
             widgets["enabled"] = enabled
+            widgets["origin"] = origin
             widgets["template"] = rule
             state["rule_widgets"][rule.key] = widgets
 
@@ -450,7 +459,7 @@ class TabArmaduras(ctk.CTkFrame):
             command=lambda k=state["key"]: self.actualizar_revision_zapata(k),
         ).pack(side="left")
         ctk.CTkLabel(
-            controls, text="Los grupos lateral y suple requieren definición manual en la siguiente etapa.",
+            controls, text="Gancho 0 = automático. Suple 3-A es opcional.",
             font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
         ).pack(side="left", padx=12)
 
@@ -487,6 +496,20 @@ class TabArmaduras(ctk.CTkFrame):
   )
   found
 )
+(defun sincal:vertices-text (data / result point)
+  (setq result "")
+  (foreach pair data
+    (if (= (car pair) 10)
+      (progn
+        (setq point (cdr pair))
+        (setq result
+          (strcat result (if (= result "") "" ";")
+                  (rtos (car point) 2 9) "," (rtos (cadr point) 2 9)))
+      )
+    )
+  )
+  result
+)
 (defun c:SINCAL-DETECTAR-ZAPATA (/ out layer ss index ent data status count obj area-result area)
   (setq out (open "{ruta_lisp}" "w"))
   (write-line "SINCAL_MOLDAJES_V1" out)
@@ -510,6 +533,9 @@ class TabArmaduras(ctk.CTkFrame):
           (write-line
             (strcat "CANDIDATE|" layer "|" (cdr (assoc 5 data)) "|" status "|"
                     (itoa count) "|" (rtos area 2 6)) out)
+          (write-line
+            (strcat "VERTICES|" layer "|" (cdr (assoc 5 data)) "|"
+                    (sincal:vertices-text data)) out)
           (setq index (1+ index))
         )
       )
@@ -617,17 +643,14 @@ class TabArmaduras(ctk.CTkFrame):
         rules = []
         for widgets in state["rule_widgets"].values():
             template = widgets["template"]
-            rules.append(RebarRule(
-                key=template.key,
-                label=template.label,
+            rules.append(replace(
+                template,
                 mark=widgets["mark"].get().strip(),
                 diameter_mm=self._entry_number(widgets["diameter"], f"Diámetro de {template.label}"),
                 spacing_cm=self._entry_number(widgets["spacing"], f"Espaciamiento de {template.label}"),
                 hook_cm=self._entry_number(widgets["hook"], f"Gancho de {template.label}"),
-                level=template.level,
-                direction=template.direction,
                 enabled=widgets["enabled"].get(),
-                automatic=template.automatic,
+                origin=widgets["origin"].get().lower(),
             ))
         return tuple(rules)
 
@@ -693,11 +716,36 @@ class TabArmaduras(ctk.CTkFrame):
                 f"Confirma primero un moldaje válido para {layer}. SINCAL no adivina ni modifica contornos.",
             )
             return
-        messagebox.showinfo(
-            "Workbench",
-            f"{state['title'].title()} · vista {vista}: moldaje {layer} confirmado "
-            f"(handle {candidate.handle}).\n\n"
-            "La revisión de marcas ya está lista. La generación gráfica será la siguiente etapa y no ha modificado el DWG.",
+        entries = state["entries"]
+        try:
+            geometry = ZapataGeometry.from_centimetres(
+                self._entry_number(entries["largo"], "Largo"),
+                self._entry_number(entries["ancho"], "Ancho"),
+                self._entry_number(entries["alto"], "Alto"),
+                self._entry_number(self.ent_z_esviaje, "Esviaje"),
+            )
+            cover = Cover.from_centimetres(
+                self._entry_number(entries["rec_inf"], "Recubrimiento inferior"),
+                self._entry_number(entries["rec_sup"], "Recubrimiento superior"),
+                self._entry_number(entries["rec_lat"], "Recubrimiento lateral"),
+            )
+            rules = self._read_zapata_rules(abutment_key)
+            lisp = build_zapata_lisp(vista, candidate, geometry, cover, rules, abutment_key)
+            token = str(int(time.time() * 1000))
+            ruta_lisp = ruta_runtime(f"SINCAL_ZAPATA_{abutment_key}_{vista}_{token}.lsp")
+            with open(ruta_lisp, "w", encoding="utf-8") as archivo:
+                archivo.write(lisp)
+        except (OSError, ValueError, ZapataCadError) as error:
+            messagebox.showerror("Workbench", f"No se pudo preparar la vista {vista}:\n{error}")
+            return
+        ruta_cad = ruta_lisp.replace("\\", "\\\\")
+        self.parent_app.enviar_comando_cad_activo(
+            f'(progn (load "{ruta_cad}") (c:SINCAL-ZAPATA-GENERAR))\n',
+            f"Generación de zapata {state['title'].lower()} · {vista}",
+        )
+        self.parent_app.log_r(
+            f"[*] Vista {vista} enviada a CAD para {state['title'].lower()}; "
+            "sólo se reemplazan entidades SINCAL de esa vista."
         )
 
     def generar_despiece_cad(self, vista, abutment_key="entrada"):

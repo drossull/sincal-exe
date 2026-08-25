@@ -69,7 +69,7 @@ Con AutoCAD, SINCAL usa `accoreconsole.exe`. Con ZWCAD 2025/2026, crea una insta
 
 Prepara vistas, despieces y cubicación de fierro mediante comandos temporales enviados al CAD abierto:
 
-- Estribos: separa **Estribo de entrada** y **Estribo de salida**, cada uno con su propio set de marcas, moldajes confirmados y cálculo. La revisión editable queda a la izquierda; a la derecha, una sola página desplazable ordena Zapata, Muros, Consolas, Topes y Contrafuerte. Los diámetros, espaciamientos, marcas y ganchos se editan únicamente en **Revisión y marcas**, mientras la geometría y los recubrimientos se declaran una sola vez en su elemento. La fase 1 detecta moldajes cerrados de zapata por vista (`FR_ZAP` a `EE_ZAP`) y exige `INSUNITS = 6`.
+- Estribos: separa **Estribo de entrada** y **Estribo de salida**, cada uno con su propio set de marcas, moldajes confirmados y cálculo. La revisión editable queda a la izquierda; a la derecha, una sola página desplazable ordena Zapata, Muros, Consolas, Topes y Contrafuerte. La zapata calcula las marcas 1–6, el suple 3-A opcional, empalmes 1–2/4–5 y las variantes excepcionales 2-A/5-A. Los diámetros, espaciamientos, origen de distribución, marcas y ganchos se editan únicamente en **Revisión y marcas**, mientras la geometría y los recubrimientos se declaran una sola vez en su elemento. La detección lee moldajes cerrados por vista (`FR_ZAP` a `EE_ZAP`), conserva sus vértices y exige `INSUNITS = 6`.
 - Travesaños: extremos, cuadrantes sobre tope, macizos y viga; geometría y despiece.
 - JSON de proyecto: importa parámetros compatibles y los convierte a las unidades de la interfaz.
 

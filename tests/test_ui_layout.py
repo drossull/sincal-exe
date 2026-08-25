@@ -93,6 +93,8 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('self._abutments = {}', source)
         self.assertIn("default_zapata_rules", source)
         self.assertIn("def actualizar_revision_zapata", source)
+        self.assertIn("build_zapata_lisp", source)
+        self.assertIn("SINCAL-ZAPATA-GENERAR", source)
         self.assertIn('("D-D", "DD")', source)
         self.assertIn('("E-E", "EE")', source)
         self.assertNotIn("self.ent_phi_inf", source)

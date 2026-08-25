@@ -14,6 +14,7 @@ class MoldajeCandidate:
     status: str
     vertex_count: int
     area_m2: float
+    vertices: tuple[tuple[float, float], ...] = ()
 
     @property
     def is_valid(self) -> bool:
@@ -41,6 +42,7 @@ def parse_moldaje_detection(text: str) -> MoldajeDetection:
     """Lee el formato de texto sencillo emitido por SINCAL-DETECTAR-ZAPATA."""
     insunits = None
     candidates = []
+    vertices_by_handle = {}
     for raw_line in text.splitlines():
         parts = [part.strip() for part in raw_line.split("|")]
         if not parts or not parts[0]:
@@ -64,4 +66,17 @@ def parse_moldaje_detection(text: str) -> MoldajeDetection:
                 ))
             except ValueError:
                 continue
-    return MoldajeDetection(insunits=insunits, candidates=tuple(candidates))
+        elif parts[0] == "VERTICES" and len(parts) == 4:
+            try:
+                vertices_by_handle[parts[2].upper()] = tuple(
+                    tuple(float(coordinate) for coordinate in point.split(","))
+                    for point in parts[3].split(";") if point
+                )
+            except ValueError:
+                continue
+    enriched = tuple(MoldajeCandidate(
+        candidate.layer, candidate.handle, candidate.status,
+        candidate.vertex_count, candidate.area_m2,
+        vertices_by_handle.get(candidate.handle, ()),
+    ) for candidate in candidates)
+    return MoldajeDetection(insunits=insunits, candidates=enriched)
