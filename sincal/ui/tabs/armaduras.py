@@ -677,6 +677,10 @@ class TabArmaduras(ctk.CTkFrame):
         state["moldaje_result_path"] = ruta_salida
         state["moldaje_deadline"] = time.monotonic() + 18
         state["moldaje_status"].configure(text="Leyendo dibujo activo…", text_color=COLOR_ACENTO)
+        self.parent_app.iniciar_actividad(
+            f"moldajes_{abutment_key}",
+            f"Detectando moldajes · {state['title']}",
+        )
         ruta_cad = ruta_lisp.replace("\\", "\\\\")
         comando = f'(progn (load "{ruta_cad}") (c:SINCAL-DETECTAR-ZAPATA))\n'
         self.parent_app.enviar_comando_cad_activo(
@@ -693,14 +697,17 @@ class TabArmaduras(ctk.CTkFrame):
             except (OSError, ValueError) as error:
                 state["moldaje_status"].configure(
                     text=f"Error leyendo resultado: {error}", text_color="#D06A5D")
+                self.parent_app.finalizar_actividad(f"moldajes_{abutment_key}")
                 return
             self._aplicar_moldajes_detectados(detection, abutment_key)
+            self.parent_app.finalizar_actividad(f"moldajes_{abutment_key}")
             return
         if time.monotonic() < state.get("moldaje_deadline", 0):
             self.after(400, lambda k=abutment_key: self._esperar_moldajes_cad(k))
             return
         state["moldaje_status"].configure(
             text="Sin respuesta CAD. Verifica que el dibujo esté abierto y accesible.", text_color="#D06A5D")
+        self.parent_app.finalizar_actividad(f"moldajes_{abutment_key}")
 
     def _aplicar_moldajes_detectados(self, detection, abutment_key):
         state = self._abutments[abutment_key]

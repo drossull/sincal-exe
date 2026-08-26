@@ -1,5 +1,5 @@
 {
-  "version": "v29.0.9",
+  "version": "v29.0.10",
   "product_version": "2.0",
   "archivos": [
     "main.py",
@@ -16,6 +16,7 @@
     "sincal/rebar/model.py",
     "sincal/rebar/detail.py",
     "sincal/ui/icons.py",
+    "sincal/ui/activity.py",
     "sincal/ui/display.py",
     "sincal/ui/theme.py",
     "sincal/ui/tabs/ubicacion.py",

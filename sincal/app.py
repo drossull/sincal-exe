@@ -53,6 +53,7 @@ from sincal.runtime import (
     ruta_cad_usuario,
 )
 from sincal.ui.icons import obtener_icono
+from sincal.ui.activity import ActivityIndicator
 from sincal.runtime import (
     ruta_recurso as runtime_ruta_recurso,
 )
@@ -192,11 +193,13 @@ class ActualizadorCAD(ctk.CTk):
         self._nav_indicators = {}
         self._page_nav_buttons = {}
         self._page_anchors = {}
+        self._main_thread_ident = threading.get_ident()
         self.protocol("WM_DELETE_WINDOW", self.cerrar_aplicacion)
         self.after(50, self._procesar_ui_queue)
         self.bind("<Configure>", self._adaptar_layout_principal, add="+")
 
         self._construir_shell()
+        self.activity_indicator = ActivityIndicator(self)
         self._crear_secciones()
         self._construir_menu_superior()
         self.setup_tab_sincronizador()
@@ -209,7 +212,27 @@ class ActualizadorCAD(ctk.CTk):
         self.vista_docs.pack(fill="both", expand=True)
         self.seleccionar_seccion("sincronizador")
 
+        self.iniciar_actividad("historial", "Cargando historial")
         threading.Thread(target=self.cargar_info_github, daemon=True).start()
+
+    def iniciar_actividad(self, key, texto="Procesando", progreso=None):
+        """Activa el indicador global desde cualquier hilo de la aplicación."""
+        if threading.get_ident() != self._main_thread_ident:
+            self._ui(self.iniciar_actividad, key, texto, progreso)
+            return
+        self.activity_indicator.begin(key, texto, progreso)
+
+    def actualizar_actividad(self, key, progreso=None, texto=None):
+        if threading.get_ident() != self._main_thread_ident:
+            self._ui(self.actualizar_actividad, key, progreso, texto)
+            return
+        self.activity_indicator.update_activity(key, progreso, texto)
+
+    def finalizar_actividad(self, key):
+        if threading.get_ident() != self._main_thread_ident:
+            self._ui(self.finalizar_actividad, key)
+            return
+        self.activity_indicator.finish(key)
 
     def _construir_shell(self):
         self.sidebar = ctk.CTkFrame(
@@ -637,6 +660,8 @@ class ActualizadorCAD(ctk.CTk):
         if hasattr(self, "_theme_mode_var"):
             self._theme_mode_var.set(value)
         self._actualizar_menu_nativo(modo)
+        if hasattr(self, "activity_indicator"):
+            self.activity_indicator.refresh_theme()
 
     def _construir_menu_superior(self):
         self.menu_superior = tk.Menu(self, tearoff=False)
@@ -933,6 +958,8 @@ class ActualizadorCAD(ctk.CTk):
                 self._ui(self._set_textbox_content, self.txt_history, "\n".join(lineas))
         except Exception as e:
             self.logger.warning("No se pudo cargar el historial de cambios: %s", e)
+        finally:
+            self.finalizar_actividad("historial")
 
     def cad_esta_ejecutandose(self):
         try:
@@ -1058,6 +1085,8 @@ class ActualizadorCAD(ctk.CTk):
         if not self._iniciar_verificacion_recursos(manual=True):
             self.log("[*] Ya hay una comprobación de recursos en curso.")
             self.btn_sync_resources.configure(state="normal", text="")
+        else:
+            self.iniciar_actividad("verificar_recursos", "Comprobando recursos")
 
     def _iniciar_verificacion_recursos(self, manual=False, periodic=False, manifest_only=False):
         if self._resource_check_running or self._cerrando:
@@ -1156,6 +1185,8 @@ class ActualizadorCAD(ctk.CTk):
                 )
         finally:
             self._resource_check_running = False
+            if manual:
+                self.finalizar_actividad("verificar_recursos")
             if manual and not actualizacion_ofrecida:
                 self._ui(self.btn_sync_resources.configure, state="normal", text="")
 
@@ -1177,6 +1208,7 @@ class ActualizadorCAD(ctk.CTk):
         )
         if messagebox.askyesno("Actualización de recursos de SINCAL Suite", mensaje, parent=self):
             self.btn_sync_resources.configure(state="disabled", text="…")
+            self.iniciar_actividad("actualizar_recursos", "Actualizando recursos", 0)
             threading.Thread(target=self._hilo_aplicar_recursos, args=(plan,), daemon=True).start()
         else:
             self.log("[!] Actualización menor pospuesta por el usuario.")
@@ -1185,7 +1217,11 @@ class ActualizadorCAD(ctk.CTk):
 
     def _hilo_aplicar_recursos(self, plan):
         try:
+            if hasattr(self, "actualizar_actividad"):
+                self.actualizar_actividad("actualizar_recursos", 15, "Descargando recursos")
             resultado = apply_resource_updates(plan)
+            if hasattr(self, "actualizar_actividad"):
+                self.actualizar_actividad("actualizar_recursos", 70, "Preparando integración CAD")
         except Exception as e:
             self.logger.exception("Falló la actualización de recursos CAD")
             record_incident("actualizar_recursos", "error", {"error": str(e)})
@@ -1197,6 +1233,8 @@ class ActualizadorCAD(ctk.CTk):
                 f"Detalle: {e}",
             )
             self._ui(self.btn_sync_resources.configure, state="normal", text="")
+            if hasattr(self, "finalizar_actividad"):
+                self.finalizar_actividad("actualizar_recursos")
             return
 
         avisos = []
@@ -1257,7 +1295,11 @@ class ActualizadorCAD(ctk.CTk):
             "Workbench",
             mensaje,
         )
+        if hasattr(self, "actualizar_actividad"):
+            self.actualizar_actividad("actualizar_recursos", 100, "Recursos actualizados")
         self._ui(self.btn_sync_resources.configure, state="normal", text="")
+        if hasattr(self, "finalizar_actividad"):
+            self.finalizar_actividad("actualizar_recursos")
 
     def _refrescar_interfaces_recursos(self):
         if hasattr(self, "tab_ubicacion_widget"):
@@ -1302,6 +1344,7 @@ class ActualizadorCAD(ctk.CTk):
         self.log("\n[*] Verificando nueva actualización en GitHub...")
         self.btn_verificar_update.configure(
             state="disabled", text="…")
+        self.iniciar_actividad("verificar_version", "Verificando versión")
         threading.Thread(
             target=self._hilo_verificar_actualizacion, daemon=True).start()
 
@@ -1331,6 +1374,7 @@ class ActualizadorCAD(ctk.CTk):
         finally:
             self._ui(self.btn_verificar_update.configure,
                      state="normal", text="")
+            self.finalizar_actividad("verificar_version")
 
     def setup_tab_renombrado(self):
         lbl_titulo = ctk.CTkLabel(
@@ -1669,6 +1713,7 @@ class ActualizadorCAD(ctk.CTk):
             return messagebox.showwarning("CAD en Uso", "Por favor cierra AutoCAD/ZWCAD para que la conversión se haga en segundo plano sin interrupciones.")
 
         self.mostrar_ventana_log()
+        self.iniciar_actividad("conversion_dxf", "Iniciando motor CAD", 0)
         threading.Thread(target=self._hilo_convertir_dxf,
                          args=(dxfs, ruta), daemon=True).start()
 
@@ -1694,7 +1739,12 @@ class ActualizadorCAD(ctk.CTk):
             except:
                 pass
 
-            for f in dxfs:
+            for index, f in enumerate(dxfs):
+                self.actualizar_actividad(
+                    "conversion_dxf",
+                    index * 100 / len(dxfs),
+                    f"Convirtiendo {index + 1} de {len(dxfs)}",
+                )
                 ruta_dxf = os.path.join(ruta_conversion, f)
                 ruta_dwg = os.path.join(ruta_conversion, f[:-4] + ".dwg")
 
@@ -1713,6 +1763,12 @@ class ActualizadorCAD(ctk.CTk):
                         self.log_script("Error (DWG no generado o vacío)\n")
                 except Exception as e:
                     self.log_script(f"Error ({str(e)})\n")
+                finally:
+                    self.actualizar_actividad(
+                        "conversion_dxf",
+                        (index + 1) * 100 / len(dxfs),
+                        f"Convirtiendo {index + 1} de {len(dxfs)}",
+                    )
 
             try:
                 app.Quit()
@@ -1726,6 +1782,7 @@ class ActualizadorCAD(ctk.CTk):
         except Exception as e:
             self.log_script(f"\n[X] Error fatal de COM: {e}\n")
         finally:
+            self.finalizar_actividad("conversion_dxf")
             pythoncom.CoUninitialize()
 
     def detener_comando_en_vivo(self):
@@ -1739,6 +1796,7 @@ class ActualizadorCAD(ctk.CTk):
         self.cancelar_comando_vivo = False
         self.btn_enviar_cmd.configure(state="disabled", text="Enviando...")
         self.btn_cancelar_cmd.configure(state="normal", text="Cancelar")
+        self.iniciar_actividad("comando_cad", "Ejecutando comando CAD")
         threading.Thread(target=self._hilo_comando_en_vivo,
                          args=(c.strip() + "\n",), daemon=True).start()
 
@@ -1749,12 +1807,14 @@ class ActualizadorCAD(ctk.CTk):
         sobre todas las pestañas abiertas: el usuario confirma primero el plano
         activo y sus moldajes antes de generar cualquier resultado.
         """
+        self.iniciar_actividad("cad_activo", descripcion)
         threading.Thread(
             target=self._hilo_comando_cad_activo,
             args=(comando, descripcion), daemon=True,
         ).start()
 
     def _hilo_comando_cad_activo(self, comando, descripcion):
+        self.iniciar_actividad("cad_activo", descripcion)
         pythoncom.CoInitialize()
         try:
             prog_ids = ["ZWCAD.Application", "AutoCAD.Application"]
@@ -1812,9 +1872,11 @@ class ActualizadorCAD(ctk.CTk):
         except Exception as error:
             self.log(f"\n[X] {descripcion}: fallo COM: {error}")
         finally:
+            self.finalizar_actividad("cad_activo")
             pythoncom.CoUninitialize()
 
     def _hilo_comando_en_vivo(self, comando):
+        self.iniciar_actividad("comando_cad", "Ejecutando comando CAD")
         pythoncom.CoInitialize()
         try:
             prog_ids = ["ZWCAD.Application", "AutoCAD.Application"]
@@ -1881,6 +1943,7 @@ class ActualizadorCAD(ctk.CTk):
         finally:
             self._ui(self.btn_enviar_cmd.configure, state="normal", text="Ejecutar")
             self._ui(self.btn_cancelar_cmd.configure, state="disabled", text="Cancelar")
+            self.finalizar_actividad("comando_cad")
             pythoncom.CoUninitialize()
 
     def abrir_carpeta_local(self): os.startfile(

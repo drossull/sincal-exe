@@ -7,6 +7,7 @@ MAIN = ROOT / "main.py"
 APP = ROOT / "sincal" / "app.py"
 THEME = ROOT / "sincal" / "ui" / "theme.py"
 ICONS = ROOT / "sincal" / "ui" / "icons.py"
+ACTIVITY = ROOT / "sincal" / "ui" / "activity.py"
 ARMADURAS = ROOT / "sincal" / "ui" / "tabs" / "armaduras.py"
 DOCUMENTACION = ROOT / "sincal" / "ui" / "tabs" / "documentacion.py"
 
@@ -140,6 +141,19 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('("comandos", "glosario", glossary)', core)
         self.assertIn("AppName=SINCAL Suite", installer)
         self.assertNotIn("AppName=SINCAL 2.0", installer)
+
+    def test_global_vector_activity_indicator_is_integrated(self):
+        core = APP.read_text(encoding="utf-8")
+        activity = ACTIVITY.read_text(encoding="utf-8")
+        self.assertIn("ActivityIndicator(self)", core)
+        self.assertIn("def iniciar_actividad", core)
+        self.assertIn("def actualizar_actividad", core)
+        self.assertIn("def finalizar_actividad", core)
+        self.assertIn('"conversion_dxf"', core)
+        self.assertIn("class BridgeMotion", activity)
+        self.assertIn('Image.new("RGBA"', activity)
+        self.assertIn('anchor="se"', activity)
+        self.assertIn('f"{round(current.progress):d} %"', activity)
 
     def test_modules_import_the_small_body_font_when_using_it(self):
         for path in (ARMADURAS, ROOT / "sincal" / "ui" / "tabs" / "ubicacion.py"):

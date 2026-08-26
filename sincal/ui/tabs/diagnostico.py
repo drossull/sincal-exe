@@ -150,6 +150,7 @@ class TabDiagnostico(ctk.CTkFrame):
             return
         self._set_running(True)
         self.status.configure(text="Comprobando recursos, comandos y motores CAD...", text_color=COLOR_MOSTAZA)
+        self.parent_app.iniciar_actividad("diagnostico", "Ejecutando diagnóstico")
         threading.Thread(target=self._worker_diagnostico, daemon=True).start()
 
     def _worker_diagnostico(self):
@@ -194,10 +195,13 @@ class TabDiagnostico(ctk.CTkFrame):
             text_color="#FF6B6B" if has_error else "#57D163",
         )
         self._set_running(False)
+        self.parent_app.finalizar_actividad("diagnostico")
 
     def _show_error(self, detail):
         self.status.configure(text="El diagnóstico no pudo completarse.", text_color="#FF6B6B")
         self._set_running(False)
+        self.parent_app.finalizar_actividad("diagnostico")
+        self.parent_app.finalizar_actividad("informe_diagnostico")
         messagebox.showerror("Diagnóstico de SINCAL Suite", f"No se pudo completar el diagnóstico.\n\n{detail}")
 
     def guardar_motor(self):
@@ -232,6 +236,7 @@ class TabDiagnostico(ctk.CTkFrame):
             return
         self._set_running(True)
         self.status.configure(text="Generando informe anonimizado...", text_color=COLOR_MOSTAZA)
+        self.parent_app.iniciar_actividad("informe_diagnostico", "Generando informe")
         description = self.description.get("1.0", "end").strip()
         project_path = getattr(self.parent_app, "ruta_renombre", None) or None
         threading.Thread(
@@ -255,6 +260,7 @@ class TabDiagnostico(ctk.CTkFrame):
 
     def _report_ready(self, path, report_id):
         self._set_running(False)
+        self.parent_app.finalizar_actividad("informe_diagnostico")
         self.status.configure(text=f"Informe {report_id} generado correctamente.", text_color="#57D163")
         messagebox.showinfo(
             "Workbench",

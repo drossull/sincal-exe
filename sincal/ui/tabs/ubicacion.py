@@ -414,6 +414,7 @@ class TabUbicacion(ctk.CTkScrollableFrame):
                 self.btn_generar_croquis.configure(
                     state="disabled", text="Descargando mapa regional..."
                 )
+                self.parent_app.iniciar_actividad("mapa_regional", "Descargando mapa")
                 threading.Thread(
                     target=self._hilo_descargar_mapa,
                     args=(relativa,),
@@ -510,12 +511,14 @@ class TabUbicacion(ctk.CTkScrollableFrame):
             self.parent_app._ui(self._mapa_descarga_fallida, str(e))
 
     def _mapa_descargado(self):
+        self.parent_app.finalizar_actividad("mapa_regional")
         self.btn_generar_croquis.configure(
             state="normal", text="GENERAR CROQUIS DE UBICACIÓN"
         )
         self.generar_croquis_png()
 
     def _mapa_descarga_fallida(self, detalle):
+        self.parent_app.finalizar_actividad("mapa_regional")
         self.btn_generar_croquis.configure(
             state="normal", text="GENERAR CROQUIS DE UBICACIÓN"
         )
