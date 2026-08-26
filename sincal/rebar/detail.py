@@ -102,9 +102,12 @@ def _piece_bend_sweeps(mark, skew_degrees):
 
 
 def _effective_partials(total_cm, hook_cm, radius_cm, sweeps):
-    """Parciales enteros cuya suma coincide exactamente con el largo desarrollado."""
+    """Mantiene el gancho nominal y absorbe arcos/redondeo en el tramo principal."""
     arcs = tuple(radius_cm * sweep for sweep in sweeps)
-    hook_partials = tuple(math.ceil(hook_cm + arc / 2.0 - 1e-9) for arc in arcs)
+    # En el despiece un gancho definido como 100 cm debe rotularse 100, no
+    # 104/106 por incorporar parte del arco. El tramo principal absorbe el
+    # desarrollo curvo y el ajuste entero para conservar exactamente L.
+    hook_partials = tuple(math.ceil(hook_cm - 1e-9) for _arc in arcs)
     main = int(total_cm) - sum(hook_partials)
     if main <= 0:
         raise ValueError("El largo total no permite distribuir ganchos y tramo principal.")
@@ -131,8 +134,8 @@ def _build_piece(mark, rule, height_cm, skew_degrees):
         segment_partials = partials
     elif mark.hook_count == 1 and mark.piece_role == "terminal":
         arc = arcs[0]
-        hook_tangent = (partials[0] - arc / 2.0) / 100.0
-        main_tangent = (partials[1] - arc / 2.0) / 100.0
+        hook_tangent = partials[0] / 100.0
+        main_tangent = (partials[1] - arc) / 100.0
         tangent_distance = radius_m * math.tan(sweeps[0] / 2.0)
         corner = (main_tangent + tangent_distance, 0.0)
         endpoint = (
@@ -144,8 +147,8 @@ def _build_piece(mark, rule, height_cm, skew_degrees):
         segment_partials = (partials[1], partials[0])
     elif mark.hook_count == 1:
         arc = arcs[0]
-        hook_tangent = (partials[0] - arc / 2.0) / 100.0
-        main_tangent = (partials[1] - arc / 2.0) / 100.0
+        hook_tangent = partials[0] / 100.0
+        main_tangent = (partials[1] - arc) / 100.0
         tangent_distance = radius_m * math.tan(sweeps[0] / 2.0)
         corner = (0.0, 0.0)
         endpoint = (
@@ -157,9 +160,9 @@ def _build_piece(mark, rule, height_cm, skew_degrees):
         segment_partials = partials
     else:
         left_arc, right_arc = arcs
-        left_hook = (partials[0] - left_arc / 2.0) / 100.0
-        main_tangent = (partials[1] - (left_arc + right_arc) / 2.0) / 100.0
-        right_hook = (partials[2] - right_arc / 2.0) / 100.0
+        left_hook = partials[0] / 100.0
+        main_tangent = (partials[1] - left_arc - right_arc) / 100.0
+        right_hook = partials[2] / 100.0
         left_tangent = radius_m * math.tan(sweeps[0] / 2.0)
         right_tangent = radius_m * math.tan(sweeps[1] / 2.0)
         left_corner = (0.0, 0.0)
@@ -263,3 +266,37 @@ def polyline_developed_length_m(piece):
             radius = chord / (2.0 * math.sin(sweep / 2.0))
             total += radius * sweep
     return total
+
+
+def polyline_render_points(piece, max_step_radians=math.radians(5.0)):
+    """Muestrea los bulges reales sin inventar curvas Bézier en la vista previa."""
+    if not piece.vertices_m:
+        return ()
+    points = [piece.vertices_m[0]]
+    for index in range(len(piece.vertices_m) - 1):
+        first, last = piece.vertices_m[index:index + 2]
+        bulge = piece.bulges[index]
+        if abs(bulge) < 1e-12:
+            points.append(last)
+            continue
+        dx, dy = last[0] - first[0], last[1] - first[1]
+        chord = math.hypot(dx, dy)
+        sweep = 4.0 * math.atan(bulge)
+        midpoint = ((first[0] + last[0]) / 2.0, (first[1] + last[1]) / 2.0)
+        normal = (-dy / chord, dx / chord)
+        center_offset = chord / (2.0 * math.tan(sweep / 2.0))
+        center = (
+            midpoint[0] + normal[0] * center_offset,
+            midpoint[1] + normal[1] * center_offset,
+        )
+        radius = math.dist(first, center)
+        start = math.atan2(first[1] - center[1], first[0] - center[0])
+        steps = max(2, math.ceil(abs(sweep) / max_step_radians))
+        points.extend(
+            (
+                center[0] + radius * math.cos(start + sweep * step / steps),
+                center[1] + radius * math.sin(start + sweep * step / steps),
+            )
+            for step in range(1, steps + 1)
+        )
+    return tuple(points)

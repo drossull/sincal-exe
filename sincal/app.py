@@ -281,6 +281,7 @@ class ActualizadorCAD(ctk.CTk):
             indicator.pack_propagate(False)
             button = ShadowButton(
                 row, text=label, font=FUENTE_MENU, anchor="w",
+                flat=True,
                 image=obtener_icono(icon_name, 18), compound="left",
                 fg_color="transparent", hover_color=COLOR_FONDO, text_color=COLOR_TEXTO,
                 corner_radius=RADIO_CONTROL, height=42,
@@ -317,6 +318,7 @@ class ActualizadorCAD(ctk.CTk):
         header.pack_propagate(False)
         self.btn_mostrar_menu = ShadowButton(
             header, text="", image=obtener_icono("menu", 19), width=36, height=34,
+            flat=True,
             fg_color="transparent", hover_color=COLOR_GRIS_BOTON, corner_radius=RADIO_CONTROL,
             command=self.alternar_menu_lateral,
         )
@@ -461,6 +463,7 @@ class ActualizadorCAD(ctk.CTk):
             indicator.pack(side="left", fill="y", pady=3)
             button = ShadowButton(
                 row, text=display_label, font=FUENTE_NORMAL, anchor="w", height=27,
+                flat=True,
                 fg_color="transparent", hover_color=COLOR_FONDO,
                 text_color=COLOR_TEXTO, corner_radius=0,
                 command=lambda selected=anchor, section=key:

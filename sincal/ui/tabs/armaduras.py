@@ -26,7 +26,7 @@ from sincal.rebar.model import (
 )
 from sincal.cad.zapata_views import ZapataCadError, build_zapata_lisp
 from sincal.cad.zapata_detail import build_zapata_detail_lisp
-from sincal.rebar.detail import build_detail_groups
+from sincal.rebar.detail import build_detail_groups, polyline_render_points
 from sincal.runtime import ruta_recurso, ruta_runtime
 from sincal.ui.theme import (
     COLOR_ACENTO,
@@ -522,9 +522,15 @@ class TabArmaduras(ctk.CTkFrame):
             )
             header.grid(row=0, column=column, sticky="w", padx=5, pady=(0, 4))
             if text == "Ø mm":
-                ToolTip(header, text="Diámetro nominal del fierro en milímetros.", bootstyle="info-inverse")
+                ToolTip(header, text="Diámetro nominal del fierro en milímetros.")
             elif text == "@ cm":
-                ToolTip(header, text="Separación entre fierros, medida en centímetros.", bootstyle="info-inverse")
+                ToolTip(header, text="Separación entre fierros, medida en centímetros.")
+            elif text == "Gancho cm":
+                ToolTip(header, text="Largo recto del gancho en centímetros; 0 usa el cálculo automático.")
+            elif text == "Origen":
+                ToolTip(header, text="Extremo desde el cual comienza la distribución de barras.")
+            elif text == "Activo":
+                ToolTip(header, text="Incluye o excluye este grupo del cálculo y del dibujo.")
 
         for row, rule in enumerate(default_zapata_rules(), 1):
             ctk.CTkLabel(table, text=rule.label, font=FUENTE_NORMAL, anchor="w").grid(
@@ -562,11 +568,12 @@ class TabArmaduras(ctk.CTkFrame):
                 bootstyle="primary-toolbutton")
             start_radio.pack(side="left")
             end_radio.pack(side="left", padx=(2, 0))
-            ToolTip(start_radio, text="Distribuir desde el inicio topológico.", bootstyle="info-inverse")
-            ToolTip(end_radio, text="Distribuir desde el final topológico.", bootstyle="info-inverse")
-            ttk.Checkbutton(
-                table, text="", variable=enabled, bootstyle="success-round-toggle").grid(
-                    row=row, column=6, sticky="w", padx=5, pady=3)
+            ToolTip(start_radio, text="I: distribuir desde el inicio topológico.")
+            ToolTip(end_radio, text="F: distribuir desde el final topológico.")
+            active_toggle = ttk.Checkbutton(
+                table, text="", variable=enabled, bootstyle="success-round-toggle")
+            active_toggle.grid(row=row, column=6, sticky="w", padx=5, pady=3)
+            ToolTip(active_toggle, text="Activar o desactivar este grupo de fierros.")
             widgets["enabled"] = enabled
             widgets["origin"] = origin
             widgets["template"] = rule
@@ -873,7 +880,7 @@ class TabArmaduras(ctk.CTkFrame):
         ).pack(fill="x", padx=18, pady=(0, 6))
 
         columns = (
-            "Marca", "Elemento", "Grupo / ubicación", "Cantidad", "Ø mm", "@ cm",
+            "Marca", "Parte del estribo", "Grupo / ubicación", "Cantidad", "Ø mm", "@ cm",
             "Largo unit. cm", "Largo total cm", "Área cm²", "kg",
             "Vistas", "Rol constructivo",
         )
@@ -894,14 +901,7 @@ class TabArmaduras(ctk.CTkFrame):
         )
         table.pack(fill="both", expand=True, padx=18, pady=(0, 8))
         marks_by_name = {mark.mark: mark for mark in schedule.marks}
-        rules = self._read_zapata_rules(abutment_key)
         entries = state["entries"]
-        geometry = ZapataGeometry.from_centimetres(
-            self._entry_number(entries["largo"], "Largo"),
-            self._entry_number(entries["ancho"], "Ancho"),
-            self._entry_number(entries["alto"], "Alto"),
-            self._entry_number(self.ent_z_esviaje, "Esviaje"),
-        )
 
         def open_mark_preview(event):
             tree = table.view
@@ -911,10 +911,32 @@ class TabArmaduras(ctk.CTkFrame):
                 return
             item_id = tree.identify_row(event.y)
             values = tree.item(item_id, "values") if item_id else ()
-            mark = marks_by_name.get(str(values[0])) if values else None
+            mark_name = str(values[0]) if values else ""
+            mark = marks_by_name.get(mark_name)
             if mark is not None:
+                # Los parámetros pueden editarse mientras esta tabla permanece
+                # abierta. Se reconstruye el contexto para que el gancho y las
+                # demás magnitudes nunca provengan de una captura anterior.
+                live_schedule = self.actualizar_revision_zapata(
+                    abutment_key, notificar=False)
+                live_rules = self._read_zapata_rules(abutment_key)
+                live_geometry = ZapataGeometry.from_centimetres(
+                    self._entry_number(entries["largo"], "Largo"),
+                    self._entry_number(entries["ancho"], "Ancho"),
+                    self._entry_number(entries["alto"], "Alto"),
+                    self._entry_number(self.ent_z_esviaje, "Esviaje"),
+                )
+                live_mark = next(
+                    (candidate for candidate in live_schedule.marks
+                     if candidate.mark == mark_name), None,
+                ) if live_schedule else None
+                if live_mark is None:
+                    messagebox.showwarning(
+                        "Vista previa del fierro",
+                        f"La marca {mark_name} ya no está activa.", parent=window)
+                    return
                 self.mostrar_vista_previa_fierro(
-                    mark, schedule, rules, geometry, window)
+                    live_mark, live_schedule, live_rules, live_geometry, window)
 
         def update_mark_cursor(event):
             is_mark = (
@@ -999,13 +1021,14 @@ class TabArmaduras(ctk.CTkFrame):
 
         raw_points = [piece.partial_segments_m[0][0]]
         raw_points.extend(segment[1] for segment in piece.partial_segments_m)
+        render_points = polyline_render_points(piece)
 
         def redraw(_event=None):
             canvas.delete("all")
             width = max(1, canvas.winfo_width())
             height = max(1, canvas.winfo_height())
-            xs = [point[0] for point in raw_points]
-            ys = [point[1] for point in raw_points]
+            xs = [point[0] for point in render_points]
+            ys = [point[1] for point in render_points]
             span_x = max(xs) - min(xs)
             span_y = max(ys) - min(ys)
             visual_height = max(span_y, span_x * 0.18, 0.01)
@@ -1020,17 +1043,18 @@ class TabArmaduras(ctk.CTkFrame):
                 return origin_x + point[0] * scale, origin_y - point[1] * scale
 
             coordinates = []
-            for point in raw_points:
+            for point in render_points:
                 coordinates.extend(point_to_canvas(point))
             accent = self._resolved_color(COLOR_ACENTO)
             text_color = self._resolved_color(COLOR_TEXTO_SUAVE)
             canvas.create_line(
                 *coordinates, fill=accent, width=5, capstyle=tk.ROUND,
-                joinstyle=tk.ROUND, smooth=True, splinesteps=24,
+                joinstyle=tk.ROUND, smooth=False,
             )
 
-            center_x = sum(coordinates[::2]) / len(raw_points)
-            center_y = sum(coordinates[1::2]) / len(raw_points)
+            raw_coordinates = [point_to_canvas(point) for point in raw_points]
+            center_x = sum(point[0] for point in raw_coordinates) / len(raw_points)
+            center_y = sum(point[1] for point in raw_coordinates) / len(raw_points)
             for segment, partial in zip(piece.partial_segments_m, piece.partials_cm):
                 x1, y1 = point_to_canvas(segment[0])
                 x2, y2 = point_to_canvas(segment[1])
@@ -1065,6 +1089,7 @@ class TabArmaduras(ctk.CTkFrame):
 
         canvas.bind("<Configure>", redraw, add="+")
         window.after_idle(redraw)
+        return window
 
     def generar_vista_cad(self, vista, abutment_key="entrada"):
         state = self._abutments[abutment_key]

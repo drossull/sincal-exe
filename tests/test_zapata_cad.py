@@ -39,6 +39,11 @@ class ZapataCadTests(unittest.TestCase):
             without_strings = re.sub(r'"(?:\\.|[^"\\])*"', '""', lisp)
             self.assertEqual(without_strings.count("("), without_strings.count(")"))
 
+    def test_diameter_22_bends_use_a_66_millimetre_radius(self):
+        lisp = build_zapata_lisp(
+            "FR", self.candidate, self.geometry, self.cover, self.rules, "entrada")
+        self.assertIn('"_.FILLET" "_R" 0.066', lisp)
+
     def test_transverse_bars_are_plain_circles_without_fi_blocks(self):
         lisp = build_zapata_lisp(
             "FR", self.candidate, self.geometry, self.cover, self.rules, "entrada")

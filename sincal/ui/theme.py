@@ -129,6 +129,7 @@ COLOR_ACENTO_HOVER = (PALETA_CLARA["activo"], PALETA_OSCURA["acento"])
 COLOR_MOSTAZA = COLOR_ACENTO
 COLOR_GRIS_BOTON = (PALETA_CLARA["suave"], PALETA_OSCURA["panel"])
 COLOR_GRIS_BOTON_HOVER = (PALETA_CLARA["activo"], PALETA_OSCURA["acento"])
+COLOR_MARCO_BOTON = ("#000000", "#000000")
 COLOR_SELECCION = (PALETA_CLARA["suave"], PALETA_OSCURA["panel"])
 COLOR_EXITO = COLOR_ACENTO
 COLOR_ERROR = COLOR_ACENTO
@@ -174,13 +175,16 @@ def registrar_fuentes() -> None:
         return
     _FUENTES_REGISTRADAS = True
     font_dir = ruta_recurso_instalado("assets", "fonts")
-    try:
-        font_names = sorted(
-            name for name in os.listdir(font_dir)
-            if os.path.splitext(name)[1].lower() in (".ttf", ".otf")
-        )
-    except OSError:
-        return
+    # Windows puede asociar erróneamente la variante Italic como estilo base
+    # cuando todas las subfamilias Helvetica Neue se registran a la vez. Los
+    # archivos siguen incluidos en el paquete, pero la interfaz sólo registra
+    # las variantes Roman y Bold que realmente utiliza.
+    font_names = (
+        "GT Pressura Regular.ttf",
+        "GTPressura-Bold.ttf",
+        "HelveticaNeueRoman.otf",
+        "HelveticaNeueBold.otf",
+    )
     for name in font_names:
         path = os.path.join(font_dir, name)
         if not os.path.isfile(path):

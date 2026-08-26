@@ -69,7 +69,9 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn("GT Pressura Regular.ttf", build)
         self.assertIn("HelveticaNeueRoman.otf", build)
         self.assertIn("HelveticaNeueBold.otf", build)
-        self.assertIn("os.listdir(font_dir)", theme)
+        self.assertIn('"HelveticaNeueRoman.otf"', theme)
+        self.assertIn('"HelveticaNeueBold.otf"', theme)
+        self.assertNotIn("os.listdir(font_dir)", theme)
         self.assertIn('TTK_PRESET_OSCURO = "sincal-dark"', theme)
         self.assertIn("ThemeDefinition(", theme)
         self.assertIn('TTK_PRESET_CLARO = "sincal-light"', theme)
@@ -88,6 +90,8 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn("x=size", widget_source)
         self.assertIn("y=size", widget_source)
         self.assertIn("shadow_color=COLOR_ACENTO", widget_source)
+        self.assertIn('kwargs["corner_radius"] = 0', widget_source)
+        self.assertIn('kwargs["border_color"] = COLOR_MARCO_BOTON', widget_source)
         for path in (
             APP,
             ARMADURAS,
@@ -221,7 +225,10 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn("ttk.Separator", source)
         self.assertIn("def mostrar_vista_previa_marcas", source)
         self.assertIn("def mostrar_vista_previa_fierro", source)
-        self.assertIn('"Marca", "Elemento", "Grupo / ubicación"', source)
+        self.assertIn('"Marca", "Parte del estribo", "Grupo / ubicación"', source)
+        self.assertIn('text="I: distribuir desde el inicio topológico."', source)
+        self.assertIn('text="Activar o desactivar este grupo de fierros."', source)
+        self.assertIn("live_schedule = self.actualizar_revision_zapata", source)
         self.assertIn("def generar_despiece_zapata", source)
         self.assertIn('text="Generar despiece general de zapata"', source)
         self.assertNotIn("def generar_despiece_cad", source)

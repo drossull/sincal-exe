@@ -23,6 +23,7 @@ class ZapataScheduleTests(unittest.TestCase):
         self.assertEqual(automatic_hook_cm(205), 110)
         self.assertEqual(automatic_hook_cm(250), 130)
         self.assertAlmostEqual(bend_radius_cm(12), 3.6)
+        self.assertAlmostEqual(bend_radius_cm(22), 6.6)
 
     def test_fixed_spacing_and_end_residue(self):
         self.assertEqual(distribution_positions_cm(175, 20), (0, 20, 40, 60, 80, 100, 120, 140, 160, 175))

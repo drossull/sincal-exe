@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from sincal.ui.theme import COLOR_ACENTO
+from sincal.ui.theme import COLOR_ACENTO, COLOR_MARCO_BOTON
 
 
 class ShadowButton(ctk.CTkFrame):
@@ -24,14 +24,20 @@ class ShadowButton(ctk.CTkFrame):
         *,
         shadow_size: int = 4,
         shadow_color=COLOR_ACENTO,
+        flat: bool = False,
         **kwargs,
     ) -> None:
         button_width = int(kwargs.pop("width", self._DEFAULT_WIDTH))
         button_height = int(kwargs.pop("height", self._DEFAULT_HEIGHT))
-        foreground = kwargs.get("fg_color")
-        self._shadow_size = 0 if foreground == "transparent" else max(0, shadow_size)
+        self._shadow_size = 0 if flat else max(0, shadow_size)
         self._button_width = button_width
         self._button_height = button_height
+        kwargs["corner_radius"] = 0
+        if flat:
+            kwargs["border_width"] = 0
+        else:
+            kwargs["border_width"] = 1
+            kwargs["border_color"] = COLOR_MARCO_BOTON
 
         super().__init__(
             master,
@@ -43,11 +49,10 @@ class ShadowButton(ctk.CTkFrame):
         self.pack_propagate(False)
         self.grid_propagate(False)
 
-        radius = int(kwargs.get("corner_radius", 6) or 0)
         self._shadow = ctk.CTkFrame(
             self,
             fg_color=shadow_color,
-            corner_radius=radius,
+            corner_radius=0,
         )
         self._button = ctk.CTkButton(
             self,
