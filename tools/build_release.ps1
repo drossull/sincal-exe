@@ -371,7 +371,7 @@ function Write-ReleaseManifest(
 ) {
     $manifest = [ordered]@{
         schema = 1
-        product = 'SINCAL 2.0'
+        product = 'SINCAL Suite'
         release = $Version
         assets = [ordered]@{
             installer = [ordered]@{

@@ -1,4 +1,4 @@
-# Tipografías de SINCAL 2.0
+# Tipografías de SINCAL Suite
 
 SINCAL registra estas tipografías sólo para su sesión, sin instalarlas de forma
 permanente en Windows:

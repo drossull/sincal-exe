@@ -3,6 +3,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+MAIN = ROOT / "main.py"
 APP = ROOT / "sincal" / "app.py"
 THEME = ROOT / "sincal" / "ui" / "theme.py"
 ICONS = ROOT / "sincal" / "ui" / "icons.py"
@@ -14,12 +15,14 @@ class WorkbenchLayoutTests(unittest.TestCase):
     def test_primary_navigation_is_ordered_and_not_tabview_based(self):
         source = APP.read_text(encoding="utf-8")
         expected = [
-            '"sincronizador", "home", "Sincronizador"',
-            '"comandos", "terminal", "Comandos en vivo"',
+            '"sincronizador", "home", "Home"',
             '"documentacion", "book", "Documentación"',
+            '"comandos", "terminal", "Comandos en vivo"',
+            '"conversion", "convert", "Conversión DXF–DWG"',
             '"procesamiento", "rename", "Renombrado"',
             '"ubicacion", "pin", "Ubicación"',
-            '"estructural", "structure", "Módulo estructural"',
+            '"estructural", "structure", "Generador de armadura"',
+            '"diagnostico", "diagnostic", "Diagnóstico"',
         ]
         positions = [source.index(item) for item in expected]
         self.assertEqual(positions, sorted(positions))
@@ -33,7 +36,7 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('"Consola: inferior"', source)
         self.assertNotIn('"Consola: derecha"', source)
         self.assertIn("def setup_tab_conversion_dxf", source)
-        self.assertIn('"conversion", "convert", "Conversión DXF"', source)
+        self.assertIn('"conversion", "convert", "Conversión DXF–DWG"', source)
         self.assertIn("def ocultar_menu_lateral", source)
         self.assertIn("def cambiar_tamano_letra", source)
         self.assertIn("def cambiar_tema", source)
@@ -43,7 +46,11 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('self.menu_ver.add_cascade(label="Tema"', source)
         self.assertIn('for label in ("Tema oscuro", "Tema claro", "Tema del sistema")', source)
         self.assertIn('label=label.replace("Tema ", "").title()', source)
-        self.assertIn("self.font_slider = ttk.Scale", source)
+        self.assertNotIn("self.font_slider", source)
+        self.assertIn('text="Aa"', source)
+        self.assertIn('(0.90, FUENTE_CAMPO, "Zoom pequeño · 90 %")', source)
+        self.assertIn('(1.00, FUENTE_NORMAL, "Zoom normal · 100 %")', source)
+        self.assertIn('(1.15, FUENTE_SUBTITULO_PEQUENO, "Zoom grande · 115 %")', source)
         self.assertIn("def _redimensionar_menu", source)
         self.assertIn("def _redimensionar_consola", source)
         self.assertNotIn("self.log_rename", source)
@@ -67,6 +74,18 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertTrue((ROOT / "assets" / "fonts" / "GT Pressura Regular.ttf").is_file())
         self.assertTrue((ROOT / "assets" / "fonts" / "GTPressura-Bold.ttf").is_file())
 
+    def test_dpi_and_ttk_typography_are_configured_before_the_root(self):
+        main = MAIN.read_text(encoding="utf-8")
+        app = APP.read_text(encoding="utf-8")
+        theme = THEME.read_text(encoding="utf-8")
+        self.assertLess(main.index("configurar_dpi_windows()"), main.index("import tkinter as tk"))
+        self.assertLess(app.index("configurar_dpi_windows()"), app.index("import tkinter as tk"))
+        init = app.split("class ActualizadorCAD", 1)[1].split("asegurar_directorios()", 1)[0]
+        self.assertLess(init.index("registrar_fuentes()"), init.index("super().__init__()"))
+        self.assertIn('FUENTE_TTK_NORMAL = (FAMILIA_PRESSURA, -13)', theme)
+        self.assertIn('FUENTE_TTK_TABLA = (FAMILIA_PRESSURA, -12)', theme)
+        self.assertIn('f"{prefix}Table.Treeview"', theme)
+
     def test_bootstrap_preset_icons_and_responsive_shell_are_integrated(self):
         core = APP.read_text(encoding="utf-8")
         icons = ICONS.read_text(encoding="utf-8")
@@ -84,15 +103,43 @@ class WorkbenchLayoutTests(unittest.TestCase):
         docs = DOCUMENTACION.read_text(encoding="utf-8")
         structural = ARMADURAS.read_text(encoding="utf-8")
         self.assertIn("def configurar_navegacion_pagina", core)
-        self.assertIn("self.page_nav_panel", core)
+        self.assertNotIn("self.page_nav_panel", core)
+        self.assertIn("self.page_nav_container = ctk.CTkFrame", core)
+        self.assertNotIn("self.page_nav_container = ctk.CTkScrollableFrame", core)
+        self.assertIn('orient="vertical"', core)
+        self.assertIn("def _registrar_ancla_pagina", core)
+        self.assertIn("def _enfocar_ancla_pagina", core)
+        self.assertIn('padx=(32, 44)', core)
+        self.assertIn('width=260', core)
+        self.assertIn('("sincronizador", "acciones", botones_sec_frame)', core)
+        self.assertIn('("sincronizador", "historial", history_panel)', core)
+        self.assertIn('("procesamiento", "reemplazo", h1_frame)', core)
+        self.assertIn('("conversion", "conversion", self.btn_convertir_dxf)', core)
+        self.assertIn("self.tab_diagnostico.ir_a_seccion(anchor)", core)
         self.assertIn("def obtener_navegacion", docs)
         self.assertIn("def mostrar_tema_por_id", docs)
+        self.assertIn('topic_id.startswith("categoria::")', docs)
+        self.assertIn('topic_id.startswith("grupo::")', docs)
         self.assertNotIn("ttk.Panedwindow", structural)
         self.assertIn("ttk.Labelframe", structural)
         self.assertIn("self.ruta_adv_var", core)
         self.assertIn("self.ruta_conversion_var", core)
         self.assertNotIn("self.lbl_ruta_adv", core)
         self.assertNotIn("self.lbl_ruta_conversion", core)
+
+    def test_home_commands_and_product_identity_are_complete(self):
+        core = APP.read_text(encoding="utf-8")
+        installer = (ROOT / "packaging" / "windows" / "SINCAL_Installer.iss").read_text(
+            encoding="utf-8")
+        self.assertIn('self.title("SINCAL Suite — Workbench")', core)
+        self.assertIn('text="SINCAL SUITE"', core)
+        self.assertIn('text="SINCRONIZADOR"', core)
+        self.assertIn("def _resumir_commit", core)
+        self.assertIn('self.entrada_comando.bind("<Return>"', core)
+        self.assertIn('text="GLOSARIO DE COMANDOS"', core)
+        self.assertIn('("comandos", "glosario", glossary)', core)
+        self.assertIn("AppName=SINCAL Suite", installer)
+        self.assertNotIn("AppName=SINCAL 2.0", installer)
 
     def test_modules_import_the_small_body_font_when_using_it(self):
         for path in (ARMADURAS, ROOT / "sincal" / "ui" / "tabs" / "ubicacion.py"):
@@ -144,6 +191,15 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('("E-E", "EE")', source)
         self.assertNotIn("self.ent_phi_inf", source)
         self.assertNotIn("self.ent_espac_inf", source)
+
+    def test_each_structural_subtab_has_only_one_page_scroll(self):
+        source = ARMADURAS.read_text(encoding="utf-8")
+        self.assertIn("tab_trav_host = ctk.CTkFrame", source)
+        self.assertIn("tab_trav_main = ctk.CTkScrollableFrame", source)
+        self.assertIn("page = ctk.CTkScrollableFrame", source)
+        self.assertIn("table = ctk.CTkFrame", source)
+        self.assertNotIn("table = ctk.CTkScrollableFrame", source)
+        self.assertEqual(source.count("ctk.CTkScrollableFrame("), 2)
 
     def test_zapata_moldajes_are_read_from_the_active_cad_document_only(self):
         core = APP.read_text(encoding="utf-8")

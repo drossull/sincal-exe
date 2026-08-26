@@ -27,7 +27,7 @@
 #endif
 
 [Setup]
-AppName=SINCAL 2.0
+AppName=SINCAL Suite
 AppId=SINCAL Suite
 AppVersion={#AppVersion}
 AppPublisher=Gonzalo Mardones V.
@@ -36,7 +36,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DefaultDirName={autopf}\SINCAL
 UsePreviousAppDir=yes
-DefaultGroupName=SINCAL 2.0
+DefaultGroupName=SINCAL Suite
 OutputDir={#ReleaseOutputDir}
 OutputBaseFilename=Setup_SINCAL_{#AppVersionTag}
 SetupIconFile=..\..\assets\icons\logo.ico
@@ -65,11 +65,11 @@ Type: filesandordirs; Name: "{app}\startup"
 Type: filesandordirs; Name: "{app}\assets"
 
 [Icons]
-Name: "{group}\SINCAL 2.0"; Filename: "{app}\SINCAL.exe"
-Name: "{commondesktop}\SINCAL 2.0"; Filename: "{app}\SINCAL.exe"; Tasks: desktopicon
+Name: "{group}\SINCAL Suite"; Filename: "{app}\SINCAL.exe"
+Name: "{commondesktop}\SINCAL Suite"; Filename: "{app}\SINCAL.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\SINCAL.exe"; Description: "{cm:LaunchProgram,SINCAL 2.0}"; Flags: nowait postinstall skipifsilent unchecked
+Filename: "{app}\SINCAL.exe"; Description: "{cm:LaunchProgram,SINCAL Suite}"; Flags: nowait postinstall skipifsilent unchecked
 
 [Code]
 const

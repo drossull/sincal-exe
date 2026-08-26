@@ -172,7 +172,7 @@ def export_distribution(
     }
     manifest = {
         "schema": 1,
-        "product": "SINCAL 2.0",
+        "product": "SINCAL Suite",
         "release": _read_version(source),
         "source_commit": source_commit,
         "resources": manifest_resources,

@@ -374,7 +374,7 @@ def collect_diagnostics(project_path=None, description="") -> dict:
 
 def format_summary(report: dict) -> str:
     lines = [
-        "SINCAL — INFORME DE DIAGNÓSTICO",
+        "SINCAL SUITE — INFORME DE DIAGNÓSTICO",
         f"ID: {report.get('report_id', '')}",
         f"Fecha: {report.get('created_at', '')}",
         f"Versión: {(report.get('application') or {}).get('version', '')}",

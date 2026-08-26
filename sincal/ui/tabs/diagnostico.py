@@ -1,7 +1,7 @@
 import os
 import threading
 from datetime import datetime
-from tkinter import filedialog, messagebox
+from tkinter import TclError, filedialog, messagebox
 
 import customtkinter as ctk
 
@@ -43,6 +43,7 @@ class TabDiagnostico(ctk.CTkFrame):
 
         container = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=RADIO_PANEL)
         container.pack(fill="both", expand=True, padx=12, pady=12)
+        self.page_container = container
 
         ctk.CTkLabel(
             container, text="DIAGNÓSTICO Y SOPORTE", font=title_font, text_color=color_title,
@@ -111,6 +112,26 @@ class TabDiagnostico(ctk.CTkFrame):
             text_color=COLOR_TEXTO, state="disabled", corner_radius=RADIO_PANEL,
         )
         self.results.pack(fill="both", expand=True, padx=8, pady=(0, 10))
+        self.status_anchor = engine_frame
+        self.report_anchor = actions
+
+    def ir_a_seccion(self, anchor):
+        """Navega a un bloque real del diagnóstico desde el índice contextual."""
+        target = {
+            "estado": getattr(self, "status_anchor", None),
+            "informe": getattr(self, "report_anchor", None),
+        }.get(anchor)
+        if target is None:
+            return
+        self.update_idletasks()
+        y_offset = target.winfo_y()
+        try:
+            total = max(1, self.page_container._parent_frame.winfo_reqheight())
+            self.page_container._parent_canvas.yview_moveto(
+                max(0.0, min(1.0, y_offset / total)))
+            target.focus_set()
+        except (AttributeError, TclError):
+            return
 
     def _ui(self, callback, *args, **kwargs):
         if hasattr(self.parent_app, "_ui"):
@@ -177,7 +198,7 @@ class TabDiagnostico(ctk.CTkFrame):
     def _show_error(self, detail):
         self.status.configure(text="El diagnóstico no pudo completarse.", text_color="#FF6B6B")
         self._set_running(False)
-        messagebox.showerror("Diagnóstico SINCAL", f"No se pudo completar el diagnóstico.\n\n{detail}")
+        messagebox.showerror("Diagnóstico de SINCAL Suite", f"No se pudo completar el diagnóstico.\n\n{detail}")
 
     def guardar_motor(self):
         engine = self.engines_by_label.get(self.engine_menu.get())
@@ -237,6 +258,6 @@ class TabDiagnostico(ctk.CTkFrame):
         self.status.configure(text=f"Informe {report_id} generado correctamente.", text_color="#57D163")
         messagebox.showinfo(
             "Workbench",
-            "Informe generado correctamente. Puedes enviarlo al responsable de SINCAL.\n\n"
+            "Informe generado correctamente. Puedes enviarlo al responsable de SINCAL Suite.\n\n"
             f"{path}",
         )

@@ -1,4 +1,10 @@
 import importlib
+
+from sincal.ui.display import configurar_dpi_windows
+
+# Tk debe heredar la conciencia DPI antes de crear incluso una ventana de error.
+configurar_dpi_windows()
+
 import tkinter as tk
 from tkinter import messagebox
 from sincal.runtime import asegurar_directorios
@@ -28,8 +34,8 @@ def iniciar():
         app.arrancar()
     except Exception as e:
         record_incident("inicio_aplicacion", "error", {"error": str(e)})
-        mostrar_error_critico("SINCAL - Error de Núcleo",
-                              f"El núcleo gráfico falló al iniciar. Revisa el detalle técnico y reinstala SINCAL si faltan recursos locales.\n\nDetalle técnico:\n{e}")
+        mostrar_error_critico("SINCAL Suite — Error de núcleo",
+                              f"El núcleo gráfico falló al iniciar. Revisa el detalle técnico y reinstala SINCAL Suite si faltan recursos locales.\n\nDetalle técnico:\n{e}")
 
 
 if __name__ == "__main__":

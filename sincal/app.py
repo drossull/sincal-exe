@@ -1,6 +1,14 @@
 import ctypes
+import json
 import logging
 import os
+
+from sincal.ui.display import configurar_dpi_windows
+
+# Debe ejecutarse antes de importar Tk/CustomTkinter para evitar rasterizado
+# borroso cuando Windows usa escalado por monitor.
+configurar_dpi_windows()
+
 import queue
 import shutil
 import subprocess
@@ -124,15 +132,15 @@ class ActualizadorCAD(ctk.CTk):
                     "SINCAL.Workbench.2")
             except Exception:
                 pass
+        registrar_fuentes()
         super().__init__()
         self.bootstrap_style = crear_estilo_bootstrap()
-        registrar_fuentes()
         asegurar_directorios()
         self.logger = configurar_logging()
         self.historial_logs = []
         self._cerrando = False
         self._ui_queue = queue.Queue()
-        self.title("SINCAL 2.0 — Workbench")
+        self.title("SINCAL Suite — Workbench")
         self.geometry("1280x820")
         self.minsize(980, 640)
         self.configure(fg_color=COLOR_FONDO)
@@ -177,12 +185,13 @@ class ActualizadorCAD(ctk.CTk):
         self._sidebar_user_hidden = False
         self._font_scale = 1.0
         self._zoom_target = 1.0
-        self._zoom_animation_job = None
+        self._zoom_buttons = {}
         self._console_mode = "Oculta"
         self._sections = {}
         self._nav_buttons = {}
         self._nav_indicators = {}
         self._page_nav_buttons = {}
+        self._page_anchors = {}
         self.protocol("WM_DELETE_WINDOW", self.cerrar_aplicacion)
         self.after(50, self._procesar_ui_queue)
         self.bind("<Configure>", self._adaptar_layout_principal, add="+")
@@ -231,13 +240,13 @@ class ActualizadorCAD(ctk.CTk):
         self.nav_container = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.nav_container.pack(fill="both", expand=True, padx=8)
         self.nav_items = (
-            ("sincronizador", "home", "Sincronizador", "Sincronizador"),
-            ("comandos", "terminal", "Comandos en vivo", "Comandos en vivo"),
+            ("sincronizador", "home", "Home", "Home"),
             ("documentacion", "book", "Documentación", "Documentación"),
+            ("comandos", "terminal", "Comandos en vivo", "Comandos en vivo"),
+            ("conversion", "convert", "Conversión DXF–DWG", "Conversión DXF–DWG"),
             ("procesamiento", "rename", "Renombrado", "Renombrado"),
             ("ubicacion", "pin", "Ubicación", "Ubicación"),
-            ("estructural", "structure", "Módulo estructural", "Módulo estructural"),
-            ("conversion", "convert", "Conversión DXF", "Conversión DXF"),
+            ("estructural", "structure", "Generador de armadura", "Generador de armadura"),
             ("diagnostico", "diagnostic", "Diagnóstico", "Diagnóstico"),
         )
         for key, icon_name, label, title in self.nav_items:
@@ -270,25 +279,27 @@ class ActualizadorCAD(ctk.CTk):
         footer.pack(fill="x", padx=12, pady=(8, 12))
         font_controls = ctk.CTkFrame(footer, fg_color="transparent", corner_radius=0)
         font_controls.pack(fill="x", pady=(0, 6))
-        ctk.CTkButton(
-            font_controls, text="−", width=30, height=28, font=FUENTE_SUBTITULO_PEQUENO,
-            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
-            corner_radius=RADIO_CONTROL, command=lambda: self.ajustar_tamano_letra(-0.05),
-        ).pack(side="left")
-        self.font_slider = ttk.Scale(
-            font_controls, from_=0.85, to=1.25,
-            command=self.cambiar_tamano_letra, bootstyle="info")
-        self.font_slider.set(self._font_scale)
-        self.font_slider.pack(side="left", fill="x", expand=True, padx=6)
-        ctk.CTkButton(
-            font_controls, text="+", width=30, height=28, font=FUENTE_SUBTITULO_PEQUENO,
-            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
-            corner_radius=RADIO_CONTROL, command=lambda: self.ajustar_tamano_letra(0.05),
-        ).pack(side="right")
+        zoom_options = (
+            (0.90, FUENTE_CAMPO, "Zoom pequeño · 90 %"),
+            (1.00, FUENTE_NORMAL, "Zoom normal · 100 %"),
+            (1.15, FUENTE_SUBTITULO_PEQUENO, "Zoom grande · 115 %"),
+        )
+        for scale, font, help_text in zoom_options:
+            button = ctk.CTkButton(
+                font_controls, text="Aa", height=32, font=font,
+                fg_color="transparent", hover_color=COLOR_GRIS_BOTON_HOVER,
+                text_color=COLOR_TEXTO, border_width=1, border_color=COLOR_BORDE,
+                corner_radius=RADIO_CONTROL,
+                command=lambda selected=scale: self.cambiar_tamano_letra(selected),
+            )
+            button.pack(side="left", fill="x", expand=True, padx=2)
+            agregar_tooltip(button, help_text)
+            self._zoom_buttons[scale] = button
         self.zoom_value_label = ctk.CTkLabel(
             footer, text="100 %", font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE,
         )
         self.zoom_value_label.pack(anchor="center", pady=(0, 5))
+        self._actualizar_indicador_zoom()
         ctk.CTkLabel(
             footer, text="Por Gonzalo M. para SINCAL Ltda. 2026.",
             font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
@@ -311,28 +322,33 @@ class ActualizadorCAD(ctk.CTk):
         )
         path_bar.pack(side="left", fill="x", expand=True, padx=14, pady=10)
         self.section_title = ctk.CTkLabel(
-            path_bar, text="Sincronizador", font=FUENTE_NORMAL,
+            path_bar, text="Home", font=FUENTE_NORMAL,
             text_color=COLOR_TEXTO, anchor="w",
         )
         self.section_title.pack(fill="x", padx=12, pady=7)
         ctk.CTkLabel(
-            header, text="SINCAL 2.0", font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
+            header, text="SINCAL SUITE · 2.0", font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
         ).pack(side="right", padx=(8, 18))
         self.content_shell = ctk.CTkFrame(
             self.workspace, fg_color=COLOR_FONDO, corner_radius=0)
-        self.content_shell.pack(fill="both", expand=True)
+        self.content_shell.pack(fill="both", expand=True, padx=(32, 44), pady=(10, 18))
         self.page_nav_column = ctk.CTkFrame(
-            self.content_shell, width=220, fg_color=COLOR_FONDO, corner_radius=0)
-        self.page_nav_column.pack(side="right", fill="y", padx=(4, 10))
+            self.content_shell, width=260, fg_color=COLOR_FONDO, corner_radius=0)
+        self.page_nav_column.pack(side="right", fill="y", padx=(18, 8))
         self.page_nav_column.pack_propagate(False)
-        self.page_nav_panel = ttk.Labelframe(
-            self.page_nav_column, text="EN ESTA PÁGINA", bootstyle="secondary")
-        self.page_nav_panel.pack(fill="x", pady=(14, 0))
-        self.page_nav_container = ctk.CTkScrollableFrame(
-            self.page_nav_panel, height=300, fg_color=COLOR_FONDO, corner_radius=0,
-            scrollbar_button_color=COLOR_GRIS_BOTON,
-            scrollbar_button_hover_color=COLOR_GRIS_BOTON_HOVER)
-        self.page_nav_container.pack(fill="x", padx=6, pady=6)
+        ttk.Separator(
+            self.page_nav_column, orient="vertical", bootstyle="secondary",
+        ).pack(side="left", fill="y", padx=(0, 12), pady=14)
+        page_nav_content = ctk.CTkFrame(
+            self.page_nav_column, fg_color=COLOR_FONDO, corner_radius=0)
+        page_nav_content.pack(side="left", fill="both", expand=True, pady=(16, 10))
+        ctk.CTkLabel(
+            page_nav_content, text="EN ESTA PÁGINA", font=FUENTE_NORMAL,
+            text_color=COLOR_TEXTO, anchor="w",
+        ).pack(fill="x", padx=(2, 0), pady=(0, 7))
+        self.page_nav_container = ctk.CTkFrame(
+            page_nav_content, fg_color=COLOR_FONDO, corner_radius=0)
+        self.page_nav_container.pack(fill="x")
         self.content_host = ctk.CTkFrame(
             self.content_shell, fg_color=COLOR_FONDO, corner_radius=0)
         self.content_host.pack(side="left", fill="both", expand=True)
@@ -364,13 +380,13 @@ class ActualizadorCAD(ctk.CTk):
 
     def _crear_secciones(self):
         definitions = (
-            ("sincronizador", "Sincronizador"),
+            ("sincronizador", "Home"),
             ("documentacion", "Documentación"),
             ("comandos", "Comandos en vivo"),
+            ("conversion", "Conversión DXF–DWG"),
             ("procesamiento", "Renombrado"),
             ("ubicacion", "Ubicación"),
-            ("estructural", "Módulo estructural"),
-            ("conversion", "Conversión DXF"),
+            ("estructural", "Generador de armadura"),
             ("diagnostico", "Diagnóstico"),
         )
         for key, title in definitions:
@@ -418,8 +434,8 @@ class ActualizadorCAD(ctk.CTk):
         self._page_nav_buttons = {}
         if entries is None:
             definitions = {
-                "sincronizador": (("Inicio", "inicio"), ("Acciones", "acciones"), ("Historial", "historial")),
-                "comandos": (("Comando", "comando"),),
+                "sincronizador": (("Presentación", "inicio"), ("Sincronizador", "acciones"), ("Historial", "historial")),
+                "comandos": (("Ejecutar comando", "comando"), ("Glosario", "glosario")),
                 "procesamiento": (("Archivos", "archivos"), ("Buscar y reemplazar", "reemplazo")),
                 "ubicacion": (("Datos del proyecto", "datos"), ("Ubicación y mapa", "mapa"), ("Generar croquis", "generar")),
                 "estructural": (("Dimensiones", "dimensiones"), ("Revisión y marcas", "revision"), ("Despiece", "despiece")),
@@ -431,7 +447,7 @@ class ActualizadorCAD(ctk.CTk):
             else:
                 entries = definitions.get(key, ())
         for label, anchor in entries:
-            display_label = label if len(label) <= 30 else label[:29].rstrip() + "…"
+            display_label = label if len(label) <= 36 else label[:35].rstrip() + "…"
             row = ctk.CTkFrame(
                 self.page_nav_container, fg_color=COLOR_FONDO, corner_radius=0)
             row.pack(fill="x")
@@ -439,7 +455,7 @@ class ActualizadorCAD(ctk.CTk):
                 row, width=3, height=28, fg_color=COLOR_FONDO, corner_radius=0)
             indicator.pack(side="left", fill="y", pady=3)
             button = ctk.CTkButton(
-                row, text=display_label, font=FUENTE_NORMAL, anchor="w", height=34,
+                row, text=display_label, font=FUENTE_NORMAL, anchor="w", height=27,
                 fg_color="transparent", hover_color=COLOR_FONDO,
                 text_color=COLOR_TEXTO, corner_radius=0,
                 command=lambda selected=anchor, section=key:
@@ -465,11 +481,56 @@ class ActualizadorCAD(ctk.CTk):
             self.tab_ubicacion_widget.ir_a_seccion(anchor)
         elif section == "documentacion" and hasattr(self, "vista_docs"):
             self.vista_docs.mostrar_tema_por_id(anchor)
+        elif section == "diagnostico" and hasattr(self, "tab_diagnostico"):
+            self.tab_diagnostico.ir_a_seccion(anchor)
+        else:
+            self._enfocar_ancla_pagina(section, anchor)
+
+    def _registrar_ancla_pagina(self, section, anchor, widget):
+        """Asocia un enlace contextual con un control visible del módulo."""
+        self._page_anchors[(section, anchor)] = widget
+
+    def _enfocar_ancla_pagina(self, section, anchor):
+        """Lleva el foco al destino y lo realza brevemente cuando no hay scroll."""
+        target = self._page_anchors.get((section, anchor))
+        if target is None or not target.winfo_exists():
+            return
+        target.update_idletasks()
+        try:
+            target.focus_set()
+        except tk.TclError:
+            pass
+
+        # Si el destino vive dentro de una página desplazable, llévalo a la
+        # parte superior. En páginas compactas, el pulso confirma la navegación.
+        ancestor = target
+        y_offset = 0
+        while ancestor is not None:
+            if isinstance(ancestor, ctk.CTkScrollableFrame):
+                try:
+                    total = max(1, ancestor._parent_frame.winfo_reqheight())
+                    ancestor._parent_canvas.yview_moveto(
+                        max(0.0, min(1.0, y_offset / total)))
+                except (AttributeError, tk.TclError):
+                    pass
+                break
+            try:
+                y_offset += ancestor.winfo_y()
+                ancestor = ancestor.master
+            except (AttributeError, tk.TclError):
+                break
+
+        try:
+            original = target.cget("fg_color")
+            target.configure(fg_color=COLOR_GRIS_BOTON)
+            target.after(420, lambda: target.winfo_exists() and target.configure(fg_color=original))
+        except (ValueError, tk.TclError, AttributeError):
+            pass
 
     def actualizar_ruta_interna(self, *segments):
         """Muestra la ubicación funcional actual como una ruta de exploración."""
         route = " > ".join(str(segment) for segment in segments if segment)
-        self.section_title.configure(text=route or "SINCAL")
+        self.section_title.configure(text=route or "SINCAL Suite")
 
     def ocultar_menu_lateral(self):
         self._animar_menu_lateral(0, ocultar_al_final=True)
@@ -540,20 +601,8 @@ class ActualizadorCAD(ctk.CTk):
         try:
             escala = float(value)
         except (TypeError, ValueError):
-            escala = {"Letra pequeña": 0.90, "Letra normal": 1.0, "Letra grande": 1.16}.get(value, 1.0)
+            escala = {"Letra pequeña": 0.90, "Letra normal": 1.0, "Letra grande": 1.15}.get(value, 1.0)
         self._zoom_target = max(0.85, min(1.25, escala))
-        self._actualizar_indicador_zoom(self._zoom_target)
-        if self._zoom_animation_job is not None:
-            try:
-                self.after_cancel(self._zoom_animation_job)
-            except Exception:
-                pass
-        # Reescalar toda la aplicación en cada píxel del slider bloquea Tk.
-        # Se aplica una sola vez cuando el usuario termina el movimiento.
-        self._zoom_animation_job = self.after(180, self._aplicar_zoom_programado)
-
-    def _aplicar_zoom_programado(self):
-        self._zoom_animation_job = None
         self._font_scale = self._zoom_target
         ctk.set_widget_scaling(self._font_scale)
         self._actualizar_indicador_zoom()
@@ -562,17 +611,21 @@ class ActualizadorCAD(ctk.CTk):
         percentage = round((self._font_scale if value is None else value) * 100)
         if hasattr(self, "zoom_value_label"):
             self.zoom_value_label.configure(text=f"{percentage} %")
+        for scale, button in getattr(self, "_zoom_buttons", {}).items():
+            selected = abs(scale - (self._font_scale if value is None else value)) < 0.001
+            button.configure(
+                fg_color=COLOR_ACENTO if selected else "transparent",
+                text_color=COLOR_FONDO if selected else COLOR_TEXTO,
+                border_color=COLOR_ACENTO if selected else COLOR_BORDE,
+            )
+        if hasattr(self, "_zoom_mode_var"):
+            self._zoom_mode_var.set(self._font_scale)
         if hasattr(self, "menu_ver") and hasattr(self, "_zoom_menu_index"):
             try:
                 self.menu_ver.entryconfigure(
                     self._zoom_menu_index, label=f"Zoom texto · {percentage} %")
             except tk.TclError:
                 pass
-
-    def ajustar_tamano_letra(self, delta):
-        target = max(0.85, min(1.25, self._zoom_target + delta))
-        self.font_slider.set(target)
-        self.cambiar_tamano_letra(target)
 
     def cambiar_tema(self, value):
         modo = {"Tema oscuro": "dark", "Tema claro": "light", "Tema del sistema": "system"}.get(value, "dark")
@@ -612,9 +665,11 @@ class ActualizadorCAD(ctk.CTk):
             command=self.alternar_consola_inferior)
         self.menu_ver.add_separator()
         zoom_menu = tk.Menu(self.menu_ver, tearoff=False)
-        zoom_menu.add_command(label="−", command=lambda: self.ajustar_tamano_letra(-0.05))
-        zoom_menu.add_command(label="100 %", command=self.restablecer_tamano_letra)
-        zoom_menu.add_command(label="+", command=lambda: self.ajustar_tamano_letra(0.05))
+        self._zoom_mode_var = tk.DoubleVar(value=self._font_scale)
+        for label, scale in (("Aa  ·  90 %", 0.90), ("Aa  ·  100 %", 1.00), ("Aa  ·  115 %", 1.15)):
+            zoom_menu.add_radiobutton(
+                label=label, value=scale, variable=self._zoom_mode_var,
+                command=lambda selected=scale: self.cambiar_tamano_letra(selected))
         self._zoom_menu_index = self.menu_ver.index("end") + 1
         self.menu_ver.add_cascade(label="Zoom texto · 100 %", menu=zoom_menu)
         self.menu_ver.add_separator()
@@ -633,7 +688,7 @@ class ActualizadorCAD(ctk.CTk):
         ayuda.add_command(label="Diagnóstico", command=lambda: self.seleccionar_seccion("diagnostico"))
         ayuda.add_command(label="Releases oficiales", command=lambda: webbrowser.open(URL_RELEASES))
         ayuda.add_separator()
-        ayuda.add_command(label="Acerca de SINCAL 2.0", command=self.mostrar_acerca_de)
+        ayuda.add_command(label="Acerca de SINCAL Suite", command=self.mostrar_acerca_de)
         self.menu_superior.add_cascade(label="Ayuda", menu=ayuda)
 
         self.config(menu=self.menu_superior)
@@ -647,13 +702,12 @@ class ActualizadorCAD(ctk.CTk):
         self.cambiar_tema(option)
 
     def restablecer_tamano_letra(self):
-        self.font_slider.set(1.0)
         self.cambiar_tamano_letra(1.0)
 
     def mostrar_acerca_de(self):
         messagebox.showinfo(
-            "Acerca de SINCAL",
-            f"SINCAL 2.0 — Workbench de ingeniería\nVersión técnica: {self.version_local_actual}",
+            "Acerca de SINCAL Suite",
+            f"SINCAL Suite — Workbench de ingeniería\nVersión de producto: 2.0\nVersión técnica: {self.version_local_actual}",
             parent=self,
         )
 
@@ -740,7 +794,7 @@ class ActualizadorCAD(ctk.CTk):
         )
         try:
             messagebox.showerror(
-                "Error SINCAL",
+                "Error de SINCAL Suite",
                 "Ocurrió un error inesperado. El detalle quedó guardado en Diagnóstico y soporte.\n\n"
                 f"{value}",
                 parent=self,
@@ -794,7 +848,7 @@ class ActualizadorCAD(ctk.CTk):
             except Exception:
                 pass
             self._resource_poll_job = None
-        self.logger.info("Cierre solicitado: SINCAL finalizará sin permanecer en segundo plano.")
+        self.logger.info("Cierre solicitado: SINCAL Suite finalizará sin permanecer en segundo plano.")
         record_incident("cierre_aplicacion", "ok")
         try:
             self.quit()
@@ -809,6 +863,36 @@ class ActualizadorCAD(ctk.CTk):
     # ==========================================================
     # PARTE COMÚN Y SOPORTE DE ACTUALIZACIONES
     # ==========================================================
+    @staticmethod
+    def _resumir_commit(mensaje):
+        """Devuelve título y una explicación breve apta para el panel angosto."""
+        lineas = [linea.strip() for linea in (mensaje or "").splitlines() if linea.strip()]
+        titulo = (lineas[0] if lineas else "Cambio sin descripción")[:76]
+        if len(lineas) > 1:
+            return titulo, " ".join(lineas[1:])[:150]
+        texto = titulo.lower()
+        categorias = (
+            (("armadura", "zapata", "fierro", "estribo", "rebar"),
+             "Mejora el generador y la representación de armaduras."),
+            (("interfaz", "tema", "fuente", "menú", "layout", "ui"),
+             "Ajusta la interfaz, su navegación o accesibilidad visual."),
+            (("release", "instalador", "manifiesto", "actualiz"),
+             "Actualiza el flujo de publicación o distribución."),
+            (("lisp", "cad", "dwg", "master", "zwcad", "autocad"),
+             "Ajusta recursos CAD o su integración con el programa."),
+            (("document", "tutorial", "readme"),
+             "Amplía o corrige la documentación disponible."),
+            (("mapa", "ubicaci", "kmz"),
+             "Mejora las herramientas de ubicación y cartografía."),
+            (("diagnóst", "error", "bug", "fix", "corrige"),
+             "Corrige un problema y refuerza la estabilidad."),
+        )
+        descripcion = next(
+            (detalle for claves, detalle in categorias if any(clave in texto for clave in claves)),
+            "Ajuste técnico y mantenimiento general de SINCAL Suite.",
+        )
+        return titulo, descripcion
+
     def cargar_info_github(self):
         try:
             commits_response = requests.get(
@@ -839,11 +923,12 @@ class ActualizadorCAD(ctk.CTk):
                     sha_completo = c['sha']
                     version_mostrar = sha_completo[:7]
 
-                    mensaje = c['commit']['message'].strip()
-                    mensaje = mensaje.replace(
-                        "\r\n", " + ").replace("\n\n", " + ").replace("\n", " + ")
-
-                    lineas.append(f"• {version_mostrar} · {fecha_formateada}\n  {mensaje[:90]}")
+                    titulo, descripcion = self._resumir_commit(c['commit']['message'])
+                    lineas.append(
+                        f"• {version_mostrar} · {fecha_formateada}\n"
+                        f"  {titulo}\n"
+                        f"  {descripcion}"
+                    )
 
                 self._ui(self._set_textbox_content, self.txt_history, "\n".join(lineas))
         except Exception as e:
@@ -864,13 +949,13 @@ class ActualizadorCAD(ctk.CTk):
         msg = (
             f"Versión detectada: {nueva_version}\n\n"
             f"Novedades:\n{desc_commit}\n\n"
-            "SINCAL ya no descarga código ejecutable en caliente.\n"
+            "SINCAL Suite ya no descarga código ejecutable en caliente.\n"
             "¿Deseas abrir la página oficial de releases para instalar la actualización?"
         )
 
-        if messagebox.askyesno("¡Actualización SINCAL Disponible!", msg):
+        if messagebox.askyesno("¡Actualización de SINCAL Suite disponible!", msg):
             webbrowser.open(URL_RELEASES)
-            self.log("[!] Abriendo página oficial de releases para actualizar SINCAL.")
+            self.log("[!] Abriendo la página oficial para actualizar SINCAL Suite.")
         else:
             self.log(
                 f"[!] Actualización a {nueva_version} pospuesta por el usuario.")
@@ -879,14 +964,37 @@ class ActualizadorCAD(ctk.CTk):
         portada = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         portada.pack(fill="x", padx=40, pady=(38, 20))
         ctk.CTkLabel(
-            portada, text="SINCAL 2.0", font=FUENTE_TITULO, text_color=COLOR_TEXTO,
+            portada, text="SINCAL SUITE", font=FUENTE_TITULO, text_color=COLOR_TEXTO,
         ).pack(pady=(4, 12))
         ctk.CTkLabel(
             portada,
-            text=("Un workbench para estandarizar CAD, automatizar planos y concentrar las "
-                  "herramientas de ingeniería que acompañan cada proyecto."),
+            text=("Una suite de ingeniería para estandarizar dibujos CAD, automatizar planos, "
+                  "organizar recursos de proyecto y generar armaduras con control del usuario."),
             font=FUENTE_NORMAL, text_color=COLOR_TEXTO, justify="center", wraplength=720,
         ).pack(padx=30)
+        ctk.CTkLabel(
+            portada,
+            text=("Integra documentación, comandos en vivo, conversión DXF–DWG, renombrado, "
+                  "ubicación, diagnóstico y herramientas estructurales en un solo entorno."),
+            font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE,
+            justify="center", wraplength=700,
+        ).pack(padx=30, pady=(7, 0))
+        ctk.CTkLabel(
+            portada, text="Por Gonzalo M. para SINCAL Ltda. · 2026",
+            font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
+        ).pack(pady=(12, 2))
+
+        ttk.Separator(self.tab_main, orient="horizontal", bootstyle="secondary").pack(
+            fill="x", padx=46, pady=(0, 14))
+        ctk.CTkLabel(
+            self.tab_main, text="SINCRONIZADOR", font=FUENTE_SUBTITULO,
+            text_color=COLOR_MOSTAZA, anchor="w",
+        ).pack(fill="x", padx=46, pady=(0, 3))
+        ctk.CTkLabel(
+            self.tab_main,
+            text="Mantiene el programa, los recursos CAD y el historial de distribución en un mismo lugar.",
+            font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE, anchor="w",
+        ).pack(fill="x", padx=46, pady=(0, 8))
 
         botones_sec_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         botones_sec_frame.pack(fill="x", padx=46, pady=(4, 18))
@@ -925,6 +1033,10 @@ class ActualizadorCAD(ctk.CTk):
             state="disabled", corner_radius=RADIO_CONTROL, wrap="word",
         )
         self.txt_history.pack(fill="both", expand=True, padx=14, pady=(0, 14))
+
+        self._registrar_ancla_pagina("sincronizador", "inicio", portada)
+        self._registrar_ancla_pagina("sincronizador", "acciones", botones_sec_frame)
+        self._registrar_ancla_pagina("sincronizador", "historial", history_panel)
 
         self._iniciar_verificacion_recursos()
         self._programar_monitoreo_recursos()
@@ -1063,7 +1175,7 @@ class ActualizadorCAD(ctk.CTk):
             "Se actualizarán LISPs, scripts, estilos, mapas o el master DWG; el ejecutable no será reemplazado.\n"
             "¿Deseas descargarla ahora?"
         )
-        if messagebox.askyesno("Actualización de recursos SINCAL", mensaje, parent=self):
+        if messagebox.askyesno("Actualización de recursos de SINCAL Suite", mensaje, parent=self):
             self.btn_sync_resources.configure(state="disabled", text="…")
             threading.Thread(target=self._hilo_aplicar_recursos, args=(plan,), daemon=True).start()
         else:
@@ -1081,7 +1193,7 @@ class ActualizadorCAD(ctk.CTk):
             self._ui(
                 messagebox.showerror,
                 "Actualización incompleta",
-                "No se aplicó completamente la actualización. SINCAL volverá a intentarlo al iniciar.\n\n"
+                "No se aplicó completamente la actualización. SINCAL Suite volverá a intentarlo al iniciar.\n\n"
                 f"Detalle: {e}",
             )
             self._ui(self.btn_sync_resources.configure, state="normal", text="")
@@ -1135,7 +1247,7 @@ class ActualizadorCAD(ctk.CTk):
         )
         mensaje = (
             "Los recursos fueron descargados, validados e instalados correctamente.\n\n"
-            "Cierra y vuelve a abrir SINCAL para refrescar toda la interfaz. "
+            "Cierra y vuelve a abrir SINCAL Suite para refrescar toda la interfaz. "
             + estado_cad
         )
         if avisos:
@@ -1242,7 +1354,7 @@ class ActualizadorCAD(ctk.CTk):
         self.ent_ruta_adv.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(7, 0))
 
         left_frame = ctk.CTkFrame(self.tab_renombrado, fg_color="transparent", corner_radius=0)
-        left_frame.pack(fill="both", expand=True, padx=20, pady=(6, 4))
+        left_frame.pack(fill="x", padx=20, pady=(6, 2))
 
         ctk.CTkLabel(left_frame, text="1. Archivos a procesar:", font=FUENTE_SUBTITULO,
                      text_color=COLOR_TEXTO).pack(pady=(8, 5), padx=2, anchor="w")
@@ -1255,12 +1367,12 @@ class ActualizadorCAD(ctk.CTk):
                       hover_color=COLOR_GRIS_BOTON_HOVER, command=self.desmarcar_todos).pack(side="left")
 
         self.scroll_archivos = ctk.CTkScrollableFrame(
-            left_frame, fg_color=COLOR_PANEL, corner_radius=0)
+            left_frame, height=205, fg_color=COLOR_PANEL, corner_radius=0)
         self.scroll_archivos.pack(
-            fill="both", expand=True, padx=2, pady=(5, 12))
+            fill="x", padx=2, pady=(5, 8))
 
         h1_frame = ctk.CTkFrame(self.tab_renombrado, fg_color="transparent", corner_radius=0)
-        h1_frame.pack(fill="x", padx=20, pady=(4, 16))
+        h1_frame.pack(fill="x", padx=20, pady=(0, 12))
         ctk.CTkLabel(h1_frame, text="2. Buscar y Reemplazar (Renombrado Automático)",
                      font=FUENTE_SUBTITULO, text_color=COLOR_TEXTO).pack(anchor="w", padx=2, pady=(4, 5))
 
@@ -1277,19 +1389,29 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkButton(h1_frame, text="Aplicar reemplazo a la selección", font=FUENTE_NORMAL, corner_radius=0,
                       fg_color=COLOR_GRIS_BOTON, text_color=COLOR_TEXTO, hover_color=COLOR_GRIS_BOTON_HOVER,
                       command=self.aplicar_reemplazo_adv).pack(pady=8, padx=2, fill="x")
+        self._registrar_ancla_pagina("procesamiento", "archivos", left_frame)
+        self._registrar_ancla_pagina("procesamiento", "reemplazo", h1_frame)
 
     def setup_tab_comandos(self):
-        ctk.CTkLabel(self.tab_comandos, text="COMANDOS EN VIVO", font=FUENTE_TITULO,
+        page = ctk.CTkScrollableFrame(
+            self.tab_comandos, fg_color=COLOR_FONDO, corner_radius=0,
+            scrollbar_button_color=COLOR_GRIS_BOTON,
+            scrollbar_button_hover_color=COLOR_GRIS_BOTON_HOVER,
+        )
+        page.pack(fill="both", expand=True, padx=(0, 4))
+        ctk.CTkLabel(page, text="COMANDOS EN VIVO", font=FUENTE_TITULO,
                      text_color=COLOR_TEXTO).pack(pady=(36, 8))
         ctk.CTkLabel(
-            self.tab_comandos,
+            page,
             text="Envía un comando a cada plano abierto en AutoCAD o ZWCAD. No uses comandos que requieran clics distintos por dibujo.",
             font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE, justify="center", wraplength=760,
         ).pack(padx=30, pady=(0, 20))
-        controls = ctk.CTkFrame(self.tab_comandos, fg_color="transparent")
+        controls = ctk.CTkFrame(page, fg_color="transparent")
         controls.pack(fill="x", padx=60, pady=8)
         self.entrada_comando = ctk.CTkEntry(
-            controls, font=FUENTE_CAMPO, placeholder_text="Ejemplo: ZE o _QSAVE", corner_radius=0,
+            controls, font=FUENTE_CAMPO,
+            placeholder_text="Escribe un comando y presiona Enter · Ejemplo: ZE o _QSAVE",
+            corner_radius=0,
         )
         self.entrada_comando.pack(side="left", fill="x", expand=True, padx=(0, 8))
         self.btn_enviar_cmd = ctk.CTkButton(
@@ -1304,6 +1426,51 @@ class ActualizadorCAD(ctk.CTk):
             state="disabled", command=self.detener_comando_en_vivo,
         )
         self.btn_cancelar_cmd.pack(side="left")
+        self.entrada_comando.bind("<Return>", self._ejecutar_comando_enter)
+        self.entrada_comando.bind("<KP_Enter>", self._ejecutar_comando_enter)
+
+        ttk.Separator(page, orient="horizontal", bootstyle="secondary").pack(
+            fill="x", padx=36, pady=(26, 14))
+        glossary = ctk.CTkFrame(page, fg_color=COLOR_FONDO, corner_radius=0)
+        glossary.pack(fill="x", padx=38, pady=(0, 28))
+        ctk.CTkLabel(
+            glossary, text="GLOSARIO DE COMANDOS", font=FUENTE_SUBTITULO,
+            text_color=COLOR_MOSTAZA, anchor="w",
+        ).pack(fill="x", pady=(0, 3))
+        ctk.CTkLabel(
+            glossary,
+            text="Estos comandos pueden escribirse arriba cuando no requieran selecciones diferentes en cada plano.",
+            font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE,
+            anchor="w", justify="left", wraplength=760,
+        ).pack(fill="x", pady=(0, 12))
+        try:
+            with open(obtener_ruta_recurso("tutoriales.json"), "r", encoding="utf-8") as source:
+                commands = (json.load(source).get("comandos_lisp") or {})
+        except (OSError, ValueError, TypeError):
+            commands = {}
+        for index, (command, detail) in enumerate(commands.items()):
+            if index:
+                ttk.Separator(glossary, orient="horizontal", bootstyle="secondary").pack(
+                    fill="x", pady=5)
+            row = ctk.CTkFrame(glossary, fg_color="transparent", corner_radius=0)
+            row.pack(fill="x")
+            ctk.CTkLabel(
+                row, text=command, width=145, font=FUENTE_NORMAL,
+                text_color=COLOR_ACENTO, anchor="nw", justify="left",
+            ).pack(side="left", padx=(0, 14), pady=3)
+            description = detail.get("descripcion") or detail.get("titulo") or "Sin descripción."
+            ctk.CTkLabel(
+                row, text=description, font=FUENTE_NORMAL,
+                text_color=COLOR_TEXTO, anchor="nw", justify="left", wraplength=590,
+            ).pack(side="left", fill="x", expand=True, pady=3)
+        self._registrar_ancla_pagina("comandos", "comando", controls)
+        self._registrar_ancla_pagina("comandos", "glosario", glossary)
+
+    def _ejecutar_comando_enter(self, _event=None):
+        """Permite ejecutar desde el campo sin abandonar el teclado."""
+        if str(self.btn_enviar_cmd.cget("state")) != "disabled":
+            self.enviar_comando_en_vivo()
+        return "break"
 
     def setup_tab_conversion_dxf(self):
         ctk.CTkLabel(
@@ -1362,11 +1529,15 @@ class ActualizadorCAD(ctk.CTk):
         self.checkboxes_dxf = []
         self.ruta_conversion = ""
         self.archivos_conversion = []
-        ctk.CTkButton(
+        self.btn_convertir_dxf = ctk.CTkButton(
             panel, text="Convertir DXF a DWG", font=FUENTE_SUBTITULO_PEQUENO,
             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0,
             command=self.convertir_dxf_a_dwg,
-        ).pack(fill="x", padx=16, pady=(0, 16))
+        )
+        self.btn_convertir_dxf.pack(fill="x", padx=16, pady=(0, 16))
+        self._registrar_ancla_pagina("conversion", "carpeta", controls)
+        self._registrar_ancla_pagina("conversion", "archivos", self.scroll_dxf)
+        self._registrar_ancla_pagina("conversion", "conversion", self.btn_convertir_dxf)
 
     def cargar_archivos_conversion(self):
         carpeta = filedialog.askdirectory(title="Seleccionar carpeta con archivos DXF")

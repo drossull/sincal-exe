@@ -1,4 +1,4 @@
-"""Tema sobrio, tipografías y ayudas breves de SINCAL 2.0."""
+"""Tema sobrio, tipografías y ayudas breves de SINCAL Suite."""
 
 import ctypes
 import os
@@ -74,24 +74,38 @@ def armonizar_estilos_ttk(style, dark=True):
     foreground = palette["texto"]
     style.configure(
         ".", background=background, foreground=foreground,
-        font=FUENTE_NORMAL, fieldbackground=background)
+        font=FUENTE_TTK_NORMAL, fieldbackground=background)
     style.configure("TFrame", background=background)
     style.configure("TPanedwindow", background=background)
+    for widget_style in (
+        "TLabel", "TEntry", "TCombobox", "TSpinbox", "TButton",
+        "TRadiobutton", "TCheckbutton", "symbol.Link.TButton",
+    ):
+        style.configure(widget_style, font=FUENTE_TTK_NORMAL)
     for prefix in ("", "primary.", "secondary."):
         style.configure(
             f"{prefix}TLabelframe", background=background,
             bordercolor=panel, lightcolor=panel, darkcolor=panel)
         style.configure(
             f"{prefix}TLabelframe.Label", background=background,
-            foreground=foreground, font=FUENTE_NORMAL)
+            foreground=foreground, font=FUENTE_TTK_NORMAL)
         style.configure(f"{prefix}TNotebook", background=background, borderwidth=0)
         style.configure(
             f"{prefix}TNotebook.Tab", background=panel,
-            foreground=foreground, font=FUENTE_NORMAL, padding=(10, 6))
+            foreground=foreground, font=FUENTE_TTK_NORMAL, padding=(10, 6))
         style.map(
             f"{prefix}TNotebook.Tab",
             background=[("selected", accent), ("active", panel)],
             foreground=[("selected", background), ("active", foreground)])
+    # Tableview crea estilos prefijados según bootstyle. Un tamaño negativo
+    # expresa píxeles en Tk y evita que Windows vuelva a escalarlo como puntos.
+    for prefix in ("", "primary.", "secondary.", "info.", "warning."):
+        style.configure(
+            f"{prefix}Table.Treeview", font=FUENTE_TTK_TABLA,
+            rowheight=23, borderwidth=0)
+        style.configure(
+            f"{prefix}Table.Treeview.Heading",
+            font=FUENTE_TTK_TABLA_ENCABEZADO, padding=(5, 4))
 
 
 COLOR_FONDO = (PALETA_CLARA["fondo"], PALETA_OSCURA["fondo"])
@@ -125,16 +139,29 @@ FUENTE_NORMAL = (FAMILIA_PRESSURA, 13)
 FUENTE_NORMAL_PEQUENA = FUENTE_NORMAL
 FUENTE_CAMPO = (FAMILIA_PRESSURA, 11)
 FUENTE_CONSOLA = ("Consolas", 13)
+# ttk/Tk interpreta los tamaños positivos como puntos; CustomTkinter los trata
+# como píxeles escalados. Estas variantes negativas unifican su altura visual.
+FUENTE_TTK_NORMAL = (FAMILIA_PRESSURA, -13)
+FUENTE_TTK_CAMPO = (FAMILIA_PRESSURA, -13)
+FUENTE_TTK_TABLA = (FAMILIA_PRESSURA, -12)
+FUENTE_TTK_TABLA_ENCABEZADO = (FAMILIA_PRESSURA, -12, "bold")
+
+
+_FUENTES_REGISTRADAS = False
 
 
 def registrar_fuentes() -> None:
     """Registra fuentes privadas incluidas, sin instalarlas permanentemente."""
+    global _FUENTES_REGISTRADAS
+    if _FUENTES_REGISTRADAS:
+        return
     if os.name != "nt":
         return
     try:
         add_font = ctypes.windll.gdi32.AddFontResourceExW
     except Exception:
         return
+    _FUENTES_REGISTRADAS = True
     font_names = (
         "GT Pressura Regular.ttf", "GT Pressura Regular.otf",
         "GTPressura-Bold.ttf",

@@ -34,7 +34,7 @@ from sincal.ui.theme import (
     COLOR_MOSTAZA,
     COLOR_PANEL,
     COLOR_TEXTO_SUAVE,
-    FUENTE_CAMPO,
+    FUENTE_TTK_CAMPO as FUENTE_CAMPO,
     FUENTE_NORMAL,
     FUENTE_NORMAL_PEQUENA,
     FUENTE_SUBTITULO,
@@ -70,7 +70,7 @@ class TabArmaduras(ctk.CTkFrame):
         fuente_subtitulo = FUENTE_SUBTITULO
         fuente_normal = FUENTE_NORMAL
 
-        ctk.CTkLabel(frame_top, text="MÓDULO ESTRUCTURAL (ARMADURAS)",
+        ctk.CTkLabel(frame_top, text="GENERADOR DE ARMADURA",
                      font=fuente_subtitulo, text_color=COLOR_MOSTAZA).grid(
                          row=0, column=0, sticky="w", padx=8, pady=(2, 10))
 
@@ -130,9 +130,15 @@ class TabArmaduras(ctk.CTkFrame):
         # =========================================================
         self.tab_sub_travesanos = ttk.Notebook(tab_travesanos, bootstyle="secondary")
         self.tab_sub_travesanos.pack(fill="both", expand=True)
-        tab_trav_main = ctk.CTkFrame(
+        tab_trav_host = ctk.CTkFrame(
             self.tab_sub_travesanos, fg_color=COLOR_PANEL, corner_radius=0)
-        self.tab_sub_travesanos.add(tab_trav_main, text="Configuración y generación")
+        self.tab_sub_travesanos.add(
+            tab_trav_host, text="Configuración y generación")
+        tab_trav_main = ctk.CTkScrollableFrame(
+            tab_trav_host, fg_color=COLOR_PANEL, corner_radius=0,
+            scrollbar_button_color=COLOR_GRIS_BOTON,
+            scrollbar_button_hover_color=COLOR_GRIS_BOTON_HOVER)
+        tab_trav_main.pack(fill="both", expand=True)
 
         # --- I. PARÁMETROS GLOBALES ---
         frame_params = ctk.CTkFrame(tab_trav_main, fg_color="transparent")
@@ -270,10 +276,10 @@ class TabArmaduras(ctk.CTkFrame):
             return
         if main_text.startswith("1."):
             detail = self.tab_estribo.tab(self.tab_estribo.select(), "text")
-            segments = ("Módulo estructural", "Estribos", detail)
+            segments = ("Generador de armadura", "Estribos", detail)
         else:
             detail = self.tab_sub_travesanos.tab(self.tab_sub_travesanos.select(), "text")
-            segments = ("Módulo estructural", "Travesaños", detail)
+            segments = ("Generador de armadura", "Travesaños", detail)
         if self.parent_app._sections.get("estructural", (None,))[0].winfo_manager():
             self.parent_app.actualizar_ruta_interna(*segments)
 
@@ -486,8 +492,8 @@ class TabArmaduras(ctk.CTkFrame):
         table_group = ttk.Labelframe(
             parent, text="PARÁMETROS DE ARMADURA", bootstyle="secondary")
         table_group.pack(fill="x", padx=14, pady=(0, 8))
-        table = ctk.CTkScrollableFrame(
-            table_group, fg_color=COLOR_FONDO, corner_radius=0, height=215)
+        table = ctk.CTkFrame(
+            table_group, fg_color=COLOR_FONDO, corner_radius=0)
         table.pack(fill="x", padx=8, pady=8)
         headers = ("Grupo", "Marca base", "Ø mm", "@ cm", "Gancho cm", "Origen", "Activo")
         for column, text in enumerate(headers):
@@ -952,7 +958,7 @@ class TabArmaduras(ctk.CTkFrame):
 
     def mostrar_ayuda_travesano(self):
         visor = ctk.CTkToplevel(self)
-        visor.title("SINCAL - Ayuda Cuadrantes de Travesaño")
+        visor.title("SINCAL Suite — Ayuda de travesaños")
         visor.geometry("900x350")
         visor.transient(self)
 
