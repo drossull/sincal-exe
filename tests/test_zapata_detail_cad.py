@@ -43,6 +43,12 @@ class ZapataDetailCadTests(unittest.TestCase):
         without_strings = re.sub(r'"(?:\\.|[^"\\])*"', '""', self.lisp)
         self.assertEqual(without_strings.count("("), without_strings.count(")"))
 
+    def test_objectdbx_release_remains_inside_the_valid_if_branch(self):
+        self.assertIn(
+            "(vl-catch-all-apply 'vlax-release-object (list dbx))))))",
+            self.lisp,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

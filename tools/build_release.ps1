@@ -253,7 +253,9 @@ function Assert-AppPayloadContents([string]$Path) {
             'mapas/ayuda_travesano.png',
             'assets/icons/logo.ico',
             'assets/fonts/GT Pressura Regular.ttf',
-            'assets/fonts/GTPressura-Bold.ttf'
+            'assets/fonts/GTPressura-Bold.ttf',
+            'assets/fonts/HelveticaNeueRoman.otf',
+            'assets/fonts/HelveticaNeueBold.otf'
         )
         $missing = @($required | Where-Object { $_ -notin $entries })
         if ($missing.Count -gt 0) {
@@ -302,11 +304,10 @@ function New-ReleasePayloads(
     Copy-Item $DistExe (Join-Path $appStage 'SINCAL.exe') -Force
     $fontStage = Join-Path $appStage 'assets\fonts'
     New-Item -ItemType Directory -Force -Path $fontStage | Out-Null
-    foreach ($relative in @('GT Pressura Regular.ttf', 'GTPressura-Bold.ttf', 'README.md')) {
-        $fontSource = Join-Path $ProjectRoot "assets\fonts\$relative"
-        if (Test-Path -LiteralPath $fontSource -PathType Leaf) {
-            Copy-Item $fontSource (Join-Path $fontStage $relative) -Force
-        }
+    Get-ChildItem (Join-Path $ProjectRoot 'assets\fonts') -File | Where-Object {
+        $_.Extension -in @('.ttf', '.otf') -or $_.Name -eq 'README.md'
+    } | ForEach-Object {
+        Copy-Item $_.FullName (Join-Path $fontStage $_.Name) -Force
     }
 
     # La primera apertura debe ser funcional incluso antes de crear el estado de

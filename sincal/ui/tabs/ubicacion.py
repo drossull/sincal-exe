@@ -9,6 +9,8 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 import ttkbootstrap as ttk
 from PIL import Image, ImageDraw
+from sincal.ui.scroll import SafeScrollableFrame
+from sincal.ui.widgets import ShadowButton
 
 from sincal.runtime import ruta_recurso
 from sincal.resources import ensure_resource_available
@@ -131,7 +133,7 @@ def _parsear_kml_puntos(kml_data):
     return estructuras, ignorados
 
 
-class TabUbicacion(ctk.CTkScrollableFrame):
+class TabUbicacion(SafeScrollableFrame):
     def __init__(self, master, parent_app, **kwargs):
         kwargs["fg_color"] = COLOR_FONDO
         super().__init__(master, **kwargs)
@@ -216,12 +218,12 @@ class TabUbicacion(ctk.CTkScrollableFrame):
         data_row = ctk.CTkFrame(data_group, fg_color=COLOR_FONDO, corner_radius=0)
         data_row.pack(fill="x", padx=10, pady=10)
 
-        self.btn_cargar_kmz = ctk.CTkButton(
+        self.btn_cargar_kmz = ShadowButton(
             data_row, text="Cargar KMZ", font=fuente_normal, fg_color=COLOR_GRIS_BOTON,
             hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0,
             command=self.cargar_kmz)
         self.btn_cargar_kmz.pack(side="right")
-        ctk.CTkButton(data_row, text="Limpiar ruta", font=FUENTE_NORMAL_PEQUENA,
+        ShadowButton(data_row, text="Limpiar ruta", font=FUENTE_NORMAL_PEQUENA,
                       fg_color="transparent", hover_color=COLOR_GRIS_BOTON,
                       text_color=COLOR_TEXTO_SUAVE, corner_radius=0,
                       command=self.limpiar_kmz).pack(side="right", padx=(0, 6))
@@ -296,7 +298,7 @@ class TabUbicacion(ctk.CTkScrollableFrame):
         self.ent_ajuste_y.pack(side="left", padx=(0, 20))
         self.ent_ajuste_y.insert(0, "0")
 
-        self.btn_generar_croquis = ctk.CTkButton(
+        self.btn_generar_croquis = ShadowButton(
             self, text="GENERAR CROQUIS DE UBICACIÓN",
             font=fuente_subtitulo,
             fg_color=COLOR_ACENTO, hover_color=COLOR_ACENTO_HOVER,

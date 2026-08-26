@@ -48,10 +48,11 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('for label in ("Tema oscuro", "Tema claro", "Tema del sistema")', source)
         self.assertIn('label=label.replace("Tema ", "").title()', source)
         self.assertNotIn("self.font_slider", source)
-        self.assertIn('text="Aa"', source)
-        self.assertIn('(0.90, FUENTE_CAMPO, "Zoom pequeño · 90 %")', source)
-        self.assertIn('(1.00, FUENTE_NORMAL, "Zoom normal · 100 %")', source)
-        self.assertIn('(1.15, FUENTE_SUBTITULO_PEQUENO, "Zoom grande · 115 %")', source)
+        self.assertNotIn('text="Aa"', source)
+        self.assertNotIn("font_controls", source)
+        self.assertIn('("Aa  ·  90 %", 0.90)', source)
+        self.assertIn('("Aa  ·  100 %", 1.00)', source)
+        self.assertIn('("Aa  ·  115 %", 1.15)', source)
         self.assertIn("def _redimensionar_menu", source)
         self.assertIn("def _redimensionar_consola", source)
         self.assertNotIn("self.log_rename", source)
@@ -62,10 +63,13 @@ class WorkbenchLayoutTests(unittest.TestCase):
         build = (ROOT / "tools" / "build_release.ps1").read_text(encoding="utf-8")
         self.assertIn('FAMILIA_PRESSURA = "GT Pressura"', theme)
         self.assertIn('(FAMILIA_PRESSURA, 28, "bold")', theme)
-        self.assertIn('(FAMILIA_PRESSURA, 13)', theme)
-        self.assertIn('(FAMILIA_PRESSURA, 11)', theme)
+        self.assertIn('FAMILIA_CUERPO = "Helvetica Neue"', theme)
+        self.assertIn('(FAMILIA_CUERPO, 13)', theme)
         self.assertIn('("Consolas", 13)', theme)
         self.assertIn("GT Pressura Regular.ttf", build)
+        self.assertIn("HelveticaNeueRoman.otf", build)
+        self.assertIn("HelveticaNeueBold.otf", build)
+        self.assertIn("os.listdir(font_dir)", theme)
         self.assertIn('TTK_PRESET_OSCURO = "sincal-dark"', theme)
         self.assertIn("ThemeDefinition(", theme)
         self.assertIn('TTK_PRESET_CLARO = "sincal-light"', theme)
@@ -74,6 +78,24 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertNotIn("#0A0A0C", theme)
         self.assertTrue((ROOT / "assets" / "fonts" / "GT Pressura Regular.ttf").is_file())
         self.assertTrue((ROOT / "assets" / "fonts" / "GTPressura-Bold.ttf").is_file())
+        self.assertTrue((ROOT / "assets" / "fonts" / "HelveticaNeueRoman.otf").is_file())
+        self.assertTrue((ROOT / "assets" / "fonts" / "HelveticaNeueBold.otf").is_file())
+
+    def test_action_buttons_use_the_shared_offset_shadow(self):
+        widget_source = (ROOT / "sincal" / "ui" / "widgets.py").read_text(
+            encoding="utf-8")
+        self.assertIn("class ShadowButton", widget_source)
+        self.assertIn("x=size", widget_source)
+        self.assertIn("y=size", widget_source)
+        self.assertIn("shadow_color=COLOR_ACENTO", widget_source)
+        for path in (
+            APP,
+            ARMADURAS,
+            ROOT / "sincal" / "ui" / "tabs" / "ubicacion.py",
+            ROOT / "sincal" / "ui" / "tabs" / "diagnostico.py",
+        ):
+            source = path.read_text(encoding="utf-8")
+            self.assertIn("ShadowButton", source)
 
     def test_dpi_and_ttk_typography_are_configured_before_the_root(self):
         main = MAIN.read_text(encoding="utf-8")
@@ -83,8 +105,8 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertLess(app.index("configurar_dpi_windows()"), app.index("import tkinter as tk"))
         init = app.split("class ActualizadorCAD", 1)[1].split("asegurar_directorios()", 1)[0]
         self.assertLess(init.index("registrar_fuentes()"), init.index("super().__init__()"))
-        self.assertIn('FUENTE_TTK_NORMAL = (FAMILIA_PRESSURA, -13)', theme)
-        self.assertIn('FUENTE_TTK_TABLA = (FAMILIA_PRESSURA, -12)', theme)
+        self.assertIn('FUENTE_TTK_NORMAL = (FAMILIA_CUERPO, -13)', theme)
+        self.assertIn('FUENTE_TTK_TABLA = (FAMILIA_CUERPO, -12)', theme)
         self.assertIn('f"{prefix}Table.Treeview"', theme)
 
     def test_bootstrap_preset_icons_and_responsive_shell_are_integrated(self):
@@ -154,6 +176,8 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('Image.new("RGBA"', activity)
         self.assertIn('anchor="se"', activity)
         self.assertIn('f"{round(current.progress):d} %"', activity)
+        self.assertIn("0.8 - (time.monotonic() - self._shown_at)", activity)
+        self.assertIn("ImageTk.PhotoImage(frame, master=self)", activity)
 
     def test_modules_import_the_small_body_font_when_using_it(self):
         for path in (ARMADURAS, ROOT / "sincal" / "ui" / "tabs" / "ubicacion.py"):
@@ -175,12 +199,12 @@ class WorkbenchLayoutTests(unittest.TestCase):
         source = ARMADURAS.read_text(encoding="utf-8")
         self.assertIn('"Estribo de entrada"', source)
         self.assertIn('"Estribo de salida"', source)
-        self.assertIn('text="2. REVISIÓN Y MARCAS"', source)
-        self.assertIn("CTkScrollableFrame", source)
-        self.assertIn('("2. MUROS",', source)
-        self.assertIn('("3. CONSOLAS",', source)
-        self.assertIn('("4. TOPES",', source)
-        self.assertIn('("5. CONTRAFUERTE",', source)
+        self.assertIn('self._labelframe(page, "2. REVISIÓN Y MARCAS")', source)
+        self.assertIn("SafeScrollableFrame", source)
+        self.assertIn('("MUROS",', source)
+        self.assertIn('("CONSOLAS",', source)
+        self.assertIn('("TOPES",', source)
+        self.assertIn('("CONTRAFUERTE",', source)
         self.assertIn('self._abutments = {}', source)
         self.assertIn("default_zapata_rules", source)
         self.assertIn("def actualizar_revision_zapata", source)
@@ -196,6 +220,8 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn("ToolTip(", source)
         self.assertIn("ttk.Separator", source)
         self.assertIn("def mostrar_vista_previa_marcas", source)
+        self.assertIn("def mostrar_vista_previa_fierro", source)
+        self.assertIn('"Marca", "Elemento", "Grupo / ubicación"', source)
         self.assertIn("def generar_despiece_zapata", source)
         self.assertIn('text="Generar despiece general de zapata"', source)
         self.assertNotIn("def generar_despiece_cad", source)
@@ -205,15 +231,20 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('("E-E", "EE")', source)
         self.assertNotIn("self.ent_phi_inf", source)
         self.assertNotIn("self.ent_espac_inf", source)
+        self.assertIn('text="ESTRIBOS"', source)
+        self.assertIn('text="TRAVESAÑOS"', source)
+        self.assertIn('self._labelframe(parent, "ZAPATA")', source)
+        self.assertIn('increment=100', source)
+        self.assertIn('increment=50', source)
 
     def test_each_structural_subtab_has_only_one_page_scroll(self):
         source = ARMADURAS.read_text(encoding="utf-8")
         self.assertIn("tab_trav_host = ctk.CTkFrame", source)
-        self.assertIn("tab_trav_main = ctk.CTkScrollableFrame", source)
-        self.assertIn("page = ctk.CTkScrollableFrame", source)
+        self.assertIn("tab_trav_main = SafeScrollableFrame", source)
+        self.assertIn("page = SafeScrollableFrame", source)
         self.assertIn("table = ctk.CTkFrame", source)
         self.assertNotIn("table = ctk.CTkScrollableFrame", source)
-        self.assertEqual(source.count("ctk.CTkScrollableFrame("), 2)
+        self.assertEqual(source.count("SafeScrollableFrame("), 2)
 
     def test_zapata_moldajes_are_read_from_the_active_cad_document_only(self):
         core = APP.read_text(encoding="utf-8")
@@ -236,6 +267,9 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertNotIn("self.theme_menu =", core)
         self.assertIn("SINCAL SUITE", core)
         self.assertIn("Por Gonzalo M. para SINCAL Ltda. 2026.", core)
+        self.assertIn('text=f"Versión {VERSION_ACTUAL}"', core)
+        self.assertIn("self.sidebar.pack_forget()", core)
+        self.assertNotIn("def _animar_menu_lateral", core)
 
     def test_active_moldaje_detection_keeps_a_valid_com_connection(self):
         core = APP.read_text(encoding="utf-8")

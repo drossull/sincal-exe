@@ -88,6 +88,10 @@ class ZapataCadTests(unittest.TestCase):
         )
         self.assertIn("vl-catch-all-apply 'getvar (list \"CANNOSCALEVALUE\")", lisp)
         self.assertNotIn('(setvar "CANNOSCALE', lisp)
+        self.assertIn(
+            "(vl-catch-all-apply 'vlax-release-object (list dbx))))))",
+            lisp,
+        )
 
     def test_ee_draws_short_lap_bar_five_millimetres_toward_negative_y(self):
         lisp = build_zapata_lisp(

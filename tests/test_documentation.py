@@ -67,6 +67,8 @@ class WebInstallerConfigurationTests(unittest.TestCase):
         self.assertIn("scripts/SINCAL_ENGINE.ps1", build_script)
         self.assertIn("assets/fonts/GT Pressura Regular.ttf", build_script)
         self.assertIn("assets/fonts/GTPressura-Bold.ttf", build_script)
+        self.assertIn("assets/fonts/HelveticaNeueRoman.otf", build_script)
+        self.assertIn("assets/fonts/HelveticaNeueBold.otf", build_script)
         self.assertIn("^mapas/Region_.*\\.png$", build_script)
 
 

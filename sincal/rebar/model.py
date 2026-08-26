@@ -176,7 +176,7 @@ def default_zapata_rules():
     return (
         RebarRule("mesh_x", "Malla 1–2 · superior e inferior", "1", 22, 20, 0,
                   "superior e inferior", "X", continuation_mark="2", terminal_mark="2-A", placement_multiplier=2),
-        RebarRule("mesh_y", "Malla 3 · superior e inferior", "3", 22, 20, 0,
+        RebarRule("mesh_y", "Fierro 3 · superior e inferior", "3", 22, 20, 0,
                   "superior e inferior", "Y", placement_multiplier=2),
         RebarRule("suple", "Suple 3-A · solo superior", "3-A", 16, 20, 0,
                   "superior", "Y", enabled=False),

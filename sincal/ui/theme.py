@@ -77,6 +77,16 @@ def armonizar_estilos_ttk(style, dark=True):
         font=FUENTE_TTK_NORMAL, fieldbackground=background)
     style.configure("TFrame", background=background)
     style.configure("TPanedwindow", background=background)
+    style.configure(
+        "SincalLabelframeTitle.TLabel",
+        background=background,
+        foreground=foreground,
+        font=FUENTE_TTK_NORMAL,
+        bordercolor=panel,
+        borderwidth=1,
+        relief="solid",
+        padding=(7, 3),
+    )
     for widget_style in (
         "TLabel", "TEntry", "TCombobox", "TSpinbox", "TButton",
         "TRadiobutton", "TCheckbutton", "symbol.Link.TButton",
@@ -127,6 +137,7 @@ RADIO_CONTROL = 6
 RADIO_PANEL = 10
 
 FAMILIA_PRESSURA = "GT Pressura"
+FAMILIA_CUERPO = "Helvetica Neue"
 # Se conserva el nombre para diagnosticar el archivo distribuido, pero toda la
 # interfaz usa una sola familia. Así números y letras comparten métricas.
 FAMILIA_PRESSURA_BOLD = "GTPressura-Bold"
@@ -134,24 +145,24 @@ FUENTE_TITULO = (FAMILIA_PRESSURA, 28, "bold")
 FUENTE_TITULO_PEQUENO = (FAMILIA_PRESSURA, 20, "bold")
 FUENTE_SUBTITULO = (FAMILIA_PRESSURA, 18, "bold")
 FUENTE_SUBTITULO_PEQUENO = (FAMILIA_PRESSURA, 15, "bold")
-FUENTE_MENU = (FAMILIA_PRESSURA, 13)
-FUENTE_NORMAL = (FAMILIA_PRESSURA, 13)
+FUENTE_MENU = (FAMILIA_CUERPO, 13)
+FUENTE_NORMAL = (FAMILIA_CUERPO, 13)
 FUENTE_NORMAL_PEQUENA = FUENTE_NORMAL
-FUENTE_CAMPO = (FAMILIA_PRESSURA, 11)
+FUENTE_CAMPO = (FAMILIA_CUERPO, 13)
 FUENTE_CONSOLA = ("Consolas", 13)
 # ttk/Tk interpreta los tamaños positivos como puntos; CustomTkinter los trata
 # como píxeles escalados. Estas variantes negativas unifican su altura visual.
-FUENTE_TTK_NORMAL = (FAMILIA_PRESSURA, -13)
-FUENTE_TTK_CAMPO = (FAMILIA_PRESSURA, -13)
-FUENTE_TTK_TABLA = (FAMILIA_PRESSURA, -12)
-FUENTE_TTK_TABLA_ENCABEZADO = (FAMILIA_PRESSURA, -12, "bold")
+FUENTE_TTK_NORMAL = (FAMILIA_CUERPO, -13)
+FUENTE_TTK_CAMPO = (FAMILIA_CUERPO, -13)
+FUENTE_TTK_TABLA = (FAMILIA_CUERPO, -12)
+FUENTE_TTK_TABLA_ENCABEZADO = (FAMILIA_CUERPO, -12, "bold")
 
 
 _FUENTES_REGISTRADAS = False
 
 
 def registrar_fuentes() -> None:
-    """Registra fuentes privadas incluidas, sin instalarlas permanentemente."""
+    """Registra la familia tipográfica incluida sin instalarla en Windows."""
     global _FUENTES_REGISTRADAS
     if _FUENTES_REGISTRADAS:
         return
@@ -162,17 +173,16 @@ def registrar_fuentes() -> None:
     except Exception:
         return
     _FUENTES_REGISTRADAS = True
-    font_names = (
-        "GT Pressura Regular.ttf", "GT Pressura Regular.otf",
-        "GTPressura-Bold.ttf",
-        "GT Pressura Pro Bold.ttf", "GT Pressura Pro Bold.otf",
-        "GT-Pressura-Pro-Regular.ttf", "GT-Pressura-Pro-Regular.otf",
-        "GT-Pressura-Pro-Bold.ttf", "GT-Pressura-Pro-Bold.otf",
-        "GTPressuraPro-Regular.ttf", "GTPressuraPro-Regular.otf",
-        "GTPressuraPro-Bold.ttf", "GTPressuraPro-Bold.otf",
-    )
+    font_dir = ruta_recurso_instalado("assets", "fonts")
+    try:
+        font_names = sorted(
+            name for name in os.listdir(font_dir)
+            if os.path.splitext(name)[1].lower() in (".ttf", ".otf")
+        )
+    except OSError:
+        return
     for name in font_names:
-        path = ruta_recurso_instalado("assets", "fonts", name)
+        path = os.path.join(font_dir, name)
         if not os.path.isfile(path):
             continue
         try:

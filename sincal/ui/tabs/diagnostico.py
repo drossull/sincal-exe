@@ -4,6 +4,8 @@ from datetime import datetime
 from tkinter import TclError, filedialog, messagebox
 
 import customtkinter as ctk
+from sincal.ui.scroll import SafeScrollableFrame
+from sincal.ui.widgets import ShadowButton
 
 from sincal.cad.engine import discover_cad_engines, save_engine_selection
 from sincal.diagnostics import collect_diagnostics, create_diagnostic_bundle, format_summary, record_incident
@@ -41,7 +43,7 @@ class TabDiagnostico(ctk.CTkFrame):
         color_title = COLOR_MOSTAZA
         color_text = COLOR_TEXTO
 
-        container = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=RADIO_PANEL)
+        container = SafeScrollableFrame(self, fg_color="transparent", corner_radius=RADIO_PANEL)
         container.pack(fill="both", expand=True, padx=12, pady=12)
         self.page_container = container
 
@@ -70,7 +72,7 @@ class TabDiagnostico(ctk.CTkFrame):
             dropdown_font=normal_font, corner_radius=RADIO_CONTROL,
         )
         self.engine_menu.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        self.btn_save_engine = ctk.CTkButton(
+        self.btn_save_engine = ShadowButton(
             engine_row, text="Usar este motor", font=normal_font, corner_radius=RADIO_CONTROL,
             command=self.guardar_motor, state="disabled",
         )
@@ -78,17 +80,17 @@ class TabDiagnostico(ctk.CTkFrame):
 
         actions = ctk.CTkFrame(container, fg_color="transparent")
         actions.pack(fill="x", padx=8, pady=6)
-        self.btn_run = ctk.CTkButton(
+        self.btn_run = ShadowButton(
             actions, text="Ejecutar diagnóstico", font=normal_font, corner_radius=RADIO_CONTROL,
             command=self.ejecutar_diagnostico,
         )
         self.btn_run.pack(side="left", padx=(0, 8))
-        self.btn_report = ctk.CTkButton(
+        self.btn_report = ShadowButton(
             actions, text="Generar informe ZIP", font=normal_font, corner_radius=RADIO_CONTROL,
             fg_color=COLOR_ACENTO, command=self.generar_informe,
         )
         self.btn_report.pack(side="left", padx=(0, 8))
-        ctk.CTkButton(
+        ShadowButton(
             actions, text="Abrir datos locales", font=normal_font, corner_radius=RADIO_CONTROL,
             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, command=lambda: os.startfile(RUTA_DATOS_USUARIO),
         ).pack(side="left")

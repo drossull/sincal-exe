@@ -54,6 +54,8 @@ from sincal.runtime import (
 )
 from sincal.ui.icons import obtener_icono
 from sincal.ui.activity import ActivityIndicator
+from sincal.ui.scroll import SafeScrollableFrame
+from sincal.ui.widgets import ShadowButton
 from sincal.runtime import (
     ruta_recurso as runtime_ruta_recurso,
 )
@@ -181,12 +183,10 @@ class ActualizadorCAD(ctk.CTk):
         self._resource_manifest_revision = ""
         self._resource_poll_job = None
         self._sidebar_width = 270
-        self._sidebar_animation_job = None
         self._sidebar_auto_hidden = False
         self._sidebar_user_hidden = False
         self._font_scale = 1.0
         self._zoom_target = 1.0
-        self._zoom_buttons = {}
         self._console_mode = "Oculta"
         self._sections = {}
         self._nav_buttons = {}
@@ -279,7 +279,7 @@ class ActualizadorCAD(ctk.CTk):
                 row, width=3, height=34, fg_color=COLOR_FONDO, corner_radius=0)
             indicator.pack(side="left", fill="y", pady=4)
             indicator.pack_propagate(False)
-            button = ctk.CTkButton(
+            button = ShadowButton(
                 row, text=label, font=FUENTE_MENU, anchor="w",
                 image=obtener_icono(icon_name, 18), compound="left",
                 fg_color="transparent", hover_color=COLOR_FONDO, text_color=COLOR_TEXTO,
@@ -300,29 +300,11 @@ class ActualizadorCAD(ctk.CTk):
 
         footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         footer.pack(fill="x", padx=12, pady=(8, 12))
-        font_controls = ctk.CTkFrame(footer, fg_color="transparent", corner_radius=0)
-        font_controls.pack(fill="x", pady=(0, 6))
-        zoom_options = (
-            (0.90, FUENTE_CAMPO, "Zoom pequeño · 90 %"),
-            (1.00, FUENTE_NORMAL, "Zoom normal · 100 %"),
-            (1.15, FUENTE_SUBTITULO_PEQUENO, "Zoom grande · 115 %"),
-        )
-        for scale, font, help_text in zoom_options:
-            button = ctk.CTkButton(
-                font_controls, text="Aa", height=32, font=font,
-                fg_color="transparent", hover_color=COLOR_GRIS_BOTON_HOVER,
-                text_color=COLOR_TEXTO, border_width=1, border_color=COLOR_BORDE,
-                corner_radius=RADIO_CONTROL,
-                command=lambda selected=scale: self.cambiar_tamano_letra(selected),
-            )
-            button.pack(side="left", fill="x", expand=True, padx=2)
-            agregar_tooltip(button, help_text)
-            self._zoom_buttons[scale] = button
-        self.zoom_value_label = ctk.CTkLabel(
-            footer, text="100 %", font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE,
-        )
-        self.zoom_value_label.pack(anchor="center", pady=(0, 5))
-        self._actualizar_indicador_zoom()
+        ctk.CTkLabel(
+            footer, text=f"Versión {VERSION_ACTUAL}",
+            font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
+            anchor="w", justify="left",
+        ).pack(fill="x")
         ctk.CTkLabel(
             footer, text="Por Gonzalo M. para SINCAL Ltda. 2026.",
             font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
@@ -333,7 +315,7 @@ class ActualizadorCAD(ctk.CTk):
         header = ctk.CTkFrame(self.workspace, height=58, fg_color=COLOR_PANEL, corner_radius=0)
         header.pack(fill="x")
         header.pack_propagate(False)
-        self.btn_mostrar_menu = ctk.CTkButton(
+        self.btn_mostrar_menu = ShadowButton(
             header, text="", image=obtener_icono("menu", 19), width=36, height=34,
             fg_color="transparent", hover_color=COLOR_GRIS_BOTON, corner_radius=RADIO_CONTROL,
             command=self.alternar_menu_lateral,
@@ -389,7 +371,7 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkLabel(
             console_header, text="CONSOLA", font=FUENTE_SUBTITULO_PEQUENO, text_color=COLOR_TEXTO,
         ).pack(side="left")
-        ctk.CTkButton(
+        ShadowButton(
             console_header, text="Limpiar", font=FUENTE_NORMAL_PEQUENA, width=70, height=26,
             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
             corner_radius=RADIO_CONTROL, command=self.limpiar_consola_global,
@@ -477,7 +459,7 @@ class ActualizadorCAD(ctk.CTk):
             indicator = ctk.CTkFrame(
                 row, width=3, height=28, fg_color=COLOR_FONDO, corner_radius=0)
             indicator.pack(side="left", fill="y", pady=3)
-            button = ctk.CTkButton(
+            button = ShadowButton(
                 row, text=display_label, font=FUENTE_NORMAL, anchor="w", height=27,
                 fg_color="transparent", hover_color=COLOR_FONDO,
                 text_color=COLOR_TEXTO, corner_radius=0,
@@ -556,37 +538,12 @@ class ActualizadorCAD(ctk.CTk):
         self.section_title.configure(text=route or "SINCAL Suite")
 
     def ocultar_menu_lateral(self):
-        self._animar_menu_lateral(0, ocultar_al_final=True)
+        self.sidebar.pack_forget()
 
     def mostrar_menu_lateral(self):
         if not self.sidebar.winfo_manager():
-            self.sidebar.configure(width=1)
+            self.sidebar.configure(width=self._sidebar_width)
             self.sidebar.pack(side="left", fill="y", before=self.workspace)
-        self._animar_menu_lateral(self._sidebar_width)
-
-    def _animar_menu_lateral(self, target, ocultar_al_final=False):
-        """Desplaza el panel lateral suavemente al mostrarlo u ocultarlo."""
-        if self._sidebar_animation_job is not None:
-            try:
-                self.after_cancel(self._sidebar_animation_job)
-            except Exception:
-                pass
-            self._sidebar_animation_job = None
-        current = max(0, self.sidebar.winfo_width())
-        difference = target - current
-        if abs(difference) <= 4:
-            if ocultar_al_final:
-                self.sidebar.pack_forget()
-            else:
-                self.sidebar.configure(width=target)
-            return
-        self.sidebar.configure(width=max(1, round(current + difference * 0.28)))
-        self._sidebar_animation_job = self.after(
-            12, lambda: self._continuar_animacion_menu(target, ocultar_al_final))
-
-    def _continuar_animacion_menu(self, target, ocultar_al_final):
-        self._sidebar_animation_job = None
-        self._animar_menu_lateral(target, ocultar_al_final)
 
     def alternar_menu_lateral(self):
         if self.sidebar.winfo_manager():
@@ -632,15 +589,6 @@ class ActualizadorCAD(ctk.CTk):
 
     def _actualizar_indicador_zoom(self, value=None):
         percentage = round((self._font_scale if value is None else value) * 100)
-        if hasattr(self, "zoom_value_label"):
-            self.zoom_value_label.configure(text=f"{percentage} %")
-        for scale, button in getattr(self, "_zoom_buttons", {}).items():
-            selected = abs(scale - (self._font_scale if value is None else value)) < 0.001
-            button.configure(
-                fg_color=COLOR_ACENTO if selected else "transparent",
-                text_color=COLOR_FONDO if selected else COLOR_TEXTO,
-                border_color=COLOR_ACENTO if selected else COLOR_BORDE,
-            )
         if hasattr(self, "_zoom_mode_var"):
             self._zoom_mode_var.set(self._font_scale)
         if hasattr(self, "menu_ver") and hasattr(self, "_zoom_menu_index"):
@@ -812,6 +760,15 @@ class ActualizadorCAD(ctk.CTk):
     def report_callback_exception(self, exc_type, value, tb):
         detail = "".join(traceback.format_exception(exc_type, value, tb))
         self.logger.error("Error no controlado en la interfaz:\n%s", detail)
+        signature = (getattr(exc_type, "__name__", str(exc_type)), str(value))
+        now = time.monotonic()
+        if (
+            signature == getattr(self, "_last_callback_error_signature", None)
+            and now - getattr(self, "_last_callback_error_at", 0.0) < 5.0
+        ):
+            return
+        self._last_callback_error_signature = signature
+        self._last_callback_error_at = now
         record_incident(
             "interfaz",
             "error",
@@ -1028,7 +985,7 @@ class ActualizadorCAD(ctk.CTk):
         self._home_action_buttons = []
 
         def boton_accion(icono, ayuda, comando):
-            boton = ctk.CTkButton(
+            boton = ShadowButton(
                 botones_sec_frame, text="", image=obtener_icono(icono, 20), width=50, height=44,
                 fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
                 text_color=COLOR_TEXTO, corner_radius=RADIO_CONTROL, command=comando,
@@ -1384,10 +1341,10 @@ class ActualizadorCAD(ctk.CTk):
         top_frame = ctk.CTkFrame(self.tab_renombrado, fg_color="transparent")
         top_frame.pack(fill="x", padx=20, pady=5)
         top_frame.grid_columnconfigure(0, weight=1)
-        self.btn_browse_adv = ctk.CTkButton(top_frame, text="Seleccionar carpeta DWG/DXF", font=FUENTE_NORMAL, width=220,
+        self.btn_browse_adv = ShadowButton(top_frame, text="Seleccionar carpeta DWG/DXF", font=FUENTE_NORMAL, width=220,
                                             corner_radius=0, fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, command=self.cargar_archivos_renombrado)
         self.btn_browse_adv.grid(row=0, column=0, sticky="w")
-        ctk.CTkButton(top_frame, text="Limpiar ruta", font=FUENTE_NORMAL_PEQUENA, width=94,
+        ShadowButton(top_frame, text="Limpiar ruta", font=FUENTE_NORMAL_PEQUENA, width=94,
                       fg_color="transparent", hover_color=COLOR_GRIS_BOTON, text_color=COLOR_TEXTO_SUAVE,
                       corner_radius=0, command=self.limpiar_ruta_renombrado).grid(row=0, column=1, sticky="e")
         self.ruta_adv_var = ctk.StringVar(value="Ruta: Ninguna")
@@ -1405,12 +1362,12 @@ class ActualizadorCAD(ctk.CTk):
 
         btn_tools = ctk.CTkFrame(left_frame, fg_color="transparent")
         btn_tools.pack(fill="x", padx=2, pady=5)
-        ctk.CTkButton(btn_tools, text="Marcar", width=80, corner_radius=0, font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON,
+        ShadowButton(btn_tools, text="Marcar", width=80, corner_radius=0, font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON,
                       hover_color=COLOR_GRIS_BOTON_HOVER, command=self.marcar_todos).pack(side="left", padx=(0, 4))
-        ctk.CTkButton(btn_tools, text="Desmarcar", width=95, corner_radius=0, font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON,
+        ShadowButton(btn_tools, text="Desmarcar", width=95, corner_radius=0, font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON,
                       hover_color=COLOR_GRIS_BOTON_HOVER, command=self.desmarcar_todos).pack(side="left")
 
-        self.scroll_archivos = ctk.CTkScrollableFrame(
+        self.scroll_archivos = SafeScrollableFrame(
             left_frame, height=205, fg_color=COLOR_PANEL, corner_radius=0)
         self.scroll_archivos.pack(
             fill="x", padx=2, pady=(5, 8))
@@ -1430,14 +1387,14 @@ class ActualizadorCAD(ctk.CTk):
             entry_row, placeholder_text="Reemplazar con (Ej: PL-)", font=FUENTE_CAMPO, corner_radius=0)
         self.ent_reemplazo_adv.pack(side="left", fill="x", expand=True)
 
-        ctk.CTkButton(h1_frame, text="Aplicar reemplazo a la selección", font=FUENTE_NORMAL, corner_radius=0,
+        ShadowButton(h1_frame, text="Aplicar reemplazo a la selección", font=FUENTE_NORMAL, corner_radius=0,
                       fg_color=COLOR_GRIS_BOTON, text_color=COLOR_TEXTO, hover_color=COLOR_GRIS_BOTON_HOVER,
                       command=self.aplicar_reemplazo_adv).pack(pady=8, padx=2, fill="x")
         self._registrar_ancla_pagina("procesamiento", "archivos", left_frame)
         self._registrar_ancla_pagina("procesamiento", "reemplazo", h1_frame)
 
     def setup_tab_comandos(self):
-        page = ctk.CTkScrollableFrame(
+        page = SafeScrollableFrame(
             self.tab_comandos, fg_color=COLOR_FONDO, corner_radius=0,
             scrollbar_button_color=COLOR_GRIS_BOTON,
             scrollbar_button_hover_color=COLOR_GRIS_BOTON_HOVER,
@@ -1458,13 +1415,13 @@ class ActualizadorCAD(ctk.CTk):
             corner_radius=0,
         )
         self.entrada_comando.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        self.btn_enviar_cmd = ctk.CTkButton(
+        self.btn_enviar_cmd = ShadowButton(
             controls, text="Ejecutar", font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON,
             hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0, width=105,
             command=self.enviar_comando_en_vivo,
         )
         self.btn_enviar_cmd.pack(side="left", padx=(0, 8))
-        self.btn_cancelar_cmd = ctk.CTkButton(
+        self.btn_cancelar_cmd = ShadowButton(
             controls, text="Cancelar", font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON,
             hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0, width=105,
             state="disabled", command=self.detener_comando_en_vivo,
@@ -1533,17 +1490,17 @@ class ActualizadorCAD(ctk.CTk):
         controls.grid_columnconfigure(0, weight=1)
         action_row = ctk.CTkFrame(controls, fg_color="transparent", corner_radius=0)
         action_row.grid(row=0, column=0, sticky="ew")
-        ctk.CTkButton(
+        ShadowButton(
             action_row, text="Seleccionar DXF", font=FUENTE_NORMAL,
             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
             corner_radius=0, command=self.seleccionar_archivos_dxf,
         ).pack(side="left")
-        ctk.CTkButton(
+        ShadowButton(
             action_row, text="Cargar carpeta", font=FUENTE_NORMAL_PEQUENA,
             fg_color="transparent", hover_color=COLOR_GRIS_BOTON,
             text_color=COLOR_TEXTO_SUAVE, corner_radius=0, command=self.cargar_archivos_conversion,
         ).pack(side="left", padx=(6, 0))
-        ctk.CTkButton(
+        ShadowButton(
             action_row, text="Limpiar ruta", font=FUENTE_NORMAL_PEQUENA, width=94,
             fg_color="transparent", hover_color=COLOR_GRIS_BOTON,
             text_color=COLOR_TEXTO_SUAVE, corner_radius=0, command=self.limpiar_ruta_conversion,
@@ -1562,18 +1519,18 @@ class ActualizadorCAD(ctk.CTk):
         row = ctk.CTkFrame(panel, fg_color="transparent")
         row.pack(fill="x", padx=16, pady=(14, 6))
         ctk.CTkLabel(row, text="Archivos DXF seleccionados", font=FUENTE_SUBTITULO, text_color=COLOR_MOSTAZA).pack(side="left")
-        ctk.CTkButton(row, text="Marcar todos", font=FUENTE_NORMAL_PEQUENA, width=92, height=26,
+        ShadowButton(row, text="Marcar todos", font=FUENTE_NORMAL_PEQUENA, width=92, height=26,
                       fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0,
                       command=self.marcar_todos_dxf).pack(side="right", padx=(6, 0))
-        ctk.CTkButton(row, text="Desmarcar", font=FUENTE_NORMAL_PEQUENA, width=86, height=26,
+        ShadowButton(row, text="Desmarcar", font=FUENTE_NORMAL_PEQUENA, width=86, height=26,
                       fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0,
                       command=self.desmarcar_todos_dxf).pack(side="right")
-        self.scroll_dxf = ctk.CTkScrollableFrame(panel, fg_color=COLOR_FONDO, corner_radius=0)
+        self.scroll_dxf = SafeScrollableFrame(panel, fg_color=COLOR_FONDO, corner_radius=0)
         self.scroll_dxf.pack(fill="both", expand=True, padx=16, pady=(0, 12))
         self.checkboxes_dxf = []
         self.ruta_conversion = ""
         self.archivos_conversion = []
-        self.btn_convertir_dxf = ctk.CTkButton(
+        self.btn_convertir_dxf = ShadowButton(
             panel, text="Convertir DXF a DWG", font=FUENTE_SUBTITULO_PEQUENO,
             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=0,
             command=self.convertir_dxf_a_dwg,

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 import tkinter as tk
+import time
 from dataclasses import dataclass
 
 import customtkinter as ctk
@@ -105,6 +106,9 @@ class ActivityIndicator(ctk.CTkFrame):
         self._sequence = 0
         self._frame_index = 0
         self._animation_job: str | None = None
+        self._hide_job: str | None = None
+        self._shown_at = 0.0
+        self._hold_until = 0.0
         self._motion = BridgeMotion()
         self._images_by_mode: dict[str, list[ImageTk.PhotoImage]] = {}
 
@@ -155,12 +159,18 @@ class ActivityIndicator(ctk.CTkFrame):
         mode = self._mode()
         if mode not in self._images_by_mode:
             self._images_by_mode[mode] = [
-                ImageTk.PhotoImage(frame)
+                ImageTk.PhotoImage(frame, master=self)
                 for frame in self._motion.render(self._accent_hex())
             ]
         return self._images_by_mode[mode]
 
     def begin(self, key: str, label: str, progress: float | None = None) -> None:
+        if not self._activities:
+            self._shown_at = time.monotonic()
+        self._hold_until = 0.0
+        if self._hide_job is not None:
+            self.after_cancel(self._hide_job)
+            self._hide_job = None
         self._sequence += 1
         self._activities[key] = _Activity(label, self._normalize(progress), self._sequence)
         self._refresh()
@@ -186,6 +196,24 @@ class ActivityIndicator(ctk.CTkFrame):
         if self._activities:
             self._refresh()
             return
+        if self._hide_job is not None:
+            try:
+                self.after_cancel(self._hide_job)
+            except Exception:
+                pass
+            self._hide_job = None
+        remaining = max(0.0, 0.8 - (time.monotonic() - self._shown_at))
+        if remaining:
+            self._hold_until = time.monotonic() + remaining
+            self._hide_job = self.after(round(remaining * 1000), self._hide_if_idle)
+        else:
+            self._hide_if_idle()
+
+    def _hide_if_idle(self) -> None:
+        self._hide_job = None
+        if self._activities:
+            return
+        self._hold_until = 0.0
         if self._animation_job is not None:
             self.after_cancel(self._animation_job)
             self._animation_job = None
@@ -213,7 +241,8 @@ class ActivityIndicator(ctk.CTkFrame):
         self.lift()
 
     def _animate(self) -> None:
-        if not self._activities or not self.winfo_exists():
+        holding = self._hold_until > time.monotonic()
+        if (not self._activities and not holding) or not self.winfo_exists():
             self._animation_job = None
             return
         frames = self._frames()

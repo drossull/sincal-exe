@@ -3,6 +3,7 @@ import math
 import os
 import threading
 import time
+import tkinter as tk
 from dataclasses import replace
 from tkinter import filedialog, messagebox
 
@@ -11,6 +12,8 @@ import ttkbootstrap as ttk
 from PIL import Image
 from ttkbootstrap.widgets import ToolTip
 from ttkbootstrap.widgets.tableview import Tableview
+from sincal.ui.scroll import SafeScrollableFrame
+from sincal.ui.widgets import ShadowButton
 
 from sincal.cad.moldajes import parse_moldaje_detection
 from sincal.rebar.model import (
@@ -23,6 +26,7 @@ from sincal.rebar.model import (
 )
 from sincal.cad.zapata_views import ZapataCadError, build_zapata_lisp
 from sincal.cad.zapata_detail import build_zapata_detail_lisp
+from sincal.rebar.detail import build_detail_groups
 from sincal.runtime import ruta_recurso, ruta_runtime
 from sincal.ui.theme import (
     COLOR_ACENTO,
@@ -78,13 +82,13 @@ class TabArmaduras(ctk.CTkFrame):
         project_row.grid(row=1, column=0, sticky="ew")
         project_row.grid_columnconfigure(2, weight=1)
 
-        self.btn_cargar_json = ctk.CTkButton(
+        self.btn_cargar_json = ShadowButton(
             project_row, text="Cargar JSON", font=fuente_normal, fg_color=COLOR_GRIS_BOTON,
             hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=RADIO_CONTROL,
             command=self.cargar_json_bim,
         )
         self.btn_cargar_json.grid(row=0, column=4, sticky="e", padx=(8, 0))
-        ctk.CTkButton(project_row, text="Limpiar", font=FUENTE_NORMAL_PEQUENA,
+        ShadowButton(project_row, text="Limpiar", font=FUENTE_NORMAL_PEQUENA,
                       fg_color="transparent", hover_color=COLOR_GRIS_BOTON,
                       text_color=COLOR_TEXTO_SUAVE, corner_radius=RADIO_CONTROL,
                       command=self.limpiar_json_bim).grid(row=0, column=3, sticky="e", padx=(6, 0))
@@ -106,8 +110,8 @@ class TabArmaduras(ctk.CTkFrame):
         self.tab_maestro.pack(padx=20, pady=5, fill="both", expand=True)
         tab_estribos = ctk.CTkFrame(self.tab_maestro, fg_color=COLOR_FONDO, corner_radius=0)
         tab_travesanos = ctk.CTkFrame(self.tab_maestro, fg_color=COLOR_FONDO, corner_radius=0)
-        self.tab_maestro.add(tab_estribos, text="1. Estribos")
-        self.tab_maestro.add(tab_travesanos, text="2. Travesaños")
+        self.tab_maestro.add(tab_estribos, text="ESTRIBOS")
+        self.tab_maestro.add(tab_travesanos, text="TRAVESAÑOS")
         ttk.Separator(tab_estribos, orient="horizontal", bootstyle="secondary").pack(
             fill="x", padx=8, pady=(8, 4))
         ttk.Separator(tab_travesanos, orient="horizontal", bootstyle="secondary").pack(
@@ -134,7 +138,7 @@ class TabArmaduras(ctk.CTkFrame):
             self.tab_sub_travesanos, fg_color=COLOR_PANEL, corner_radius=0)
         self.tab_sub_travesanos.add(
             tab_trav_host, text="Configuración y generación")
-        tab_trav_main = ctk.CTkScrollableFrame(
+        tab_trav_main = SafeScrollableFrame(
             tab_trav_host, fg_color=COLOR_PANEL, corner_radius=0,
             scrollbar_button_color=COLOR_GRIS_BOTON,
             scrollbar_button_hover_color=COLOR_GRIS_BOTON_HOVER)
@@ -147,7 +151,7 @@ class TabArmaduras(ctk.CTkFrame):
         ctk.CTkLabel(frame_params, text="I. PARÁMETROS GLOBALES:", font=fuente_subtitulo,
                      text_color=COLOR_ACENTO).grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 10))
 
-        btn_ayuda = ctk.CTkButton(frame_params, text="?  Abrir ayuda", font=fuente_normal, width=100,
+        btn_ayuda = ShadowButton(frame_params, text="?  Abrir ayuda", font=fuente_normal, width=100,
                                   fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
                                   corner_radius=0, border_width=1, border_color=COLOR_BORDE,
                                   command=self.mostrar_ayuda_travesano)
@@ -232,11 +236,11 @@ class TabArmaduras(ctk.CTkFrame):
             hover_c = COLOR_MOSTAZA if is_viga else COLOR_ACENTO
             text_c = COLOR_FONDO if is_viga else COLOR_TEXTO_SUAVE
 
-            btn_gen = ctk.CTkButton(frm, text=texto, font=fuente_normal, fg_color=COLOR_GRIS_BOTON,
+            btn_gen = ShadowButton(frm, text=texto, font=fuente_normal, fg_color=COLOR_GRIS_BOTON,
                                     hover_color=hover_c, text_color=text_c, corner_radius=0, command=comando_gen)
             btn_gen.pack(side="left", expand=True, fill="x")
 
-            btn_desp = ctk.CTkButton(frm, text="D", font=fuente_subtitulo, corner_radius=0, width=30,
+            btn_desp = ShadowButton(frm, text="D", font=fuente_subtitulo, corner_radius=0, width=30,
                                      fg_color=COLOR_ACENTO, hover_color=COLOR_ACENTO_HOVER, text_color=COLOR_FONDO,
                                      command=comando_desp)
             btn_desp.pack(side="right", padx=(2, 0))
@@ -274,7 +278,7 @@ class TabArmaduras(ctk.CTkFrame):
             main_text = self.tab_maestro.tab(self.tab_maestro.select(), "text")
         except Exception:
             return
-        if main_text.startswith("1."):
+        if main_text == "ESTRIBOS":
             detail = self.tab_estribo.tab(self.tab_estribo.select(), "text")
             segments = ("Generador de armadura", "Estribos", detail)
         else:
@@ -285,7 +289,7 @@ class TabArmaduras(ctk.CTkFrame):
 
     def ir_a_seccion(self, anchor):
         """Desplaza la página del estribo actual desde el índice contextual."""
-        if not self.tab_maestro.tab(self.tab_maestro.select(), "text").startswith("1."):
+        if self.tab_maestro.tab(self.tab_maestro.select(), "text") != "ESTRIBOS":
             return
         key = "entrada" if self.tab_estribo.index("current") == 0 else "salida"
         state = self._abutments[key]
@@ -318,16 +322,15 @@ class TabArmaduras(ctk.CTkFrame):
 
         ttk.Separator(parent, orient="horizontal", bootstyle="secondary").pack(
             fill="x", padx=10, pady=(8, 0))
-        page = ctk.CTkScrollableFrame(
+        page = SafeScrollableFrame(
             parent, fg_color=COLOR_FONDO, corner_radius=0,
             scrollbar_button_color=COLOR_GRIS_BOTON,
             scrollbar_button_hover_color=COLOR_GRIS_BOTON_HOVER)
         page.pack(fill="both", expand=True, padx=10, pady=10)
-        configuration_pane = ttk.Labelframe(
-            page, text="1. DIMENSIONES Y CONFIGURACIÓN", bootstyle="secondary")
+        configuration_pane = self._labelframe(
+            page, "1. DIMENSIONES Y CONFIGURACIÓN")
         configuration_pane.pack(fill="x", padx=2, pady=(2, 10))
-        revision_pane = ttk.Labelframe(
-            page, text="2. REVISIÓN Y MARCAS", bootstyle="secondary")
+        revision_pane = self._labelframe(page, "2. REVISIÓN Y MARCAS")
         revision_pane.pack(fill="x", padx=2, pady=(0, 10))
         configuration = ctk.CTkFrame(
             configuration_pane, fg_color=COLOR_FONDO, corner_radius=0,
@@ -356,11 +359,21 @@ class TabArmaduras(ctk.CTkFrame):
         if "CONTRAFUERTE" in text:
             ToolTip(label, text="CTF: contrafuerte del estribo.", bootstyle="info-inverse")
 
-    def _labeled_entry(self, parent, state, key, label, default, row, column):
+    @staticmethod
+    def _labelframe(parent, title, bootstyle="secondary"):
+        """Crea un LabelFrame cuyo rótulo también tiene un marco visible."""
+        label = ttk.Label(
+            parent, text=title, style="SincalLabelframeTitle.TLabel")
+        return ttk.Labelframe(
+            parent, labelwidget=label, bootstyle=bootstyle)
+
+    def _labeled_entry(
+        self, parent, state, key, label, default, row, column, increment=0.5
+    ):
         ctk.CTkLabel(parent, text=label, font=FUENTE_NORMAL).grid(
             row=row, column=column, sticky="w", padx=(0, 6), pady=4)
         entry = ttk.Spinbox(
-            parent, from_=0, to=100000, increment=0.5, width=10,
+            parent, from_=0, to=100000, increment=increment, width=10,
             font=FUENTE_CAMPO, bootstyle="secondary")
         entry.insert(0, default)
         entry.grid(row=row, column=column + 1, sticky="w", padx=(0, 14), pady=4)
@@ -379,19 +392,24 @@ class TabArmaduras(ctk.CTkFrame):
             justify="left", wraplength=640,
         ).pack(anchor="w", padx=8, pady=(2, 8))
 
-        geometry_group = ttk.Labelframe(
-            parent, text="1. ZAPATA", bootstyle="secondary")
+        geometry_group = self._labelframe(parent, "ZAPATA")
         state["geometry_group"] = geometry_group
         geometry_group.pack(fill="x", padx=8, pady=(8, 4))
         geometry = ctk.CTkFrame(
             geometry_group, fg_color=COLOR_FONDO, corner_radius=0)
         geometry.pack(fill="x", padx=8, pady=8)
-        self._labeled_entry(geometry, state, "largo", "Largo (cm):", "750", 0, 0)
-        self._labeled_entry(geometry, state, "ancho", "Ancho (cm):", "1159.6", 0, 2)
-        self._labeled_entry(geometry, state, "alto", "Alto (cm):", "150", 1, 0)
-        self._labeled_entry(geometry, state, "rec_inf", "Rec. inferior (cm):", "7.5", 2, 0)
-        self._labeled_entry(geometry, state, "rec_sup", "Rec. superior (cm):", "5", 2, 2)
-        self._labeled_entry(geometry, state, "rec_lat", "Rec. lateral (cm):", "5", 3, 0)
+        self._labeled_entry(
+            geometry, state, "largo", "Largo (cm):", "750", 0, 0, increment=100)
+        self._labeled_entry(
+            geometry, state, "ancho", "Ancho (cm):", "1159.6", 0, 2, increment=100)
+        self._labeled_entry(
+            geometry, state, "alto", "Alto (cm):", "150", 1, 0, increment=50)
+        self._labeled_entry(
+            geometry, state, "rec_inf", "Rec. inferior (cm):", "7.5", 2, 0, increment=0.5)
+        self._labeled_entry(
+            geometry, state, "rec_sup", "Rec. superior (cm):", "5", 2, 2, increment=0.5)
+        self._labeled_entry(
+            geometry, state, "rec_lat", "Rec. lateral (cm):", "5", 3, 0, increment=0.5)
 
         ctk.CTkLabel(
             geometry, text="Vistas y despieces", font=FUENTE_NORMAL_PEQUENA,
@@ -401,28 +419,32 @@ class TabArmaduras(ctk.CTkFrame):
             ("Frontal", "FR"), ("A-A", "AA"), ("B-B", "BB"),
             ("C-C", "CC"), ("D-D", "DD"), ("E-E", "EE"),
         )
+        view_buttons = ttk.Frame(geometry)
+        view_buttons.grid(row=5, column=0, columnspan=4, sticky="w")
         for index, (text, view) in enumerate(views):
-            row = 5 + index // 3
+            row = index // 3
             column = index % 3
-            ttk.Button(
-                geometry, text=text, width=12, bootstyle="secondary",
+            ShadowButton(
+                view_buttons, text=text, width=82, height=30,
+                font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON,
+                hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=RADIO_CONTROL,
                 command=lambda v=view, k=state["key"]: self.generar_vista_cad(v, k),
-            ).grid(row=row, column=column, sticky="ew", padx=(0, 3), pady=3)
-        for column in range(3):
-            geometry.grid_columnconfigure(column, weight=1)
-        ttk.Button(
-            geometry, text="Generar despiece general de zapata", bootstyle="warning",
+            ).grid(row=row, column=column, padx=(0, 5), pady=3)
+        ShadowButton(
+            geometry, text="Generar despiece general de zapata", width=270,
+            font=FUENTE_NORMAL, fg_color=COLOR_ACENTO,
+            hover_color=COLOR_ACENTO_HOVER, corner_radius=RADIO_CONTROL,
             command=lambda k=state["key"]: self.generar_despiece_zapata(k),
-        ).grid(row=7, column=0, columnspan=3, sticky="ew", pady=(10, 3))
+        ).grid(row=6, column=0, columnspan=4, sticky="w", pady=(10, 3))
 
         pending_sections = (
-            ("2. MUROS", "Muro frontal, muro espaldar y alas."),
-            ("3. CONSOLAS", "Consola de muro espaldar y consola frontal opcional."),
-            ("4. TOPES", "Topes sísmicos del estribo."),
-            ("5. CONTRAFUERTE", "Contrafuerte opcional (CTF)."),
+            ("MUROS", "Muro frontal, muro espaldar y alas."),
+            ("CONSOLAS", "Consola de muro espaldar y consola frontal opcional."),
+            ("TOPES", "Topes sísmicos del estribo."),
+            ("CONTRAFUERTE", "Contrafuerte opcional (CTF)."),
         )
         for title, description in pending_sections:
-            group = ttk.Labelframe(parent, text=title, bootstyle="secondary")
+            group = self._labelframe(parent, title)
             group.pack(fill="x", padx=8, pady=5)
             ttk.Separator(group, orient="horizontal", bootstyle="secondary").pack(
                 fill="x", padx=8, pady=(5, 2))
@@ -446,19 +468,18 @@ class TabArmaduras(ctk.CTkFrame):
             justify="left", wraplength=600,
         ).pack(anchor="w", padx=14, pady=(0, 10))
 
-        detector_group = ttk.Labelframe(
-            parent, text="MOLDAJES CAD — DIBUJO ACTIVO", bootstyle="secondary")
+        detector_group = self._labelframe(parent, "MOLDAJES CAD — DIBUJO ACTIVO")
         detector_group.pack(fill="x", padx=14, pady=(0, 8))
         detector = ctk.CTkFrame(
             detector_group, fg_color=COLOR_FONDO, corner_radius=0)
         detector.pack(fill="x", padx=8, pady=8)
-        detect_button = ctk.CTkButton(
+        detect_button = ShadowButton(
             detector, text="Detectar moldajes", font=FUENTE_NORMAL, corner_radius=0,
             fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
             command=lambda k=state["key"]: self.detectar_moldajes_cad(k),
         )
         detect_button.grid(row=0, column=0, sticky="w", padx=(0, 10))
-        confirm_button = ctk.CTkButton(
+        confirm_button = ShadowButton(
             detector, text="Confirmar selección", font=FUENTE_NORMAL, corner_radius=0,
             fg_color="transparent", border_width=1, border_color=COLOR_ACENTO,
             hover_color=COLOR_GRIS_BOTON,
@@ -489,8 +510,7 @@ class TabArmaduras(ctk.CTkFrame):
             option.grid(row=row, column=column + 1, columnspan=3, sticky="ew", padx=(0, 5), pady=3)
             state["moldaje_option_vars"][layer] = (value, option)
 
-        table_group = ttk.Labelframe(
-            parent, text="PARÁMETROS DE ARMADURA", bootstyle="secondary")
+        table_group = self._labelframe(parent, "PARÁMETROS DE ARMADURA")
         table_group.pack(fill="x", padx=14, pady=(0, 8))
         table = ctk.CTkFrame(
             table_group, fg_color=COLOR_FONDO, corner_radius=0)
@@ -554,12 +574,16 @@ class TabArmaduras(ctk.CTkFrame):
 
         controls = ctk.CTkFrame(parent, fg_color="transparent")
         controls.pack(fill="x", padx=14, pady=(0, 8))
-        ttk.Button(
-            controls, text="Actualizar revisión", bootstyle="secondary",
+        ShadowButton(
+            controls, text="Actualizar revisión", width=150,
+            font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON,
+            hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=RADIO_CONTROL,
             command=lambda k=state["key"]: self.actualizar_revision_zapata(k),
         ).pack(side="left")
-        ttk.Button(
-            controls, text="Vista previa completa", bootstyle="info-outline",
+        ShadowButton(
+            controls, text="Vista previa completa", width=165,
+            font=FUENTE_NORMAL, fg_color=COLOR_GRIS_BOTON,
+            hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=RADIO_CONTROL,
             command=lambda k=state["key"]: self.mostrar_vista_previa_marcas(k),
         ).pack(side="left", padx=(8, 0))
         ctk.CTkLabel(
@@ -841,15 +865,21 @@ class TabArmaduras(ctk.CTkFrame):
         ).pack(side="right")
         ttk.Separator(window, orient="horizontal", bootstyle="secondary").pack(
             fill="x", padx=18, pady=(0, 8))
+        ctk.CTkLabel(
+            window,
+            text="Haz clic sobre el número de una marca para revisar su forma y sus longitudes.",
+            font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
+            anchor="w",
+        ).pack(fill="x", padx=18, pady=(0, 6))
 
         columns = (
-            "Marca", "Grupo / ubicación", "Cantidad", "Ø mm", "@ cm",
+            "Marca", "Elemento", "Grupo / ubicación", "Cantidad", "Ø mm", "@ cm",
             "Largo unit. cm", "Largo total cm", "Área cm²", "kg",
             "Vistas", "Rol constructivo",
         )
         rows = [
             (
-                mark.mark, mark.location, mark.quantity, f"{mark.diameter_mm:g}",
+                mark.mark, mark.element, mark.location, mark.quantity, f"{mark.diameter_mm:g}",
                 f"{state['rule_widgets'][mark.key]['spacing'].get()}",
                 f"{mark.unit_length_cm:.0f}", f"{mark.total_length_cm:.0f}",
                 f"{mark.area_m2 * 10000:.3f}", f"{mark.kg_steel:.1f}",
@@ -863,6 +893,38 @@ class TabArmaduras(ctk.CTkFrame):
             autoalign=True, bootstyle="primary", height=16,
         )
         table.pack(fill="both", expand=True, padx=18, pady=(0, 8))
+        marks_by_name = {mark.mark: mark for mark in schedule.marks}
+        rules = self._read_zapata_rules(abutment_key)
+        entries = state["entries"]
+        geometry = ZapataGeometry.from_centimetres(
+            self._entry_number(entries["largo"], "Largo"),
+            self._entry_number(entries["ancho"], "Ancho"),
+            self._entry_number(entries["alto"], "Alto"),
+            self._entry_number(self.ent_z_esviaje, "Esviaje"),
+        )
+
+        def open_mark_preview(event):
+            tree = table.view
+            if tree.identify_region(event.x, event.y) != "cell":
+                return
+            if tree.identify_column(event.x) != "#1":
+                return
+            item_id = tree.identify_row(event.y)
+            values = tree.item(item_id, "values") if item_id else ()
+            mark = marks_by_name.get(str(values[0])) if values else None
+            if mark is not None:
+                self.mostrar_vista_previa_fierro(
+                    mark, schedule, rules, geometry, window)
+
+        def update_mark_cursor(event):
+            is_mark = (
+                table.view.identify_region(event.x, event.y) == "cell"
+                and table.view.identify_column(event.x) == "#1"
+            )
+            table.view.configure(cursor="hand2" if is_mark else "")
+
+        table.view.bind("<ButtonRelease-1>", open_mark_preview, add="+")
+        table.view.bind("<Motion>", update_mark_cursor, add="+")
 
         issues = "Sin observaciones de validación."
         if schedule.issues:
@@ -873,6 +935,136 @@ class TabArmaduras(ctk.CTkFrame):
             text_color=COLOR_TEXTO_SUAVE, anchor="w", justify="left",
             wraplength=1180,
         ).pack(fill="x", padx=18, pady=(0, 12))
+
+    @staticmethod
+    def _resolved_color(value):
+        if isinstance(value, (tuple, list)):
+            return value[0] if ctk.get_appearance_mode() == "Light" else value[1]
+        return value
+
+    def mostrar_vista_previa_fierro(
+        self, mark, schedule, rules, geometry, owner=None
+    ):
+        """Dibuja un representante de la marca con parciales y largo total."""
+        piece = None
+        for group in build_detail_groups(schedule, rules, geometry):
+            piece = next(
+                (candidate for candidate in group.pieces if candidate.mark == mark.mark),
+                None,
+            )
+            if piece is not None:
+                break
+        if piece is None:
+            messagebox.showwarning(
+                "Vista previa del fierro",
+                f"No se pudo construir la geometría de la marca {mark.mark}.",
+                parent=owner,
+            )
+            return
+
+        window = ctk.CTkToplevel(self)
+        window.title(f"Marca {mark.mark} — {mark.element}")
+        window.geometry("820x500")
+        window.minsize(640, 420)
+        window.transient(owner or self.winfo_toplevel())
+
+        header = ctk.CTkFrame(window, fg_color="transparent", corner_radius=0)
+        header.pack(fill="x", padx=22, pady=(18, 8))
+        ctk.CTkLabel(
+            header, text=f"MARCA {mark.mark}", font=FUENTE_SUBTITULO,
+            text_color=COLOR_MOSTAZA,
+        ).pack(side="left")
+        ctk.CTkLabel(
+            header, text=f"{mark.element} · {mark.location}",
+            font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE,
+        ).pack(side="right")
+        ttk.Separator(window, orient="horizontal", bootstyle="secondary").pack(
+            fill="x", padx=22, pady=(0, 8))
+
+        canvas = tk.Canvas(
+            window, background=self._resolved_color(COLOR_FONDO),
+            borderwidth=0, highlightthickness=0,
+        )
+        canvas.pack(fill="both", expand=True, padx=22, pady=(0, 8))
+        footer = ctk.CTkLabel(
+            window,
+            text=(
+                f"{piece.quantity} Ø{piece.diameter_mm} @{piece.spacing_cm:g} · "
+                f"L={piece.total_cm} cm · Parciales: "
+                + " + ".join(f"{value} cm" for value in piece.partials_cm)
+            ),
+            font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE,
+        )
+        footer.pack(pady=(0, 18))
+
+        raw_points = [piece.partial_segments_m[0][0]]
+        raw_points.extend(segment[1] for segment in piece.partial_segments_m)
+
+        def redraw(_event=None):
+            canvas.delete("all")
+            width = max(1, canvas.winfo_width())
+            height = max(1, canvas.winfo_height())
+            xs = [point[0] for point in raw_points]
+            ys = [point[1] for point in raw_points]
+            span_x = max(xs) - min(xs)
+            span_y = max(ys) - min(ys)
+            visual_height = max(span_y, span_x * 0.18, 0.01)
+            scale = max(1.0, min(
+                (width - 150) / max(span_x, 0.01),
+                (height - 120) / visual_height,
+            ))
+            origin_x = (width - span_x * scale) / 2.0 - min(xs) * scale
+            origin_y = (height + span_y * scale) / 2.0 + min(ys) * scale
+
+            def point_to_canvas(point):
+                return origin_x + point[0] * scale, origin_y - point[1] * scale
+
+            coordinates = []
+            for point in raw_points:
+                coordinates.extend(point_to_canvas(point))
+            accent = self._resolved_color(COLOR_ACENTO)
+            text_color = self._resolved_color(COLOR_TEXTO_SUAVE)
+            canvas.create_line(
+                *coordinates, fill=accent, width=5, capstyle=tk.ROUND,
+                joinstyle=tk.ROUND, smooth=True, splinesteps=24,
+            )
+
+            center_x = sum(coordinates[::2]) / len(raw_points)
+            center_y = sum(coordinates[1::2]) / len(raw_points)
+            for segment, partial in zip(piece.partial_segments_m, piece.partials_cm):
+                x1, y1 = point_to_canvas(segment[0])
+                x2, y2 = point_to_canvas(segment[1])
+                dx, dy = x2 - x1, y2 - y1
+                length = math.hypot(dx, dy)
+                if length < 1:
+                    continue
+                nx, ny = -dy / length, dx / length
+                mid_x, mid_y = (x1 + x2) / 2.0, (y1 + y2) / 2.0
+                if nx * (mid_x - center_x) + ny * (mid_y - center_y) < 0:
+                    nx, ny = -nx, -ny
+                offset = 34
+                ax1, ay1 = x1 + nx * offset, y1 + ny * offset
+                ax2, ay2 = x2 + nx * offset, y2 + ny * offset
+                canvas.create_line(x1, y1, ax1, ay1, fill=text_color, width=1)
+                canvas.create_line(x2, y2, ax2, ay2, fill=text_color, width=1)
+                canvas.create_line(
+                    ax1, ay1, ax2, ay2, fill=text_color, width=1,
+                    arrow=tk.BOTH, arrowshape=(6, 7, 2),
+                )
+                canvas.create_text(
+                    (ax1 + ax2) / 2.0 + nx * 11,
+                    (ay1 + ay2) / 2.0 + ny * 11,
+                    text=f"{partial} cm", fill=text_color,
+                    font=FUENTE_NORMAL,
+                )
+            canvas.create_text(
+                width / 2.0, height - 18,
+                text=f"LONGITUD DESARROLLADA TOTAL  L={piece.total_cm} cm",
+                fill=accent, font=FUENTE_NORMAL,
+            )
+
+        canvas.bind("<Configure>", redraw, add="+")
+        window.after_idle(redraw)
 
     def generar_vista_cad(self, vista, abutment_key="entrada"):
         state = self._abutments[abutment_key]

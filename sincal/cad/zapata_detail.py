@@ -164,8 +164,8 @@ def _annotation_support(master_path):
               (if (and ok (not (sincal:item (vla-get-Blocks doc) "MARK")))
                 (if (not (sincal:copy-style dbx (vla-get-Blocks dbx)
                                              (vla-get-Blocks doc) "MARK"))
-                  (setq ok nil))))))
-          (vl-catch-all-apply 'vlax-release-object (list dbx)))))
+                  (setq ok nil)))))
+          (vl-catch-all-apply 'vlax-release-object (list dbx))))))
   (and ok (sincal:detail-ready doc)))
 (defun sincal:ensure-detail-styles (acad doc)
   (or (sincal:detail-ready doc) (sincal:import-detail-styles acad doc)))'''
