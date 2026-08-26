@@ -176,14 +176,14 @@ def registrar_fuentes() -> None:
     _FUENTES_REGISTRADAS = True
     font_dir = ruta_recurso_instalado("assets", "fonts")
     # Windows puede asociar erróneamente la variante Italic como estilo base
-    # cuando todas las subfamilias Helvetica Neue se registran a la vez. Los
-    # archivos siguen incluidos en el paquete, pero la interfaz sólo registra
-    # las variantes Roman y Bold que realmente utiliza.
+    # cuando todas las subfamilias Helvetica Neue se registran a la vez. Las
+    # variantes TTF incorporan hinting TrueType y una tabla GASP explícita para
+    # que Tk/GDI use ClearType también en los cuerpos pequeños de la interfaz.
     font_names = (
         "GT Pressura Regular.ttf",
         "GTPressura-Bold.ttf",
-        "HelveticaNeueRoman.otf",
-        "HelveticaNeueBold.otf",
+        "HelveticaNeueRoman.ttf",
+        "HelveticaNeueBold.ttf",
     )
     for name in font_names:
         path = os.path.join(font_dir, name)

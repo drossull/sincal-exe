@@ -5,4 +5,6 @@
 *.ctb binary
 *.dwg binary
 *.ico binary
+*.otf binary
 *.png binary
+*.ttf binary

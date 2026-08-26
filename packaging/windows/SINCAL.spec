@@ -41,5 +41,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    manifest=os.path.join(project_root, 'packaging', 'windows', 'SINCAL.manifest'),
     icon=[os.path.join(project_root, 'assets', 'icons', 'logo.ico')],
 )

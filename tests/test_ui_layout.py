@@ -67,10 +67,11 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('(FAMILIA_CUERPO, 13)', theme)
         self.assertIn('("Consolas", 13)', theme)
         self.assertIn("GT Pressura Regular.ttf", build)
-        self.assertIn("HelveticaNeueRoman.otf", build)
-        self.assertIn("HelveticaNeueBold.otf", build)
-        self.assertIn('"HelveticaNeueRoman.otf"', theme)
-        self.assertIn('"HelveticaNeueBold.otf"', theme)
+        self.assertIn("HelveticaNeueRoman.ttf", build)
+        self.assertIn("HelveticaNeueBold.ttf", build)
+        self.assertIn('"HelveticaNeueRoman.ttf"', theme)
+        self.assertIn('"HelveticaNeueBold.ttf"', theme)
+        self.assertIn("hinting TrueType", theme)
         self.assertNotIn("os.listdir(font_dir)", theme)
         self.assertIn('TTK_PRESET_OSCURO = "sincal-dark"', theme)
         self.assertIn("ThemeDefinition(", theme)
@@ -80,8 +81,8 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertNotIn("#0A0A0C", theme)
         self.assertTrue((ROOT / "assets" / "fonts" / "GT Pressura Regular.ttf").is_file())
         self.assertTrue((ROOT / "assets" / "fonts" / "GTPressura-Bold.ttf").is_file())
-        self.assertTrue((ROOT / "assets" / "fonts" / "HelveticaNeueRoman.otf").is_file())
-        self.assertTrue((ROOT / "assets" / "fonts" / "HelveticaNeueBold.otf").is_file())
+        self.assertTrue((ROOT / "assets" / "fonts" / "HelveticaNeueRoman.ttf").is_file())
+        self.assertTrue((ROOT / "assets" / "fonts" / "HelveticaNeueBold.ttf").is_file())
 
     def test_action_buttons_use_the_shared_offset_shadow(self):
         widget_source = (ROOT / "sincal" / "ui" / "widgets.py").read_text(
@@ -105,8 +106,14 @@ class WorkbenchLayoutTests(unittest.TestCase):
         main = MAIN.read_text(encoding="utf-8")
         app = APP.read_text(encoding="utf-8")
         theme = THEME.read_text(encoding="utf-8")
+        manifest = (ROOT / "packaging" / "windows" / "SINCAL.manifest").read_text(
+            encoding="utf-8")
+        spec = (ROOT / "packaging" / "windows" / "SINCAL.spec").read_text(
+            encoding="utf-8")
         self.assertLess(main.index("configurar_dpi_windows()"), main.index("import tkinter as tk"))
         self.assertLess(app.index("configurar_dpi_windows()"), app.index("import tkinter as tk"))
+        self.assertIn("PerMonitorV2,PerMonitor", manifest)
+        self.assertIn("SINCAL.manifest", spec)
         init = app.split("class ActualizadorCAD", 1)[1].split("asegurar_directorios()", 1)[0]
         self.assertLess(init.index("registrar_fuentes()"), init.index("super().__init__()"))
         self.assertIn('FUENTE_TTK_NORMAL = (FAMILIA_CUERPO, -13)', theme)

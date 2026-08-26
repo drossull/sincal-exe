@@ -132,13 +132,11 @@ def _circle_command(point, diameter, tag):
 
 
 def _dimension_command(first, last, text_point, entries, layer, tag):
-    lisp_entries = " ".join(
-        f'(list "{mark}" "{description}{" +" if index < len(entries) - 1 else ""}")'
-        for index, (mark, description) in enumerate(entries)
-    )
+    override = " + ".join(
+        f"({mark}) {description}" for mark, description in entries)
     return (
         f'(sincal:marked-dim {_point(first)} {_point(last)} {_point(text_point)} '
-        f'(list {lisp_entries}) "{layer}" "{tag}")'
+        f'"{override}" "{layer}" "{tag}")'
     )
 
 
@@ -166,7 +164,6 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
     minx, maxx = min(p[0] for p in points), max(p[0] for p in points)
     miny, maxy = min(p[1] for p in points), max(p[1] for p in points)
     mx, my = active["mesh_x"], active["mesh_y"]
-    hook_m = max(1.0, math.ceil((geometry.alto_m * 50.0) / 10.0) / 10.0)
     tag = f"{abutment_key.upper()}_{view}_ZAP"
     commands = []
     diameters = sorted({int(rule.diameter_mm) for rule in active.values()})
@@ -183,7 +180,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
         return tuple(mark.mark for mark in marks_by_key.get(rule.key, ()))
 
     def distribution_entries(rule, visible_count):
-        """Bloque MARK y descripción por cada marca de la distribución visible."""
+        """Texto completo por cada marca de la distribución visible."""
         entries = []
         group_marks = marks_by_key.get(rule.key, ())
         base_quantity = group_marks[0].quantity if group_marks else 1
@@ -217,11 +214,26 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
     def inset(rule):
         return cover.lateral_m + rule.diameter_mm / 2000.0
 
+    def hook_length_m(rule):
+        hook_cm = rule.hook_cm or automatic_hook_cm(geometry.alto_m * 100.0)
+        return hook_cm / 100.0
+
+    def horizontal_tangent_span(rule, y):
+        """Tangencias del tramo real luego de aplicar el radio 3ϕ."""
+        inner = inward_offset(points, inset(rule))
+        a, b = _axis_intersections(inner, y, True)
+        if a is None:
+            raise ZapataCadError("No fue posible intersectar el moldaje en el nivel de la malla.")
+        vector = _unit(a, b)
+        radius_m = bend_radius_cm(rule.diameter_mm) / 100.0
+        return _at(a, vector, radius_m), _at(b, vector, -radius_m), a, b
+
     def horizontal_u(rule, y, upward, annotation_side, lane=0):
         inner = inward_offset(points, inset(rule))
         a, b = _axis_intersections(inner, y, True)
         if a is None:
             raise ZapataCadError("No fue posible intersectar el moldaje en el nivel de la malla.")
+        hook_m = hook_length_m(rule)
         dy = hook_m if upward else -hook_m
         commands.append(_path_command(((a[0], a[1] + dy), a, b, (b[0], b[1] + dy)),
                                       f"fi{int(rule.diameter_mm)}", bend_radius_cm(rule.diameter_mm) / 100, tag))
@@ -232,6 +244,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
         a, b = _axis_intersections(inner, x, False)
         if a is None:
             raise ZapataCadError("No fue posible intersectar el moldaje en el nivel de la malla.")
+        hook_m = hook_length_m(rule)
         dx = hook_m if rightward else -hook_m
         commands.append(_path_command(((a[0] + dx, a[1]), a, b, (b[0] + dx, b[1])),
                                       f"fi{int(rule.diameter_mm)}", bend_radius_cm(rule.diameter_mm) / 100, tag))
@@ -288,8 +301,10 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
             text = " + ".join(f"({mark}) {description}" for mark, description in entries)
             commands.append(_mleader_command(centres[0], landing, text, layer, tag))
 
-    def column_blocks(rule, x, levels, dimension_side, lane=0):
-        centres = tuple((x, bottom_y + value / 100) for value in levels)
+    def column_blocks(rule, x, start_y, end_y, dimension_side, lane=0):
+        positions = distribution_positions_cm(
+            max(0.0, (end_y - start_y) * 100.0), rule.spacing_cm, rule.origin)
+        centres = tuple((x, start_y + value / 100) for value in positions)
         commands.extend(_circle_command(point, rule.diameter_mm, tag) for point in centres)
         entries = distribution_entries(rule, len(centres))
         layer = f"fi{int(rule.diameter_mm)}"
@@ -357,13 +372,21 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
     if view == "FR":
         horizontal_u(mx, top_y, False, "top")
         horizontal_u(mx, bottom_y, True, "bottom")
-        row_blocks(my, top_y - my.diameter_mm / 2000, left_x, right_x, "top")
-        row_blocks(my, bottom_y + my.diameter_mm / 2000, left_x, right_x, "bottom")
+        top_start, top_end, _, _ = horizontal_tangent_span(mx, top_y)
+        bottom_start, bottom_end, _, _ = horizontal_tangent_span(mx, bottom_y)
+        row_blocks(my, top_y - my.diameter_mm / 2000,
+                   top_start[0], top_end[0], "top")
+        row_blocks(my, bottom_y + my.diameter_mm / 2000,
+                   bottom_start[0], bottom_end[0], "bottom")
     elif view in ("AA", "BB", "CC"):
-        horizontal_u(my, top_y - mx.diameter_mm / 1000, False, "top")
-        horizontal_u(my, bottom_y + mx.diameter_mm / 1000, True, "bottom")
-        row_blocks(mx, top_y, left_x, right_x, "top")
-        row_blocks(mx, bottom_y, left_x, right_x, "bottom")
+        top_real_y = top_y - mx.diameter_mm / 2000
+        bottom_real_y = bottom_y + mx.diameter_mm / 2000
+        horizontal_u(my, top_real_y, False, "top")
+        horizontal_u(my, bottom_real_y, True, "bottom")
+        top_start, top_end, _, _ = horizontal_tangent_span(my, top_real_y)
+        bottom_start, bottom_end, _, _ = horizontal_tangent_span(my, bottom_real_y)
+        row_blocks(mx, top_y, top_start[0], top_end[0], "top")
+        row_blocks(mx, bottom_y, bottom_start[0], bottom_end[0], "bottom")
 
     if view in ("FR", "AA", "BB", "CC") and "suple" in active:
         suple = active["suple"]
@@ -378,15 +401,25 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
 
     if view in ("AA", "BB", "CC") and "lateral_x" in active:
         lx = active["lateral_x"]
-        levels = distribution_positions_cm((top_y - bottom_y) * 100, lx.spacing_cm, lx.origin)
-        column_blocks(lx, left_x, levels, "left")
-        column_blocks(lx, right_x, levels, "right")
+        top_real_y = top_y - mx.diameter_mm / 2000
+        bottom_real_y = bottom_y + mx.diameter_mm / 2000
+        radius_real = bend_radius_cm(my.diameter_mm) / 100.0
+        lateral_radius = lx.diameter_mm / 2000.0
+        _, _, left_hook, right_hook = horizontal_tangent_span(my, top_real_y)
+        column_blocks(lx, left_hook[0] + lateral_radius,
+                      bottom_real_y + radius_real, top_real_y - radius_real, "left")
+        column_blocks(lx, right_hook[0] - lateral_radius,
+                      bottom_real_y + radius_real, top_real_y - radius_real, "right")
 
     if view == "FR" and "lateral_y" in active:
         ly = active["lateral_y"]
-        levels = distribution_positions_cm((top_y - bottom_y) * 100, ly.spacing_cm, ly.origin)
-        column_blocks(ly, left_x, levels, "left")
-        column_blocks(ly, right_x, levels, "right")
+        radius_real = bend_radius_cm(mx.diameter_mm) / 100.0
+        lateral_radius = ly.diameter_mm / 2000.0
+        _, _, left_hook, right_hook = horizontal_tangent_span(mx, top_y)
+        column_blocks(ly, left_hook[0] + lateral_radius,
+                      bottom_y + radius_real, top_y - radius_real, "left")
+        column_blocks(ly, right_hook[0] - lateral_radius,
+                      bottom_y + radius_real, top_y - radius_real, "right")
 
     if view == "EE":
         ee_mesh_x_pair(mx)
@@ -398,6 +431,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
             if key not in active:
                 continue
             rule = active[key]
+            hook_m = hook_length_m(rule)
             inner = inward_offset(points, inset(rule))
             for i, a in enumerate(inner):
                 b = inner[(i + 1) % len(inner)]
@@ -427,9 +461,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
 (defun sincal:styles-ready (database / mldict)
   (and (sincal:item (vla-get-DimStyles database) "GSG_COTAS")
        (setq mldict (sincal:mleader-dict database))
-       (sincal:item mldict "GSG_MLEADER")
-       (sincal:item (vla-get-TextStyles database) "RomanD")
-       (sincal:item (vla-get-Blocks database) "MARK")))
+       (sincal:item mldict "GSG_MLEADER")))
 (defun sincal:get-dbx (acad / major names dbx candidate)
   (setq major (substr (getvar "ACADVER") 1 2)
         names (list (strcat "ObjectDBX.AxDbDocument." major)
@@ -472,70 +504,19 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
               (if (and ok (not (sincal:item target-ml "GSG_MLEADER")))
                 (if (or (not source-ml)
                         (not (sincal:copy-style dbx source-ml target-ml "GSG_MLEADER")))
-                  (setq ok nil)))
-              (if (and ok (not (sincal:item (vla-get-TextStyles doc) "RomanD")))
-                (if (not (sincal:copy-style dbx (vla-get-TextStyles dbx)
-                                             (vla-get-TextStyles doc) "RomanD"))
-                  (setq ok nil)))
-              (if (and ok (not (sincal:item (vla-get-Blocks doc) "MARK")))
-                (if (not (sincal:copy-style dbx (vla-get-Blocks dbx)
-                                             (vla-get-Blocks doc) "MARK"))
                   (setq ok nil)))))
           (vl-catch-all-apply 'vlax-release-object (list dbx))))))
   (and ok (sincal:styles-ready doc)))
 (defun sincal:ensure-annotation-styles (acad doc master)
   (or (sincal:styles-ready doc)
       (sincal:import-annotation-styles acad doc master)))
-(defun sincal:set-mark (block value / attributes attribute)
-  (if (= (vla-get-HasAttributes block) :vlax-true)
-    (progn
-      (setq attributes (vlax-invoke block 'GetAttributes))
-      (foreach attribute attributes
-        (if (= (strcase (vla-get-TagString attribute)) "MARCA")
-          (vla-put-TextString attribute value))))))
-(defun sincal:add-mark (point value layer rotation tag / block)
-  (setq block (vla-InsertBlock ms (vlax-3d-point point) "MARK" 1.0 1.0 1.0 rotation))
-  (vla-put-Layer block layer)
-  (sincal:set-mark block value)
-  (sincal:tag (vlax-vla-object->ename block) tag)
-  block)
-(defun sincal:add-mtext (point text layer rotation width tag / obj)
-  (setq obj (vla-AddMText ms (vlax-3d-point point) width text))
-  (vla-put-StyleName obj "RomanD")
-  (vla-put-Height obj 0.0025)
-  (vla-put-Rotation obj rotation)
-  (vla-put-AttachmentPoint obj 4)
-  (vl-catch-all-apply 'vla-put-BackgroundFill (list obj :vlax-true))
-  (vla-put-Layer obj layer)
-  (sincal:tag (vlax-vla-object->ename obj) tag)
-  obj)
-(defun sincal:annotation-scale (/ value)
-  (setq value (vl-catch-all-apply 'getvar (list "CANNOSCALEVALUE")))
-  (if (or (vl-catch-all-error-p value) (not (numberp value)) (<= value 0.0))
-    1.0
-    (max 1.0 value)))
-(defun sincal:marked-dim (p1 p2 location entries layer tag / obj angle scale unit total cursor item mark description width mark-point text-point)
+(defun sincal:marked-dim (p1 p2 location text layer tag / obj)
   (setq obj (vla-AddDimAligned ms (vlax-3d-point p1) (vlax-3d-point p2)
                                 (vlax-3d-point location)))
   (vla-put-StyleName obj "GSG_COTAS")
-  (vla-put-TextOverride obj " ")
+  (vla-put-TextOverride obj text)
   (vla-put-Layer obj layer)
   (sincal:tag (vlax-vla-object->ename obj) tag)
-  (setq angle (angle p1 p2)
-        scale (sincal:annotation-scale)
-        unit (* 0.0025 scale)
-        total 0.0)
-  (foreach item entries
-    (setq total (+ total (* unit (+ 2.2 (* 0.62 (strlen (cadr item))) 1.1)))))
-  (setq cursor (polar location (+ angle pi) (/ total 2.0)))
-  (foreach item entries
-    (setq mark (car item) description (cadr item)
-          mark-point cursor
-          text-point (polar cursor angle (* unit 1.8))
-          width (* unit (+ 1.0 (* 0.70 (strlen description)))))
-    (sincal:add-mark mark-point mark layer angle tag)
-    (sincal:add-mtext text-point description layer angle width tag)
-    (setq cursor (polar cursor angle (+ (* unit 2.2) width (* unit 1.1)))))
   obj)
 (defun sincal:mleader (arrow landing text layer tag / points obj)
   (setq points (vlax-make-safearray vlax-vbDouble '(0 . 5)))
@@ -555,7 +536,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
     {body}
     (vla-Regen doc 1)
     (princ "\\n[SINCAL] Vista {view} generada con cotas y llamadas. Moldaje preservado."))
-    (alert (strcat "SINCAL no pudo importar GSG_COTAS, GSG_MLEADER, RomanD y MARK.\\n"
+    (alert (strcat "SINCAL no pudo importar GSG_COTAS y GSG_MLEADER.\\n"
                    "Verifique el master DWG y vuelva a generar; no se modifico la vista.")))
   (princ))
 '''

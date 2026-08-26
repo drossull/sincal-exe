@@ -254,8 +254,8 @@ function Assert-AppPayloadContents([string]$Path) {
             'assets/icons/logo.ico',
             'assets/fonts/GT Pressura Regular.ttf',
             'assets/fonts/GTPressura-Bold.ttf',
-            'assets/fonts/HelveticaNeueRoman.otf',
-            'assets/fonts/HelveticaNeueBold.otf'
+            'assets/fonts/HelveticaNeueRoman.ttf',
+            'assets/fonts/HelveticaNeueBold.ttf'
         )
         $missing = @($required | Where-Object { $_ -notin $entries })
         if ($missing.Count -gt 0) {
