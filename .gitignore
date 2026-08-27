@@ -6,6 +6,7 @@
 build/
 dist/
 installer_output/
+tmp/
 
 # 2. Archivos ejecutables y empaquetados
 *.exe

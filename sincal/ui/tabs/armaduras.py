@@ -63,9 +63,10 @@ SIGLAS_ZAPATA = {
 
 
 class TabArmaduras(ctk.CTkFrame):
-    def __init__(self, master, parent_app, **kwargs):
+    def __init__(self, master, parent_app, project_context=None, **kwargs):
         super().__init__(master, **kwargs)
         self.parent_app = parent_app
+        self.project_context = project_context
         self._abutments = {}
         self._session_metadata = {}
         self._session_path = None
@@ -123,20 +124,16 @@ class TabArmaduras(ctk.CTkFrame):
         project_row.grid(row=2, column=0, sticky="ew")
         project_row.grid_columnconfigure(2, weight=1)
 
-        self.btn_cargar_json = ShadowButton(
-            project_row, text="Cargar JSON", font=fuente_normal, fg_color=COLOR_GRIS_BOTON,
-            hover_color=COLOR_GRIS_BOTON_HOVER, corner_radius=RADIO_CONTROL,
-            command=self.cargar_json_bim,
-        )
-        self.btn_cargar_json.grid(row=0, column=4, sticky="e", padx=(8, 0))
-        ShadowButton(project_row, text="Limpiar", font=FUENTE_NORMAL_PEQUENA,
-                      fg_color="transparent", hover_color=COLOR_GRIS_BOTON,
-                      text_color=COLOR_TEXTO_SUAVE, corner_radius=RADIO_CONTROL,
-                      command=self.limpiar_json_bim).grid(row=0, column=3, sticky="e", padx=(6, 0))
         self.lbl_json_status = ctk.CTkLabel(
-            project_row, text="Archivo: Ninguno", font=fuente_normal,
+            project_row, text="Proyecto: ninguno", font=fuente_normal,
             text_color=COLOR_TEXTO_SUAVE, anchor="w", justify="left", wraplength=430)
         self.lbl_json_status.grid(row=0, column=2, sticky="ew", padx=(14, 4))
+        ShadowButton(
+            project_row, text="Ir a Consulta", font=FUENTE_NORMAL_PEQUENA,
+            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
+            corner_radius=0,
+            command=lambda: self.parent_app.seleccionar_seccion("consulta"),
+        ).grid(row=0, column=3, sticky="e", padx=(8, 0))
         self.ent_z_esviaje = ttk.Entry(
             project_row, width=7, font=FUENTE_CAMPO, bootstyle="secondary")
         self.ent_z_esviaje.insert(0, "0")
@@ -321,10 +318,10 @@ class TabArmaduras(ctk.CTkFrame):
             return
         if main_text == "ESTRIBOS":
             detail = self.tab_estribo.tab(self.tab_estribo.select(), "text")
-            segments = ("Generador de armadura", "Estribos", detail)
+            segments = ("Proyecto", "Generador de armadura", "Estribos", detail)
         else:
             detail = self.tab_sub_travesanos.tab(self.tab_sub_travesanos.select(), "text")
-            segments = ("Generador de armadura", "Travesaños", detail)
+            segments = ("Proyecto", "Generador de armadura", "Travesaños", detail)
         if self.parent_app._sections.get("estructural", (None,))[0].winfo_manager():
             self.parent_app.actualizar_ruta_interna(*segments)
 
@@ -2601,31 +2598,50 @@ class TabArmaduras(ctk.CTkFrame):
         self._json_snapshot = datos
         self._json_sha256 = sha256_file(ruta)
         nombre = os.path.basename(ruta) if ruta else "Instantánea de sesión"
-        self.lbl_json_status.configure(text=f"Archivo: {nombre}", text_color=COLOR_ACENTO)
+        self.lbl_json_status.configure(text=f"Proyecto: {nombre}", text_color=COLOR_ACENTO)
         if notificar:
             self.parent_app.log_r(f"[*] JSON cargado: {nombre}")
             messagebox.showinfo(
                 "SINCAL Suite", "Datos mapeados exitosamente en centímetros y grados.")
 
     def cargar_json_bim(self):
-        ruta = filedialog.askopenfilename(
-            title="Seleccionar Archivo JSON del Proyecto", filetypes=[("JSON Files", "*.json")])
-        if not ruta:
-            return
-        try:
-            with open(ruta, 'r', encoding='utf-8') as f:
-                datos = json.load(f)
-            self._aplicar_json_bim(datos, ruta)
-            self.marcar_sesion_modificada()
-        except Exception as e:
-            messagebox.showerror("Error JSON", f"Fallo al leer archivo:\n{e}")
+        """Compatibilidad interna: la carga se realiza desde Proyecto > Consulta."""
+        self.parent_app.seleccionar_seccion("consulta")
 
     def limpiar_json_bim(self):
-        self.lbl_json_status.configure(text="Archivo: Ninguno", text_color=COLOR_TEXTO_SUAVE)
+        self.parent_app.clear_project()
+
+    def confirm_project_change(self):
+        return self._confirmar_descartar_cambios()
+
+    def _reset_session_identity(self):
+        old_id = self._session_metadata.get("id")
+        self._session_metadata = {}
+        self._session_path = None
+        self._session_dirty = False
+        self.lbl_session_status.configure(
+            text="Sin sesión activa", text_color=COLOR_TEXTO_SUAVE)
+        self.btn_guardar_sesion.configure(state="disabled")
+        self.btn_nueva_sesion.configure(state="disabled")
+        self.parent_app.session_store.clear_autosave(old_id)
+
+    def switch_project(self, context):
+        """Inicia un espacio limpio y aplica el proyecto compartido."""
+        self._restore_workspace(self._blank_workspace)
+        self._reset_session_identity()
+        self._aplicar_json_bim(context.data, context.path, notificar=False)
+        self._json_sha256 = context.sha256
+        self.parent_app.log_r(
+            f"[*] Generador vinculado al proyecto: {context.filename}")
+
+    def clear_shared_project(self):
+        self._restore_workspace(self._blank_workspace)
+        self._reset_session_identity()
         self._json_path = ""
         self._json_snapshot = None
         self._json_sha256 = ""
-        self.marcar_sesion_modificada()
+        self.lbl_json_status.configure(
+            text="Proyecto: ninguno", text_color=COLOR_TEXTO_SUAVE)
 
     # =========================================================
     # SESIONES DE TRABAJO
@@ -2758,18 +2774,27 @@ class TabArmaduras(ctk.CTkFrame):
 
     def _project_metadata(self):
         data = self._json_snapshot or {}
+        identification = (
+            dict(self.project_context.identification)
+            if self.project_context is not None else {}
+        )
         json_name = os.path.basename(self._json_path) if self._json_path else ""
-        bridge_name = self._json_value_by_keys(
+        bridge_name = identification.get("structure_name") or self._json_value_by_keys(
             data, {"nombre_puente", "nombre_estructura", "puente"})
         if not bridge_name and json_name:
             bridge_name = Path(json_name).stem
-        plan_name = self._json_value_by_keys(data, {"nombre_plano"})
-        project_code = self._json_value_by_keys(
+        revision = identification.get("revision", "")
+        plan_name = self._json_value_by_keys(data, {"nombre_plano"}) or (
+            f"Revisión {revision}" if revision else "")
+        project_code = identification.get("ot") or self._json_value_by_keys(
             data, {"codigo_proyecto", "codigo", "project_code"})
         e_data = data.get("estribos", {}) if isinstance(data, dict) else {}
         return {
             "bridge_name": bridge_name,
             "project_code": project_code,
+            "ot": identification.get("ot", ""),
+            "revision": revision,
+            "structure_name": identification.get("structure_name", ""),
             "plan_name": plan_name,
             "json_name": json_name,
             "json_path": self._json_path,
@@ -2894,19 +2919,18 @@ class TabArmaduras(ctk.CTkFrame):
     def nueva_sesion(self):
         if not self._confirmar_descartar_cambios():
             return False
-        old_id = self._session_metadata.get("id")
         self._restore_workspace(self._blank_workspace)
-        self._session_metadata = {}
-        self._session_path = None
-        self._session_dirty = False
-        self._json_path = ""
-        self._json_snapshot = None
-        self._json_sha256 = ""
-        self.lbl_json_status.configure(text="Archivo: Ninguno", text_color=COLOR_TEXTO_SUAVE)
-        self.lbl_session_status.configure(text="Sin sesión activa", text_color=COLOR_TEXTO_SUAVE)
-        self.btn_guardar_sesion.configure(state="disabled")
-        self.btn_nueva_sesion.configure(state="disabled")
-        self.parent_app.session_store.clear_autosave(old_id)
+        self._reset_session_identity()
+        if self.project_context is not None and self.project_context.active:
+            self._aplicar_json_bim(
+                self.project_context.data, self.project_context.path, notificar=False)
+            self._json_sha256 = self.project_context.sha256
+        else:
+            self._json_path = ""
+            self._json_snapshot = None
+            self._json_sha256 = ""
+            self.lbl_json_status.configure(
+                text="Proyecto: ninguno", text_color=COLOR_TEXTO_SUAVE)
         return True
 
     def abrir_sesion_desde_ruta(self, path):
@@ -2940,6 +2964,16 @@ class TabArmaduras(ctk.CTkFrame):
                         return False
         self._restore_workspace(document.get("workspace") or {})
         snapshot = source.get("snapshot")
+        project = document.get("project") or {}
+        identification = {
+            "ot": project.get("ot") or project.get("project_code", ""),
+            "revision": project.get("revision", ""),
+            "structure_name": project.get("structure_name") or project.get("bridge_name", ""),
+        }
+        active_data = current_data if current_data is not None else (snapshot or {})
+        active_hash = sha256_file(source_path) if current_data is not None else source.get("sha256", "")
+        self.parent_app.activate_project_snapshot(
+            active_data, source_path, active_hash, identification)
         if current_data is not None:
             self._aplicar_json_bim(current_data, source_path, notificar=False)
         else:
@@ -2947,7 +2981,7 @@ class TabArmaduras(ctk.CTkFrame):
             self._json_snapshot = snapshot
             self._json_sha256 = source.get("sha256", "")
             json_name = os.path.basename(source_path) if source_path else "Instantánea de sesión"
-            self.lbl_json_status.configure(text=f"Archivo: {json_name}", text_color=COLOR_ACENTO)
+            self.lbl_json_status.configure(text=f"Proyecto: {json_name}", text_color=COLOR_ACENTO)
         self._session_metadata = dict(document.get("metadata") or {})
         is_recovery = Path(path).name.startswith("recovery-")
         formal_path = document.get("formal_path") if is_recovery else str(path)

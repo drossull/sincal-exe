@@ -30,6 +30,7 @@ from customtkinter import filedialog
 from PIL import Image, ImageTk
 
 from sincal.ui.tabs.armaduras import TabArmaduras
+from sincal.ui.tabs.project import TabProject
 from sincal.ui.tabs.sessions import TabSessions
 from sincal.ui.tabs.diagnostico import TabDiagnostico
 from sincal.ui.tabs.documentacion import TabDocs
@@ -55,6 +56,7 @@ from sincal.runtime import (
     ruta_cad_usuario,
 )
 from sincal.sessions import SessionStore
+from sincal.project import ProjectContext
 from sincal.ui.icons import obtener_icono
 from sincal.ui.activity import ActivityIndicator
 from sincal.ui.scroll import SafeScrollableFrame
@@ -213,6 +215,7 @@ class ActualizadorCAD(ctk.CTk):
         self._page_anchors = {}
         self._main_thread_ident = threading.get_ident()
         self.session_store = SessionStore()
+        self.project_context = ProjectContext()
         self.protocol("WM_DELETE_WINDOW", self.cerrar_aplicacion)
         self.after(50, self._procesar_ui_queue)
         self.bind("<Configure>", self._adaptar_layout_principal, add="+")
@@ -225,12 +228,14 @@ class ActualizadorCAD(ctk.CTk):
         self.setup_tab_comandos()
         self.setup_tab_renombrado()
         self.setup_tab_conversion_dxf()
+        self.setup_tab_project()
         self.setup_tab_armaduras()
         self.setup_tab_sessions()
         self.vista_docs = TabDocs(
             self.tab_docs, parent_app=self, fg_color="transparent")
         self.vista_docs.pack(fill="both", expand=True)
         self.seleccionar_seccion("sincronizador")
+        self.after(2_200, self._offer_last_project)
 
         self.iniciar_actividad("historial", "Cargando historial")
         threading.Thread(target=self.cargar_info_github, daemon=True).start()
@@ -282,6 +287,7 @@ class ActualizadorCAD(ctk.CTk):
 
         self.nav_container = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.nav_container.pack(fill="both", expand=True, padx=8)
+        self._project_sections = {"consulta", "estructural", "sesiones"}
         self.nav_items = (
             ("sincronizador", "home", "Home", "Home"),
             ("documentacion", "book", "Documentación", "Documentación"),
@@ -289,6 +295,8 @@ class ActualizadorCAD(ctk.CTk):
             ("conversion", "convert", "Conversión DXF–DWG", "Conversión DXF–DWG"),
             ("procesamiento", "rename", "Renombrado", "Renombrado"),
             ("ubicacion", "pin", "Ubicación", "Ubicación"),
+            ("proyecto", "structure", "Proyecto", "Proyecto"),
+            ("consulta", "query", "Consulta", "Consulta"),
             ("estructural", "structure", "Generador de armadura", "Generador de armadura"),
             ("sesiones", "sessions", "Sesiones", "Sesiones"),
             ("diagnostico", "diagnostic", "Diagnóstico", "Diagnóstico"),
@@ -306,11 +314,12 @@ class ActualizadorCAD(ctk.CTk):
                 image=obtener_icono(icon_name, 18), compound="left",
                 fg_color="transparent", hover_color=COLOR_FONDO, text_color=COLOR_TEXTO,
                 corner_radius=RADIO_CONTROL, height=42,
-                command=lambda selected=key: self.seleccionar_seccion(selected),
+                command=lambda selected=key: self.seleccionar_seccion(
+                    "consulta" if selected == "proyecto" else selected),
             )
             button.pack(
                 side="left", fill="x", expand=True,
-                padx=(18 if key == "sesiones" else 5, 2),
+                padx=(22 if key in self._project_sections else 5, 2),
             )
             self._nav_buttons[key] = button
             self._nav_indicators[key] = indicator
@@ -390,7 +399,7 @@ class ActualizadorCAD(ctk.CTk):
         ).pack(fill="x", padx=10, pady=(9, 4))
         ctk.CTkLabel(
             self.page_nav_guide,
-            text=("1. Carga el JSON y elige el elemento.\n"
+            text=("1. Selecciona el proyecto en Consulta.\n"
                   "2. Confirma el moldaje o sector CAD.\n"
                   "3. Revisa dimensiones y armaduras.\n"
                   "4. Genera una vista y comprueba el DWG.\n"
@@ -435,6 +444,7 @@ class ActualizadorCAD(ctk.CTk):
             ("conversion", "Conversión DXF–DWG"),
             ("procesamiento", "Renombrado"),
             ("ubicacion", "Ubicación"),
+            ("consulta", "Consulta"),
             ("estructural", "Generador de armadura"),
             ("sesiones", "Sesiones"),
             ("diagnostico", "Diagnóstico"),
@@ -447,6 +457,7 @@ class ActualizadorCAD(ctk.CTk):
         self.tab_comandos = self._sections["comandos"][0]
         self.tab_renombrado = self._sections["procesamiento"][0]
         self.tab_ubicacion = self._sections["ubicacion"][0]
+        self.tab_project = self._sections["consulta"][0]
         self.tab_armaduras = self._sections["estructural"][0]
         self.tab_sessions = self._sections["sesiones"][0]
         self.tab_conversion = self._sections["conversion"][0]
@@ -457,15 +468,19 @@ class ActualizadorCAD(ctk.CTk):
         self.tab_diagnostico.pack(expand=True, fill="both")
 
     def seleccionar_seccion(self, key):
+        if key == "proyecto":
+            key = "consulta"
         if key not in self._sections:
             return
         for frame, _title in self._sections.values():
             frame.pack_forget()
         frame, title = self._sections[key]
         frame.pack(fill="both", expand=True)
-        self.actualizar_ruta_interna(title)
+        self.actualizar_ruta_interna(
+            *(('Proyecto', title) if key in self._project_sections else (title,)))
         for item_key, button in self._nav_buttons.items():
-            selected = item_key == key
+            selected = item_key == key or (
+                item_key == "proyecto" and key in self._project_sections)
             button.configure(
                 fg_color="transparent", hover_color=COLOR_FONDO,
                 text_color=COLOR_ACENTO if selected else COLOR_TEXTO,
@@ -473,11 +488,13 @@ class ActualizadorCAD(ctk.CTk):
             self._nav_indicators[item_key].configure(
                 fg_color=COLOR_ACENTO if selected else COLOR_FONDO)
         self.configurar_navegacion_pagina(key)
-        if key == "estructural" and hasattr(self, "vista_armaduras"):
+        if key == "consulta" and hasattr(self, "vista_project"):
+            self.vista_project.refresh()
+        elif key == "estructural" and hasattr(self, "vista_armaduras"):
             self.after_idle(self.vista_armaduras.actualizar_breadcrumb)
         elif key == "sesiones" and hasattr(self, "vista_sessions"):
             self.vista_sessions.refresh()
-            self.actualizar_ruta_interna("Generador de armadura", "Sesiones")
+            self.actualizar_ruta_interna("Proyecto", "Sesiones")
 
     def configurar_navegacion_pagina(self, key, entries=None):
         """Construye el índice contextual situado en la esquina superior derecha."""
@@ -496,6 +513,7 @@ class ActualizadorCAD(ctk.CTk):
                 "comandos": (("Ejecutar comando", "comando"), ("Glosario", "glosario")),
                 "procesamiento": (("Archivos", "archivos"), ("Buscar y reemplazar", "reemplazo")),
                 "ubicacion": (("Datos del proyecto", "datos"), ("Ubicación y mapa", "mapa"), ("Generar croquis", "generar")),
+                "consulta": (("Identificación", "identificacion"), ("Fuente JSON", "fuente")),
                 "estructural": (("Dimensiones", "dimensiones"), ("Revisión y marcas", "revision"), ("Despiece", "despiece")),
                 "sesiones": (("Buscar", "buscar"), ("Biblioteca", "biblioteca")),
                 "conversion": (("Carpeta DXF", "carpeta"), ("Archivos", "archivos"), ("Conversión", "conversion")),
@@ -535,7 +553,9 @@ class ActualizadorCAD(ctk.CTk):
 
     def _navegar_pagina(self, section, anchor):
         self.marcar_navegacion_pagina(anchor)
-        if section == "estructural" and hasattr(self, "vista_armaduras"):
+        if section == "consulta" and hasattr(self, "vista_project"):
+            self.vista_project.ir_a_seccion(anchor)
+        elif section == "estructural" and hasattr(self, "vista_armaduras"):
             self.vista_armaduras.ir_a_seccion(anchor)
         elif section == "sesiones" and hasattr(self, "vista_sessions"):
             self.vista_sessions.ir_a_seccion(anchor)
@@ -896,9 +916,16 @@ class ActualizadorCAD(ctk.CTk):
         finally:
             self.destroy()
 
+    def setup_tab_project(self):
+        self.vista_project = TabProject(
+            master=self.tab_project, parent_app=self,
+            context=self.project_context, fg_color="transparent")
+        self.vista_project.pack(fill="both", expand=True)
+
     def setup_tab_armaduras(self):
         self.vista_armaduras = TabArmaduras(
-            master=self.tab_armaduras, parent_app=self, fg_color="transparent")
+            master=self.tab_armaduras, parent_app=self,
+            project_context=self.project_context, fg_color="transparent")
         self.vista_armaduras.pack(fill="both", expand=True)
 
     def setup_tab_sessions(self):
@@ -908,6 +935,79 @@ class ActualizadorCAD(ctk.CTk):
             fg_color="transparent",
         )
         self.vista_sessions.pack(fill="both", expand=True)
+
+    def load_project(self, path, identification=None, confirm_session=True):
+        """Activa el JSON y lo entrega al generador como una sola fuente de verdad."""
+        if confirm_session and hasattr(self, "vista_armaduras"):
+            if not self.vista_armaduras.confirm_project_change():
+                return False
+        try:
+            self.iniciar_actividad("project", "Leyendo proyecto")
+            self.project_context.load(path, identification)
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            messagebox.showerror(
+                "Consulta de proyecto", f"No se pudo leer el JSON:\n{error}")
+            return False
+        finally:
+            self.finalizar_actividad("project")
+        if hasattr(self, "vista_armaduras"):
+            self.vista_armaduras.switch_project(self.project_context)
+        if hasattr(self, "vista_project"):
+            self.vista_project.refresh()
+        self.log_r(f"[OK] Proyecto activo: {self.project_context.path}")
+        return True
+
+    def update_project_identification(self, values):
+        self.project_context.update_identification(**values)
+        if hasattr(self, "vista_armaduras") and (
+            self.vista_armaduras._session_dirty
+            or self.vista_armaduras._session_path
+            or self.vista_armaduras._session_metadata
+        ):
+            self.vista_armaduras.marcar_sesion_modificada()
+        if hasattr(self, "vista_sessions"):
+            self.vista_sessions.refresh()
+
+    def clear_project(self):
+        if hasattr(self, "vista_armaduras"):
+            if not self.vista_armaduras.confirm_project_change():
+                return False
+            self.vista_armaduras.clear_shared_project()
+        self.project_context.clear(forget_last=True)
+        if hasattr(self, "vista_project"):
+            self.vista_project.refresh()
+        self.log_r("[*] Proyecto activo limpiado.")
+        return True
+
+    def activate_project_snapshot(self, data, path="", source_hash="", identification=None):
+        """Sincroniza Consulta al abrir una sesión, incluso si el JSON ya no existe."""
+        self.project_context.activate_snapshot(
+            data or {}, path, source_hash, identification,
+            remember=bool(path and os.path.isfile(path)),
+        )
+        if hasattr(self, "vista_project"):
+            self.vista_project.refresh()
+
+    def _offer_last_project(self):
+        if self.project_context.active or not hasattr(self, "vista_armaduras"):
+            return
+        if (
+            self.vista_armaduras._session_dirty
+            or self.vista_armaduras._session_path
+            or self.vista_armaduras._json_snapshot
+        ):
+            return
+        path = self.project_context.last_project_path()
+        if not path:
+            return
+        if not os.path.isfile(path):
+            self.project_context.clear(forget_last=True)
+            return
+        if messagebox.askyesno(
+            "Proyecto reciente",
+            f"¿Quieres volver a abrir el último proyecto consultado?\n\n{path}",
+        ):
+            self.load_project(path, confirm_session=False)
 
     # ==========================================================
     # PARTE COMÚN Y SOPORTE DE ACTUALIZACIONES

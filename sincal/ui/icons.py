@@ -57,6 +57,14 @@ def _draw_icon(name: str, size: int, color: str) -> Image.Image:
         line(((side * .34, side * .36), (side * .66, side * .36)))
         line(((side * .34, side * .50), (side * .62, side * .50)))
         line(((side * .34, side * .64), (side * .56, side * .64)))
+    elif name == "query":
+        rect((side * .22, side * .18, side * .66, side * .76), side * .02)
+        line(((side * .30, side * .34), (side * .57, side * .34)))
+        line(((side * .30, side * .47), (side * .53, side * .47)))
+        draw.ellipse(
+            (side * .51, side * .49, side * .78, side * .76),
+            outline=color, width=width)
+        line(((side * .72, side * .70), (side * .84, side * .82)))
     elif name == "convert":
         line(((side * .20, side * .35), (side * .68, side * .35)))
         line(((side * .60, side * .25), (side * .72, side * .35), (side * .60, side * .45)))

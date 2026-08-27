@@ -11,6 +11,7 @@ ACTIVITY = ROOT / "sincal" / "ui" / "activity.py"
 ARMADURAS = ROOT / "sincal" / "ui" / "tabs" / "armaduras.py"
 DOCUMENTACION = ROOT / "sincal" / "ui" / "tabs" / "documentacion.py"
 SESSIONS = ROOT / "sincal" / "ui" / "tabs" / "sessions.py"
+PROJECT = ROOT / "sincal" / "ui" / "tabs" / "project.py"
 
 
 class WorkbenchLayoutTests(unittest.TestCase):
@@ -23,7 +24,10 @@ class WorkbenchLayoutTests(unittest.TestCase):
             '"conversion", "convert", "Conversión DXF–DWG"',
             '"procesamiento", "rename", "Renombrado"',
             '"ubicacion", "pin", "Ubicación"',
+            '"proyecto", "structure", "Proyecto"',
+            '"consulta", "query", "Consulta"',
             '"estructural", "structure", "Generador de armadura"',
+            '"sesiones", "sessions", "Sesiones"',
             '"diagnostico", "diagnostic", "Diagnóstico"',
         ]
         positions = [source.index(item) for item in expected]
@@ -215,8 +219,25 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn("width=38, height=36", core)
         self.assertIn("self.page_nav_guide", core)
         self.assertIn('if key == "estructural":', core)
-        self.assertIn("1. Carga el JSON y elige el elemento.", core)
+        self.assertIn("1. Selecciona el proyecto en Consulta.", core)
         self.assertIn("5. Valida marcas antes del despiece.", core)
+
+    def test_project_consultation_is_the_shared_read_only_json_gateway(self):
+        core = APP.read_text(encoding="utf-8")
+        consultation = PROJECT.read_text(encoding="utf-8")
+        structural = ARMADURAS.read_text(encoding="utf-8")
+        self.assertIn('self._project_sections = {"consulta", "estructural", "sesiones"}', core)
+        self.assertIn("ProjectContext()", core)
+        self.assertIn("def load_project", core)
+        self.assertIn("def _offer_last_project", core)
+        self.assertIn('text="CONSULTA DE PROYECTO"', consultation)
+        self.assertIn('"ot": tk.StringVar()', consultation)
+        self.assertIn('"revision": tk.StringVar()', consultation)
+        self.assertIn('"structure_name": tk.StringVar()', consultation)
+        self.assertIn('text="Exportar consulta .txt"', consultation)
+        self.assertIn("project_sections(self.context.data)", consultation)
+        self.assertIn("def switch_project", structural)
+        self.assertNotIn('project_row, text="Cargar JSON"', structural)
 
     def test_modules_import_the_small_body_font_when_using_it(self):
         for path in (ARMADURAS, ROOT / "sincal" / "ui" / "tabs" / "ubicacion.py"):

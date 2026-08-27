@@ -1,10 +1,10 @@
 # SINCAL Suite — Ingeniería y estándares CAD
 
-**SINCAL Suite** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 2.0 y la secuencia técnica continúa en `v29.0.16` para conservar una actualización ordenada desde las instalaciones v28.
+**SINCAL Suite** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 2.0 y la secuencia técnica continúa en `v29.0.17` para conservar una actualización ordenada desde las instalaciones v28.
 
 ## Instalación web y distribución
 
-SINCAL Suite se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.16.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
+SINCAL Suite se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.17.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
 
 El programa base no incorpora los 125 MB de mapas regionales. El paquete web sí contiene una copia inicial del master DWG, LISPs, startup, scripts, plumilla, calibración y ayuda estructural para que el primer arranque sea funcional. GitHub mantiene esos recursos al día mediante actualizaciones menores. Cada mapa regional se descarga solamente cuando se selecciona por primera vez en el módulo Ubicación.
 
@@ -12,7 +12,7 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
 
 ## Primer inicio
 
-1. Ejecuta el instalador oficial de la release `v29.0.16`.
+1. Ejecuta el instalador oficial de la release `v29.0.17`.
 2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
 3. Abre **Diagnóstico**, verifica el motor CAD sugerido y cámbialo si necesitas otra versión.
 4. Pulsa **Preparar integración CAD**.
@@ -67,13 +67,19 @@ Con AutoCAD, SINCAL usa `accoreconsole.exe`. Con ZWCAD 2025/2026, crea una insta
 
 **Conversión DXF** es un módulo independiente: usa **Seleccionar DXF** para ver y escoger los archivos antes de cargarlos, o **Cargar carpeta** para listar todos los DXF de una ubicación. Marca solamente los deseados y conviértelos a DWG mediante una instancia CAD temporal. Cierra AutoCAD/ZWCAD antes de iniciarlo, conserva un respaldo y revisa los resultados en la consola Workbench.
 
+### Proyecto y Consulta
+
+El módulo **Proyecto** agrupa **Consulta**, **Generador de armadura** y **Sesiones**. Consulta es la única puerta de entrada del JSON: muestra todos sus campos desde el resumen general hasta estribos, cepas, tableros, materiales, planos y metadatos. OT, Revisión y Nombre de estructura se completan manualmente y se guardan de manera local, sin modificar el JSON. Las dimensiones conservan el valor original en milímetros y agregan su conversión a metros; las coordenadas se identifican como PTL y no se transfieren al módulo Ubicación. La consulta puede exportarse exclusivamente como `.txt`.
+
+SINCAL recuerda la última ruta y solicita confirmación para reabrirla al iniciar. Si una sesión contiene cambios, cargar o limpiar otro proyecto exige guardarlos o descartarlos primero. El contexto activo alimenta automáticamente al Generador de armadura y también queda registrado dentro de las sesiones.
+
 ### Generador de armadura
 
 Prepara vistas, despieces y cubicación de fierro mediante comandos temporales enviados al CAD abierto:
 
 - Estribos: separa **Estribo de entrada** y **Estribo de salida**, cada uno con su propio set de marcas, moldajes confirmados y cálculo. Cada estribo es una página continua: primero dimensiones y configuración; después revisión y marcas; finalmente despiece. El índice contextual permite saltar entre esas secciones. La zapata calcula las marcas 1–6, el suple 3-A opcional, empalmes 1–2/4–5 y las variantes excepcionales 2-A/5-A. Los diámetros se eligen desde una lista y los espaciamientos, origen de distribución, marcas y ganchos se editan únicamente en **Revisión y marcas**. La detección lee moldajes cerrados por vista (`FR_ZAP` a `EE_ZAP`), conserva sus vértices y exige `INSUNITS = 6`.
 - Travesaños: extremos, cuadrantes sobre tope, macizos y viga; geometría y despiece.
-- JSON de proyecto: importa parámetros compatibles y los convierte a las unidades de la interfaz.
+- Proyecto activo: recibe automáticamente desde **Proyecto → Consulta** los parámetros compatibles y los convierte a las unidades de la interfaz.
 
 Las vistas de zapata generan cotas coordinadas con `MARK`, `GSG_COTAS` y `GSG_MLEADER`. El **despiece general de zapata** se inserta en Model, agrupa los empalmes, acota parciales con `GSG_ARM-COTAS` y describe cada pieza con RomanD a 2,5 mm de papel. Cada grupo queda identificado de manera independiente; cuando sus parámetros cambian, AutoCAD/ZWCAD permite actualizarlo, conservarlo, aceptar todos los cambios o cancelar desde la línea de comandos.
 
@@ -139,10 +145,10 @@ El proceso valida código y pruebas, compila y firma el plugin y la aplicación,
 
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v29.0.16.exe`
-- `SINCAL_App_v29.0.16.zip`
-- `SINCAL_AutoCAD_v29.0.16.zip`
-- `release-manifest_v29.0.16.json`
+- `Setup_SINCAL_v29.0.17.exe`
+- `SINCAL_App_v29.0.17.zip`
+- `SINCAL_AutoCAD_v29.0.17.zip`
+- `release-manifest_v29.0.17.json`
 - `SHA256SUMS.txt`
 
 No renombres los paquetes después de compilar: el instalador usa URLs versionadas y hashes fijados en el momento del build.

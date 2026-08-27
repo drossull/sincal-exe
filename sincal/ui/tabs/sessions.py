@@ -1,4 +1,4 @@
-"""Biblioteca visual de sesiones del generador de armaduras."""
+"""Biblioteca visual de sesiones del módulo Proyecto."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ class TabSessions(ctk.CTkFrame):
         ).pack(anchor="w")
         ctk.CTkLabel(
             header,
-            text="Retoma el estado de un puente sin depender del DWG que esté abierto.",
+            text="Retoma el proyecto y sus armaduras sin depender del DWG que esté abierto.",
             font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE,
         ).pack(anchor="w", pady=(3, 0))
 
@@ -116,7 +116,7 @@ class TabSessions(ctk.CTkFrame):
         if not visible:
             ctk.CTkLabel(
                 self.cards,
-                text="No hay sesiones guardadas.\nGuarda una desde el Generador de armadura.",
+                text="No hay sesiones guardadas.\nGuarda una desde Proyecto > Generador de armadura.",
                 font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE, justify="center",
             ).grid(row=0, column=0, columnspan=2, rowspan=2, sticky="nsew")
         for index, item in enumerate(visible):
@@ -131,6 +131,8 @@ class TabSessions(ctk.CTkFrame):
         bridge = project.get("bridge_name") or "Puente sin identificar"
         plan = project.get("plan_name") or "Plano sin identificar"
         json_name = project.get("json_name") or "Sin JSON"
+        ot = project.get("ot") or project.get("project_code") or "OT no definida"
+        revision = project.get("revision") or "Revisión no definida"
         structure = "Estribos"
         types = " / ".join(filter(None, (
             project.get("abutment_entry_type"), project.get("abutment_exit_type"))))
@@ -141,7 +143,7 @@ class TabSessions(ctk.CTkFrame):
         except (ValueError, TypeError):
             updated = "Fecha no disponible"
         detail = (
-            f"{name}\n\n{bridge}\n{plan}\n{structure}"
+            f"{name}\n\n{bridge}\n{ot} · {revision}\n{plan}\n{structure}"
             f"{f' · {types}' if types else ''} · Esviaje {skew}°\nJSON: {json_name}\n"
             f"{overview.get('mark_count', 0)} marcas · {overview.get('total_kg', 0):.1f} kg\n"
             f"Estado: {overview.get('milestone', 'configuración')}\n"

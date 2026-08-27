@@ -136,6 +136,8 @@ class SessionStore:
                 "search_text": normalized_search_text(" ".join(map(str, (
                     metadata.get("name", ""), project.get("bridge_name", ""),
                     project.get("project_code", ""), project.get("plan_name", ""),
+                    project.get("ot", ""), project.get("revision", ""),
+                    project.get("structure_name", ""),
                     project.get("json_name", ""), metadata.get("tags", ""),
                 )))),
             })
