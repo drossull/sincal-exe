@@ -76,7 +76,7 @@
       "categoria": "Comandos en vivo",
       "titulo": "Comandos en planos abiertos",
       "tags": "com live sendcommand cancelar",
-      "contenido": "Esta herramienta envía el mismo comando a todos los dibujos abiertos accesibles en AutoCAD/ZWCAD. Escribe un comando completo, por ejemplo ZE o _QSAVE, y presiona Enter o pulsa Ejecutar. SINCAL Suite activa cada documento, cancela órdenes pendientes y envía el texto.\n\nDebajo del campo aparece un glosario con los comandos LISP disponibles y una explicación breve. No envíes comandos que requieran clics o respuestas distintas por dibujo. Usa Cancelar para detener el recorrido; el comando que ya llegó a CAD puede necesitar ESC dentro del propio programa."
+      "contenido": "Esta herramienta envía el mismo comando autónomo a todos los dibujos abiertos accesibles en AutoCAD/ZWCAD. Escribe sólo su nombre, por ejemplo ZE, PLOTYA o _QSAVE, y presiona Enter o pulsa Ejecutar. No se aceptan parámetros, saltos de línea ni expresiones LISP.\n\nEl glosario muestra las órdenes SINCAL recomendadas. Para usar otro comando nativo debes confirmar que termina por sí solo y que no solicita puntos, opciones ni respuestas. Usa Cancelar para detener el recorrido; el comando que ya llegó a CAD puede necesitar ESC dentro del propio programa."
     },
     {
       "id": "modulo-estructural",
@@ -214,6 +214,13 @@
       "notas": ["Verifica unidades y sistema de coordenadas del origen."],
       "tags": ["paste", "origen", "bloque"]
     },
+    "PLOTYA": {
+      "titulo": "Publicar el plano actual en PDF",
+      "descripcion": "Genera silenciosamente un PDF junto al DWG usando la configuración de trazado vigente y el mismo nombre base.",
+      "pasos": ["Guarda primero el DWG.", "Verifica que el layout use una impresora PDF válida.", "Escribe PLOTYA y espera el mensaje final."],
+      "notas": ["No solicita una ruta adicional.", "El PDF se reemplaza si ya existe y el sistema permite escribirlo."],
+      "tags": ["plot", "pdf", "publicar"]
+    },
     "PND": {
       "titulo": "Calcular pendiente",
       "descripcion": "Calcula y muestra la pendiente porcentual de una línea o segmento válido.",
@@ -253,7 +260,7 @@
       "titulo": "Altura fija cero en estilos",
       "descripcion": "Establece la altura de todos los estilos de texto en 0.0 para permitir alturas por objeto.",
       "pasos": ["Guarda una copia.", "Escribe ST0 y revisa los estilos."],
-      "notas": ["Afecta todos los estilos del dibujo."],
+      "notas": ["Afecta todos los estilos del dibujo.", "También se puede escribir STO usando la letra O."],
       "tags": ["textstyle", "altura"]
     },
     "VRAP": {

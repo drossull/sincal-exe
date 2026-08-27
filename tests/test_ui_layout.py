@@ -163,6 +163,8 @@ class WorkbenchLayoutTests(unittest.TestCase):
 
     def test_home_commands_and_product_identity_are_complete(self):
         core = APP.read_text(encoding="utf-8")
+        command_validation = (ROOT / "sincal" / "cad" / "commands.py").read_text(
+            encoding="utf-8")
         installer = (ROOT / "packaging" / "windows" / "SINCAL_Installer.iss").read_text(
             encoding="utf-8")
         self.assertIn('self.title("SINCAL Suite — Workbench")', core)
@@ -172,6 +174,11 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('self.entrada_comando.bind("<Return>"', core)
         self.assertIn('text="GLOSARIO DE COMANDOS"', core)
         self.assertIn('("comandos", "glosario", glossary)', core)
+        self.assertIn('("ST0 / STO", "ST0")', core)
+        self.assertIn('("PLOTYA", "PLOTYA")', core)
+        self.assertIn("normalizar_comando_cad_autonomo", core)
+        self.assertIn("self.comando_autonomo_var", core)
+        self.assertIn("sin espacios, parámetros", command_validation)
         self.assertIn("AppName=SINCAL Suite", installer)
         self.assertNotIn("AppName=SINCAL 2.0", installer)
 
@@ -189,6 +196,14 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('f"{round(current.progress):d} %"', activity)
         self.assertIn("0.8 - (time.monotonic() - self._shown_at)", activity)
         self.assertIn("ImageTk.PhotoImage(frame, master=self)", activity)
+
+    def test_home_actions_are_compact_and_structural_guide_is_contextual(self):
+        core = APP.read_text(encoding="utf-8")
+        self.assertIn("width=38, height=36", core)
+        self.assertIn("self.page_nav_guide", core)
+        self.assertIn('if key == "estructural":', core)
+        self.assertIn("1. Carga el JSON y elige el elemento.", core)
+        self.assertIn("5. Valida marcas antes del despiece.", core)
 
     def test_modules_import_the_small_body_font_when_using_it(self):
         for path in (ARMADURAS, ROOT / "sincal" / "ui" / "tabs" / "ubicacion.py"):

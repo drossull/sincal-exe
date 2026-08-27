@@ -13,7 +13,7 @@ class DocumentationTests(unittest.TestCase):
         documented = set(data["comandos_lisp"])
         expected = {
             "SINCAL", "BV", "CEVIADA", "CPOL", "DIMEL", "DL2",
-            "DUP / DUPLICAR", "EXTRIMOUT", "MC", "MPEND", "P0", "PND",
+            "DUP / DUPLICAR", "EXTRIMOUT", "MC", "MPEND", "P0", "PLOTYA", "PND",
             "PURGEALL", "RMLAY", "SETUP-A1", "SINCAL-ESCALAS", "ST0",
             "VRAP", "W08", "ZE", "CUSTOM-PROPS", "COPY-PROPS",
             "PASTE-PROPS", "REPARAR-PROPS", "C-INICIO / C-FIN", "C0 … C9",

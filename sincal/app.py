@@ -33,6 +33,7 @@ from sincal.ui.tabs.armaduras import TabArmaduras
 from sincal.ui.tabs.diagnostico import TabDiagnostico
 from sincal.ui.tabs.documentacion import TabDocs
 from sincal.ui.tabs.ubicacion import TabUbicacion
+from sincal.cad.commands import normalizar_comando_cad_autonomo
 from sincal.cad.engine import ensure_cad_engine
 from sincal.cad.integration import registrar_ruta_cad_usuario, registrar_scripts_en_path
 from sincal.diagnostics import record_incident
@@ -101,6 +102,21 @@ from sincal.ui.theme import (
 URL_RELEASES = DISTRIBUTION_RELEASES_URL
 RESOURCE_POLL_INTERVAL_MS = 60 * 1000
 
+COMANDOS_VIVO = (
+    ("BV", "BV"),
+    ("DL2", "DL2"),
+    ("P0", "P0"),
+    ("PURGEALL", "PURGEALL"),
+    ("SETUP-A1", "SETUP-A1"),
+    ("ST0 / STO", "ST0"),
+    ("W08", "W08"),
+    ("ZE", "ZE"),
+    ("PLOTYA", "PLOTYA"),
+)
+COMANDOS_VIVO_CONOCIDOS = {
+    alias for _label, command in COMANDOS_VIVO
+    for alias in (command, "STO" if command == "ST0" else command)
+}
 COLOR_TITULO = COLOR_MOSTAZA
 
 ctk.set_appearance_mode("dark")
@@ -346,16 +362,34 @@ class ActualizadorCAD(ctk.CTk):
         ttk.Separator(
             self.page_nav_column, orient="vertical", bootstyle="secondary",
         ).pack(side="left", fill="y", padx=(0, 12), pady=14)
-        page_nav_content = ctk.CTkFrame(
+        self.page_nav_content = ctk.CTkFrame(
             self.page_nav_column, fg_color=COLOR_FONDO, corner_radius=0)
-        page_nav_content.pack(side="left", fill="both", expand=True, pady=(16, 10))
+        self.page_nav_content.pack(side="left", fill="both", expand=True, pady=(16, 10))
         ctk.CTkLabel(
-            page_nav_content, text="EN ESTA PÁGINA", font=FUENTE_NORMAL,
+            self.page_nav_content, text="EN ESTA PÁGINA", font=FUENTE_NORMAL,
             text_color=COLOR_TEXTO, anchor="w",
         ).pack(fill="x", padx=(2, 0), pady=(0, 7))
         self.page_nav_container = ctk.CTkFrame(
-            page_nav_content, fg_color=COLOR_FONDO, corner_radius=0)
+            self.page_nav_content, fg_color=COLOR_FONDO, corner_radius=0)
         self.page_nav_container.pack(fill="x")
+        self.page_nav_guide = ctk.CTkFrame(
+            self.page_nav_content, fg_color=COLOR_PANEL, corner_radius=0,
+            border_width=1, border_color=COLOR_BORDE,
+        )
+        ctk.CTkLabel(
+            self.page_nav_guide, text="PRIMEROS PASOS", font=FUENTE_NORMAL,
+            text_color=COLOR_ACENTO, anchor="w",
+        ).pack(fill="x", padx=10, pady=(9, 4))
+        ctk.CTkLabel(
+            self.page_nav_guide,
+            text=("1. Carga el JSON y elige el elemento.\n"
+                  "2. Confirma el moldaje o sector CAD.\n"
+                  "3. Revisa dimensiones y armaduras.\n"
+                  "4. Genera una vista y comprueba el DWG.\n"
+                  "5. Valida marcas antes del despiece."),
+            font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO,
+            anchor="nw", justify="left", wraplength=205,
+        ).pack(fill="x", padx=10, pady=(0, 10))
         self.content_host = ctk.CTkFrame(
             self.content_shell, fg_color=COLOR_FONDO, corner_radius=0)
         self.content_host.pack(side="left", fill="both", expand=True)
@@ -439,6 +473,10 @@ class ActualizadorCAD(ctk.CTk):
         for widget in self.page_nav_container.winfo_children():
             widget.destroy()
         self._page_nav_buttons = {}
+        if key == "estructural":
+            self.page_nav_guide.pack(side="bottom", fill="x", pady=(14, 2))
+        else:
+            self.page_nav_guide.pack_forget()
         if entries is None:
             definitions = {
                 "sincronizador": (("Presentación", "inicio"), ("Sincronizador", "acciones"), ("Historial", "historial")),
@@ -989,7 +1027,7 @@ class ActualizadorCAD(ctk.CTk):
 
         def boton_accion(icono, ayuda, comando):
             boton = ShadowButton(
-                botones_sec_frame, text="", image=obtener_icono(icono, 20), width=50, height=44,
+                botones_sec_frame, text="", image=obtener_icono(icono, 18), width=38, height=36,
                 fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
                 text_color=COLOR_TEXTO, corner_radius=RADIO_CONTROL, command=comando,
             )
@@ -1035,9 +1073,9 @@ class ActualizadorCAD(ctk.CTk):
         width = event.width if event is not None else 600
         columns = 5 if width >= 500 else 3 if width >= 310 else 2
         for column in range(5):
-            self._home_action_buttons[0].master.grid_columnconfigure(column, weight=1 if column < columns else 0)
+            self._home_action_buttons[0].master.grid_columnconfigure(column, weight=0)
         for index, button in enumerate(self._home_action_buttons):
-            button.grid(row=index // columns, column=index % columns, padx=5, pady=5, sticky="ew")
+            button.grid(row=index // columns, column=index % columns, padx=3, pady=3)
 
     def verificar_recursos_manual(self):
         self.log("\n[*] Buscando actualizaciones menores de recursos CAD en GitHub...")
@@ -1407,14 +1445,15 @@ class ActualizadorCAD(ctk.CTk):
                      text_color=COLOR_TEXTO).pack(pady=(36, 8))
         ctk.CTkLabel(
             page,
-            text="Envía un comando a cada plano abierto en AutoCAD o ZWCAD. No uses comandos que requieran clics distintos por dibujo.",
+            text=("Envía una orden autónoma a cada plano abierto en AutoCAD o ZWCAD. "
+                  "Puede ser un LISP del glosario o cualquier comando nativo que termine sin pedir datos."),
             font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE, justify="center", wraplength=760,
         ).pack(padx=30, pady=(0, 20))
         controls = ctk.CTkFrame(page, fg_color="transparent")
         controls.pack(fill="x", padx=60, pady=8)
         self.entrada_comando = ctk.CTkEntry(
             controls, font=FUENTE_CAMPO,
-            placeholder_text="Escribe un comando y presiona Enter · Ejemplo: ZE o _QSAVE",
+            placeholder_text="Nombre del comando · Ejemplo: ZE, PLOTYA o _QSAVE",
             corner_radius=0,
         )
         self.entrada_comando.pack(side="left", fill="x", expand=True, padx=(0, 8))
@@ -1432,6 +1471,13 @@ class ActualizadorCAD(ctk.CTk):
         self.btn_cancelar_cmd.pack(side="left")
         self.entrada_comando.bind("<Return>", self._ejecutar_comando_enter)
         self.entrada_comando.bind("<KP_Enter>", self._ejecutar_comando_enter)
+        self.comando_autonomo_var = tk.BooleanVar(value=False)
+        ctk.CTkCheckBox(
+            page, text="Confirmo que el comando no solicita puntos, opciones ni respuestas",
+            variable=self.comando_autonomo_var, font=FUENTE_NORMAL_PEQUENA,
+            fg_color=COLOR_ACENTO, hover_color=COLOR_ACENTO_HOVER,
+            border_color=COLOR_BORDE, corner_radius=0,
+        ).pack(anchor="w", padx=60, pady=(4, 0))
 
         ttk.Separator(page, orient="horizontal", bootstyle="secondary").pack(
             fill="x", padx=36, pady=(26, 14))
@@ -1452,7 +1498,12 @@ class ActualizadorCAD(ctk.CTk):
                 commands = (json.load(source).get("comandos_lisp") or {})
         except (OSError, ValueError, TypeError):
             commands = {}
-        for index, (command, detail) in enumerate(commands.items()):
+        visible_commands = (
+            (label, commands.get(command))
+            for label, command in COMANDOS_VIVO
+        )
+        for index, (command, detail) in enumerate(
+                (item for item in visible_commands if item[1])):
             if index:
                 ttk.Separator(glossary, orient="horizontal", bootstyle="secondary").pack(
                     fill="x", pady=5)
@@ -1750,15 +1801,28 @@ class ActualizadorCAD(ctk.CTk):
         self.btn_cancelar_cmd.configure(state="disabled", text="Deteniendo...")
 
     def enviar_comando_en_vivo(self):
-        c = self.entrada_comando.get()
-        if not c:
+        try:
+            c = normalizar_comando_cad_autonomo(self.entrada_comando.get())
+        except ValueError as error:
+            messagebox.showwarning("Comando CAD no válido", str(error), parent=self)
+            self.entrada_comando.focus_set()
+            return
+        command_key = c.upper().lstrip("_.")
+        if (command_key not in COMANDOS_VIVO_CONOCIDOS
+                and not self.comando_autonomo_var.get()):
+            messagebox.showwarning(
+                "Confirma el comando autónomo",
+                "Para ejecutar un comando fuera del glosario, confirma que termina por sí solo "
+                "y que no solicita puntos, opciones ni respuestas.",
+                parent=self,
+            )
             return
         self.cancelar_comando_vivo = False
         self.btn_enviar_cmd.configure(state="disabled", text="Enviando...")
         self.btn_cancelar_cmd.configure(state="normal", text="Cancelar")
         self.iniciar_actividad("comando_cad", "Ejecutando comando CAD")
         threading.Thread(target=self._hilo_comando_en_vivo,
-                         args=(c.strip() + "\n",), daemon=True).start()
+                         args=(c + "\n",), daemon=True).start()
 
     def enviar_comando_cad_activo(self, comando, descripcion="Comando estructural"):
         """Envía una orden sólo al documento CAD activo.

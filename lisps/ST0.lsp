@@ -32,3 +32,6 @@
   (princ (strcat "\n¡Listo! Se han actualizado " (itoa count) " estilos de texto con altura 0.0."))
   (princ)
 )
+
+;; Alias alfabético para evitar confundir el cero de ST0 con la letra O.
+(defun c:STO () (c:ST0))
