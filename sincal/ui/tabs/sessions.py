@@ -153,7 +153,7 @@ class TabSessions(ctk.CTkFrame):
         )
         wrapper.grid(row=row, column=column, sticky="nsew", padx=6, pady=6)
         card = ShadowButton(
-            wrapper, text=detail, font=FUENTE_NORMAL, anchor="w", justify="left",
+            wrapper, text=detail, font=FUENTE_NORMAL, anchor="w",
             flat=True, fg_color=COLOR_PANEL, hover_color=COLOR_GRIS_BOTON,
             text_color=COLOR_TEXTO, corner_radius=0,
             command=lambda current=item: self._select(current),

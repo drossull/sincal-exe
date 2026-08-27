@@ -10,6 +10,7 @@ ICONS = ROOT / "sincal" / "ui" / "icons.py"
 ACTIVITY = ROOT / "sincal" / "ui" / "activity.py"
 ARMADURAS = ROOT / "sincal" / "ui" / "tabs" / "armaduras.py"
 DOCUMENTACION = ROOT / "sincal" / "ui" / "tabs" / "documentacion.py"
+SESSIONS = ROOT / "sincal" / "ui" / "tabs" / "sessions.py"
 
 
 class WorkbenchLayoutTests(unittest.TestCase):
@@ -101,6 +102,12 @@ class WorkbenchLayoutTests(unittest.TestCase):
         ):
             source = path.read_text(encoding="utf-8")
             self.assertIn("ShadowButton", source)
+
+    def test_session_cards_only_use_supported_ctkbutton_arguments(self):
+        source = SESSIONS.read_text(encoding="utf-8")
+        self.assertIn("card = ShadowButton(", source)
+        self.assertIn('anchor="w"', source)
+        self.assertNotIn('anchor="w", justify=', source)
 
     def test_dpi_and_ttk_typography_are_configured_before_the_root(self):
         main = MAIN.read_text(encoding="utf-8")
