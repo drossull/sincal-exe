@@ -193,9 +193,15 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn("class BridgeMotion", activity)
         self.assertIn('Image.new("RGBA"', activity)
         self.assertIn('anchor="se"', activity)
-        self.assertIn('f"{round(current.progress):d} %"', activity)
+        self.assertIn('f" · {round(current.progress):d} %"', activity)
         self.assertIn("0.8 - (time.monotonic() - self._shown_at)", activity)
         self.assertIn("ImageTk.PhotoImage(frame, master=self)", activity)
+        self.assertIn("deck_top = 0.18", activity)
+        self.assertIn("deck_end = deck_samples[-1]", activity)
+        self.assertIn("upper_edge + lower_edge", activity)
+        self.assertIn('fg_color="transparent"', activity)
+        self.assertIn("font=FUENTE_CARGA", activity)
+        self.assertNotIn("self.percentage", activity)
 
     def test_home_actions_are_compact_and_structural_guide_is_contextual(self):
         core = APP.read_text(encoding="utf-8")

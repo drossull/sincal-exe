@@ -52,6 +52,11 @@ def _draw_icon(name: str, size: int, color: str) -> Image.Image:
         line(((side * .18, side * .64), (side * .82, side * .64)))
         line(((side * .38, side * .30), (side * .38, side * .78)))
         line(((side * .62, side * .30), (side * .62, side * .78)))
+    elif name == "sessions":
+        rect((side * .25, side * .20, side * .75, side * .76), side * .02)
+        line(((side * .34, side * .36), (side * .66, side * .36)))
+        line(((side * .34, side * .50), (side * .62, side * .50)))
+        line(((side * .34, side * .64), (side * .56, side * .64)))
     elif name == "convert":
         line(((side * .20, side * .35), (side * .68, side * .35)))
         line(((side * .60, side * .25), (side * .72, side * .35), (side * .60, side * .45)))

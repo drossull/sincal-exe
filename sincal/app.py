@@ -30,6 +30,7 @@ from customtkinter import filedialog
 from PIL import Image, ImageTk
 
 from sincal.ui.tabs.armaduras import TabArmaduras
+from sincal.ui.tabs.sessions import TabSessions
 from sincal.ui.tabs.diagnostico import TabDiagnostico
 from sincal.ui.tabs.documentacion import TabDocs
 from sincal.ui.tabs.ubicacion import TabUbicacion
@@ -53,6 +54,7 @@ from sincal.runtime import (
     is_newer_version,
     ruta_cad_usuario,
 )
+from sincal.sessions import SessionStore
 from sincal.ui.icons import obtener_icono
 from sincal.ui.activity import ActivityIndicator
 from sincal.ui.scroll import SafeScrollableFrame
@@ -210,6 +212,7 @@ class ActualizadorCAD(ctk.CTk):
         self._page_nav_buttons = {}
         self._page_anchors = {}
         self._main_thread_ident = threading.get_ident()
+        self.session_store = SessionStore()
         self.protocol("WM_DELETE_WINDOW", self.cerrar_aplicacion)
         self.after(50, self._procesar_ui_queue)
         self.bind("<Configure>", self._adaptar_layout_principal, add="+")
@@ -223,6 +226,7 @@ class ActualizadorCAD(ctk.CTk):
         self.setup_tab_renombrado()
         self.setup_tab_conversion_dxf()
         self.setup_tab_armaduras()
+        self.setup_tab_sessions()
         self.vista_docs = TabDocs(
             self.tab_docs, parent_app=self, fg_color="transparent")
         self.vista_docs.pack(fill="both", expand=True)
@@ -286,6 +290,7 @@ class ActualizadorCAD(ctk.CTk):
             ("procesamiento", "rename", "Renombrado", "Renombrado"),
             ("ubicacion", "pin", "Ubicación", "Ubicación"),
             ("estructural", "structure", "Generador de armadura", "Generador de armadura"),
+            ("sesiones", "sessions", "Sesiones", "Sesiones"),
             ("diagnostico", "diagnostic", "Diagnóstico", "Diagnóstico"),
         )
         for key, icon_name, label, title in self.nav_items:
@@ -303,7 +308,10 @@ class ActualizadorCAD(ctk.CTk):
                 corner_radius=RADIO_CONTROL, height=42,
                 command=lambda selected=key: self.seleccionar_seccion(selected),
             )
-            button.pack(side="left", fill="x", expand=True, padx=(5, 2))
+            button.pack(
+                side="left", fill="x", expand=True,
+                padx=(18 if key == "sesiones" else 5, 2),
+            )
             self._nav_buttons[key] = button
             self._nav_indicators[key] = indicator
 
@@ -428,6 +436,7 @@ class ActualizadorCAD(ctk.CTk):
             ("procesamiento", "Renombrado"),
             ("ubicacion", "Ubicación"),
             ("estructural", "Generador de armadura"),
+            ("sesiones", "Sesiones"),
             ("diagnostico", "Diagnóstico"),
         )
         for key, title in definitions:
@@ -439,6 +448,7 @@ class ActualizadorCAD(ctk.CTk):
         self.tab_renombrado = self._sections["procesamiento"][0]
         self.tab_ubicacion = self._sections["ubicacion"][0]
         self.tab_armaduras = self._sections["estructural"][0]
+        self.tab_sessions = self._sections["sesiones"][0]
         self.tab_conversion = self._sections["conversion"][0]
         tab_diagnostico = self._sections["diagnostico"][0]
         self.tab_ubicacion_widget = TabUbicacion(self.tab_ubicacion, parent_app=self)
@@ -465,6 +475,9 @@ class ActualizadorCAD(ctk.CTk):
         self.configurar_navegacion_pagina(key)
         if key == "estructural" and hasattr(self, "vista_armaduras"):
             self.after_idle(self.vista_armaduras.actualizar_breadcrumb)
+        elif key == "sesiones" and hasattr(self, "vista_sessions"):
+            self.vista_sessions.refresh()
+            self.actualizar_ruta_interna("Generador de armadura", "Sesiones")
 
     def configurar_navegacion_pagina(self, key, entries=None):
         """Construye el índice contextual situado en la esquina superior derecha."""
@@ -484,6 +497,7 @@ class ActualizadorCAD(ctk.CTk):
                 "procesamiento": (("Archivos", "archivos"), ("Buscar y reemplazar", "reemplazo")),
                 "ubicacion": (("Datos del proyecto", "datos"), ("Ubicación y mapa", "mapa"), ("Generar croquis", "generar")),
                 "estructural": (("Dimensiones", "dimensiones"), ("Revisión y marcas", "revision"), ("Despiece", "despiece")),
+                "sesiones": (("Buscar", "buscar"), ("Biblioteca", "biblioteca")),
                 "conversion": (("Carpeta DXF", "carpeta"), ("Archivos", "archivos"), ("Conversión", "conversion")),
                 "diagnostico": (("Estado", "estado"), ("Informe", "informe")),
             }
@@ -523,6 +537,8 @@ class ActualizadorCAD(ctk.CTk):
         self.marcar_navegacion_pagina(anchor)
         if section == "estructural" and hasattr(self, "vista_armaduras"):
             self.vista_armaduras.ir_a_seccion(anchor)
+        elif section == "sesiones" and hasattr(self, "vista_sessions"):
+            self.vista_sessions.ir_a_seccion(anchor)
         elif section == "ubicacion" and hasattr(self, "tab_ubicacion_widget"):
             self.tab_ubicacion_widget.ir_a_seccion(anchor)
         elif section == "documentacion" and hasattr(self, "vista_docs"):
@@ -865,6 +881,8 @@ class ActualizadorCAD(ctk.CTk):
             return
         self._cerrando = True
         self.cancelar_comando_vivo = True
+        if hasattr(self, "vista_armaduras"):
+            self.vista_armaduras.guardar_recuperacion_al_cerrar()
         if self._resource_poll_job is not None:
             try:
                 self.after_cancel(self._resource_poll_job)
@@ -882,6 +900,14 @@ class ActualizadorCAD(ctk.CTk):
         self.vista_armaduras = TabArmaduras(
             master=self.tab_armaduras, parent_app=self, fg_color="transparent")
         self.vista_armaduras.pack(fill="both", expand=True)
+
+    def setup_tab_sessions(self):
+        self.vista_sessions = TabSessions(
+            master=self.tab_sessions, parent_app=self,
+            store=self.session_store, armaduras_tab=self.vista_armaduras,
+            fg_color="transparent",
+        )
+        self.vista_sessions.pack(fill="both", expand=True)
 
     # ==========================================================
     # PARTE COMÚN Y SOPORTE DE ACTUALIZACIONES

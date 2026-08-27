@@ -4,8 +4,11 @@ import os
 import threading
 import time
 import tkinter as tk
+import uuid
+from dataclasses import asdict
 from dataclasses import replace
-from tkinter import filedialog, messagebox
+from pathlib import Path
+from tkinter import filedialog, messagebox, simpledialog
 
 import customtkinter as ctk
 import ttkbootstrap as ttk
@@ -28,6 +31,7 @@ from sincal.cad.zapata_views import ZapataCadError, build_zapata_lisp
 from sincal.cad.zapata_detail import build_zapata_detail_lisp
 from sincal.rebar.detail import build_detail_groups, polyline_render_points
 from sincal.runtime import ruta_recurso, ruta_runtime
+from sincal.sessions import sha256_file
 from sincal.ui.theme import (
     COLOR_ACENTO,
     COLOR_ACENTO_HOVER,
@@ -63,7 +67,18 @@ class TabArmaduras(ctk.CTkFrame):
         super().__init__(master, **kwargs)
         self.parent_app = parent_app
         self._abutments = {}
+        self._session_metadata = {}
+        self._session_path = None
+        self._session_dirty = False
+        self._restoring_session = False
+        self._json_path = ""
+        self._json_snapshot = None
+        self._json_sha256 = ""
         self.setup_ui()
+        self._blank_workspace = self._capture_workspace()
+        self._bind_session_change_tracking()
+        self._autosave_job = self.after(60_000, self._autosave_tick)
+        self.after(1_200, self._comprobar_recuperacion_pendiente)
 
     def setup_ui(self):
         # --- Frame Superior: JSON ---
@@ -78,8 +93,34 @@ class TabArmaduras(ctk.CTkFrame):
                      font=fuente_subtitulo, text_color=COLOR_MOSTAZA).grid(
                          row=0, column=0, sticky="w", padx=8, pady=(2, 10))
 
+        session_row = ctk.CTkFrame(frame_top, fg_color="transparent", corner_radius=0)
+        session_row.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        self.btn_abrir_sesion = ShadowButton(
+            session_row, text="Abrir sesión", font=fuente_normal,
+            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
+            corner_radius=0, command=self.abrir_biblioteca_sesiones,
+        )
+        self.btn_abrir_sesion.pack(side="left")
+        self.btn_guardar_sesion = ShadowButton(
+            session_row, text="Guardar sesión", font=fuente_normal,
+            fg_color=COLOR_GRIS_BOTON, hover_color=COLOR_GRIS_BOTON_HOVER,
+            corner_radius=0, state="disabled", command=self.guardar_sesion,
+        )
+        self.btn_guardar_sesion.pack(side="left", padx=(8, 0))
+        self.btn_nueva_sesion = ShadowButton(
+            session_row, text="Nueva sesión", font=fuente_normal,
+            fg_color="transparent", hover_color=COLOR_GRIS_BOTON,
+            corner_radius=0, state="disabled", command=self.nueva_sesion,
+        )
+        self.btn_nueva_sesion.pack(side="left", padx=(8, 0))
+        self.lbl_session_status = ctk.CTkLabel(
+            session_row, text="Sin sesión activa", font=FUENTE_NORMAL_PEQUENA,
+            text_color=COLOR_TEXTO_SUAVE, anchor="w",
+        )
+        self.lbl_session_status.pack(side="left", padx=(14, 0))
+
         project_row = ctk.CTkFrame(frame_top, fg_color="transparent", corner_radius=0)
-        project_row.grid(row=1, column=0, sticky="ew")
+        project_row.grid(row=2, column=0, sticky="ew")
         project_row.grid_columnconfigure(2, weight=1)
 
         self.btn_cargar_json = ShadowButton(
@@ -317,6 +358,8 @@ class TabArmaduras(ctk.CTkFrame):
             "moldaje_choices": {},
             "confirmed_moldajes": {},
             "moldajes_use_metres": False,
+            "generated_views": set(),
+            "detail_generated": False,
         }
         self._abutments[key] = state
 
@@ -784,6 +827,7 @@ class TabArmaduras(ctk.CTkFrame):
             text=f"{len(confirmed)} moldaje(s) confirmado(s). El DWG no se ha modificado.", text_color=COLOR_ACENTO)
         self.parent_app.log_r(
             f"[*] Moldajes de zapata confirmados para {state['title'].lower()}: {', '.join(confirmed)}")
+        self.marcar_sesion_modificada()
 
     def _read_zapata_rules(self, abutment_key):
         state = self._abutments[abutment_key]
@@ -1141,6 +1185,8 @@ class TabArmaduras(ctk.CTkFrame):
             f"[*] Vista {vista} enviada a CAD para {state['title'].lower()}; "
             "sólo se reemplazan entidades SINCAL de esa vista."
         )
+        state["generated_views"].add(vista)
+        self.marcar_sesion_modificada()
 
     def generar_despiece_zapata(self, abutment_key="entrada"):
         state = self._abutments[abutment_key]
@@ -1179,6 +1225,8 @@ class TabArmaduras(ctk.CTkFrame):
             f"[*] Despiece general enviado a CAD para {state['title'].lower()}; "
             "AutoCAD/ZWCAD solicitará el punto o confirmará los grupos modificados."
         )
+        state["detail_generated"] = True
+        self.marcar_sesion_modificada()
 
     def mostrar_ayuda_travesano(self):
         visor = ctk.CTkToplevel(self)
@@ -2526,6 +2574,39 @@ class TabArmaduras(ctk.CTkFrame):
         threading.Thread(target=self.parent_app._hilo_comando_en_vivo, args=(
             f'(load "{ruta_lisp}") (c:SINCAL-DESPIECE-TRAV)\n',), daemon=True).start()
 
+    def _aplicar_json_bim(self, datos, ruta="", notificar=True):
+        """Mapea una instantánea BIM sin modificar nunca su archivo de origen."""
+        e_data = datos.get("estribos", {})
+        for abutment_key, state in self._abutments.items():
+            mapped = (
+                (state["entries"]["largo"], f"dado_muro_frontal_largo_{abutment_key}"),
+                (state["entries"]["ancho"], f"dado_muro_frontal_ancho_{abutment_key}"),
+                (state["entries"]["alto"], f"dado_muro_frontal_espesor_{abutment_key}"),
+            )
+            for entry, json_key in mapped:
+                if json_key in e_data:
+                    self._set_entry(entry, e_data[json_key] / 10.0)
+
+        travesanos = datos.get("elementos_comunes", {}).get("travesanos", {})
+        if travesanos.get("espesor_travesano") is not None:
+            self._set_entry(self.ent_t_espesor, travesanos["espesor_travesano"] / 10.0)
+        esviaje = datos.get("parametros_generales", {}).get("angulo_esviaje_puente")
+        if esviaje is not None:
+            self._set_entry(self.ent_z_esviaje, esviaje)
+            self._set_entry(self.ent_t_esviaje, esviaje)
+        for abutment_key in self._abutments:
+            self.actualizar_revision_zapata(abutment_key, notificar=False)
+
+        self._json_path = str(ruta or "")
+        self._json_snapshot = datos
+        self._json_sha256 = sha256_file(ruta)
+        nombre = os.path.basename(ruta) if ruta else "Instantánea de sesión"
+        self.lbl_json_status.configure(text=f"Archivo: {nombre}", text_color=COLOR_ACENTO)
+        if notificar:
+            self.parent_app.log_r(f"[*] JSON cargado: {nombre}")
+            messagebox.showinfo(
+                "SINCAL Suite", "Datos mapeados exitosamente en centímetros y grados.")
+
     def cargar_json_bim(self):
         ruta = filedialog.askopenfilename(
             title="Seleccionar Archivo JSON del Proyecto", filetypes=[("JSON Files", "*.json")])
@@ -2534,46 +2615,385 @@ class TabArmaduras(ctk.CTkFrame):
         try:
             with open(ruta, 'r', encoding='utf-8') as f:
                 datos = json.load(f)
-
-            e_data = datos.get("estribos", {})
-            for abutment_key, state in self._abutments.items():
-                mapped = (
-                    (state["entries"]["largo"], f"dado_muro_frontal_largo_{abutment_key}"),
-                    (state["entries"]["ancho"], f"dado_muro_frontal_ancho_{abutment_key}"),
-                    (state["entries"]["alto"], f"dado_muro_frontal_espesor_{abutment_key}"),
-                )
-                for entry, json_key in mapped:
-                    if json_key in e_data:
-                        entry.delete(0, 'end')
-                        entry.insert(0, str(e_data[json_key] / 10.0))
-
-            if "elementos_comunes" in datos and "travesanos" in datos["elementos_comunes"]:
-                espesor_mm = datos["elementos_comunes"]["travesanos"].get(
-                    "espesor_travesano")
-                if espesor_mm is not None:
-                    self.ent_t_espesor.delete(0, 'end')
-                    self.ent_t_espesor.insert(0, str(espesor_mm / 10.0))
-
-            if "parametros_generales" in datos:
-                esviaje = datos["parametros_generales"].get(
-                    "angulo_esviaje_puente")
-                if esviaje is not None:
-                    self.ent_z_esviaje.delete(0, 'end')
-                    self.ent_z_esviaje.insert(0, str(esviaje))
-                    self.ent_t_esviaje.delete(0, 'end')
-                    self.ent_t_esviaje.insert(0, str(esviaje))
-
-            for abutment_key in self._abutments:
-                self.actualizar_revision_zapata(abutment_key, notificar=False)
-
-            nombre_archivo = os.path.basename(ruta)
-            self.lbl_json_status.configure(
-                text=f"Archivo: {nombre_archivo}", text_color=COLOR_ACENTO)
-            self.parent_app.log_r(f"[*] JSON cargado: {nombre_archivo}")
-            messagebox.showinfo(
-                "Workbench", "Datos mapeados exitosamente en centímetros y grados.")
+            self._aplicar_json_bim(datos, ruta)
+            self.marcar_sesion_modificada()
         except Exception as e:
             messagebox.showerror("Error JSON", f"Fallo al leer archivo:\n{e}")
 
     def limpiar_json_bim(self):
         self.lbl_json_status.configure(text="Archivo: Ninguno", text_color=COLOR_TEXTO_SUAVE)
+        self._json_path = ""
+        self._json_snapshot = None
+        self._json_sha256 = ""
+        self.marcar_sesion_modificada()
+
+    # =========================================================
+    # SESIONES DE TRABAJO
+    # =========================================================
+    @staticmethod
+    def _set_entry(entry, value):
+        state = None
+        try:
+            state = str(entry.cget("state"))
+            if state == "readonly":
+                entry.configure(state="normal")
+        except (tk.TclError, AttributeError):
+            pass
+        entry.delete(0, "end")
+        entry.insert(0, str(value))
+        if state == "readonly":
+            entry.configure(state="readonly")
+
+    @staticmethod
+    def _json_value_by_keys(data, keys):
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if str(key).lower() in keys and value not in (None, ""):
+                    return str(value)
+            for value in data.values():
+                found = TabArmaduras._json_value_by_keys(value, keys)
+                if found:
+                    return found
+        elif isinstance(data, list):
+            for value in data:
+                found = TabArmaduras._json_value_by_keys(value, keys)
+                if found:
+                    return found
+        return ""
+
+    def _capture_workspace(self):
+        abutments = {}
+        for key, state in self._abutments.items():
+            rules = {}
+            for rule_key, widgets in state["rule_widgets"].items():
+                rules[rule_key] = {
+                    "mark": widgets["mark"].get(),
+                    "diameter": widgets["diameter"].get(),
+                    "spacing": widgets["spacing"].get(),
+                    "hook": widgets["hook"].get(),
+                    "origin": widgets["origin"].get(),
+                    "enabled": bool(widgets["enabled"].get()),
+                }
+            references = {
+                layer: asdict(candidate)
+                for layer, candidate in state["confirmed_moldajes"].items()
+            }
+            abutments[key] = {
+                "entries": {name: widget.get() for name, widget in state["entries"].items()},
+                "rules": rules,
+                "moldaje_references": references,
+                "generated_views": sorted(state.get("generated_views", set())),
+                "detail_generated": bool(state.get("detail_generated")),
+            }
+        travesano_names = (
+            "ent_t_rec", "ent_t_espesor", "ent_t_esviaje", "ent_t_phi_ext",
+            "ent_t_phi_horiz", "ent_t_phi_estr", "ent_viga_largo", "ent_t_cantidad",
+        )
+        return {
+            "skew": self.ent_z_esviaje.get(),
+            "abutments": abutments,
+            "crossbeam": {
+                name: getattr(self, name).get() for name in travesano_names
+                if hasattr(self, name)
+            },
+            "active_tabs": {
+                "main": self.tab_maestro.index("current"),
+                "abutment": self.tab_estribo.index("current"),
+                "crossbeam": self.tab_sub_travesanos.index("current"),
+            },
+        }
+
+    def _restore_workspace(self, workspace):
+        self._restoring_session = True
+        try:
+            self._set_entry(self.ent_z_esviaje, workspace.get("skew", "0"))
+            for key, saved in workspace.get("abutments", {}).items():
+                state = self._abutments.get(key)
+                if not state:
+                    continue
+                for name, value in saved.get("entries", {}).items():
+                    if name in state["entries"]:
+                        self._set_entry(state["entries"][name], value)
+                for rule_key, values in saved.get("rules", {}).items():
+                    widgets = state["rule_widgets"].get(rule_key)
+                    if not widgets:
+                        continue
+                    for field in ("mark", "diameter", "spacing", "hook"):
+                        if field in values:
+                            self._set_entry(widgets[field], values[field])
+                    widgets["origin"].set(values.get("origin", "Inicio"))
+                    widgets["enabled"].set(bool(values.get("enabled", True)))
+                # Los handles CAD son sólo una huella informativa. Nunca se
+                # restauran como selección válida en otro dibujo o sesión.
+                state["confirmed_moldajes"] = {}
+                for value, option in state["moldaje_option_vars"].values():
+                    value.set("Sin detectar")
+                    option.configure(values=["Sin detectar"])
+                refs = saved.get("moldaje_references", {})
+                if refs:
+                    state["moldaje_status"].configure(
+                        text=f"{len(refs)} referencia(s) guardada(s); vuelve a detectar y confirmar en el DWG activo.",
+                        text_color=COLOR_MOSTAZA,
+                    )
+                else:
+                    state["moldaje_status"].configure(
+                        text="Sin lectura CAD.", text_color=COLOR_TEXTO_SUAVE)
+                state["generated_views"] = set(saved.get("generated_views", ()))
+                state["detail_generated"] = bool(saved.get("detail_generated"))
+                self.actualizar_revision_zapata(key, notificar=False)
+            for name, value in workspace.get("crossbeam", {}).items():
+                if hasattr(self, name):
+                    self._set_entry(getattr(self, name), value)
+            tabs = workspace.get("active_tabs", {})
+            for notebook, name in (
+                (self.tab_maestro, "main"), (self.tab_estribo, "abutment"),
+                (self.tab_sub_travesanos, "crossbeam"),
+            ):
+                try:
+                    notebook.select(int(tabs.get(name, 0)))
+                except (tk.TclError, ValueError):
+                    pass
+        finally:
+            self._restoring_session = False
+
+    def _project_metadata(self):
+        data = self._json_snapshot or {}
+        json_name = os.path.basename(self._json_path) if self._json_path else ""
+        bridge_name = self._json_value_by_keys(
+            data, {"nombre_puente", "nombre_estructura", "puente"})
+        if not bridge_name and json_name:
+            bridge_name = Path(json_name).stem
+        plan_name = self._json_value_by_keys(data, {"nombre_plano"})
+        project_code = self._json_value_by_keys(
+            data, {"codigo_proyecto", "codigo", "project_code"})
+        e_data = data.get("estribos", {}) if isinstance(data, dict) else {}
+        return {
+            "bridge_name": bridge_name,
+            "project_code": project_code,
+            "plan_name": plan_name,
+            "json_name": json_name,
+            "json_path": self._json_path,
+            "skew_degrees": self.ent_z_esviaje.get(),
+            "abutment_entry_type": e_data.get("tipo_estribo_entrada", ""),
+            "abutment_exit_type": e_data.get("tipo_estribo_salida", ""),
+        }
+
+    def _session_document(self):
+        mark_count = 0
+        total_kg = 0.0
+        for key, state in self._abutments.items():
+            schedule = self.actualizar_revision_zapata(key, notificar=False)
+            if schedule:
+                mark_count += len(schedule.marks)
+                total_kg += schedule.total_kg
+        metadata = dict(self._session_metadata)
+        metadata.setdefault("id", str(uuid.uuid4()))
+        metadata.setdefault("name", "Sesión sin guardar")
+        return {
+            "metadata": metadata,
+            "formal_path": self._session_path,
+            "project": self._project_metadata(),
+            "source_json": {
+                "path": self._json_path,
+                "sha256": self._json_sha256,
+                "snapshot": self._json_snapshot,
+            },
+            "workspace": self._capture_workspace(),
+            "overview": {
+                "mark_count": mark_count,
+                "total_kg": round(total_kg, 3),
+                "milestone": "despiece" if any(
+                    state.get("detail_generated") for state in self._abutments.values())
+                    else "vistas" if any(
+                        state.get("generated_views") for state in self._abutments.values())
+                    else "configuración",
+            },
+        }
+
+    def _bind_session_change_tracking(self):
+        widgets = [self.ent_z_esviaje]
+        for state in self._abutments.values():
+            widgets.extend(state["entries"].values())
+            for rule in state["rule_widgets"].values():
+                widgets.extend(rule[field] for field in ("mark", "diameter", "spacing", "hook"))
+                rule["origin"].trace_add("write", lambda *_: self.marcar_sesion_modificada())
+                rule["enabled"].trace_add("write", lambda *_: self.marcar_sesion_modificada())
+        widgets.extend(
+            getattr(self, name) for name in (
+                "ent_t_rec", "ent_t_espesor", "ent_t_esviaje", "ent_t_phi_ext",
+                "ent_t_phi_horiz", "ent_t_phi_estr", "ent_viga_largo", "ent_t_cantidad",
+            ) if hasattr(self, name)
+        )
+        for widget in widgets:
+            widget.bind("<KeyRelease>", lambda _event: self.marcar_sesion_modificada(), add="+")
+            widget.bind("<<ComboboxSelected>>", lambda _event: self.marcar_sesion_modificada(), add="+")
+
+    def marcar_sesion_modificada(self):
+        if self._restoring_session:
+            return
+        self._session_metadata.setdefault("id", str(uuid.uuid4()))
+        self._session_dirty = True
+        self.btn_guardar_sesion.configure(state="normal")
+        self.btn_nueva_sesion.configure(state="normal")
+        name = self._session_metadata.get("name", "Sesión sin guardar")
+        self.lbl_session_status.configure(
+            text=f"{name} · Cambios sin guardar", text_color=COLOR_MOSTAZA)
+
+    def abrir_biblioteca_sesiones(self):
+        self.parent_app.seleccionar_seccion("sesiones")
+
+    def guardar_sesion(self):
+        if not self._session_metadata.get("name"):
+            suggestion = self._project_metadata().get("bridge_name") or "Nueva sesión"
+            name = simpledialog.askstring(
+                "Guardar sesión", "Nombre de la sesión:", initialvalue=suggestion,
+                parent=self.winfo_toplevel())
+            if not name or not name.strip():
+                return False
+            tags = simpledialog.askstring(
+                "Etiquetas de sesión",
+                "Etiquetas opcionales, separadas por comas:",
+                parent=self.winfo_toplevel(),
+            )
+            self._session_metadata = {
+                "id": str(uuid.uuid4()), "name": name.strip(),
+                "tags": [tag.strip() for tag in (tags or "").split(",") if tag.strip()],
+            }
+        try:
+            document, path = self.parent_app.session_store.save(
+                self._session_document(), self._session_path)
+        except (OSError, ValueError) as error:
+            messagebox.showerror("Guardar sesión", f"No se pudo guardar la sesión:\n{error}")
+            return False
+        self._session_metadata = document["metadata"]
+        self._session_path = str(path)
+        self._session_dirty = False
+        self.parent_app.session_store.clear_autosave(self._session_metadata.get("id"))
+        self.lbl_session_status.configure(
+            text=f"Sesión: {self._session_metadata['name']}", text_color=COLOR_ACENTO)
+        self.btn_guardar_sesion.configure(state="disabled")
+        self.btn_nueva_sesion.configure(state="normal")
+        self.parent_app.log_r(f"[OK] Sesión guardada: {path}")
+        messagebox.showinfo("Guardar sesión", f"Sesión guardada correctamente en:\n{path}")
+        if hasattr(self.parent_app, "vista_sessions"):
+            self.parent_app.vista_sessions.refresh()
+        return True
+
+    def _confirmar_descartar_cambios(self):
+        if not self._session_dirty:
+            return True
+        answer = messagebox.askyesnocancel(
+            "Cambios sin guardar",
+            "La sesión actual tiene cambios sin guardar.\n\n"
+            "Sí: guardar y continuar.\nNo: descartar los cambios.\nCancelar: volver.",
+        )
+        if answer is None:
+            return False
+        return self.guardar_sesion() if answer else True
+
+    def nueva_sesion(self):
+        if not self._confirmar_descartar_cambios():
+            return False
+        old_id = self._session_metadata.get("id")
+        self._restore_workspace(self._blank_workspace)
+        self._session_metadata = {}
+        self._session_path = None
+        self._session_dirty = False
+        self._json_path = ""
+        self._json_snapshot = None
+        self._json_sha256 = ""
+        self.lbl_json_status.configure(text="Archivo: Ninguno", text_color=COLOR_TEXTO_SUAVE)
+        self.lbl_session_status.configure(text="Sin sesión activa", text_color=COLOR_TEXTO_SUAVE)
+        self.btn_guardar_sesion.configure(state="disabled")
+        self.btn_nueva_sesion.configure(state="disabled")
+        self.parent_app.session_store.clear_autosave(old_id)
+        return True
+
+    def abrir_sesion_desde_ruta(self, path):
+        if not self._confirmar_descartar_cambios():
+            return False
+        try:
+            document = self.parent_app.session_store.load(path)
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            messagebox.showerror("Abrir sesión", f"No se pudo abrir la sesión:\n{error}")
+            return False
+        source = document.get("source_json") or {}
+        source_path = source.get("path", "")
+        current_data = None
+        if source_path and os.path.isfile(source_path):
+            current_hash = sha256_file(source_path)
+            if source.get("sha256") and current_hash != source.get("sha256"):
+                answer = messagebox.askyesnocancel(
+                    "JSON modificado",
+                    "El JSON original cambió desde que se guardó esta sesión.\n\n"
+                    "Sí: recargar el JSON actual y recalcular.\n"
+                    "No: usar la instantánea guardada.\nCancelar: no abrir la sesión.",
+                )
+                if answer is None:
+                    return False
+                if answer:
+                    try:
+                        with open(source_path, "r", encoding="utf-8") as source_file:
+                            current_data = json.load(source_file)
+                    except (OSError, json.JSONDecodeError) as error:
+                        messagebox.showerror("Abrir sesión", f"No se pudo leer el JSON actual:\n{error}")
+                        return False
+        self._restore_workspace(document.get("workspace") or {})
+        snapshot = source.get("snapshot")
+        if current_data is not None:
+            self._aplicar_json_bim(current_data, source_path, notificar=False)
+        else:
+            self._json_path = source_path
+            self._json_snapshot = snapshot
+            self._json_sha256 = source.get("sha256", "")
+            json_name = os.path.basename(source_path) if source_path else "Instantánea de sesión"
+            self.lbl_json_status.configure(text=f"Archivo: {json_name}", text_color=COLOR_ACENTO)
+        self._session_metadata = dict(document.get("metadata") or {})
+        is_recovery = Path(path).name.startswith("recovery-")
+        formal_path = document.get("formal_path") if is_recovery else str(path)
+        self._session_path = formal_path or None
+        self._session_dirty = bool(current_data is not None or is_recovery)
+        name = self._session_metadata.get("name", "Sesión")
+        self.lbl_session_status.configure(
+            text=f"Sesión: {name}" + (
+                " · Recuperada, guarda para confirmar" if is_recovery
+                else " · JSON recalculado" if current_data is not None else ""),
+            text_color=COLOR_MOSTAZA if self._session_dirty else COLOR_ACENTO,
+        )
+        self.btn_guardar_sesion.configure(state="normal" if self._session_dirty else "disabled")
+        self.btn_nueva_sesion.configure(state="normal")
+        self.parent_app.log_r(f"[OK] Sesión cargada: {name}. Revalida los moldajes en el DWG activo.")
+        return True
+
+    def _comprobar_recuperacion_pendiente(self):
+        if self._session_dirty or self._session_path:
+            return
+        pending = self.parent_app.session_store.pending_recoveries()
+        if not pending:
+            return
+        newest = pending[0]
+        metadata = newest["document"].get("metadata") or {}
+        name = metadata.get("name", "sesión sin guardar")
+        if messagebox.askyesno(
+            "Recuperar sesión",
+            f"SINCAL Suite encontró cambios recuperables de «{name}».\n\n"
+            "¿Quieres restaurarlos ahora? Los moldajes CAD deberán revalidarse.",
+        ):
+            if self.abrir_sesion_desde_ruta(newest["path"]):
+                self.parent_app.seleccionar_seccion("estructural")
+
+    def _autosave_tick(self):
+        if self._session_dirty:
+            try:
+                self.parent_app.session_store.autosave(self._session_document())
+            except OSError as error:
+                self.parent_app.log_r(f"[!] No se pudo guardar la recuperación automática: {error}")
+        self._autosave_job = self.after(60_000, self._autosave_tick)
+
+    def guardar_recuperacion_al_cerrar(self):
+        if not self._session_dirty:
+            return
+        try:
+            self.parent_app.session_store.autosave(self._session_document())
+        except OSError:
+            pass

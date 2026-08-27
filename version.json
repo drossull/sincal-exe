@@ -1,11 +1,12 @@
 {
-  "version": "v29.0.14",
+  "version": "v29.0.15",
   "product_version": "2.0",
   "archivos": [
     "main.py",
     "sincal/app.py",
     "sincal/runtime.py",
     "sincal/resources.py",
+    "sincal/sessions.py",
     "sincal/diagnostics.py",
     "sincal/update_config.py",
     "sincal/cad/engine.py",
@@ -24,6 +25,7 @@
     "sincal/ui/widgets.py",
     "sincal/ui/tabs/ubicacion.py",
     "sincal/ui/tabs/armaduras.py",
+    "sincal/ui/tabs/sessions.py",
     "sincal/ui/tabs/documentacion.py",
     "sincal/ui/tabs/diagnostico.py",
     "lisps/BV.lsp",

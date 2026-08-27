@@ -18,11 +18,7 @@ from PIL import Image, ImageDraw, ImageTk
 from sincal.ui.theme import (
     COLOR_ACENTO,
     COLOR_FONDO,
-    COLOR_TEXTO,
-    COLOR_TEXTO_SUAVE,
-    FUENTE_NORMAL,
-    FUENTE_NORMAL_PEQUENA,
-    RADIO_CONTROL,
+    FUENTE_CARGA,
 )
 
 
@@ -73,13 +69,24 @@ class BridgeMotion:
                     )
                 x += period
 
+            # Reproduce el logo: borde superior horizontal con aire transparente
+            # encima e intradós curvo que converge hacia el extremo derecho.
             samples = 80
-            cap = [(0, 2 * scale), (width, 2 * scale)]
-            cap.extend(
+            deck_top = 0.18
+            deck_samples = [
+                x for x in range(samples + 1)
+                if self._guide(x / samples) >= deck_top
+            ]
+            deck_end = deck_samples[-1]
+            upper_edge = [
+                (0, round(deck_top * height)),
+                (round(deck_end / samples * width), round(deck_top * height)),
+            ]
+            lower_edge = [
                 (round(x / samples * width), round(self._guide(x / samples) * height))
-                for x in range(samples, -1, -1)
-            )
-            draw.polygon(cap, fill=color)
+                for x in range(deck_end, -1, -1)
+            ]
+            draw.polygon(upper_edge + lower_edge, fill=color)
             frames.append(
                 image.resize((self.width, self.height), Image.Resampling.LANCZOS)
             )
@@ -92,12 +99,11 @@ class ActivityIndicator(ctk.CTkFrame):
     def __init__(self, master, **kwargs) -> None:
         super().__init__(
             master,
-            width=196,
-            height=76,
-            fg_color=COLOR_FONDO,
-            border_width=1,
-            border_color=COLOR_TEXTO_SUAVE,
-            corner_radius=RADIO_CONTROL,
+            width=170,
+            height=92,
+            fg_color="transparent",
+            border_width=0,
+            corner_radius=0,
             **kwargs,
         )
         self.pack_propagate(False)
@@ -113,7 +119,6 @@ class ActivityIndicator(ctk.CTkFrame):
         self._images_by_mode: dict[str, list[ImageTk.PhotoImage]] = {}
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)
         self.animation = tk.Label(
             self,
             text="",
@@ -121,23 +126,15 @@ class ActivityIndicator(ctk.CTkFrame):
             highlightthickness=0,
             background=self._background_hex(),
         )
-        self.animation.grid(row=0, column=0, rowspan=2, padx=(9, 4), pady=7)
+        self.animation.grid(row=0, column=0, padx=0, pady=(0, 4))
         self.status = ctk.CTkLabel(
             self,
             text="Procesando…",
-            font=FUENTE_NORMAL_PEQUENA,
-            text_color=COLOR_TEXTO,
-            anchor="w",
-        )
-        self.status.grid(row=0, column=1, sticky="sw", padx=(0, 10), pady=(10, 0))
-        self.percentage = ctk.CTkLabel(
-            self,
-            text="",
-            font=FUENTE_NORMAL,
+            font=FUENTE_CARGA,
             text_color=COLOR_ACENTO,
-            anchor="w",
+            anchor="center",
         )
-        self.percentage.grid(row=1, column=1, sticky="nw", padx=(0, 10), pady=(0, 9))
+        self.status.grid(row=1, column=0, sticky="ew", padx=2, pady=(0, 2))
 
     @staticmethod
     def _mode() -> str:
@@ -232,10 +229,8 @@ class ActivityIndicator(ctk.CTkFrame):
         current = self._current()
         if current is None:
             return
-        self.status.configure(text=current.label)
-        self.percentage.configure(
-            text="" if current.progress is None else f"{round(current.progress):d} %"
-        )
+        progress = "" if current.progress is None else f" · {round(current.progress):d} %"
+        self.status.configure(text=f"{current.label}{progress}")
         self.animation.configure(background=self._background_hex())
         self.place(relx=1.0, rely=1.0, x=-22, y=-18, anchor="se")
         self.lift()
