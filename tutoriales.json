@@ -263,6 +263,13 @@
       "notas": ["Startup ya intenta crear estas escalas al abrir cada dibujo."],
       "tags": ["scale", "viewport", "metros"]
     },
+    "SEL-SC": {
+      "titulo": "Conservar una sola escala anotativa",
+      "descripcion": "Detecta las escalas anotativas presentes en los objetos seleccionados y conserva la que elijas.",
+      "pasos": ["Selecciona objetos anotativos o escríbelos cuando el comando lo solicite.", "Escribe SEL-SC.", "Elige por número la escala que deseas conservar."],
+      "notas": ["La escala elegida se asigna a todos los objetos anotativos válidos antes de quitar las demás.", "Los objetos no anotativos se omiten y la operación queda en un solo Deshacer."],
+      "tags": ["annotative", "scale", "annotation", "limpiar"]
+    },
     "ST0": {
       "titulo": "Altura fija cero en estilos",
       "descripcion": "Establece la altura de todos los estilos de texto en 0.0 para permitir alturas por objeto.",

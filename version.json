@@ -34,6 +34,7 @@
     "lisps/VRAP.lsp",
     "lisps/SINCAL.lsp",
     "lisps/SINCAL_ESCALAS.lsp",
+    "lisps/SEL-SC.lsp",
     "lisps/DL2.lsp",
     "lisps/DUP.lsp",
     "lisps/DIMEL.lsp",
