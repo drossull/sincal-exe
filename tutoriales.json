@@ -2,6 +2,13 @@
   "schema": 2,
   "temas": [
     {
+      "id": "prospecciones",
+      "categoria": "Proyecto",
+      "titulo": "Prospecciones: perfiles Vs del informe de suelos",
+      "tags": "prospecciones geotecnia mecanica suelos pdf masw vs vs30 arreglos sesion",
+      "contenido": "Abre Proyecto → Prospecciones y pulsa Cargar informe. Se admiten PDF con texto y TXT UTF-8 con columnas de número de estrato, Inicio/Desde, Final/Hasta y Vs. Selecciona un arreglo para consultar su tabla oficial, página de origen y vista previa. Esta versión no aplica OCR: los escaneos y las disposiciones no reconocidas requieren otro importador.\n\nLos datos son de solo lectura. Vs,30 conserva el valor publicado en la tabla individual, aunque el control numérico o un resumen reconocido discrepen. Los avisos indican los valores y páginas correspondientes; Copiar avisos permite preparar una consulta al autor del informe. No se generan clasificaciones de suelo.\n\nGuardar sesión conserva el informe extraído, su ruta y SHA-256, las tablas, el texto de origen, la selección y la opción de incluir tabla en CAD. Puedes reabrir estos datos aunque el PDF ya no esté disponible. Nueva sesión o cargar otro proyecto limpia las prospecciones anteriores.\n\nPara insertar, abre Model en un DWG en metros (INSUNITS=6), con RomanD disponible y la escala anotativa deseada. Pulsa Insertar en CAD y elige el punto superior izquierdo en AutoCAD/ZWCAD. Se insertan entidades vectoriales editables agrupadas: cuadrícula color 8, texto RomanD anotativo color 3, perfil Vs escalonado color 5 y círculos/ticks color 1. La cuadrícula mide 100 × 150 mm de papel y el texto 2,5 mm a la escala actual. La tabla es opcional. La vista previa utiliza una fuente de pantalla; CAD usa RomanD. El comando no guarda el DWG automáticamente."
+    },
+    {
       "id": "primer-inicio",
       "categoria": "Inicio",
       "titulo": "Primer inicio y preparación",

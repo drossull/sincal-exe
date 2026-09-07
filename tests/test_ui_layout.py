@@ -226,7 +226,7 @@ class WorkbenchLayoutTests(unittest.TestCase):
         core = APP.read_text(encoding="utf-8")
         consultation = PROJECT.read_text(encoding="utf-8")
         structural = ARMADURAS.read_text(encoding="utf-8")
-        self.assertIn('self._project_sections = {"consulta", "estructural", "sesiones"}', core)
+        self.assertIn('self._project_sections = {"consulta", "estructural", "prospecciones", "sesiones"}', core)
         self.assertIn("ProjectContext()", core)
         self.assertIn("def load_project", core)
         self.assertIn("def _offer_last_project", core)

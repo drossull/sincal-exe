@@ -31,6 +31,7 @@ from PIL import Image, ImageTk
 
 from sincal.ui.tabs.armaduras import TabArmaduras
 from sincal.ui.tabs.project import TabProject
+from sincal.ui.tabs.prospecciones import TabProspecciones
 from sincal.ui.tabs.sessions import TabSessions
 from sincal.ui.tabs.diagnostico import TabDiagnostico
 from sincal.ui.tabs.documentacion import TabDocs
@@ -230,6 +231,9 @@ class ActualizadorCAD(ctk.CTk):
         self.setup_tab_conversion_dxf()
         self.setup_tab_project()
         self.setup_tab_armaduras()
+        self.vista_prospecciones = TabProspecciones(
+            self._sections["prospecciones"][0], parent_app=self, fg_color="transparent")
+        self.vista_prospecciones.pack(fill="both", expand=True)
         self.setup_tab_sessions()
         self.vista_docs = TabDocs(
             self.tab_docs, parent_app=self, fg_color="transparent")
@@ -287,7 +291,7 @@ class ActualizadorCAD(ctk.CTk):
 
         self.nav_container = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.nav_container.pack(fill="both", expand=True, padx=8)
-        self._project_sections = {"consulta", "estructural", "sesiones"}
+        self._project_sections = {"consulta", "estructural", "prospecciones", "sesiones"}
         self.nav_items = (
             ("sincronizador", "home", "Home", "Home"),
             ("documentacion", "book", "Documentación", "Documentación"),
@@ -298,6 +302,7 @@ class ActualizadorCAD(ctk.CTk):
             ("proyecto", "structure", "Proyecto", "Proyecto"),
             ("consulta", "query", "Consulta", "Consulta"),
             ("estructural", "structure", "Generador de armadura", "Generador de armadura"),
+            ("prospecciones", "query", "Prospecciones", "Prospecciones"),
             ("sesiones", "sessions", "Sesiones", "Sesiones"),
             ("diagnostico", "diagnostic", "Diagnóstico", "Diagnóstico"),
         )
@@ -446,6 +451,7 @@ class ActualizadorCAD(ctk.CTk):
             ("ubicacion", "Ubicación"),
             ("consulta", "Consulta"),
             ("estructural", "Generador de armadura"),
+            ("prospecciones", "Prospecciones"),
             ("sesiones", "Sesiones"),
             ("diagnostico", "Diagnóstico"),
         )
@@ -516,6 +522,7 @@ class ActualizadorCAD(ctk.CTk):
                 "consulta": (("Identificación", "identificacion"), ("Fuente JSON", "fuente")),
                 "estructural": (("Dimensiones", "dimensiones"), ("Revisión y marcas", "revision"), ("Despiece", "despiece")),
                 "sesiones": (("Buscar", "buscar"), ("Biblioteca", "biblioteca")),
+                "prospecciones": (("Arreglos", "arreglos"), ("Tabla y avisos", "tabla"), ("Vista previa e inserción", "vista")),
                 "conversion": (("Carpeta DXF", "carpeta"), ("Archivos", "archivos"), ("Conversión", "conversion")),
                 "diagnostico": (("Estado", "estado"), ("Informe", "informe")),
             }
@@ -559,6 +566,8 @@ class ActualizadorCAD(ctk.CTk):
             self.vista_armaduras.ir_a_seccion(anchor)
         elif section == "sesiones" and hasattr(self, "vista_sessions"):
             self.vista_sessions.ir_a_seccion(anchor)
+        elif section == "prospecciones" and hasattr(self, "vista_prospecciones"):
+            self.vista_prospecciones.ir_a_seccion(anchor)
         elif section == "ubicacion" and hasattr(self, "tab_ubicacion_widget"):
             self.tab_ubicacion_widget.ir_a_seccion(anchor)
         elif section == "documentacion" and hasattr(self, "vista_docs"):

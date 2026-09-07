@@ -73,6 +73,35 @@ El módulo **Proyecto** agrupa **Consulta**, **Generador de armadura** y **Sesio
 
 SINCAL recuerda la última ruta y solicita confirmación para reabrirla al iniciar. Si una sesión contiene cambios, cargar o limpiar otro proyecto exige guardarlos o descartarlos primero. El contexto activo alimenta automáticamente al Generador de armadura y también queda registrado dentro de las sesiones.
 
+### Prospecciones
+
+**Proyecto → Prospecciones** carga localmente un informe PDF con texto o un TXT
+UTF-8 con tablas de estratos (N°, Inicio/Desde, Final/Hasta, Vs). Lista los arreglos
+reconocidos, sus páginas y el Vs,30 oficial; permite escoger uno, consultar su tabla
+y texto de origen, previsualizarlo e insertarlo en el dibujo CAD activo.
+Los escaneos requieren OCR y las disposiciones no reconocidas necesitan otro
+importador: esta versión avisa cuando no puede extraer una tabla, sin inventar datos.
+El importador inicial está verificado con los seis arreglos de Calera de Tango.
+
+Los valores son de solo lectura. El control de Vs,30 únicamente genera avisos
+(tolerancia de 1 m/s o 0,5 % por redondeos); nunca reemplaza el valor publicado.
+Se comparan también los resúmenes reconocidos y se pueden copiar los avisos
+con sus páginas y la huella SHA-256 del documento. El resumen del arreglo 1-2 de
+Calera de Tango difiere de su tabla individual y se informa como discrepancia.
+
+**Guardar sesión** conserva tablas, valores oficiales, texto extraído, referencias,
+selección y opción de incluir la tabla en CAD; no necesita el PDF original para
+reabrir esos datos. Las sesiones anteriores se abren con Prospecciones vacío.
+Cargar otro proyecto o iniciar una sesión nueva limpia las prospecciones anteriores.
+
+Para insertar, activa Model en un dibujo en metros (`INSUNITS=6`) con el estilo
+`RomanD` del master SINCAL y la escala anotativa deseada. Selecciona el punto en CAD.
+Se crean líneas, círculos y textos editables, agrupados: cuadrícula ACI 8,
+textos RomanD anotativos ACI 3, perfil escalonado ACI 5 y círculos/ticks ACI 1.
+La cuadrícula ocupa 100 × 150 mm de papel y el texto 2,5 mm a la escala actual;
+la tabla es opcional. El dibujo no se guarda automáticamente. La vista previa usa
+una fuente de pantalla; la rotulación final en CAD usa RomanD.
+
 ### Generador de armadura
 
 Prepara vistas, despieces y cubicación de fierro mediante comandos temporales enviados al CAD abierto:

@@ -2615,6 +2615,8 @@ class TabArmaduras(ctk.CTkFrame):
         return self._confirmar_descartar_cambios()
 
     def _reset_session_identity(self):
+        if hasattr(self.parent_app, "vista_prospecciones"):
+            self.parent_app.vista_prospecciones.restore()
         old_id = self._session_metadata.get("id")
         self._session_metadata = {}
         self._session_path = None
@@ -2824,6 +2826,9 @@ class TabArmaduras(ctk.CTkFrame):
                 "snapshot": self._json_snapshot,
             },
             "workspace": self._capture_workspace(),
+            "prospecciones": (
+                self.parent_app.vista_prospecciones.snapshot()
+                if hasattr(self.parent_app, "vista_prospecciones") else None),
             "overview": {
                 "mark_count": mark_count,
                 "total_kg": round(total_kg, 3),
@@ -2938,7 +2943,9 @@ class TabArmaduras(ctk.CTkFrame):
             return False
         try:
             document = self.parent_app.session_store.load(path)
-        except (OSError, ValueError, json.JSONDecodeError) as error:
+            if hasattr(self.parent_app, "vista_prospecciones"):
+                self.parent_app.vista_prospecciones.validate_snapshot(document.get("prospecciones"))
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as error:
             messagebox.showerror("Abrir sesión", f"No se pudo abrir la sesión:\n{error}")
             return False
         source = document.get("source_json") or {}
@@ -2963,6 +2970,8 @@ class TabArmaduras(ctk.CTkFrame):
                         messagebox.showerror("Abrir sesión", f"No se pudo leer el JSON actual:\n{error}")
                         return False
         self._restore_workspace(document.get("workspace") or {})
+        if hasattr(self.parent_app, "vista_prospecciones"):
+            self.parent_app.vista_prospecciones.restore(document.get("prospecciones"))
         snapshot = source.get("snapshot")
         project = document.get("project") or {}
         identification = {
