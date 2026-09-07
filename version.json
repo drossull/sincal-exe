@@ -1,5 +1,5 @@
 {
-  "version": "v29.0.17",
+  "version": "v29.0.18",
   "product_version": "2.0",
   "archivos": [
     "main.py",
@@ -7,6 +7,7 @@
     "sincal/runtime.py",
     "sincal/resources.py",
     "sincal/project.py",
+    "sincal/prospecciones.py",
     "sincal/sessions.py",
     "sincal/diagnostics.py",
     "sincal/update_config.py",
@@ -16,6 +17,7 @@
     "sincal/cad/moldajes.py",
     "sincal/cad/zapata_views.py",
     "sincal/cad/zapata_detail.py",
+    "sincal/cad/prospecciones.py",
     "sincal/rebar/model.py",
     "sincal/rebar/detail.py",
     "sincal/ui/icons.py",
@@ -26,6 +28,7 @@
     "sincal/ui/widgets.py",
     "sincal/ui/tabs/ubicacion.py",
     "sincal/ui/tabs/project.py",
+    "sincal/ui/tabs/prospecciones.py",
     "sincal/ui/tabs/armaduras.py",
     "sincal/ui/tabs/sessions.py",
     "sincal/ui/tabs/documentacion.py",

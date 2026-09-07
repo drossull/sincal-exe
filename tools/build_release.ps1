@@ -99,7 +99,7 @@ function Invoke-SelfCheck([string]$ProjectRoot) {
         if ($LASTEXITCODE -ne 0) {
             throw 'Falló selfcheck_runtime.py.'
         }
-        & python -m unittest discover -s tests -p 'test_*.py'
+        & python -m pytest tests -q --tb=short
         if ($LASTEXITCODE -ne 0) {
             throw 'Fallaron las pruebas unitarias.'
         }
