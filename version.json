@@ -35,6 +35,7 @@
     "sincal/ui/tabs/diagnostico.py",
     "lisps/BV.lsp",
     "lisps/VRAP.lsp",
+    "lisps/VPTOGGLE.lsp",
     "lisps/SINCAL.lsp",
     "lisps/SINCAL_ESCALAS.lsp",
     "lisps/SEL-SC.lsp",

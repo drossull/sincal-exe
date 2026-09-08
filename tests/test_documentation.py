@@ -15,7 +15,7 @@ class DocumentationTests(unittest.TestCase):
             "SINCAL", "BV", "CEVIADA", "CPOL", "DIMEL", "DL2",
             "DUP / DUPLICAR", "EXTRIMOUT", "MC", "MPEND", "P0", "PLOTYA", "PND",
             "PURGEALL", "RMLAY", "SEL-SC", "SETUP-A1", "SINCAL-ESCALAS", "ST0",
-            "VRAP", "W08", "ZE", "CUSTOM-PROPS", "COPY-PROPS",
+            "VRAP", "VPTOGGLE", "W08", "ZE", "CUSTOM-PROPS", "COPY-PROPS",
             "PASTE-PROPS", "REPARAR-PROPS", "C-INICIO / C-FIN", "C0 … C9",
         }
         self.assertEqual(documented, expected)

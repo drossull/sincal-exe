@@ -291,6 +291,13 @@
       "notas": ["El comando cambia entre Model y Layout automáticamente.", "Ajusta la escala de cada viewport después si corresponde."],
       "tags": ["mview", "model", "layout"]
     },
+    "VPTOGGLE": {
+      "titulo": "Mostrar u ocultar la capa de viewports",
+      "descripcion": "Alterna la visibilidad de la capa Viewport layer sin solicitar parámetros adicionales.",
+      "pasos": ["Escribe VPTOGGLE y presiona Enter.", "Vuelve a ejecutarlo para recuperar el estado de visibilidad anterior."],
+      "notas": ["Si Viewport layer es la capa actual, SINCAL cambia primero a la capa 0.", "Si la capa no existe, el dibujo no se modifica.", "Ocultar la capa no cambia por sí solo su propiedad de impresión."],
+      "tags": ["viewport", "layer", "visibilidad"]
+    },
     "W08": {
       "titulo": "Factor de ancho 0.8",
       "descripcion": "Aplica Width Factor 0.8 a todos los estilos de texto.",

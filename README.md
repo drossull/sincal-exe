@@ -55,7 +55,7 @@ La pestaña permite cargar una carpeta DWG/DXF, marcar archivos y renombrarlos p
 
 ### Comandos en vivo
 
-Este módulo envía una orden autónoma a los dibujos CAD abiertos. El glosario visible se limita a `BV`, `DL2`, `P0`, `PURGEALL`, `SETUP-A1`, `ST0`/`STO`, `W08`, `ZE` y `PLOTYA`. También puedes escribir un comando nativo, como `_QSAVE`, si confirmas que termina por sí solo y no solicita puntos, opciones ni respuestas. El campo acepta únicamente el nombre del comando, sin parámetros ni expresiones LISP. Usa Cancelar si necesitas detener el recorrido.
+Este módulo envía una orden autónoma a los dibujos CAD abiertos. El glosario visible se limita a `BV`, `DL2`, `P0`, `PURGEALL`, `SETUP-A1`, `ST0`/`STO`, `W08`, `ZE`, `PLOTYA` y `VPTOGGLE`. `VPTOGGLE` alterna la visibilidad de la capa `Viewport layer` y no requiere respuestas posteriores. También puedes escribir un comando nativo, como `_QSAVE`, si confirmas que termina por sí solo y no solicita puntos, opciones ni respuestas. El campo acepta únicamente el nombre del comando, sin parámetros ni expresiones LISP. Usa Cancelar si necesitas detener el recorrido.
 
 ### Procesamiento DWG desde CMD
 

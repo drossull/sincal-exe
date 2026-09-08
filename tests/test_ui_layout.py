@@ -187,6 +187,7 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('("comandos", "glosario", glossary)', core)
         self.assertIn('("ST0 / STO", "ST0")', core)
         self.assertIn('("PLOTYA", "PLOTYA")', core)
+        self.assertIn('("VPTOGGLE", "VPTOGGLE")', core)
         self.assertIn("normalizar_comando_cad_autonomo", core)
         self.assertIn("self.comando_autonomo_var", core)
         self.assertIn("sin espacios, parámetros", command_validation)

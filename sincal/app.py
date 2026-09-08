@@ -117,6 +117,7 @@ COMANDOS_VIVO = (
     ("W08", "W08"),
     ("ZE", "ZE"),
     ("PLOTYA", "PLOTYA"),
+    ("VPTOGGLE", "VPTOGGLE"),
 )
 COMANDOS_VIVO_CONOCIDOS = {
     alias for _label, command in COMANDOS_VIVO
