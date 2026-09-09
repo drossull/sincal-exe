@@ -1,9 +1,20 @@
 (vl-load-com)
 (setvar "FILEDIA" 0)
 
-;; 1. Obtener documento puenteando la falta de interfaz grafica
-(setq doc (vla-get-Document (vlax-ename->vla-object (namedobjdict))))
-(setq layouts (vla-get-Layouts doc))
+;; 1. Obtener los layouts desde su diccionario. AcCoreConsole no siempre
+;; expone ActiveDocument ni permite convertir el NOD completo a VLA.
+(setq layoutData (dictsearch (namedobjdict) "ACAD_LAYOUT"))
+(setq layouts nil)
+(foreach item layoutData
+  (if (= (car item) 350)
+    (progn
+      (setq layoutObject (vl-catch-all-apply 'vlax-ename->vla-object (list (cdr item))))
+      (if (not (vl-catch-all-error-p layoutObject))
+        (setq layouts (cons layoutObject layouts))
+      )
+    )
+  )
+)
 
 ;; 2. Deteccion del Software (AutoCAD vs ZWCAD)
 (setq rrp (vl-catch-all-apply 'getvar '("ROAMABLEROOTPREFIX")))
@@ -26,7 +37,7 @@
 )
 
 ;; 4. Inyectar configuracion directa a los Layouts
-(vlax-for layout layouts
+(foreach layout layouts
   (setq layoutName (vla-get-Name layout))
   
   (if (/= (strcase layoutName) "MODEL")

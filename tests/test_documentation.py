@@ -87,6 +87,18 @@ class MassProcessingConfigurationTests(unittest.TestCase):
         purge = (ROOT / "scripts" / "PURGEALL.ps1").read_text(encoding="utf-8")
         self.assertNotIn('Start-Process -FilePath "cmd.exe"', purge)
 
+    def test_publish_script_represents_double_quote_without_breaking_scr_input(self):
+        publish = (ROOT / "scripts" / "PUBLISH-A1.scr").read_text(encoding="utf-8")
+        self.assertIn("(chr 34)", publish)
+        self.assertNotIn("'\"'", publish)
+
+    def test_page_setup_scripts_do_not_require_active_document_com(self):
+        for name in ("PUBLISH-A1.scr", "PAGESETUP-A1.scr"):
+            script = (ROOT / "scripts" / name).read_text(encoding="utf-8")
+            self.assertIn('dictsearch (namedobjdict) "ACAD_LAYOUT"', script, name)
+            self.assertNotIn("vla-get-ActiveDocument", script, name)
+            self.assertNotIn("vla-get-Document", script, name)
+
 
 if __name__ == "__main__":
     unittest.main()

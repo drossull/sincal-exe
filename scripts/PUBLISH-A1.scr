@@ -21,7 +21,8 @@
 )
 
 (defun SINCAL:SanitizeFileName (s / chars)
-  (setq chars '("<" ">" ":" '"' "/" "\\" "|" "?" "*"))
+  ;; (chr 34) evita insertar una comilla literal que rompe el lector de SCR.
+  (setq chars (list "<" ">" ":" (chr 34) "/" "\\" "|" "?" "*"))
   (foreach c chars
     (setq s (vl-string-subst "_" c s))
   )
@@ -35,9 +36,20 @@
   s
 )
 
-;; 1. Obtener documento puenteando la falta de interfaz grafica
-(setq doc (vla-get-Document (vlax-ename->vla-object (namedobjdict))))
-(setq layouts (vla-get-Layouts doc))
+;; 1. Obtener los layouts desde su diccionario. AcCoreConsole no siempre
+;; expone ActiveDocument ni permite convertir el NOD completo a VLA.
+(setq layoutData (dictsearch (namedobjdict) "ACAD_LAYOUT"))
+(setq layouts nil)
+(foreach item layoutData
+  (if (= (car item) 350)
+    (progn
+      (setq layoutObject (vl-catch-all-apply 'vlax-ename->vla-object (list (cdr item))))
+      (if (not (vl-catch-all-error-p layoutObject))
+        (setq layouts (cons layoutObject layouts))
+      )
+    )
+  )
+)
 
 ;; 2. Deteccion del Software (AutoCAD vs ZWCAD)
 (setq rrp (vl-catch-all-apply 'getvar '("ROAMABLEROOTPREFIX")))
@@ -60,7 +72,7 @@
 )
 
 ;; 4. Inyectar configuracion directa a los Layouts
-(vlax-for layout layouts
+(foreach layout layouts
   (setq layoutName (vla-get-Name layout))
   
   (if (/= (strcase layoutName) "MODEL")
@@ -108,7 +120,7 @@
 (setq lays nil)
 (setq statusPath (strcat (getvar "DWGPREFIX") (vl-filename-base (getvar "DWGNAME")) "__publish_status.txt"))
 (setq statusFile (open statusPath "w"))
-(foreach x (dictsearch (namedobjdict) "ACAD_LAYOUT") 
+(foreach x layoutData
   (if (and (= (car x) 3) (/= (strcase (cdr x)) "MODEL")) 
     (setq lays (cons (cdr x) lays))
   )

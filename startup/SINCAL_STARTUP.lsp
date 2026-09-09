@@ -185,7 +185,9 @@
 ;;; =========================================================================
 ;;; EJECUCIÓN AUTOMÁTICA AL ABRIR EL PLANO
 ;;; =========================================================================
-(SINCAL:AutoCrearPropiedad)
-(SINCAL:GenerarEscalas)
+;; Core Console puede no exponer ActiveDocument mediante COM. Cada tarea se
+;; aísla para que esa limitación no impida cargar escalas ni ejecutar el SCR.
+(vl-catch-all-apply 'SINCAL:AutoCrearPropiedad '())
+(vl-catch-all-apply 'SINCAL:GenerarEscalas '())
 (princ "\n--- SINCAL STARTUP CARGADO EXITOSAMENTE ---")
 (princ)
