@@ -40,6 +40,7 @@
     "lisps/SINCAL_ESCALAS.lsp",
     "lisps/SEL-SC.lsp",
     "lisps/DL2.lsp",
+    "lisps/DEL-VIN.lsp",
     "lisps/DUP.lsp",
     "lisps/DIMEL.lsp",
     "lisps/CPOL.lsp",

@@ -12,7 +12,7 @@ class DocumentationTests(unittest.TestCase):
         self.assertEqual(data["schema"], 2)
         documented = set(data["comandos_lisp"])
         expected = {
-            "SINCAL", "BV", "CEVIADA", "CPOL", "DIMEL", "DL2",
+            "SINCAL", "BV", "CEVIADA", "CPOL", "DEL-VIN", "DIMEL", "DL2",
             "DUP / DUPLICAR", "EXTRIMOUT", "MC", "MPEND", "P0", "PLOTYA", "PND",
             "PURGEALL", "RMLAY", "SEL-SC", "SETUP-A1", "SINCAL-ESCALAS", "ST0",
             "VRAP", "VPTOGGLE", "W08", "ZE", "ZV", "CUSTOM-PROPS", "COPY-PROPS",

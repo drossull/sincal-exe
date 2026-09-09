@@ -179,6 +179,13 @@
       "notas": ["La distancia elegida se replica al lado opuesto."],
       "tags": ["polilinea", "centro"]
     },
+    "DEL-VIN": {
+      "titulo": "Eliminar viñeta antigua por zona",
+      "descripcion": "Detecta objetos de espacio papel que intersectan las franjas del marco y la zona inferior derecha de la hoja 841 × 605, excluyendo todos los viewports.",
+      "pasos": ["Activa el layout que contiene la viñeta antigua.", "Escribe DEL-VIN.", "Revisa los objetos destacados y confirma con Si."],
+      "notas": ["La respuesta predeterminada es No.", "La eliminación queda agrupada en un solo Deshacer.", "Los objetos situados en capas bloqueadas se informan y permanecen en el dibujo."],
+      "tags": ["vineta", "layout", "limpiar", "viewport"]
+    },
     "DIMEL": {
       "titulo": "Acotado por línea de corte",
       "descripcion": "Busca intersecciones a lo largo de una línea ortogonal y genera cotas consecutivas en la capa ES-ACOTADO.",
