@@ -12,4 +12,5 @@ _A
 _N
 (setvar "WIPEOUTFRAME" 0)
 _.QSAVE
-_.CLOSE
+_.QUIT
+_Y

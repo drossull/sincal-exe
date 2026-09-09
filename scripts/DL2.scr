@@ -28,4 +28,5 @@
 (setvar "DYNMODE" 3)
 (setvar "WIPEOUTFRAME" 0)
 _.QSAVE
-_.CLOSE
+_.QUIT
+_Y

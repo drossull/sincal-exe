@@ -99,6 +99,23 @@ class MassProcessingConfigurationTests(unittest.TestCase):
             self.assertNotIn("vla-get-ActiveDocument", script, name)
             self.assertNotIn("vla-get-Document", script, name)
 
+    def test_core_console_scripts_answer_the_final_quit_prompt(self):
+        script_names = (
+            "AUDIT.scr", "BV.scr", "DL2.scr", "PAGESETUP-A1.scr",
+            "PUBLISH-A1.scr", "PURGEALL.scr", "ZE.scr",
+        )
+        for name in script_names:
+            script = (ROOT / "scripts" / name).read_text(encoding="utf-8")
+            self.assertTrue(script.rstrip().endswith("_.QUIT\n_Y"), name)
+
+        purge = (ROOT / "scripts" / "PURGEALL.ps1").read_text(encoding="utf-8")
+        self.assertIn("_.QUIT\n_Y", purge)
+
+    def test_core_console_runner_enforces_its_timeout(self):
+        engine = (ROOT / "scripts" / "SINCAL_ENGINE.ps1").read_text(encoding="utf-8")
+        self.assertIn("$process.WaitForExit($TimeoutSeconds * 1000)", engine)
+        self.assertIn("Stop-Process -Id $process.Id", engine)
+
 
 if __name__ == "__main__":
     unittest.main()

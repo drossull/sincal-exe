@@ -32,6 +32,7 @@ _.-PURGE _R * _N
 _.ZOOM _E
 _.QSAVE
 _.QUIT
+_Y
 
 "@
 

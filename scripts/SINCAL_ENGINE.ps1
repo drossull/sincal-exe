@@ -52,7 +52,11 @@ function New-SincalZwcadScript {
     param([string]$SourcePath, [string]$MarkerPath, [string]$Token)
     $source = Get-Content -LiteralPath $SourcePath -Raw -Encoding Default
     # El controlador COM administra el cierre después de comprobar el resultado.
-    $source = [regex]::Replace($source, '(?im)^\s*_?\.?\s*(CLOSE|QUIT)\s*$\r?\n?', '')
+    $source = [regex]::Replace(
+        $source,
+        '(?ims)\r?\n\s*_?\.?\s*(CLOSE|QUIT)\s*(?:\r?\n\s*_?[YN]\s*)?\z',
+        ''
+    )
     $markerForLisp = $MarkerPath.Replace('\', '/').Replace('"', '\"')
     $completion = @"
 
@@ -159,7 +163,14 @@ function Invoke-SincalCadScript {
         return Invoke-SincalZwcadScript -Engine $Engine -DrawingPath $DrawingPath -ScriptPath $ScriptPath -TimeoutSeconds $TimeoutSeconds
     }
     $arguments = "/i `"$DrawingPath`" /s `"$ScriptPath`""
-    $process = Start-Process -FilePath $Engine.Path -ArgumentList $arguments -Wait -NoNewWindow -PassThru
+    $process = Start-Process -FilePath $Engine.Path -ArgumentList $arguments -NoNewWindow -PassThru
+    if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+        # El PID pertenece exclusivamente al Core Console iniciado arriba.
+        # Evita que un prompt inesperado bloquee todo el lote indefinidamente.
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        throw "AutoCAD Core Console no terminó antes de $TimeoutSeconds segundos. Se cerró sólo el proceso de este DWG; revisa si el SCR dejó una pregunta sin responder."
+    }
+    $process.Refresh()
     if ($process.ExitCode -ne 0) { throw "AutoCAD Core Console terminó con código $($process.ExitCode)." }
     return 0
 }

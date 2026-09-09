@@ -87,3 +87,4 @@
 (vl-cmdf "_.QSAVE")
 (princ)
 _.QUIT
+_Y
