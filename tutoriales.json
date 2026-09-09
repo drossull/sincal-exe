@@ -83,7 +83,7 @@
       "categoria": "Comandos en vivo",
       "titulo": "Comandos en planos abiertos",
       "tags": "com live sendcommand cancelar",
-      "contenido": "Esta herramienta envía el mismo comando autónomo a todos los dibujos abiertos accesibles en AutoCAD/ZWCAD. Escribe sólo su nombre, por ejemplo ZE, PLOTYA o _QSAVE, y presiona Enter o pulsa Ejecutar. No se aceptan parámetros, saltos de línea ni expresiones LISP.\n\nEl glosario muestra las órdenes SINCAL recomendadas. Para usar otro comando nativo debes confirmar que termina por sí solo y que no solicita puntos, opciones ni respuestas. Usa Cancelar para detener el recorrido; el comando que ya llegó a CAD puede necesitar ESC dentro del propio programa."
+      "contenido": "Esta herramienta envía el mismo comando autónomo, de forma secuencial, a todos los dibujos abiertos de una única sesión AutoCAD/ZWCAD. SINCAL espera la confirmación de término antes de avanzar al dibujo siguiente y bloquea la ejecución si detecta varias instancias o versiones CAD abiertas. Escribe sólo su nombre, por ejemplo ZE, PLOTYA o _QSAVE, y presiona Enter o pulsa Ejecutar. No se aceptan parámetros, saltos de línea ni expresiones LISP.\n\nEl glosario muestra las órdenes SINCAL recomendadas. Para usar otro comando nativo debes confirmar que termina por sí solo y que no solicita puntos, opciones ni respuestas. Usa Cancelar para detener el recorrido; el comando que ya llegó a CAD puede necesitar ESC dentro del propio programa. Para carpetas grandes, prefiere el procesamiento desde CMD con el motor elegido en Diagnóstico: abre y termina cada DWG de forma aislada."
     },
     {
       "id": "modulo-estructural",

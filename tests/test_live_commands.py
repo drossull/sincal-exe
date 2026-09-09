@@ -1,7 +1,10 @@
 import unittest
 from pathlib import Path
 
-from sincal.cad.commands import normalizar_comando_cad_autonomo
+from sincal.cad.commands import (
+    construir_comando_cad_con_marcador,
+    normalizar_comando_cad_autonomo,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +24,14 @@ class LiveCommandValidationTests(unittest.TestCase):
             with self.subTest(value=value):
                 with self.assertRaises(ValueError):
                     normalizar_comando_cad_autonomo(value)
+
+    def test_completion_marker_runs_after_the_autonomous_command(self):
+        command = construir_comando_cad_con_marcador(
+            "PURGEALL", r"C:\Temp\SINCAL-LIVE.done", "abc123")
+        self.assertTrue(command.startswith("PURGEALL\n(progn "))
+        self.assertIn('open "C:/Temp/SINCAL-LIVE.done" "w"', command)
+        self.assertIn('write-line "abc123"', command)
+        self.assertTrue(command.endswith("(princ))\n"))
 
     def test_vptoggle_is_autonomous_and_handles_the_current_layer(self):
         source = (ROOT / "lisps" / "VPTOGGLE.lsp").read_text(encoding="utf-8")

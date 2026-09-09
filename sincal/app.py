@@ -12,10 +12,12 @@ configurar_dpi_windows()
 import queue
 import shutil
 import subprocess
+import tempfile
 import threading
 import time
 import tkinter as tk
 import traceback
+import uuid
 import webbrowser
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
@@ -36,7 +38,10 @@ from sincal.ui.tabs.sessions import TabSessions
 from sincal.ui.tabs.diagnostico import TabDiagnostico
 from sincal.ui.tabs.documentacion import TabDocs
 from sincal.ui.tabs.ubicacion import TabUbicacion
-from sincal.cad.commands import normalizar_comando_cad_autonomo
+from sincal.cad.commands import (
+    construir_comando_cad_con_marcador,
+    normalizar_comando_cad_autonomo,
+)
 from sincal.cad.engine import ensure_cad_engine
 from sincal.cad.integration import registrar_ruta_cad_usuario, registrar_scripts_en_path
 from sincal.diagnostics import record_incident
@@ -1581,8 +1586,8 @@ class ActualizadorCAD(ctk.CTk):
                      text_color=COLOR_TEXTO).pack(pady=(36, 8))
         ctk.CTkLabel(
             page,
-            text=("Envía una orden autónoma a cada plano abierto en AutoCAD o ZWCAD. "
-                  "Puede ser un LISP del glosario o cualquier comando nativo que termine sin pedir datos."),
+            text=("Ejecuta una orden autónoma de forma secuencial en los planos abiertos de una sola "
+                  "sesión AutoCAD o ZWCAD. Espera a que cada plano termine antes de continuar."),
             font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE, justify="center", wraplength=760,
         ).pack(padx=30, pady=(0, 20))
         controls = ctk.CTkFrame(page, fg_color="transparent")
@@ -2045,17 +2050,43 @@ class ActualizadorCAD(ctk.CTk):
                 prog_ids.append(f"AutoCAD.Application.{i}")
 
             apps_encontradas = []
+            aplicaciones_vistas = set()
 
             for s in prog_ids:
                 try:
                     app = win32com.client.GetActiveObject(s)
-                    if app:
+                    if not app:
+                        continue
+                    try:
+                        identidad_app = ("hwnd", int(app.HWND))
+                    except Exception:
+                        identidad_app = (
+                            "cad", str(getattr(app, "Name", "")),
+                            str(getattr(app, "Version", "")),
+                        )
+                    if identidad_app not in aplicaciones_vistas:
+                        aplicaciones_vistas.add(identidad_app)
                         apps_encontradas.append(app)
                 except:
                     pass
 
             if not apps_encontradas:
                 return self.log("\n[X] Error: No se detecta CAD abierto o accesible para la sesión actual.")
+
+            if len(apps_encontradas) > 1:
+                self.log(
+                    "\n[X] Se detectaron varias instancias o versiones de CAD. "
+                    "Cierra las sesiones que no usarás y deja sólo una antes de ejecutar "
+                    "un comando sobre varios planos. No se envió ningún comando."
+                )
+                self._ui(
+                    messagebox.showwarning,
+                    "Varias sesiones CAD abiertas",
+                    "SINCAL no ejecutó el comando porque detectó varias instancias o "
+                    "versiones de AutoCAD/ZWCAD.\n\nCierra las sesiones que no usarás, "
+                    "deja sólo una abierta y vuelve a intentarlo.",
+                )
+                return
 
             docs_procesados = set()
             ejecuciones = 0
@@ -2081,16 +2112,46 @@ class ActualizadorCAD(ctk.CTk):
                                 app.ActiveDocument = doc
                                 time.sleep(0.2)
 
+                            token = uuid.uuid4().hex
+                            ruta_marcador = os.path.join(
+                                tempfile.gettempdir(), f"SINCAL-LIVE-{token}.done")
+                            comando_marcado = construir_comando_cad_con_marcador(
+                                comando.strip(), ruta_marcador, token)
                             try:
-                                doc.SendCommand("\x03\x03")
-                            except:
-                                pass
-
-                            doc.SendCommand(comando)
-                            self.log(f"  > Aplicado en: {doc.Name}")
+                                doc.SendCommand(comando_marcado)
+                                limite = time.monotonic() + 900
+                                while time.monotonic() < limite:
+                                    if os.path.isfile(ruta_marcador):
+                                        try:
+                                            with open(ruta_marcador, "r", encoding="ascii") as marker:
+                                                if marker.read().strip() == token:
+                                                    break
+                                        except OSError:
+                                            pass
+                                    time.sleep(0.25)
+                                else:
+                                    raise TimeoutError(
+                                        "CAD no confirmó el término en 15 minutos; "
+                                        "se detuvo el recorrido para proteger los demás planos."
+                                    )
+                            finally:
+                                try:
+                                    os.remove(ruta_marcador)
+                                except FileNotFoundError:
+                                    pass
+                                except OSError as error:
+                                    self.logger.debug(
+                                        "No se pudo retirar el marcador CAD %s: %s",
+                                        ruta_marcador, error,
+                                    )
+                            self.log(f"  > Completado en: {doc.Name}")
                             ejecuciones += 1
                         except Exception as e:
                             self.log(f"  > [X] Error pestaña: {e}")
+                            # Si una ejecución pesada falla o CAD deja de responder,
+                            # continuar sobre el resto multiplica el riesgo y oculta
+                            # cuál fue el primer plano afectado.
+                            break
                 except:
                     pass
 

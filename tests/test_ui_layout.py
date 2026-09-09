@@ -344,6 +344,15 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('(progn (load', structural)
         self.assertIn('(c:SINCAL-DETECTAR-ZAPATA))\\n', structural)
 
+    def test_live_commands_wait_and_reject_multiple_cad_sessions(self):
+        core = APP.read_text(encoding="utf-8")
+        worker = core.split("def _hilo_comando_en_vivo", 1)[1].split(
+            "def abrir_carpeta_local", 1)[0]
+        self.assertIn("construir_comando_cad_con_marcador", worker)
+        self.assertIn("len(apps_encontradas) > 1", worker)
+        self.assertIn("Completado en:", worker)
+        self.assertNotIn('SendCommand("\\x03\\x03")', worker)
+
 
 if __name__ == "__main__":
     unittest.main()
