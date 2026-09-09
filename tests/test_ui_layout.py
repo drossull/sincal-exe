@@ -351,6 +351,9 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn("construir_comando_cad_con_marcador", worker)
         self.assertIn("len(apps_encontradas) > 1", worker)
         self.assertIn("Completado en:", worker)
+        self.assertIn('GetVariable("CMDACTIVE")', worker)
+        self.assertIn("RECIBIDO:{token}", worker)
+        self.assertIn("doc = activar_documento", worker)
         self.assertNotIn('SendCommand("\\x03\\x03")', worker)
 
 

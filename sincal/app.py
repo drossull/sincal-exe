@@ -2043,6 +2043,79 @@ class ActualizadorCAD(ctk.CTk):
     def _hilo_comando_en_vivo(self, comando):
         self.iniciar_actividad("comando_cad", "Ejecutando comando CAD")
         pythoncom.CoInitialize()
+
+        def leer_marcador(ruta):
+            try:
+                with open(ruta, "r", encoding="ascii") as marker:
+                    return marker.read().strip()
+            except OSError:
+                return ""
+
+        def esperar_documento_ocioso(app, segundos=30):
+            """Espera que la pila de comandos quede estable antes de usar COM."""
+            limite = time.monotonic() + segundos
+            lecturas_ociosas = 0
+            ultimo_error = None
+            while time.monotonic() < limite:
+                if self.cancelar_comando_vivo:
+                    raise RuntimeError("Ejecución cancelada por el usuario.")
+                try:
+                    activo = app.ActiveDocument
+                    comandos_activos = int(activo.GetVariable("CMDACTIVE"))
+                    if comandos_activos == 0:
+                        lecturas_ociosas += 1
+                        if lecturas_ociosas >= 3:
+                            return activo
+                    else:
+                        lecturas_ociosas = 0
+                except Exception as error:
+                    ultimo_error = error
+                    lecturas_ociosas = 0
+                pythoncom.PumpWaitingMessages()
+                time.sleep(0.15)
+            detalle = f" ({ultimo_error!r})" if ultimo_error else ""
+            raise TimeoutError(
+                "CAD no quedó disponible para recibir el siguiente comando"
+                f"{detalle}."
+            )
+
+        def buscar_documento(app, nombre, ruta_completa):
+            """Obtiene un proxy COM nuevo; los creados por Item pueden caducar."""
+            docs_actuales = app.Documents
+            ruta_objetivo = os.path.normcase(str(ruta_completa or ""))
+            for indice in range(docs_actuales.Count):
+                candidato = docs_actuales.Item(indice)
+                try:
+                    ruta_candidata = os.path.normcase(str(candidato.FullName or ""))
+                except Exception:
+                    ruta_candidata = ""
+                if ruta_objetivo and ruta_candidata == ruta_objetivo:
+                    return candidato
+                if not ruta_objetivo and str(candidato.Name) == nombre:
+                    return candidato
+            raise RuntimeError(f'El dibujo "{nombre}" ya no está abierto.')
+
+        def activar_documento(app, nombre, ruta_completa, segundos=30):
+            limite = time.monotonic() + segundos
+            ultimo_error = None
+            while time.monotonic() < limite:
+                if self.cancelar_comando_vivo:
+                    raise RuntimeError("Ejecución cancelada por el usuario.")
+                try:
+                    objetivo = buscar_documento(app, nombre, ruta_completa)
+                    if str(app.ActiveDocument.Name) != str(objetivo.Name):
+                        app.ActiveDocument = objetivo
+                    activo = app.ActiveDocument
+                    if str(activo.Name) == str(objetivo.Name):
+                        return esperar_documento_ocioso(app)
+                except Exception as error:
+                    ultimo_error = error
+                pythoncom.PumpWaitingMessages()
+                time.sleep(0.2)
+            raise RuntimeError(
+                f'No fue posible activar "{nombre}": {ultimo_error!r}'
+            )
+
         try:
             prog_ids = ["ZWCAD.Application", "AutoCAD.Application"]
             for i in range(15, 36):
@@ -2096,21 +2169,25 @@ class ActualizadorCAD(ctk.CTk):
                     break
                 try:
                     docs = app.Documents
+                    documentos = []
                     for i in range(docs.Count):
+                        doc_inicial = docs.Item(i)
+                        documentos.append((
+                            str(doc_inicial.Name),
+                            str(getattr(doc_inicial, "FullName", "") or ""),
+                        ))
+
+                    for nombre_doc, ruta_doc in documentos:
                         if self.cancelar_comando_vivo:
                             break
                         try:
-                            doc = docs.Item(i)
-                            doc_id = f"{doc.FullName}_{doc.Name}"
+                            doc_id = f"{ruta_doc}_{nombre_doc}"
 
                             if doc_id in docs_procesados:
                                 continue
 
                             docs_procesados.add(doc_id)
-
-                            if app.ActiveDocument.Name != doc.Name:
-                                app.ActiveDocument = doc
-                                time.sleep(0.2)
+                            doc = activar_documento(app, nombre_doc, ruta_doc)
 
                             token = uuid.uuid4().hex
                             ruta_marcador = os.path.join(
@@ -2118,22 +2195,64 @@ class ActualizadorCAD(ctk.CTk):
                             comando_marcado = construir_comando_cad_con_marcador(
                                 comando.strip(), ruta_marcador, token)
                             try:
-                                doc.SendCommand(comando_marcado)
+                                error_envio = None
+                                enviado = False
+                                for intento in range(1, 6):
+                                    try:
+                                        estado = leer_marcador(ruta_marcador)
+                                        if estado in (f"RECIBIDO:{token}", token):
+                                            enviado = True
+                                            break
+                                        # ActiveDocument entrega un proxy fresco después
+                                        # de cada cambio de pestaña. Documents.Item puede
+                                        # fallar intermitentemente como Item.SendCommand.
+                                        doc = activar_documento(
+                                            app, nombre_doc, ruta_doc)
+                                        estado = leer_marcador(ruta_marcador)
+                                        if estado in (f"RECIBIDO:{token}", token):
+                                            enviado = True
+                                            break
+                                        doc.SendCommand(comando_marcado)
+                                        enviado = True
+                                        break
+                                    except Exception as error:
+                                        error_envio = error
+                                        # SendCommand puede aceptar la cadena y aun así
+                                        # devolver una excepción. El marcador inicial
+                                        # impide duplicar la ejecución durante el reintento.
+                                        espera_recepcion = time.monotonic() + 2
+                                        while time.monotonic() < espera_recepcion:
+                                            estado = leer_marcador(ruta_marcador)
+                                            if estado in (f"RECIBIDO:{token}", token):
+                                                enviado = True
+                                                break
+                                            pythoncom.PumpWaitingMessages()
+                                            time.sleep(0.1)
+                                        if enviado:
+                                            break
+                                        self.logger.warning(
+                                            "SendCommand rechazado en %s (intento %s/5): %r",
+                                            nombre_doc, intento, error,
+                                        )
+                                        time.sleep(min(0.25 * intento, 1.0))
+                                if not enviado:
+                                    raise RuntimeError(
+                                        "CAD rechazó SendCommand después de 5 intentos: "
+                                        f"{error_envio!r}"
+                                    )
+
                                 limite = time.monotonic() + 900
                                 while time.monotonic() < limite:
-                                    if os.path.isfile(ruta_marcador):
-                                        try:
-                                            with open(ruta_marcador, "r", encoding="ascii") as marker:
-                                                if marker.read().strip() == token:
-                                                    break
-                                        except OSError:
-                                            pass
+                                    if leer_marcador(ruta_marcador) == token:
+                                        break
+                                    pythoncom.PumpWaitingMessages()
                                     time.sleep(0.25)
                                 else:
                                     raise TimeoutError(
                                         "CAD no confirmó el término en 15 minutos; "
                                         "se detuvo el recorrido para proteger los demás planos."
                                     )
+                                esperar_documento_ocioso(app)
                             finally:
                                 try:
                                     os.remove(ruta_marcador)
@@ -2144,10 +2263,12 @@ class ActualizadorCAD(ctk.CTk):
                                         "No se pudo retirar el marcador CAD %s: %s",
                                         ruta_marcador, error,
                                     )
-                            self.log(f"  > Completado en: {doc.Name}")
+                            self.log(f"  > Completado en: {nombre_doc}")
                             ejecuciones += 1
                         except Exception as e:
-                            self.log(f"  > [X] Error pestaña: {e}")
+                            self.log(
+                                f"  > [X] Error en {nombre_doc}: {e!r}"
+                            )
                             # Si una ejecución pesada falla o CAD deja de responder,
                             # continuar sobre el resto multiplica el riesgo y oculta
                             # cuál fue el primer plano afectado.

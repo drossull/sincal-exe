@@ -28,8 +28,10 @@ class LiveCommandValidationTests(unittest.TestCase):
     def test_completion_marker_runs_after_the_autonomous_command(self):
         command = construir_comando_cad_con_marcador(
             "PURGEALL", r"C:\Temp\SINCAL-LIVE.done", "abc123")
-        self.assertTrue(command.startswith("PURGEALL\n(progn "))
-        self.assertIn('open "C:/Temp/SINCAL-LIVE.done" "w"', command)
+        self.assertTrue(command.startswith("(progn "))
+        self.assertIn('write-line "RECIBIDO:abc123"', command)
+        self.assertIn("(princ))\nPURGEALL\n(progn ", command)
+        self.assertEqual(command.count('open "C:/Temp/SINCAL-LIVE.done" "w"'), 2)
         self.assertIn('write-line "abc123"', command)
         self.assertTrue(command.endswith("(princ))\n"))
 
