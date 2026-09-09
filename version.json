@@ -53,6 +53,7 @@
     "lisps/RMLAY.lsp",
     "lisps/ST0.lsp",
     "lisps/ZE.lsp",
+    "lisps/ZV.lsp",
     "lisps/W08.lsp",
     "lisps/SETUP-A1.lsp",
     "lisps/PURGEALL.lsp",

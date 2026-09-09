@@ -312,6 +312,13 @@
       "notas": ["Para carpetas completas usa Encuadrar vista."],
       "tags": ["zoom", "extents"]
     },
+    "ZV": {
+      "titulo": "Zoom al tercio inferior derecho del layout",
+      "descripcion": "Divide virtualmente la hoja del layout en una cuadrícula de tres por tres y encuadra la zona inferior derecha.",
+      "pasos": ["Activa el layout que deseas revisar.", "Escribe ZV."],
+      "notas": ["Si estás dentro de un viewport, el comando vuelve primero a espacio papel.", "No modifica la escala ni la vista interna de los viewports."],
+      "tags": ["zoom", "layout", "papel", "cuadrante"]
+    },
     "CUSTOM-PROPS": {
       "titulo": "Editar propiedades de viñeta",
       "descripcion": "Recorre las propiedades SINCAL del dibujo, conserva el valor con Enter, actualiza campos y guarda.",
