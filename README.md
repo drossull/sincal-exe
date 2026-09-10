@@ -1,10 +1,10 @@
 # SINCAL Suite — Ingeniería y estándares CAD
 
-**SINCAL Suite** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 2.0 y la secuencia técnica continúa en `v29.0.20` para conservar una actualización ordenada desde las instalaciones v28.
+**SINCAL Suite** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 2.0 y la secuencia técnica continúa en `v29.0.21` para conservar una actualización ordenada desde las instalaciones v28.
 
 ## Instalación web y distribución
 
-SINCAL Suite se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.20.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
+SINCAL Suite se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.21.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
 
 El programa base no incorpora los 125 MB de mapas regionales. El paquete web sí contiene una copia inicial del master DWG, LISPs, startup, scripts, plumilla, calibración y ayuda estructural para que el primer arranque sea funcional. GitHub mantiene esos recursos al día mediante actualizaciones menores. Cada mapa regional se descarga solamente cuando se selecciona por primera vez en el módulo Ubicación.
 
@@ -12,7 +12,7 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
 
 ## Primer inicio
 
-1. Ejecuta el instalador oficial de la release `v29.0.20`.
+1. Ejecuta el instalador oficial de la release `v29.0.21`.
 2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
 3. Abre **Diagnóstico**, verifica el motor CAD sugerido y cámbialo si necesitas otra versión.
 4. Pulsa **Preparar integración CAD**.
@@ -54,6 +54,11 @@ El diseño responde al ancho disponible con tres zonas: navegación lateral retr
 La pestaña permite cargar una carpeta DWG/DXF, marcar archivos y renombrarlos por búsqueda y reemplazo. Se puede limpiar la ruta seleccionada en cualquier momento.
 
 ### Comandos en vivo
+
+La interfaz comparte el lenguaje visual de Cadence: fondo carbón o beige cálido,
+acentos corporativos, separadores finos, controles rectos y botones con sombra
+desplazada. Usa Roboto para lectura y Roboto Condensed para títulos; ambas fuentes
+se incluyen con la aplicación. La animación conserva su rótulo Pressura.
 
 Este módulo envía una orden autónoma, de forma secuencial, a los dibujos CAD abiertos y espera tanto la recepción como el término antes de cambiar de plano. Cada transición vuelve a adquirir el documento activo, espera que la pila de comandos quede ociosa y reintenta los rechazos COM transitorios sin duplicar la orden. Por seguridad no ejecuta si detecta varias instancias o versiones de AutoCAD/ZWCAD abiertas. El glosario visible se limita a `BV`, `DL2`, `P0`, `PURGEALL`, `SETUP-A1`, `ST0`/`STO`, `W08`, `ZE`, `PLOTYA` y `VPTOGGLE`. `VPTOGGLE` alterna la visibilidad de la capa `Viewport layer` y no requiere respuestas posteriores. También puedes escribir un comando nativo, como `_QSAVE`, si confirmas que termina por sí solo y no solicita puntos, opciones ni respuestas. El campo acepta únicamente el nombre del comando, sin parámetros ni expresiones LISP. Usa Cancelar si necesitas detener el recorrido. Para carpetas grandes, prefiere el procesamiento desde CMD, que aísla cada DWG mediante el motor elegido en Diagnóstico.
 
@@ -174,10 +179,10 @@ El proceso valida código y pruebas, compila y firma el plugin y la aplicación,
 
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v29.0.20.exe`
-- `SINCAL_App_v29.0.20.zip`
-- `SINCAL_AutoCAD_v29.0.20.zip`
-- `release-manifest_v29.0.20.json`
+- `Setup_SINCAL_v29.0.21.exe`
+- `SINCAL_App_v29.0.21.zip`
+- `SINCAL_AutoCAD_v29.0.21.zip`
+- `release-manifest_v29.0.21.json`
 - `SHA256SUMS.txt`
 
 No renombres los paquetes después de compilar: el instalador usa URLs versionadas y hashes fijados en el momento del build.

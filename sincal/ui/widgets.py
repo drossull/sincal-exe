@@ -16,7 +16,7 @@ class ShadowButton(ctk.CTkFrame):
     """
 
     _DEFAULT_WIDTH = 140
-    _DEFAULT_HEIGHT = 28
+    _DEFAULT_HEIGHT = 36
 
     def __init__(
         self,

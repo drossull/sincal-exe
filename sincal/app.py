@@ -278,7 +278,7 @@ class ActualizadorCAD(ctk.CTk):
         self.sidebar.pack_propagate(False)
 
         brand = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        brand.pack(fill="x", padx=14, pady=(18, 4))
+        brand.pack(fill="x", padx=20, pady=(24, 6))
         if getattr(self, "_brand_logo", None) is not None:
             ctk.CTkLabel(
                 brand, text="", image=self._brand_logo, width=30,
@@ -294,6 +294,7 @@ class ActualizadorCAD(ctk.CTk):
             text_color=COLOR_TEXTO_SUAVE,
         )
         self.brand_subtitle.pack(anchor="w", padx=16, pady=(0, 18))
+        ttk.Separator(self.sidebar, orient="horizontal").pack(fill="x", padx=14, pady=(0, 16))
 
         self.nav_container = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.nav_container.pack(fill="both", expand=True, padx=8)
@@ -357,7 +358,7 @@ class ActualizadorCAD(ctk.CTk):
         ).pack(fill="x", pady=(8, 0))
         self.workspace = ctk.CTkFrame(self, fg_color=COLOR_FONDO, corner_radius=0)
         self.workspace.pack(side="right", fill="both", expand=True)
-        header = ctk.CTkFrame(self.workspace, height=58, fg_color=COLOR_PANEL, corner_radius=0)
+        header = ctk.CTkFrame(self.workspace, height=64, fg_color=COLOR_PANEL, corner_radius=0)
         header.pack(fill="x")
         header.pack_propagate(False)
         self.btn_mostrar_menu = ShadowButton(
@@ -380,6 +381,7 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkLabel(
             header, text="SINCAL SUITE · 2.0", font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
         ).pack(side="right", padx=(8, 18))
+        ttk.Separator(self.workspace, orient="horizontal").pack(fill="x")
         self.content_shell = ctk.CTkFrame(
             self.workspace, fg_color=COLOR_FONDO, corner_radius=0)
         self.content_shell.pack(fill="both", expand=True, padx=(32, 44), pady=(10, 18))

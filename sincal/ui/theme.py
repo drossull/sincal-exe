@@ -16,11 +16,14 @@ TTK_PRESET_CLARO = "sincal-light"
 # Paletas corporativas cerradas. No se introducen fondos negros ni blancos puros.
 PALETA_OSCURA = {
     "fondo": "#1E1F25", "panel": "#3B3F4A", "acento": "#FFB000",
-    "texto": "#F2F5F8",
+    "texto": "#F2F5F8", "elevado": "#24262D", "muted": "#B8BCC5",
+    "exito": "#77B99F", "error": "#F26D5B",
 }
 PALETA_CLARA = {
     "acento": "#B1482C", "activo": "#E36F4A", "suave": "#FFB38A",
     "fondo": "#F7E6D6", "texto": "#3A2F2B",
+    "elevado": "#FBEEE3", "muted": "#735F56",
+    "exito": "#4B7868", "error": "#A73724",
 }
 
 
@@ -29,18 +32,18 @@ def _bootstrap_colors(palette, dark=False):
     if dark:
         return {
             "primary": palette["acento"], "secondary": palette["panel"],
-            "success": palette["acento"], "info": palette["texto"],
-            "warning": palette["acento"], "danger": palette["acento"],
+            "success": palette["exito"], "info": palette["texto"],
+            "warning": palette["acento"], "danger": palette["error"],
             "light": palette["texto"], "dark": palette["fondo"],
             "bg": palette["fondo"], "fg": palette["texto"],
             "selectbg": palette["panel"], "selectfg": palette["texto"],
             "border": palette["panel"], "inputfg": palette["texto"],
-            "inputbg": palette["panel"], "active": palette["panel"],
+            "inputbg": palette["fondo"], "active": palette["elevado"],
         }
     return {
         "primary": palette["acento"], "secondary": palette["suave"],
-        "success": palette["acento"], "info": palette["activo"],
-        "warning": palette["activo"], "danger": palette["acento"],
+        "success": palette["exito"], "info": palette["activo"],
+        "warning": palette["activo"], "danger": palette["error"],
         "light": palette["fondo"], "dark": palette["texto"],
         "bg": palette["fondo"], "fg": palette["texto"],
         "selectbg": palette["suave"], "selectfg": palette["texto"],
@@ -101,21 +104,23 @@ def armonizar_estilos_ttk(style, dark=True):
             foreground=foreground, font=FUENTE_TTK_NORMAL)
         style.configure(f"{prefix}TNotebook", background=background, borderwidth=0)
         style.configure(
-            f"{prefix}TNotebook.Tab", background=panel,
+            f"{prefix}TNotebook.Tab", background=background,
             foreground=foreground, font=FUENTE_TTK_NORMAL, padding=(10, 6))
         style.map(
             f"{prefix}TNotebook.Tab",
-            background=[("selected", accent), ("active", panel)],
-            foreground=[("selected", background), ("active", foreground)])
+            background=[("selected", background), ("active", palette["elevado"])],
+            foreground=[("selected", accent), ("active", foreground)])
     # Tableview crea estilos prefijados según bootstyle. Un tamaño negativo
     # expresa píxeles en Tk y evita que Windows vuelva a escalarlo como puntos.
     for prefix in ("", "primary.", "secondary.", "info.", "warning."):
         style.configure(
             f"{prefix}Table.Treeview", font=FUENTE_TTK_TABLA,
-            rowheight=23, borderwidth=0)
+            rowheight=28, borderwidth=0,
+            background=background, fieldbackground=background, foreground=foreground)
         style.configure(
             f"{prefix}Table.Treeview.Heading",
-            font=FUENTE_TTK_TABLA_ENCABEZADO, padding=(5, 4))
+            font=FUENTE_TTK_TABLA_ENCABEZADO, padding=(8, 7),
+            background=palette["elevado"], foreground=foreground)
 
 
 COLOR_FONDO = (PALETA_CLARA["fondo"], PALETA_OSCURA["fondo"])
@@ -123,7 +128,7 @@ COLOR_PANEL = COLOR_FONDO
 COLOR_PANEL_OSCURO = COLOR_FONDO
 COLOR_BORDE = (PALETA_CLARA["activo"], PALETA_OSCURA["panel"])
 COLOR_TEXTO = (PALETA_CLARA["texto"], PALETA_OSCURA["texto"])
-COLOR_TEXTO_SUAVE = (PALETA_CLARA["texto"], PALETA_OSCURA["texto"])
+COLOR_TEXTO_SUAVE = (PALETA_CLARA["muted"], PALETA_OSCURA["muted"])
 COLOR_ACENTO = (PALETA_CLARA["acento"], PALETA_OSCURA["acento"])
 COLOR_ACENTO_HOVER = (PALETA_CLARA["activo"], PALETA_OSCURA["acento"])
 COLOR_MOSTAZA = COLOR_ACENTO
@@ -131,21 +136,22 @@ COLOR_GRIS_BOTON = (PALETA_CLARA["suave"], PALETA_OSCURA["panel"])
 COLOR_GRIS_BOTON_HOVER = (PALETA_CLARA["activo"], PALETA_OSCURA["acento"])
 COLOR_MARCO_BOTON = ("#000000", "#000000")
 COLOR_SELECCION = (PALETA_CLARA["suave"], PALETA_OSCURA["panel"])
-COLOR_EXITO = COLOR_ACENTO
-COLOR_ERROR = COLOR_ACENTO
+COLOR_EXITO = (PALETA_CLARA["exito"], PALETA_OSCURA["exito"])
+COLOR_ERROR = (PALETA_CLARA["error"], PALETA_OSCURA["error"])
 
-RADIO_CONTROL = 6
-RADIO_PANEL = 10
+RADIO_CONTROL = 0
+RADIO_PANEL = 0
 
 FAMILIA_PRESSURA = "GT Pressura"
-FAMILIA_CUERPO = "Helvetica Neue"
+FAMILIA_CUERPO = "Roboto"
+FAMILIA_TITULOS = "Roboto Condensed"
 # Se conserva el nombre para diagnosticar el archivo distribuido, pero toda la
 # interfaz usa una sola familia. Así números y letras comparten métricas.
 FAMILIA_PRESSURA_BOLD = "GTPressura-Bold"
-FUENTE_TITULO = (FAMILIA_PRESSURA, 28, "bold")
-FUENTE_TITULO_PEQUENO = (FAMILIA_PRESSURA, 20, "bold")
-FUENTE_SUBTITULO = (FAMILIA_PRESSURA, 18, "bold")
-FUENTE_SUBTITULO_PEQUENO = (FAMILIA_PRESSURA, 15, "bold")
+FUENTE_TITULO = (FAMILIA_TITULOS, 28, "bold")
+FUENTE_TITULO_PEQUENO = (FAMILIA_TITULOS, 22, "bold")
+FUENTE_SUBTITULO = (FAMILIA_TITULOS, 18, "bold")
+FUENTE_SUBTITULO_PEQUENO = (FAMILIA_TITULOS, 15, "bold")
 FUENTE_MENU = (FAMILIA_CUERPO, 13)
 FUENTE_NORMAL = (FAMILIA_CUERPO, 13)
 FUENTE_NORMAL_PEQUENA = FUENTE_NORMAL
@@ -185,6 +191,9 @@ def registrar_fuentes() -> None:
         "GTPressura-Bold.ttf",
         "HelveticaNeueRoman.ttf",
         "HelveticaNeueBold.ttf",
+        "roboto-400.ttf",
+        "roboto-700.ttf",
+        "roboto-condensed-700.ttf",
     )
     for name in font_names:
         path = os.path.join(font_dir, name)
