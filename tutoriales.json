@@ -165,6 +165,13 @@
       "notas": ["No funciona en Model.", "Revisa el resultado en los layouts antes de publicar."],
       "tags": ["layout", "viewport"]
     },
+    "BTORIENT": {
+      "titulo": "Orientar un bloque mediante dos puntos",
+      "descripcion": "Rota completamente la referencia de bloque seleccionada para alinearla con una dirección definida mediante dos puntos.",
+      "pasos": ["Escribe BTORIENT.", "Selecciona el bloque.", "Marca el primer punto de alineación.", "Marca el segundo punto en la dirección deseada."],
+      "notas": ["Sólo cambia la inserción seleccionada; la definición y las demás referencias no se modifican.", "El orden de los puntos determina el sentido de la orientación.", "La operación conserva el punto de inserción y queda agrupada en un solo Deshacer."],
+      "tags": ["bloque", "orientar", "rotar", "alinear", "torient"]
+    },
     "CEVIADA": {
       "titulo": "Cotas para elementos esviados",
       "descripcion": "Crea una cota alineada y muestra además la dimensión recta calculada con el coseno del ángulo de esviaje; admite cotas continuas.",

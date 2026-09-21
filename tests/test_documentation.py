@@ -12,13 +12,22 @@ class DocumentationTests(unittest.TestCase):
         self.assertEqual(data["schema"], 2)
         documented = set(data["comandos_lisp"])
         expected = {
-            "SINCAL", "BV", "CEVIADA", "CPOL", "DEL-VIN", "DIMEL", "DL2",
+            "SINCAL", "BV", "BTORIENT", "CEVIADA", "CPOL", "DEL-VIN", "DIMEL", "DL2",
             "DUP / DUPLICAR", "EXTRIMOUT", "MC", "MPEND", "P0", "PLOTYA", "PND",
             "PURGEALL", "RMLAY", "SEL-SC", "SETUP-A1", "SINCAL-ESCALAS", "ST0",
             "VRAP", "VPTOGGLE", "W08", "ZE", "ZV", "CUSTOM-PROPS", "COPY-PROPS",
             "PASTE-PROPS", "REPARAR-PROPS", "C-INICIO / C-FIN", "C0 … C9",
         }
         self.assertEqual(documented, expected)
+
+    def test_btorient_rotates_only_the_selected_reference(self):
+        source = (ROOT / "lisps" / "BTORIENT.lsp").read_text(encoding="utf-8")
+        self.assertIn("(defun c:BTORIENT", source)
+        self.assertIn("vla-put-Rotation", source)
+        self.assertIn("Primer punto de alineacion", source)
+        self.assertIn("Segundo punto de alineacion", source)
+        self.assertNotIn("vla-CopyObjects", source)
+        self.assertNotIn("vla-InsertBlock", source)
 
     def test_tutorials_cover_every_main_interface_area(self):
         data = json.loads((ROOT / "tutoriales.json").read_text(encoding="utf-8"))

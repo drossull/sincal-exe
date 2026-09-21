@@ -34,6 +34,7 @@
     "sincal/ui/tabs/documentacion.py",
     "sincal/ui/tabs/diagnostico.py",
     "lisps/BV.lsp",
+    "lisps/BTORIENT.lsp",
     "lisps/VRAP.lsp",
     "lisps/VPTOGGLE.lsp",
     "lisps/SINCAL.lsp",
