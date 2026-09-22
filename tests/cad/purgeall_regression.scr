@@ -1,0 +1,5 @@
+(load (strcat (getenv "SINCAL_TEST_ROOT") "/lisps/PURGEALL.lsp"))
+(load (strcat (getenv "SINCAL_TEST_ROOT") "/tests/cad/purgeall_regression.lsp"))
+(sincal:test-purgeall)
+_.QUIT
+_Y

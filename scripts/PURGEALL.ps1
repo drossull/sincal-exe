@@ -29,6 +29,7 @@ $scrContent = @"
 _.AUDIT _Y
 _.-PURGE _A * _N
 _.-PURGE _R * _N
+_.-SCALELISTEDIT _Delete * _Exit
 _.ZOOM _E
 _.QSAVE
 _.QUIT
