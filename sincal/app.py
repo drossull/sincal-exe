@@ -123,6 +123,7 @@ COMANDOS_VIVO = (
     ("ZE", "ZE"),
     ("PLOTYA", "PLOTYA"),
     ("VPTOGGLE", "VPTOGGLE"),
+    ("LAYORIGIN", "LAYORIGIN"),
 )
 COMANDOS_VIVO_CONOCIDOS = {
     alias for _label, command in COMANDOS_VIVO

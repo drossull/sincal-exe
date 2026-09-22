@@ -60,7 +60,17 @@ acentos corporativos, separadores finos, controles rectos y botones con sombra
 desplazada. Usa Roboto para lectura y Roboto Condensed para títulos; ambas fuentes
 se incluyen con la aplicación. La animación conserva su rótulo Pressura.
 
-Este módulo envía una orden autónoma, de forma secuencial, a los dibujos CAD abiertos y espera tanto la recepción como el término antes de cambiar de plano. Cada transición vuelve a adquirir el documento activo, espera que la pila de comandos quede ociosa y reintenta los rechazos COM transitorios sin duplicar la orden. Por seguridad no ejecuta si detecta varias instancias o versiones de AutoCAD/ZWCAD abiertas. El glosario visible se limita a `BV`, `DL2`, `P0`, `PURGEALL`, `SETUP-A1`, `ST0`/`STO`, `W08`, `ZE`, `PLOTYA` y `VPTOGGLE`. `VPTOGGLE` alterna la visibilidad de la capa `Viewport layer` y no requiere respuestas posteriores. También puedes escribir un comando nativo, como `_QSAVE`, si confirmas que termina por sí solo y no solicita puntos, opciones ni respuestas. El campo acepta únicamente el nombre del comando, sin parámetros ni expresiones LISP. Usa Cancelar si necesitas detener el recorrido. Para carpetas grandes, prefiere el procesamiento desde CMD, que aísla cada DWG mediante el motor elegido en Diagnóstico.
+Este módulo envía una orden autónoma, de forma secuencial, a los dibujos CAD abiertos y espera tanto la recepción como el término antes de cambiar de plano. Cada transición vuelve a adquirir el documento activo, espera que la pila de comandos quede ociosa y reintenta los rechazos COM transitorios sin duplicar la orden. Por seguridad no ejecuta si detecta varias instancias o versiones de AutoCAD/ZWCAD abiertas. El glosario visible incluye `BV`, `DL2`, `P0`, `PURGEALL`, `SETUP-A1`, `ST0`/`STO`, `W08`, `ZE`, `PLOTYA`, `VPTOGGLE` y `LAYORIGIN`. `VPTOGGLE` alterna la visibilidad de la capa `Viewport layer` y no requiere respuestas posteriores. También puedes escribir un comando nativo, como `_QSAVE`, si confirmas que termina por sí solo y no solicita puntos, opciones ni respuestas. El campo acepta únicamente el nombre del comando, sin parámetros ni expresiones LISP. Usa Cancelar si necesitas detener el recorrido. Para carpetas grandes, prefiere el procesamiento desde CMD, que aísla cada DWG mediante el motor elegido en Diagnóstico.
+
+### Corregir el origen del papel conservando Layout
+
+`LAYORIGIN` corrige el origen interno del papel de la presentación actual cuando
+el área de trazado está en **Layout**. Restablece los campos DXF 148/149 a cero,
+sin mover entidades ni modificar papel, escala, PC3, UCS o desplazamiento de
+trazado. No guarda el DWG y permite deshacer con `U`. Activa el layout afectado,
+ejecuta el comando y verifica la vista previa antes de guardar. Para un solo
+dibujo úsalo directamente en CAD; Comandos en vivo lo envía a cada dibujo abierto.
+Validado en AutoCAD 2025; pendiente de prueba en ZWCAD.
 
 ### Procesamiento DWG desde CMD
 

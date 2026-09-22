@@ -37,6 +37,7 @@
     "lisps/BTORIENT.lsp",
     "lisps/VRAP.lsp",
     "lisps/VPTOGGLE.lsp",
+    "lisps/LAYORIGIN.lsp",
     "lisps/SINCAL.lsp",
     "lisps/SINCAL_ESCALAS.lsp",
     "lisps/SEL-SC.lsp",

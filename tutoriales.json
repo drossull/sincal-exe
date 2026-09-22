@@ -312,6 +312,13 @@
       "notas": ["Si Viewport layer es la capa actual, SINCAL cambia primero a la capa 0.", "Si la capa no existe, el dibujo no se modifica.", "Ocultar la capa no cambia por sí solo su propiedad de impresión."],
       "tags": ["viewport", "layer", "visibilidad"]
     },
+    "LAYORIGIN": {
+      "titulo": "Restablecer el origen interno del papel",
+      "descripcion": "Corrige el desfase interno de la hoja del layout actual, manteniendo What to plot en Layout y sin mover el formato ni los viewports.",
+      "pasos": ["Activa la presentación afectada con What to plot = Layout.", "Escribe LAYORIGIN y presiona Enter.", "Comprueba la vista previa y guarda el DWG si el resultado es correcto."],
+      "notas": ["Restablece únicamente el origen interno de la imagen del papel (DXF 148 y 149). No modifica el desplazamiento de trazado, PC3, papel, escala ni UCS.", "No actúa en Model ni cuando el área de trazado es Window u otra distinta de Layout.", "Si el origen ya es cero no hace cambios. La corrección puede deshacerse con U y no guarda automáticamente.", "Desde Comandos en vivo se aplica al layout actual de cada dibujo abierto; para corregir solo un dibujo, ejecútalo directamente en CAD.", "Validado en AutoCAD 2025. Pendiente de prueba en ZWCAD."],
+      "tags": ["layout", "origen", "papel", "desfase", "plot"]
+    },
     "W08": {
       "titulo": "Factor de ancho 0.8",
       "descripcion": "Aplica Width Factor 0.8 a todos los estilos de texto.",
