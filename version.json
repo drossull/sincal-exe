@@ -35,6 +35,7 @@
     "sincal/ui/tabs/diagnostico.py",
     "lisps/BV.lsp",
     "lisps/BTORIENT.lsp",
+    "lisps/TXT-JOIN.lsp",
     "lisps/MARCAS-SC.lsp",
     "lisps/VRAP.lsp",
     "lisps/VPTOGGLE.lsp",

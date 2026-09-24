@@ -165,6 +165,13 @@
       "notas": ["No funciona en Model.", "Revisa el resultado en los layouts antes de publicar."],
       "tags": ["layout", "viewport"]
     },
+    "TXT-JOIN": {
+      "titulo": "Reconstruir textos fragmentados en un MTEXT",
+      "descripcion": "Agrupa entidades TEXT (líneas, palabras o caracteres sueltos) por su posición para crear un MTEXT editable, con lectura de arriba abajo y de izquierda a derecha.",
+      "pasos": ["Carga TXT-JOIN.lsp o actualiza los recursos de SINCAL y escribe TXT-JOIN.", "Selecciona una sola columna o bloque de lectura; puedes incluir líneas de dibujo, que serán omitidas.", "Acepta las tolerancias de 0.35 o ajústalas: aumenta la de líneas para agrupar bases desalineadas, y reduce la de palabras si dos palabras quedan pegadas.", "Indica un punto libre para revisar el MTEXT; Enter utiliza la ubicación original.", "Elige Conservar (predeterminado), Reemplazar o Cancelar. Reemplazar elimina únicamente los TEXT incorporados al resultado."],
+      "notas": ["Reconstrucción geométrica, sin OCR ni corrección lingüística: revisa espacios, cifras y símbolos técnicos antes de reemplazar.", "Si las letras son LINE o POLYLINE, ya no contienen texto y requieren OCR. MTEXT existentes, atributos y textos dentro de bloques se omiten.", "Selecciona cada columna independiente por separado para no mezclar sus renglones. Las tablas se ordenan por filas, con separación aproximada entre celdas.", "Conserva saltos de línea, tamaños relativos, factores de ancho, oblicuidad y códigos de subrayado del texto. Unifica fuente, capa y color usando el TEXT compatible más largo como referencia; no reproduce exactamente la maquetación.", "Admite textos paralelos en el plano XY, incluso girados. Omite texto reflejado, vertical, ajustado/alineado, con campos o situado en otro plano/orientación.", "Las líneas dibujadas como subrayados no se convierten ni se borran. Si una capa está bloqueada, conserva todos los originales. La operación se agrupa en un Deshacer."],
+      "tags": ["texto", "mtext", "unir", "explotado", "especificaciones", "TXT-JOIN"]
+    },
     "BTORIENT": {
       "titulo": "Orientar un bloque mediante dos puntos",
       "descripcion": "Rota completamente la referencia de bloque seleccionada para alinearla con una dirección definida mediante dos puntos.",

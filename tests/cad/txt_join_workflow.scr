@@ -1,0 +1,47 @@
+(setq txut-root (getenv "SINCAL_TEST_ROOT"))
+(load (strcat txut-root "/lisps/TXT-JOIN.lsp"))
+(load (strcat txut-root "/tests/cad/txt_join_regression.lsp"))
+_.UNDO
+_Auto
+_Off
+(setvar "PICKFIRST" 1)
+(setq txut-original (TXUT:Text "FLUJO" 0.0 0.0 1.0 0.0) txut-last (entlast))
+(sssetfirst nil (ssadd txut-original))
+TXT-JOIN
+
+
+100,100,0
+Cancelar
+(TXUT:Assert (and (entget txut-original) (eq (entlast) txut-last)) "cancel preserves originals and removes preview")
+(sssetfirst nil (ssadd txut-original))
+TXT-JOIN
+
+
+100,100,0
+Conservar
+(setq txut-copy (entlast))
+(TXUT:Assert (and (entget txut-original) (= "MTEXT" (cdr (assoc 0 (entget txut-copy))))) "keep originals workflow")
+(sssetfirst nil (ssadd txut-original))
+TXT-JOIN
+
+
+200,100,0
+Reemplazar
+_.U
+(TXUT:Assert (and (entget txut-original) (eq (entlast) txut-copy)) "single undo restores originals and removes replacement")
+(entmake '((0 . "LAYER") (2 . "TXUT_LOCKED") (70 . 0)))
+(setq txut-locked (TXUT:Text "X" 0.0 -2.0 1.0 0.0))
+(entmod (subst '(8 . "TXUT_LOCKED") (assoc 8 (entget txut-locked)) (entget txut-locked)))
+(setq txut-layer (entget (tblobjname "LAYER" "TXUT_LOCKED")))
+(entmod (subst '(70 . 4) (assoc 70 txut-layer) txut-layer))
+(sssetfirst nil (ssadd txut-locked (ssadd txut-original)))
+TXT-JOIN
+
+
+300,100,0
+Reemplazar
+(TXUT:Assert (and (entget txut-original) (entget txut-locked) (= "MTEXT" (cdr (assoc 0 (entget (entlast)))))) "locked layer keeps all originals and new MTEXT")
+(princ (strcat "\nTXT-JOIN_WORKFLOW_FAILURES=" (itoa TXUT:Failures) "\n"))
+_.UNDO
+_Auto
+_On
