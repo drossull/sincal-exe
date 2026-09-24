@@ -340,6 +340,34 @@
       "notas": ["Si estás dentro de un viewport, el comando vuelve primero a espacio papel.", "No modifica la escala ni la vista interna de los viewports."],
       "tags": ["zoom", "layout", "papel", "cuadrante"]
     },
+    "MARCA-SC": {
+      "titulo": "Insertar marca de armadura vinculada",
+      "descripcion": "Inserta una marca dinámica anotativa vinculada a una tabla: flip izquierda/derecha y cantidad opcional delante del diámetro.",
+      "pasos": ["Carga MARCAS-SC.lsp y escribe MARCA-SC.", "Selecciona la tabla: título en fila 1, encabezados en fila 2 y columnas A=marca, B=cantidad, C=diámetro, D=separación.", "Indica una marca numérica única.", "Pulsa Enter para usar masters/SINCAL_MARCA_SC_V2.dwg y definir la altura de texto en papel; o selecciona un bloque modelo existente para copiarlo.", "Indica el punto de inserción. Usa Flip state1 para cambiar el lado y Visibility1 para elegir SIN_CANTIDAD o CON_CANTIDAD.", "Copia el bloque y edita únicamente XX. Al confirmar, busca esa marca en la misma tabla y reconstruye sus campos."],
+      "notas": ["La plantilla V2 usa RomanD, círculo rojo ACI 1 y una máscara de fondo de factor 1.2 en cada descripción completa. El flip no invierte la lectura.", "El bloque es anotativo. Añade las escalas de representación necesarias con OBJECTSCALE; no confundas altura en papel con altura en modelo. Copiar un modelo antiguo conserva sus propiedades, no lo convierte a V2.", "La búsqueda automática requiere MARCAS-SC.lsp cargado en cada dibujo. Marca inexistente o duplicada muestra [SIN VINCULO]. No busca automáticamente otra tabla; para cambiarla usa REASIGNAR-MARCA.", "La cantidad se lee de B, no se cuentan barras ni copias de rótulos. Se requieren marcas numéricas únicas, cantidades enteras positivas y diámetro/separación positivos. Probado en AutoCAD 2025 Windows con ActiveX.", "Si modificas XX desde una herramienta que no finaliza un comando, REGEN procesa los cambios pendientes. ACTUALIZAR-MARCAS repara vínculos por identidad de fila. No se modifica el plano original ni se sustituyen automáticamente sus bloques antiguos."],
+      "tags": ["armaduras", "marca", "tabla", "campos", "bloque"]
+    },
+    "REASIGNAR-MARCA": {
+      "titulo": "Vincular o reasignar rótulos de armadura",
+      "descripcion": "Asigna conjuntamente el número de marca y sus campos de diámetro y separación a los bloques seleccionados, conservando geometría y otros atributos.",
+      "pasos": ["Escribe REASIGNAR-MARCA.", "Selecciona uno o varios bloques con atributos editables XX y MARCA; Enter.", "Selecciona la tabla e indica la marca numérica de destino."],
+      "notas": ["Todos los seleccionados se asignan a la misma marca: para migrar un plano existente trabaja por grupos de marca.", "No migra automáticamente los rótulos antiguos. Conserva TEXTO y los parámetros dinámicos.", "Rechaza capas bloqueadas. Una operación se deshace con U."],
+      "tags": ["armaduras", "reasignar", "campos", "migración"]
+    },
+    "ACTUALIZAR-MARCAS": {
+      "titulo": "Reparar referencias por identidad de fila",
+      "descripcion": "Localiza la fila original por su identificador y reconstruye las referencias de los campos de las marcas seleccionadas.",
+      "pasos": ["Escribe ACTUALIZAR-MARCAS.", "Selecciona los rótulos registrados con MARCA-SC o REASIGNAR-MARCA; Enter.", "Revisa las marcas omitidas en la línea de comandos."],
+      "notas": ["No adivina otra fila si se eliminó la original ni si hay identificadores duplicados.", "Permite renumerar una marca numérica e insertar filas. Pegar solo valores sobre otra fila no mueve su identidad: reasigna expresamente si cambias el significado de las filas.", "Restablece XX desde la fila vinculada y reconstruye MARCA y MARCA_CANT. XX es una entrada editable; las descripciones son campos administrados. No cambia TEXTO ni cuenta barras."],
+      "tags": ["armaduras", "identificador", "actualizar", "tabla"]
+    },
+    "REVISAR-MARCAS": {
+      "titulo": "Revisar vínculos de armaduras sin modificarlos",
+      "descripcion": "Comprueba rótulos de modelo y layouts, sus registros de tabla/fila y sus campos. Informa incidencias por handle del bloque.",
+      "pasos": ["Escribe REVISAR-MARCAS.", "Lee el resumen; F2 muestra el detalle.", "Usa REASIGNAR-MARCA para registrar rótulos antiguos, o ACTUALIZAR-MARCAS para reparar campos de rótulos registrados."],
+      "notas": ["Sin registro no significa necesariamente que un campo antiguo esté roto: significa que aún no tiene la identidad gestionada por SINCAL.", "No modifica ni guarda el dibujo. No recorre bloques anidados o referencias externas."],
+      "tags": ["armaduras", "revisar", "diagnóstico", "campos"]
+    },
     "CUSTOM-PROPS": {
       "titulo": "Editar propiedades de viñeta",
       "descripcion": "Recorre las propiedades SINCAL del dibujo, conserva el valor con Enter, actualiza campos y guarda.",

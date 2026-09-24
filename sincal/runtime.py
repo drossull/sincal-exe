@@ -55,6 +55,7 @@ RUTA_CAD_USUARIO = os.path.join(
 RECURSOS_EXACTOS = {
     "tutoriales.json",
     "masters/FORMATOS ANOTATIVOS ACAD_2025.dwg",
+    "masters/SINCAL_MARCA_SC_V2.dwg",
 }
 RECURSOS_POR_CARPETA = {
     "lisps/": {".lsp"},

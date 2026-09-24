@@ -8,6 +8,10 @@ from sincal import runtime as sincal_runtime
 
 
 class RuntimeResourceResolutionTests(unittest.TestCase):
+    def test_dynamic_mark_template_is_updateable(self):
+        self.assertTrue(sincal_runtime.es_recurso_actualizable("masters/SINCAL_MARCA_SC_V2.dwg"))
+        self.assertFalse(sincal_runtime.es_recurso_actualizable("masters/unrelated.dwg"))
+
     def test_uses_overlay_fallback_and_tombstone(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             installed = os.path.join(temp_dir, "installed")

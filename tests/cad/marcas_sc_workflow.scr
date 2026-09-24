@@ -1,0 +1,24 @@
+(setq scmt-root (getenv "SINCAL_TEST_ROOT"))
+(load (strcat scmt-root "/lisps/MARCAS-SC.lsp"))
+(load (strcat scmt-root "/tests/cad/marcas_sc_regression.lsp"))
+_.UNDO
+_Auto
+_Off
+(entmake '((0 . "POINT") (10 500.0 500.0 0.0)))
+(setq scmt-before (entlast))
+(defun SCMT:Cancel () (quit))
+(SCM:Run 'SCMT:Cancel)
+(SCMT:Assert (equal scmt-before (entlast)) "cancel without writes preserves previous user action")
+(defun SCMT:FailAfterWrite () (entmake '((0 . "POINT") (10 600.0 600.0 0.0))) (setq SCM:changed T) (SCM:Fail "Fallo controlado de prueba"))
+(SCM:Run 'SCMT:FailAfterWrite)
+(SCMT:Assert (equal scmt-before (entlast)) "error rolls back only command writes")
+(defun SCMT:Write () (entmake '((0 . "POINT") (10 700.0 700.0 0.0))) (setq SCM:changed T))
+(SCM:Run 'SCMT:Write)
+(SCMT:Assert (not (equal scmt-before (entlast))) "command actually writes")
+_.U
+(SCMT:Assert (equal scmt-before (entlast)) "single undo restores state")
+(princ (strcat "\nMARCAS_SC_UNDO_FAILURES=" (itoa SCMT:Failures) "\n"))
+_.UNDO
+_Auto
+_On
+(if SCMT:Report (progn (write-line (strcat "DONE failures=" (itoa SCMT:Failures)) SCMT:Report) (close SCMT:Report) (setq SCMT:Report nil)))

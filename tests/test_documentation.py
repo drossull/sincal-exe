@@ -17,6 +17,7 @@ class DocumentationTests(unittest.TestCase):
             "PURGEALL", "RMLAY", "SEL-SC", "SETUP-A1", "SINCAL-ESCALAS", "ST0",
             "VRAP", "VPTOGGLE", "LAYORIGIN", "W08", "ZE", "ZV", "CUSTOM-PROPS", "COPY-PROPS",
             "PASTE-PROPS", "REPARAR-PROPS", "C-INICIO / C-FIN", "C0 … C9",
+            "MARCA-SC", "REASIGNAR-MARCA", "ACTUALIZAR-MARCAS", "REVISAR-MARCAS",
         }
         self.assertEqual(documented, expected)
 

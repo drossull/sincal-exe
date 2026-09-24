@@ -27,6 +27,7 @@ class DistributionExportTests(unittest.TestCase):
 
     def test_exports_only_allowed_resources_and_manifest(self):
         self._write("lisps/G45.lsp", b"(defun c:G45 () (princ))\n")
+        self._write("masters/SINCAL_MARCA_SC_V2.dwg", b"AC1032dynamic-mark")
         self._write("sincal/app.py", b"private source")
 
         result = export_distribution(
@@ -42,6 +43,7 @@ class DistributionExportTests(unittest.TestCase):
         self.assertEqual(manifest["release"], "v28.0.1")
         self.assertEqual(manifest["source_commit"], "a" * 40)
         self.assertIn("lisps/G45.lsp", manifest["resources"])
+        self.assertIn("masters/SINCAL_MARCA_SC_V2.dwg", manifest["resources"])
 
     def test_removes_a_resource_deleted_from_private_source(self):
         self._write("lisps/OLD.lsp", b"(princ)\n")

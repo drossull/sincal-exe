@@ -1,0 +1,47 @@
+(setq scmt-root (getenv "SINCAL_TEST_ROOT"))
+(load (strcat scmt-root "/lisps/MARCAS-SC.lsp"))
+(load (strcat scmt-root "/tests/cad/marcas_sc_regression.lsp"))
+(load (strcat scmt-root "/tests/cad/marcas_sc_dynamic.lsp"))
+(defun c:SCMT-EDIT () (SCM:PutText (cdr (assoc "XX" (SCM:Attrs SCMT:Copy))) "12") (princ))
+SCMT-EDIT
+(SCMT:Assert (= "12" (SCMT:Text SCMT:Copy "XX")) "edited number retained")
+(SCMT:Assert (= "24 %%c12@15" (SCMT:Text SCMT:Copy "MARCA_CANT")) "copy edit automatically relinks and evaluates")
+(SCMT:Assert (= "1" (SCMT:Text SCMT:Original "XX")) "copy edit does not change original")
+(SCMT:Assert (SCM:Healthy SCMT:Copy (SCM:Resolve SCMT:Copy)) "automatic binding has correct native fields")
+(defun c:SCMT-BAD () (SCM:PutText (cdr (assoc "XX" (SCM:Attrs SCMT:Copy))) "999") (princ))
+SCMT-BAD
+(SCMT:Assert (= "[SIN VINCULO]" (SCMT:Text SCMT:Copy "MARCA")) "unknown number clears stale description")
+SCMT-EDIT
+(SCMT:Assert (= "24 %%c12@15" (SCMT:Text SCMT:Copy "MARCA_CANT")) "correcting number restores link")
+(setvar "FIELDDISPLAY" 0)
+(command "_.-OBJECTSCALE" (vlax-vla-object->ename SCMT:Original) "" "_Add" "1:2" "")
+(setvar "CANNOSCALE" "1:2")
+(SCMT:Assert (equal 5.0 (vla-get-XScaleFactor SCMT:Original) 1e-8) "annotation 1:2 doubles model size")
+(setq SCMT:Scaled (vla-InsertBlock (vla-get-ModelSpace (SCM:Doc)) (vlax-3d-point '(60 0 0)) (SCM:BasicDefinition) 2.5 2.5 2.5 0.0))
+(SCMT:Assert (equal 5.0 (vla-get-XScaleFactor SCMT:Scaled) 1e-8) "new insertion uses current annotation scale")
+(setvar "CANNOSCALE" "1:1")
+(SCMT:Assert (equal 2.5 (vla-get-XScaleFactor SCMT:Original) 1e-8) "annotation 1:1 restores paper size")
+(command "_.COPYBASE" '(0 0 0) (vlax-vla-object->ename SCMT:Original) "")
+(command "_.PASTECLIP" '(0 -30 0))
+(setq SCMT:Paste (vlax-ename->vla-object (entlast)))
+(SCMT:Assert (SCM:Healthy SCMT:Paste (SCM:Resolve SCMT:Paste)) "clipboard paste retains same-table binding")
+(SCM:PutText (cdr (assoc "XX" (SCM:Attrs SCMT:Paste))) "12")
+(SCMT:Assert (= "24 %%c12@15" (SCMT:Text SCMT:Paste "MARCA_CANT")) "clipboard paste number edit relinks")
+(defun c:SCMT-ONE () (SCM:PutText (cdr (assoc "XX" (SCM:Attrs SCMT:Paste))) "1") (princ))
+_.UNDO
+_Auto
+_Off
+_.UNDO
+_Begin
+SCMT-ONE
+_.UNDO
+_End
+_.U
+(SCMT:Assert (= "12" (SCMT:Text SCMT:Paste "XX")) "undo edit group restores user mark")
+(SCMT:Assert (SCM:Healthy SCMT:Paste (SCM:Resolve SCMT:Paste)) "undo edit group restores binding and fields")
+_.UNDO
+_Auto
+_On
+_.ZOOM
+_Extents
+(if SCMT:Report (progn (write-line (strcat "DONE failures=" (itoa SCMT:Failures)) SCMT:Report) (close SCMT:Report) (setq SCMT:Report nil)))
