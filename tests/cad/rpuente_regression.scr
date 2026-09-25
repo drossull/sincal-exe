@@ -1,0 +1,17 @@
+(load (strcat (getenv "SINCAL_TEST_ROOT") "/lisps/RPUENTE.lsp"))
+(load (strcat (getenv "SINCAL_TEST_ROOT") "/tests/cad/rpuente_regression.lsp"))
+(setvar "OSMODE" 0)
+(setvar "SNAPMODE" 0)
+(setvar "DYNMODE" 0)
+_.UCS
+_World
+RPUENTE
+Trespuntos
+1,0,0
+0,1,0
+-1,0,0
+Metros
+(RPT:Assert (RPT:Near (cdr (assoc 'radio-metros RPUENTE-RESULTADO)) 1.0) "interactive three point measurement")
+(princ (strcat "\nRPUENTE_FINAL_FAILURES=" (itoa RPT:Failures) "\n"))
+_.QUIT
+_Y
