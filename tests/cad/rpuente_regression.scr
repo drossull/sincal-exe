@@ -1,4 +1,8 @@
 (load (strcat (getenv "SINCAL_TEST_ROOT") "/lisps/RPUENTE.lsp"))
+(vlr-remove-all)
+_.UNDO
+_Auto
+_Off
 (load (strcat (getenv "SINCAL_TEST_ROOT") "/tests/cad/rpuente_regression.lsp"))
 (setvar "OSMODE" 0)
 (setvar "SNAPMODE" 0)
@@ -11,7 +15,22 @@ Trespuntos
 0,1,0
 -1,0,0
 Metros
+No
 (RPT:Assert (RPT:Near (cdr (assoc 'radio-metros RPUENTE-RESULTADO)) 1.0) "interactive three point measurement")
+(RPT:Assert (null (assoc 'marca RPUENTE-RESULTADO)) "optional no marker")
+_.UCS
+_Origin
+100,200,0
+RPUENTE
+Trespuntos
+1,0,0
+0,1,0
+-1,0,0
+Metros
+Si
+(RPT:Assert (equal (cdr (assoc 10 (entget (car (cdr (assoc 'marca RPUENTE-RESULTADO)))))) '(100.0 200.0 0.0) 1.0e-8) "interactive mark in WCS with shifted UCS")
+_.U
+(RPT:Assert (not (vl-some 'entget (cdr (assoc 'marca RPUENTE-RESULTADO)))) "one undo removes the whole marker")
 (princ (strcat "\nRPUENTE_FINAL_FAILURES=" (itoa RPT:Failures) "\n"))
 _.QUIT
 _Y

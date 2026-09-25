@@ -1,6 +1,7 @@
 ;;; RPUENTE -- Radio geometrico de una curva en planta.
 ;;; AutoCAD 2025/2027 y ZWCAD 2026 Windows; no requiere Express Tools.
-;;; No altera entidades ni variables del dibujo. No calcula el radio de giro
+;;; Marca opcional del centro con POINT y cruz, sin alterar la curva original.
+;;; No calcula el radio de giro
 ;;; de una seccion (sqrt(I/A)), ni verifica el trazado o el diseno estructural.
 ;;; Resultado: alist RPUENTE-RESULTADO, radios en unidades reales del dibujo.
 (vl-load-com)
@@ -148,7 +149,45 @@
         ((= units "Milimetros") (/ radius 1000.0)))
 )
 
-(defun RP:Report (result / units radius metres center)
+(defun RP:MarkCenter (center radius / *error* layer data halfsize specs entities spec ent undo-open failed)
+  (defun *error* (msg)
+    (foreach ent entities (if (entget ent) (entdel ent)))
+    (setq entities nil)
+    (if undo-open (progn (setq undo-open nil) (command-s "_.UNDO" "_End")))
+    (princ (strcat "\n[RPUENTE] No se completo la marca: " msg))
+    (princ))
+  (setq layer (getvar "CLAYER") data (tblsearch "LAYER" layer))
+  (if (or (/= 0 (logand 5 (RP:Get 70 data 0))) (< (RP:Get 62 data 7) 0))
+    (progn (princ "\n[RPUENTE] La capa actual esta bloqueada, apagada o congelada. No se creo la marca.") nil)
+    (progn
+      ;; POINT admite referencia NODO. La cruz es visible sin modificar PDMODE.
+      ;; Todos los puntos DXF estan en WCS y en unidades de dibujo, no en metros.
+      (setq halfsize (/ radius 200.0)
+            specs (list
+              (list '(0 . "POINT") (cons 10 center))
+              (list '(0 . "LINE")
+                (cons 10 (list (- (car center) halfsize) (cadr center) (caddr center)))
+                (cons 11 (list (+ (car center) halfsize) (cadr center) (caddr center))))
+              (list '(0 . "LINE")
+                (cons 10 (list (car center) (- (cadr center) halfsize) (caddr center)))
+                (cons 11 (list (car center) (+ (cadr center) halfsize) (caddr center))))))
+      (command "_.UNDO" "_Begin")
+      (setq undo-open T)
+      (foreach spec specs
+        (if (not failed)
+          (if (entmake (append spec (list (cons 8 layer) '(62 . 1) '(6 . "Continuous"))))
+            (setq entities (cons (entlast) entities))
+            (setq failed T))))
+      (if failed
+        (progn
+          (foreach ent entities (entdel ent))
+          (setq entities nil)
+          (princ "\n[RPUENTE] No se pudo crear la marca completa; se retiro la marca parcial.")))
+      (command "_.UNDO" "_End")
+      (setq undo-open nil)
+      (reverse entities))))
+
+(defun RP:Report (result / units radius metres center mark entities)
   (if (assoc 'error result)
     (princ (strcat "\n[RPUENTE] " (cdr (assoc 'error result))))
     (progn
@@ -166,7 +205,18 @@
         (rtos (car center) 2 6) ", " (rtos (cadr center) 2 6)))
       (if (assoc 'aviso result) (princ (strcat "\nAVISO: " (cdr (assoc 'aviso result)))))
       (princ "\nEl radio corresponde a la curva elegida, no necesariamente al eje del puente.")
-      (princ "\nResultado guardado en RPUENTE-RESULTADO. No se modifico el dibujo.")
+      (princ (strcat "\nZ del centro: " (rtos (caddr center) 2 6)
+        ". En Trespuntos el centro se proyecta a Z=0."))
+      (initget "Si No")
+      (setq mark (getkword "\nMarcar el centro calculado [Si/No] <Si>: "))
+      (if (/= mark "No")
+        (if (setq entities (RP:MarkCenter center radius))
+          (progn
+            (setq RPUENTE-RESULTADO (append RPUENTE-RESULTADO (list (cons 'marca entities))))
+            (princ "\nCentro marcado con un PUNTO y una cruz roja en la capa actual.")
+            (princ "\nUse ID con referencia NODO o INTERSECCION; las coordenadas mostradas arriba son WCS.")
+            (princ "\nSi el centro queda fuera de pantalla, use ZOOM Extension para localizarlo."))))
+      (princ "\nResultado guardado en RPUENTE-RESULTADO. La curva original se conserva.")
     )
   )
 )
