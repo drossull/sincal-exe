@@ -55,6 +55,7 @@ Source: "{#AppPayloadUrl}"; DestDir: "{app}"; DestName: "SINCAL_App_{#AppVersion
 Source: "{#PluginPayloadUrl}"; DestDir: "{commonpf}\Autodesk\ApplicationPlugins\SINCAL.bundle"; DestName: "SINCAL_AutoCAD_{#AppVersionTag}.zip"; ExternalSize: {#PluginPayloadSize}; Hash: "{#PluginPayloadHash}"; Flags: external download extractarchive recursesubdirs createallsubdirs ignoreversion
 
 [InstallDelete]
+Type: filesandordirs; Name: "{app}\ocr_runtime"
 Type: filesandordirs; Name: "{app}\lisps"
 Type: filesandordirs; Name: "{app}\mapas"
 Type: filesandordirs; Name: "{app}\masters"

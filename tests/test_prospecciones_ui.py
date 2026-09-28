@@ -58,5 +58,34 @@ def test_real_widgets_save_restore_reset_and_ignore_old_import(_showinfo, tmp_pa
         with patch('sincal.ui.tabs.armaduras.messagebox.showerror'):
             assert not app.vista_armaduras.abrir_sesion_desde_ruta(invalid)
         assert tab.report.to_dict() == report.to_dict()
+        check_ocr_review_persists_and_cancel_preserves_report(tab)
     finally:
         root.destroy()
+
+
+def check_ocr_review_persists_and_cancel_preserves_report(tab):
+    import threading
+    from sincal.prospecciones_ocr import ImportCancelled
+    report = parse_pages([PAGE])
+    report.profiles[0].method = 'ocr'
+    tab.restore({'report': report.to_dict()})
+    assert tab.insert_button.cget('state') == 'disabled'
+    tab.reviewed.set(True)
+    tab._review_changed()
+    assert tab.insert_button.cget('state') == 'normal'
+    snapshot = tab.snapshot()
+    tab.restore(snapshot)
+    assert tab.selected_profile().reviewed
+    tab._cancel = threading.Event()
+    tab.cancel_import()
+    assert tab._cancel.is_set()
+    tab._results.put((tab._generation, ImportCancelled('Cancelado')))
+    tab._poll()
+    assert tab.snapshot() == snapshot
+    token = tab._generation
+    tab.restore()
+    tab._results.put((token, ('progress', 'resultado obsoleto')))
+    tab._results.put((token, report))
+    tab._poll()
+    assert tab.report is None
+    assert 'obsoleto' not in tab.status.cget('text')

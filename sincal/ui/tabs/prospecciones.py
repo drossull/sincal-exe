@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import base64
+from io import BytesIO
 import queue
 import threading
 import tkinter as tk
@@ -14,6 +16,7 @@ import ttkbootstrap as ttk
 
 from sincal.cad.prospecciones import COLORS, build_profile_lisp, lisp_string, profile_scene
 from sincal.prospecciones import VsReport, read_report
+from sincal.prospecciones_ocr import ImportCancelled
 from sincal.runtime import ruta_runtime
 from sincal.ui.scroll import SafeScrollableFrame
 from sincal.ui.theme import (
@@ -33,6 +36,10 @@ class TabProspecciones(ctk.CTkFrame):
         self._restoring = False
         self._selected_key = ''
         self.include_table = tk.BooleanVar(value=True)
+        self.use_ocr = tk.BooleanVar(value=True)
+        self.exhaustive_ocr = tk.BooleanVar(value=False)
+        self.reviewed = tk.BooleanVar(value=False)
+        self._cancel = None
         self._build_ui()
         self.after(150, self._poll)
 
@@ -56,7 +63,15 @@ class TabProspecciones(ctk.CTkFrame):
         self._button(actions, 'Abrir sesión', lambda: self.parent_app.seleccionar_seccion('sesiones'))
         self._button(actions, 'Guardar sesión', lambda: self.parent_app.vista_armaduras.guardar_sesion())
         self._button(actions, 'Nueva sesión', lambda: self.parent_app.vista_armaduras.nueva_sesion())
-        self.status = ctk.CTkLabel(header, text='Carga un PDF con texto o un TXT con tablas Vs.',
+        options = ctk.CTkFrame(header, fg_color='transparent')
+        options.pack(fill='x', pady=4)
+        checks = ctk.CTkFrame(options, fg_color='transparent')
+        checks.pack(side='left', padx=(0, 15))
+        ttk.Checkbutton(checks, text='PaddleOCR para imágenes (local)', variable=self.use_ocr).pack(anchor='w')
+        ttk.Checkbutton(checks, text='OCR en todas las páginas (más lento)', variable=self.exhaustive_ocr).pack(anchor='w')
+        self.cancel_button = self._button(options, 'Cancelar lectura', self.cancel_import)
+        self.cancel_button.configure(state='disabled')
+        self.status = ctk.CTkLabel(header, text='Carga un PDF con texto o imágenes, o un TXT con tablas Vs.',
                                    font=FUENTE_NORMAL_PEQUENA, anchor='w', wraplength=760)
         self.status.pack(fill='x')
         self.page = SafeScrollableFrame(self, fg_color=COLOR_FONDO, corner_radius=0)
@@ -68,11 +83,11 @@ class TabProspecciones(ctk.CTkFrame):
         self.source_label.pack(fill='x')
         list_host = ctk.CTkFrame(source, fg_color='transparent')
         list_host.pack(fill='x', pady=6)
-        self.profiles_table = ttk.Treeview(list_host, columns=('name', 'page', 'layers', 'vs', 'warnings'),
+        self.profiles_table = ttk.Treeview(list_host, columns=('name', 'page', 'layers', 'vs', 'method', 'warnings'),
                                            show='headings', selectmode='browse', height=6)
         for key, title, width in [('name', 'Arreglo', 150), ('page', 'Página PDF', 90),
                                    ('layers', 'Estratos', 70), ('vs', 'Vs,30 oficial (m/s)', 145),
-                                   ('warnings', 'Avisos', 65)]:
+                                   ('method', 'Origen / revisión', 130), ('warnings', 'Avisos', 65)]:
             self.profiles_table.heading(key, text=title)
             self.profiles_table.column(key, width=width, minwidth=60, stretch=True)
         self.profiles_table.pack(side='left', fill='x', expand=True)
@@ -99,8 +114,11 @@ class TabProspecciones(ctk.CTkFrame):
         self.warning_label.pack(fill='x', pady=8)
         tools = ctk.CTkFrame(details, fg_color='transparent')
         tools.pack(fill='x')
-        self._button(tools, 'Ver texto de origen', self.show_source)
+        self._button(tools, 'Ver original / texto', self.show_source)
         self._button(tools, 'Copiar avisos', self.copy_warnings)
+        self.review_check = ttk.Checkbutton(details, text='He cotejado las cifras OCR con la imagen original',
+                                            variable=self.reviewed, command=self._review_changed)
+        self.review_check.pack(anchor='w', pady=4)
         preview = self._panel('vista', 'VISTA PREVIA E INSERCIÓN CAD')
         controls = ctk.CTkFrame(preview, fg_color='transparent')
         controls.pack(fill='x')
@@ -136,6 +154,8 @@ class TabProspecciones(ctk.CTkFrame):
 
     def restore(self, data=None):
         self.validate_snapshot(data)
+        if self._cancel:
+            self._cancel.set()
         self._generation += 1  # Una lectura pendiente no debe contaminar otra sesión.
         self._restoring = True
         try:
@@ -144,6 +164,7 @@ class TabProspecciones(ctk.CTkFrame):
             self._selected_key = str(data.get('selected_key', ''))
             self.include_table.set(bool(data.get('include_table', True)))
             self.load_button.configure(state='normal', text='Cargar informe')
+            self.cancel_button.configure(state='disabled')
             self._refresh()
         finally:
             self._restoring = False
@@ -158,16 +179,31 @@ class TabProspecciones(ctk.CTkFrame):
             return
         self._generation += 1
         token = self._generation
+        cancel = self._cancel = threading.Event()
+        use_ocr, exhaustive = self.use_ocr.get(), self.exhaustive_ocr.get()
         self.load_button.configure(state='disabled', text='Leyendo…')
+        self.cancel_button.configure(state='normal')
         self.status.configure(text='Buscando tablas Vs en el informe…')
 
         def work():
             try:
-                result = read_report(path)
+                result = read_report(path, ocr=use_ocr, exhaustive=exhaustive, cancel=cancel,
+                                     progress=lambda text: self._results.put((token, ('progress', text))))
             except Exception as error:
                 result = error
             self._results.put((token, result))
         threading.Thread(target=work, daemon=True).start()
+
+    def cancel_import(self):
+        if self._cancel:
+            self._cancel.set()
+            self.cancel_button.configure(state='disabled')
+            self.status.configure(text='Cancelando lectura…')
+
+    def destroy(self):
+        if self._cancel:
+            self._cancel.set()
+        super().destroy()
 
     def _poll(self):
         try:
@@ -175,8 +211,15 @@ class TabProspecciones(ctk.CTkFrame):
                 token, result = self._results.get_nowait()
                 if token != self._generation:
                     continue
+                if isinstance(result, tuple) and result[0] == 'progress':
+                    if not self._cancel or not self._cancel.is_set():
+                        self.status.configure(text=result[1])
+                    continue
                 self.load_button.configure(state='normal', text='Cargar informe')
-                if isinstance(result, Exception):
+                self.cancel_button.configure(state='disabled')
+                if isinstance(result, ImportCancelled):
+                    self.status.configure(text='Lectura cancelada. Se conserva el informe anterior.')
+                elif isinstance(result, Exception):
                     self.status.configure(text='No se pudo cargar el nuevo informe. Se conserva el estado anterior.')
                     messagebox.showerror('Prospecciones', str(result), parent=self.winfo_toplevel())
                 else:
@@ -194,7 +237,9 @@ class TabProspecciones(ctk.CTkFrame):
             self.source_label.configure(text=self.report.path)
             for p in self.report.profiles:
                 self.profiles_table.insert('', 'end', iid=p.key,
-                    values=(p.name, p.page, len(p.layers), p.official_vs30 or 'No identificado', len(p.warnings())))
+                    values=(p.name, p.page, len(p.layers), p.official_vs30 or 'No identificado',
+                            ('OCR revisado' if p.reviewed else 'OCR pendiente') if p.method == 'ocr' else 'Texto',
+                            len(p.warnings())))
             if self._selected_key not in [p.key for p in self.report.profiles]:
                 self._selected_key = self.report.profiles[0].key if self.report.profiles else ''
             if self._selected_key:
@@ -204,7 +249,7 @@ class TabProspecciones(ctk.CTkFrame):
         else:
             self._selected_key = ''
             self.source_label.configure(text='Sin informe')
-            self.status.configure(text='Carga un PDF con texto o un TXT con tablas Vs.')
+            self.status.configure(text='Carga un PDF con texto o imágenes, o un TXT con tablas Vs.')
         self._show_profile()
 
     def selected_profile(self):
@@ -233,8 +278,18 @@ class TabProspecciones(ctk.CTkFrame):
         notices = (self.report.notices if self.report else []) + (profile.warnings() if profile else [])
         self.warning_label.configure(text='\n'.join(notices) if notices else (
             'Sin discrepancias detectadas en los controles disponibles.' if profile else 'Selecciona un arreglo.'))
-        self.insert_button.configure(state='normal' if profile and not profile.errors() else 'disabled')
+        self.reviewed.set(bool(profile and profile.reviewed))
+        self.review_check.configure(state='normal' if profile and profile.method == 'ocr' and not profile.errors() else 'disabled')
+        can_insert = profile and not profile.errors() and (profile.method != 'ocr' or profile.reviewed)
+        self.insert_button.configure(state='normal' if can_insert else 'disabled')
         self.draw_preview()
+
+    def _review_changed(self):
+        profile = self.selected_profile()
+        if profile and profile.method == 'ocr':
+            profile.reviewed = self.reviewed.get()
+            self._refresh()
+            self._changed()
 
     def _changed(self):
         if not self._restoring:
@@ -277,10 +332,32 @@ class TabProspecciones(ctk.CTkFrame):
             return
         window = ctk.CTkToplevel(self)
         window.title(f'{profile.name} · Página PDF {profile.page}')
-        window.geometry('850x650')
-        box = ctk.CTkTextbox(window, wrap='word')
-        box.pack(fill='both', expand=True, padx=12, pady=12)
-        box.insert('1.0', profile.source_text)
+        window.geometry('950x800')
+        host = SafeScrollableFrame(window)
+        host.pack(fill='both', expand=True)
+        if profile.evidence.get('image_png'):
+            from PIL import Image, ImageDraw
+            try:
+                image = Image.open(BytesIO(base64.b64decode(profile.evidence['image_png'], validate=True))).convert('RGB')
+                # Mark uncertain cells without changing the stored source image.
+                draw = ImageDraw.Draw(image)
+                for cell in profile.evidence.get('cells', []):
+                    if cell['confidence'] < .98:
+                        draw.rectangle(cell['box'], outline='red', width=2)
+                image.thumbnail((860, 1600))
+                preview = ctk.CTkImage(light_image=image, dark_image=image, size=image.size)
+                label = ctk.CTkLabel(host, text='', image=preview)
+                label.pack(padx=12, pady=12)
+                label._source_image = preview
+            except (ValueError, OSError):
+                ctk.CTkLabel(host, text='No se pudo abrir la imagen guardada. Revisa el PDF original.').pack()
+        details = profile.source_text
+        if profile.method == 'ocr':
+            details += '\n\nConfianza de cada celda (no garantiza exactitud):\n' + '\n'.join(
+                f"{cell['text']}: {cell['confidence']:.2%}" for cell in profile.evidence.get('cells', []))
+        box = ctk.CTkTextbox(host, wrap='word', height=300)
+        box.pack(fill='x', padx=12, pady=12)
+        box.insert('1.0', details)
         box.configure(state='disabled')
 
     def copy_warnings(self):

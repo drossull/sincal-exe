@@ -210,13 +210,18 @@ function Resolve-InnoSetupPath([string]$Provided) {
 }
 
 function Remove-ArtifactIfExists([string]$Path) {
+    $resolvedTarget = [IO.Path]::GetFullPath($Path)
+    $resolvedRoot = [IO.Path]::GetFullPath((Get-ProjectRoot)).TrimEnd('\')
+    if (-not $resolvedTarget.StartsWith($resolvedRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Artefacto fuera del repositorio: $resolvedTarget"
+    }
     if (-not (Test-Path $Path)) {
         return
     }
 
     for ($attempt = 1; $attempt -le 5; $attempt++) {
         try {
-            Remove-Item $Path -Force -Recurse -ErrorAction Stop
+            Remove-Item -LiteralPath $resolvedTarget -Force -Recurse -ErrorAction Stop
             return
         }
         catch {
@@ -241,6 +246,11 @@ function Assert-AppPayloadContents([string]$Path) {
         $entries = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
         $required = @(
             'SINCAL.exe',
+            'ocr_runtime/python.exe',
+            'ocr_runtime/worker.pyc',
+            'ocr_runtime/runtime-manifest.json',
+            'ocr_runtime/models/PP-OCRv6_medium_det/inference.pdiparams',
+            'ocr_runtime/models/PP-OCRv6_medium_rec/inference.pdiparams',
             'version.json',
             'tutoriales.json',
             'lisps/SINCAL.lsp',
@@ -305,6 +315,7 @@ function New-ReleasePayloads(
     New-Item -ItemType Directory -Force -Path $iconStage | Out-Null
     Copy-Item (Join-Path $ProjectRoot 'assets\icons\logo.ico') (Join-Path $iconStage 'logo.ico') -Force
     Copy-Item $DistExe (Join-Path $appStage 'SINCAL.exe') -Force
+    Copy-Item (Join-Path $ProjectRoot 'ocr_runtime') (Join-Path $appStage 'ocr_runtime') -Recurse -Force
     $fontStage = Join-Path $appStage 'assets\fonts'
     New-Item -ItemType Directory -Force -Path $fontStage | Out-Null
     Get-ChildItem (Join-Path $ProjectRoot 'assets\fonts') -File | Where-Object {
@@ -423,6 +434,10 @@ Invoke-SelfCheck -ProjectRoot $projectRoot
 
 Write-Step "Compilando plugin AutoCAD 2025"
 Invoke-AutoCAD2025PluginBuild -ProjectRoot $projectRoot
+
+Write-Step "Preparando runtime OCR local"
+& python (Join-Path $projectRoot 'tools\build_ocr_runtime.py')
+if ($LASTEXITCODE -ne 0) { throw 'Falló el empaquetado del runtime OCR.' }
 
 Write-Step "Limpiando artefactos previos"
 Remove-ArtifactIfExists (Join-Path $projectRoot 'build')

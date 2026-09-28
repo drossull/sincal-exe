@@ -141,7 +141,7 @@ def test_real_report_when_explicitly_available():
     source = os.environ.get('SINCAL_TEST_IMS')
     if not source:
         pytest.skip('Set SINCAL_TEST_IMS to the local reference PDF')
-    report = read_report(source)
+    report = read_report(source, ocr=False)
     assert [p.page for p in report.profiles] == [101, 104, 107, 110, 114, 117]
     assert [len(p.layers) for p in report.profiles] == [7, 6, 7, 7, 4, 7]
     assert [p.official_vs30 for p in report.profiles] == ['754,00', '690,70', '791,54', '625,37', '704,63', '717,81']

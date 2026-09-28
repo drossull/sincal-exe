@@ -1,5 +1,5 @@
 {
-  "version": "v29.0.21",
+  "version": "v29.0.22",
   "product_version": "2.0",
   "archivos": [
     "main.py",
@@ -8,6 +8,8 @@
     "sincal/resources.py",
     "sincal/project.py",
     "sincal/prospecciones.py",
+    "sincal/prospecciones_ocr.py",
+    "sincal/ocr_runtime.py",
     "sincal/sessions.py",
     "sincal/diagnostics.py",
     "sincal/update_config.py",

@@ -55,12 +55,24 @@ class VsProfile:
     official_vs30: str = ""
     source_text: str = ""
     references: list[dict] = field(default_factory=list)
+    context: str = ""
+    method: str = "text"
+    evidence: dict = field(default_factory=dict)
+    extraction_errors: list[str] = field(default_factory=list)
+    extraction_warnings: list[str] = field(default_factory=list)
+    reviewed: bool = False
 
     def errors(self) -> list[str]:
-        errors = []
+        errors = list(self.extraction_errors)
         previous = 0.0
         if not self.layers:
-            return ["No se extrajeron estratos."]
+            return errors + ["No se extrajeron estratos."]
+        if self.official_vs30:
+            try:
+                if number(self.official_vs30) <= 0:
+                    errors.append('Vs30 oficial no representable.')
+            except ValueError:
+                errors.append('Vs30 oficial no interpretable.')
         for i, layer in enumerate(self.layers, 1):
             try:
                 start, end, vs = number(layer.start), number(layer.end), number(layer.vs)
@@ -84,7 +96,9 @@ class VsProfile:
         return 30 / travel_time
 
     def warnings(self) -> list[str]:
-        warnings = list(self.errors())
+        warnings = list(self.errors()) + list(self.extraction_warnings)
+        if self.method == 'ocr' and not self.reviewed:
+            warnings.append("Lectura OCR pendiente de revisión contra la imagen original antes de insertar en CAD.")
         if not self.official_vs30:
             warnings.append("No se identificó el Vs,30 oficial; no se completará por cálculo.")
         calculated = self.check_vs30()
@@ -99,6 +113,8 @@ class VsProfile:
             if self.official_vs30 and abs(number(ref['value']) - number(self.official_vs30)) > .05:
                 warnings.append(f"El resumen de la p. {ref['page']} publica {ref['value']} m/s; "
                                 f"la tabla de la p. {self.page} publica {self.official_vs30} m/s.")
+            if ref.get('partial'):
+                warnings.append(f"El resumen de la p. {ref['page']} no incluye todos los estratos de esta tabla.")
         return warnings
 
 
@@ -125,7 +141,22 @@ class VsReport:
                 official_vs30=str(item.get('official_vs30', '')),
                 source_text=str(item.get('source_text', '')),
                 references=list(item.get('references', [])),
+                context=str(item.get('context', '')), method=str(item.get('method', 'text')),
+                evidence=dict(item.get('evidence', {})),
+                extraction_errors=list(map(str, item.get('extraction_errors', []))),
+                extraction_warnings=list(map(str, item.get('extraction_warnings', []))),
+                reviewed=item.get('reviewed') is True,
             )
+            if profile.method not in ('text', 'ocr'):
+                raise ValueError('Método de extracción desconocido.')
+            image = profile.evidence.get('image_png', '')
+            if not isinstance(image, str) or len(image) > 32_000_000:
+                raise ValueError('Imagen de evidencia no válida o demasiado grande.')
+            for cell in profile.evidence.get('cells', []):
+                confidence = float(cell['confidence'])
+                box = cell['box']
+                if not 0 <= confidence <= 1 or len(box) != 4 or not all(math.isfinite(float(x)) for x in box):
+                    raise ValueError('Coordenadas o confianza OCR no válidas.')
             if profile.official_vs30:
                 number(profile.official_vs30)
             for ref in profile.references:
@@ -138,7 +169,7 @@ class VsReport:
                    list(map(str, data.get('notices', []))))
 
 
-def parse_pages(pages: list[str], path="", sha256="") -> VsReport:
+def parse_pages(pages: list[str], path="", sha256="", *, allow_empty=False) -> VsReport:
     """Tablas con N°, Inicio/Desde, Final/Hasta y Vs; coma o punto decimal.
 
     Se conservan por separado las tablas repetidas y su página. Las tablas de
@@ -176,10 +207,10 @@ def parse_pages(pages: list[str], path="", sha256="") -> VsReport:
             key=f"p{page_index}-{arrangement or 'vs'}", name=name, page=page_index,
             layers=rows, official_vs30=official[1] if official else '', source_text=text,
         ))
-    if not profiles:
+    if not profiles and not allow_empty:
         raise ValueError("No se reconocieron tablas de estratos Vs. Esta versión admite PDF con "
-                         "texto o TXT con columnas N°, Inicio, Final y Vs. Los escaneos y otras "
-                         "disposiciones necesitan un importador adicional; no se estiman valores desde la imagen.")
+                         "columnas N°, Inicio, Final y Vs. Activa OCR para las tablas en imágenes. "
+                         "Las disposiciones no reconocidas requieren revisión; no se inventan valores.")
     return VsReport(path, sha256, profiles, notices)
 
 
@@ -206,12 +237,18 @@ def compare_summary(report: VsReport, text: str, page: int):
 
     for rows, value in groups:
         if value:
-            matching = [p for p in report.profiles if signature(p.layers) == signature(rows)]
+            sig = signature(rows)
+            matching = [p for p in report.profiles if signature(p.layers) == sig]
+            partial = False
+            if not matching and len(rows) >= 3:
+                matching = [p for p in report.profiles if len(p.layers) > len(rows)
+                            and signature(p.layers)[:len(rows)] == sig]
+                partial = True
             if len(matching) == 1:
-                matching[0].references.append({'page': page, 'value': value})
+                matching[0].references.append({'page': page, 'value': value, **({'partial': True} if partial else {})})
 
 
-def read_report(path: str) -> VsReport:
+def read_report(path: str, *, ocr=True, exhaustive=False, progress=None, cancel=None, engine_factory=None) -> VsReport:
     source = Path(path)
     suffix = source.suffix.lower()
     if suffix not in ('.pdf', '.txt'):
@@ -225,13 +262,28 @@ def read_report(path: str) -> VsReport:
     reader = PdfReader(BytesIO(raw))
     if reader.is_encrypted and not reader.decrypt(''):
         raise ValueError("El PDF está protegido con contraseña.")
-    pages = [page.extract_text() or '' for page in reader.pages]
-    report = parse_pages(pages, str(source), digest)
+    from sincal.prospecciones_ocr import ImportCancelled, enrich_context, extract_images
+    pages = []
+    for index, page in enumerate(reader.pages, 1):
+        if cancel and cancel.is_set():
+            raise ImportCancelled('Lectura cancelada.')
+        if progress:
+            progress(f'Leyendo texto: página {index}/{len(reader.pages)}')
+        pages.append(page.extract_text() or '')
+    report = parse_pages(pages, str(source), digest, allow_empty=True)
+    enrich_context(report, pages)
+    if ocr:
+        extract_images(reader, pages, report, raw, exhaustive=exhaustive,
+                       progress=progress, cancel=cancel, engine_factory=engine_factory)
     for i, text in enumerate(pages):
         plain = normalized(text)
         if 'resumen' in plain and 'resultado' in plain and 'vs' in plain:
             compare_summary(report, reader.pages[i].extract_text(extraction_mode='layout'), i + 1)
     empty = [str(i + 1) for i, text in enumerate(pages) if len(text.strip()) < 20]
     if empty:
-        report.notices.append("Páginas sin texto suficiente (no se aplica OCR): " + ', '.join(empty))
+        if not ocr:
+            report.notices.append("Páginas sin texto suficiente (OCR desactivado): " + ', '.join(empty))
+    if not report.profiles:
+        raise ValueError('No se reconocieron tablas Vs. Prueba OCR en todas las páginas.\n' + '\n'.join(report.notices))
+    report.profiles.sort(key=lambda p: (p.page, p.key))
     return report

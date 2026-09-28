@@ -1,0 +1,17 @@
+SINCAL - motor OCR local
+
+Esta distribución incluye CPython (PSF License, LICENSE.txt), PaddleOCR y
+PaddlePaddle (Apache License 2.0), y los modelos PP-OCRv6_medium_det/rec
+publicados por PaddlePaddle bajo Apache License 2.0. Sus fichas están en models.
+https://github.com/PaddlePaddle/PaddleOCR
+https://github.com/PaddlePaddle/Paddle
+https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_det
+https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec
+
+Las licencias y avisos de las dependencias se conservan en Lib/site-packages,
+en los directorios de cada paquete y sus correspondientes *.dist-info.
+La relación de versiones y los hashes de los modelos se incluye en
+runtime-manifest.json. No se requiere instalar Python globalmente.
+
+Las imágenes del usuario se procesan localmente. El programa no las envía a
+un servicio OCR y los modelos necesarios vienen incluidos en el instalador.

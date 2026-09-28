@@ -79,6 +79,8 @@ def lisp_string(value):
 
 
 def build_profile_lisp(profile: VsProfile, include_table=True) -> str:
+    if profile.method == 'ocr' and not profile.reviewed:
+        raise ValueError('Revisa las cifras OCR contra la imagen original antes de insertar en CAD.')
     scene = profile_scene(profile, include_table)
 
     def point(p):

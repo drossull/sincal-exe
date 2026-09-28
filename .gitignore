@@ -7,6 +7,8 @@ build/
 dist/
 installer_output/
 tmp/
+ocr_runtime/
+payload_stage/
 
 # 2. Archivos ejecutables y empaquetados
 *.exe

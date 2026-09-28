@@ -1,10 +1,10 @@
 # SINCAL Suite — Ingeniería y estándares CAD
 
-**SINCAL Suite** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 2.0 y la secuencia técnica continúa en `v29.0.21` para conservar una actualización ordenada desde las instalaciones v28.
+**SINCAL Suite** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 2.0 y la secuencia técnica continúa en `v29.0.22` para conservar una actualización ordenada desde las instalaciones v28.
 
 ## Instalación web y distribución
 
-SINCAL Suite se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.21.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
+SINCAL Suite se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.22.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
 
 El programa base no incorpora los 125 MB de mapas regionales. El paquete web sí contiene una copia inicial del master DWG, LISPs, startup, scripts, plumilla, calibración y ayuda estructural para que el primer arranque sea funcional. GitHub mantiene esos recursos al día mediante actualizaciones menores. Cada mapa regional se descarga solamente cuando se selecciona por primera vez en el módulo Ubicación.
 
@@ -12,7 +12,7 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
 
 ## Primer inicio
 
-1. Ejecuta el instalador oficial de la release `v29.0.21`.
+1. Ejecuta el instalador oficial de la release `v29.0.22`.
 2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
 3. Abre **Diagnóstico**, verifica el motor CAD sugerido y cámbialo si necesitas otra versión.
 4. Pulsa **Preparar integración CAD**.
@@ -99,13 +99,28 @@ SINCAL recuerda la última ruta y solicita confirmación para reabrirla al inici
 
 ### Prospecciones
 
-**Proyecto → Prospecciones** carga localmente un informe PDF con texto o un TXT
+**Proyecto → Prospecciones** carga localmente un informe PDF con texto o imágenes, o un TXT
 UTF-8 con tablas de estratos (N°, Inicio/Desde, Final/Hasta, Vs). Lista los arreglos
 reconocidos, sus páginas y el Vs,30 oficial; permite escoger uno, consultar su tabla
 y texto de origen, previsualizarlo e insertarlo en el dibujo CAD activo.
-Los escaneos requieren OCR y las disposiciones no reconocidas necesitan otro
-importador: esta versión avisa cuando no puede extraer una tabla, sin inventar datos.
-El importador inicial está verificado con los seis arreglos de Calera de Tango.
+PaddleOCR transcribe las tablas en imágenes como respaldo del texto nativo. El motor
+CPU y sus modelos vienen incluidos: no necesitas Python, una cuenta ni un servicio
+OCR externo. Los informes se procesan localmente, con progreso y cancelación.
+La búsqueda automática prioriza páginas con contexto Vs; en informes mixtos,
+**OCR en todas las páginas** incluye también anexos escaneados sin ese contexto y
+es más lento. Los informes completamente escaneados se examinan por OCR igualmente.
+Las tablas deben tener columnas de estrato, inicio, final y Vs. Los bloques ambiguos
+se señalan y no se envían a CAD; no se estiman magnitudes desde la curva.
+
+**Ver original / texto** muestra la imagen y la confianza de las celdas. Las cifras
+con confianza menor al 98 % quedan señaladas, pero una puntuación alta tampoco
+garantiza exactitud. Todos los perfiles OCR requieren marcar **He cotejado las cifras
+OCR con la imagen original** antes de insertarlos. Las sesiones conservan la imagen,
+las coordenadas/confianzas y ese estado de revisión, además de los valores oficiales.
+La identidad incluye sección y estructura cuando están documentadas; los rótulos
+contradictorios se conservan con un aviso. No se unen perfiles solo por su nombre.
+Verificado con las tablas nativas de Calera de Tango y los diez perfiles del anexo
+P33 del IMS de Loreto, incluyendo nueve tablas en imagen.
 
 Los valores son de solo lectura. El control de Vs,30 únicamente genera avisos
 (tolerancia de 1 m/s o 0,5 % por redondeos); nunca reemplaza el valor publicado.
@@ -196,12 +211,20 @@ pwsh -NoProfile -File tools/build_release.ps1
 
 El proceso valida código y pruebas, compila y firma el plugin y la aplicación, crea los paquetes remotos, calcula hashes, compila el instalador web y genera el manifiesto y `SHA256SUMS.txt`. Cada compilación queda aislada en `installer_output/vXX.X.X/`; las versiones anteriores no se mezclan ni se eliminan. Para una compilación local no publicable se puede usar `-SkipSigning`.
 
+La compilación utiliza CPython 3.12 x64 de python.org. `tools/build_ocr_runtime.py`
+prepara un runtime aislado en `ocr_runtime/`, con dependencias fijadas en
+`requirements-ocr-lock.txt` y modelos comprobados por SHA-256. Se incluye dentro del
+paquete de aplicación (aumenta su tamaño); no se descarga nada al leer un informe.
+Los avisos y licencias de terceros acompañan al runtime. No se incorpora PyMuPDF.
+Para probar el PDF completo localmente: define `SINCAL_TEST_LORETO` con su ruta y
+ejecuta `python -m pytest tests/test_prospecciones_ocr.py -q` después de preparar el runtime.
+
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v29.0.21.exe`
-- `SINCAL_App_v29.0.21.zip`
-- `SINCAL_AutoCAD_v29.0.21.zip`
-- `release-manifest_v29.0.21.json`
+- `Setup_SINCAL_v29.0.22.exe`
+- `SINCAL_App_v29.0.22.zip`
+- `SINCAL_AutoCAD_v29.0.22.zip`
+- `release-manifest_v29.0.22.json`
 - `SHA256SUMS.txt`
 
 No renombres los paquetes después de compilar: el instalador usa URLs versionadas y hashes fijados en el momento del build.
