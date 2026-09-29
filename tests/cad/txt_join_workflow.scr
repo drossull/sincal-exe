@@ -1,6 +1,9 @@
 (setq txut-root (getenv "SINCAL_TEST_ROOT"))
 (load (strcat txut-root "/lisps/TXT-JOIN.lsp"))
+(vl-load-com)
+(vlr-remove-all)
 (load (strcat txut-root "/tests/cad/txt_join_regression.lsp"))
+(load (strcat txut-root "/tests/cad/txt_join_structured.lsp"))
 _.UNDO
 _Auto
 _Off
@@ -8,6 +11,7 @@ _Off
 (setq txut-original (TXUT:Text "FLUJO" 0.0 0.0 1.0 0.0) txut-last (entlast))
 (sssetfirst nil (ssadd txut-original))
 TXT-JOIN
+Lineas
 
 
 100,100,0
@@ -15,6 +19,7 @@ Cancelar
 (TXUT:Assert (and (entget txut-original) (eq (entlast) txut-last)) "cancel preserves originals and removes preview")
 (sssetfirst nil (ssadd txut-original))
 TXT-JOIN
+Lineas
 
 
 100,100,0
@@ -23,6 +28,7 @@ Conservar
 (TXUT:Assert (and (entget txut-original) (= "MTEXT" (cdr (assoc 0 (entget txut-copy))))) "keep originals workflow")
 (sssetfirst nil (ssadd txut-original))
 TXT-JOIN
+Lineas
 
 
 200,100,0
@@ -36,11 +42,24 @@ _.U
 (entmod (subst '(70 . 4) (assoc 70 txut-layer) txut-layer))
 (sssetfirst nil (ssadd txut-locked (ssadd txut-original)))
 TXT-JOIN
+Lineas
 
 
 300,100,0
 Reemplazar
 (TXUT:Assert (and (entget txut-original) (entget txut-locked) (= "MTEXT" (cdr (assoc 0 (entget (entlast)))))) "locked layer keeps all originals and new MTEXT")
+(setq txut-paragraph (TXUT:Text "1. PARRAFO EDITABLE." 0.0 50.0 1.0 0.0))
+(sssetfirst nil (ssadd txut-paragraph))
+TXT-JOIN
+Parrafos
+
+
+Si
+30
+400,100,0
+Conservar
+(TXUT:Assert (and (entget txut-paragraph) (equal 30.0 (cdr (assoc 41 (entget (entlast)))))) "paragraph workflow keeps originals and applies width")
+(TXUT:Assert (vl-string-search "1.\tPARRAFO EDITABLE." (TXUT:Content (entlast))) "paragraph workflow uses editable hanging indent")
 (princ (strcat "\nTXT-JOIN_WORKFLOW_FAILURES=" (itoa TXUT:Failures) "\n"))
 _.UNDO
 _Auto
