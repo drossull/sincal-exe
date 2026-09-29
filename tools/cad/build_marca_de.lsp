@@ -16,7 +16,8 @@
     (if (= "AcDbAttributeDefinition" (vla-get-ObjectName obj))
       (progn
         (vla-put-LockPosition obj :vlax-true)
-        (if (/= "XX" (vla-get-TagString obj))
+        ;; Manual values stay single-line for direct editing in Ctrl+1.
+        (if (= "MARCA" (vla-get-TagString obj))
           (progn
             (vla-put-MTextAttribute obj :vlax-true)
             (vla-UpdateMTextAttribute obj)

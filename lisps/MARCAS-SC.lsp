@@ -32,6 +32,25 @@
 (defun SCM:DetailP (obj / attrs)
   (setq attrs (SCM:Attrs obj))
   (and (assoc "CANT_TOTAL" attrs) (assoc "LARGO" attrs)))
+(defun SCM:DetailEditableP (obj / attrs)
+  (setq attrs (SCM:Attrs obj))
+  (or (not (SCM:DetailP obj))
+    (and (= :vlax-false (vla-get-MTextAttribute (cdr (assoc "CANT_TOTAL" attrs))))
+         (= :vlax-false (vla-get-MTextAttribute (cdr (assoc "LARGO" attrs)))))))
+(defun SCM:MakeDetailEditable (obj / attrs tag att value)
+  ;; Convert only manual attributes on this reference, preserving their values.
+  ;; No ATTSYNC/redefinition: those can reset user values and dynamic settings.
+  (if (SCM:DetailP obj)
+    (progn
+      (setq attrs (SCM:Attrs obj))
+      (foreach tag '("CANT_TOTAL" "LARGO")
+        (setq att (cdr (assoc tag attrs)))
+        (if (= :vlax-true (vla-get-MTextAttribute att))
+          (progn
+            (setq value (vla-get-TextString att) SCM:changed T)
+            (vla-put-MTextAttribute att :vlax-false)
+            (vla-put-TextString att value)
+            (vla-Update att)))))))
 (defun SCM:WritableMark (obj / a)
   (if (not (SCM:MarkP obj)) (SCM:Fail "El bloque necesita atributos editables XX y MARCA."))
   (if (SCM:Locked obj) (SCM:Fail "La capa del bloque esta bloqueada."))
@@ -166,6 +185,7 @@
   (SCM:WritableMark obj)
   (if (SCM:Locked table) (SCM:Fail "La capa de la tabla esta bloqueada."))
   (if (setq issue (SCM:RowIssueFor table row (SCM:DetailP obj))) (SCM:Fail issue))
+  (SCM:MakeDetailEditable obj)
   (setq id (SCM:EnsureID table row) attrs (SCM:Attrs obj))
   ;; XX es una entrada editable, no un campo. Su ultimo valor se conserva en XData.
   (SCM:PutText (cdr (assoc "XX" attrs)) (SCM:Trim (vla-GetText table row 0)))
@@ -219,7 +239,8 @@
     (T "%%c%<\\_FldIdx 0>%@%<\\_FldIdx 1>%")))))
 (defun SCM:Healthy (obj binding / attrs)
   (setq attrs (SCM:Attrs obj))
-  (and (equal (SCM:Trim (vla-get-TextString (cdr (assoc "XX" attrs))))
+  (and (SCM:DetailEditableP obj)
+       (equal (SCM:Trim (vla-get-TextString (cdr (assoc "XX" attrs))))
               (SCM:Trim (vla-GetText (car binding) (cadr binding) 0)))
        (SCM:AttributeMatches (cdr (assoc "MARCA" attrs)) (car binding) (cadr binding)
          (if (SCM:DetailP obj) '("C") '("C" "D")))

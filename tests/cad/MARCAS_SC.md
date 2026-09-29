@@ -77,12 +77,18 @@ ACTUALIZAR-MARCAS reconstruye también los campos antiguos sin este formato.
 ## MARCA-DE: despiece
 
 `MARCA-DE` utiliza la variante `masters/SINCAL_MARCA_DE_V1.dwg`, derivada del
-mismo diseño: círculo rojo, RomanD, máscaras y flip nativo, bloque anotativo.
+mismo diseño: círculo rojo, RomanD, máscara del diámetro y flip nativo, bloque anotativo.
 Siempre muestra cantidad y largo (sin estados de visibilidad). Sus atributos
 son XX (marca vinculada), MARCA (solo diámetro vinculado), CANT_TOTAL y LARGO
 (manuales). Actualizar, reasignar, copiar y editar XX no sobrescribe los manuales.
 LARGO incluye el prefijo en su texto (por ejemplo `L=368`); conservarlo al editar
 el atributo. Así permanece unido al valor incluso al invertir el bloque.
+Cantidad total y largo son atributos de una línea para editarlos directamente
+en Ctrl+1 > Atributos. No tienen máscara propia. MARCA sigue siendo multilínea
+con máscara. ACTUALIZAR-MARCAS convierte referencias DE antiguas sin ATTSYNC y
+conserva sus valores; deseleccionar y volver a seleccionar refresca Propiedades.
+La regresión verifica la migración de atributos multilínea y su persistencia
+después de cambiar flip, copiar, actualizar y cambiar la marca.
 Solo requiere marca única y diámetro positivo de la tabla; B y D son opcionales
 para despiece, no para vista. El largo se conserva como se escribe, sin convertir
 unidades. La disposición reserva espacios fijos para los atributos; comprobar
