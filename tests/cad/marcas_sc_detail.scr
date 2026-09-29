@@ -1,0 +1,34 @@
+(setq scmt-root (getenv "SINCAL_TEST_ROOT"))
+(load (strcat scmt-root "/lisps/MARCAS-SC.lsp"))
+(load (strcat scmt-root "/tests/cad/marcas_sc_regression.lsp"))
+(load (strcat scmt-root "/tests/cad/marcas_sc_detail.lsp"))
+MARCA-DE
+7a
+
+2.5
+172
+368
+0,0,0
+(SCMDT:Check)
+SCMDT-EDIT
+(SCMT:Assert (= "%%c16" (SCMDT:Text SCMDT:Copy "MARCA")) "copy edit automatically relinks diameter")
+(SCMT:Assert (SCMDT:ManualP SCMDT:Copy) "copy reassignment preserves manual values")
+(SCMT:Assert (= "7a" (SCMDT:Text SCMDT:Original "XX")) "copy edit leaves original unchanged")
+SCMDT-MANUAL
+(SCMT:Assert (and (= "200" (SCMDT:Text SCMDT:Copy "CANT_TOTAL")) (= "L=450" (SCMDT:Text SCMDT:Copy "LARGO"))) "reactor preserves user edits")
+SCMDT-BAD
+(SCMT:Assert (= "[SIN VINCULO]" (SCMDT:Text SCMDT:Copy "MARCA")) "missing detail mark clears only linked diameter")
+(SCMT:Assert (and (= "200" (SCMDT:Text SCMDT:Copy "CANT_TOTAL")) (= "L=450" (SCMDT:Text SCMDT:Copy "LARGO"))) "missing link preserves manual values")
+SCMDT-EDIT
+(SCMT:Assert (SCM:Healthy SCMDT:Copy (SCM:Resolve SCMDT:Copy)) "detail link recovers")
+(command "_.-OBJECTSCALE" (vlax-vla-object->ename SCMDT:Original) "" "_Add" "1:2" "")
+(setvar "CANNOSCALE" "1:2")
+(SCMT:Assert (equal 5.0 (vla-get-XScaleFactor SCMDT:Original) 1e-8) "detail annotation 1:2 doubles model size")
+(setvar "CANNOSCALE" "1:1")
+(SCMT:Assert (equal 2.5 (vla-get-XScaleFactor SCMDT:Original) 1e-8) "detail annotation 1:1 restores size")
+(vla-put-Value SCMDT:Flip (vlax-make-variant 0 vlax-vbInteger))
+(setvar "FIELDDISPLAY" 0)
+(vla-Move SCMDT:Original (vlax-3d-point '(0 0 0)) (vlax-3d-point '(0 -100 0)))
+(vla-Move SCMDT:Copy (vlax-3d-point '(0 0 0)) (vlax-3d-point '(0 -100 0)))
+(command "_.ZOOM" "_W" "_non" '(-45 -124 0) "_non" '(45 -88 0))
+(if SCMT:Report (progn (write-line (strcat "DONE failures=" (itoa SCMT:Failures)) SCMT:Report) (close SCMT:Report) (setq SCMT:Report nil)))

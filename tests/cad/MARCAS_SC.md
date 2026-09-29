@@ -73,3 +73,34 @@ Los campos de diámetro y separación muestran como máximo un decimal, sin cero
 finales (`7.500000` se muestra como `7.5`, `20` como `20`). La cantidad no muestra
 decimales. Solo se redondea la presentación, sin modificar valores de la tabla.
 ACTUALIZAR-MARCAS reconstruye también los campos antiguos sin este formato.
+
+## MARCA-DE: despiece
+
+`MARCA-DE` utiliza la variante `masters/SINCAL_MARCA_DE_V1.dwg`, derivada del
+mismo diseño: círculo rojo, RomanD, máscaras y flip nativo, bloque anotativo.
+Siempre muestra cantidad y largo (sin estados de visibilidad). Sus atributos
+son XX (marca vinculada), MARCA (solo diámetro vinculado), CANT_TOTAL y LARGO
+(manuales). Actualizar, reasignar, copiar y editar XX no sobrescribe los manuales.
+LARGO incluye el prefijo en su texto (por ejemplo `L=368`); conservarlo al editar
+el atributo. Así permanece unido al valor incluso al invertir el bloque.
+Solo requiere marca única y diámetro positivo de la tabla; B y D son opcionales
+para despiece, no para vista. El largo se conserva como se escribe, sin convertir
+unidades. La disposición reserva espacios fijos para los atributos; comprobar
+visualmente valores excepcionalmente largos antes de imprimir.
+
+Ejecutar `python tools/cad/test_marcas_native.py --workflow detail` para comprobar
+la inserción real por comando, atributos manuales, campos, copia, edición
+automática de XX, cambio de filas, flip y anotatividad en una sesión desechable.
+La prueba sustituye únicamente la selección gráfica de la tabla por su fixture.
+También ejecuta la regresión de vista. No usa ni guarda dibujos del usuario.
+
+Para regenerar la plantilla DE en una copia desechable con RomanD, cargar
+`tools/cad/build_marca_sc.lsp` y `tools/cad/build_marca_de.lsp`, ejecutar
+`(SCMDB:Build)` y exportar solo SINCAL_MARCA_DE_V1 con -WBLOCK. La opción de
+autoría `--workflow build_detail` realiza esto y escribe el master del repositorio;
+usar únicamente cuando no exista el archivo destino (no sobrescribe en silencio).
+
+La nueva plantilla está autorizada en `sincal/runtime.py` y en `version.json`.
+Las versiones antiguas del ejecutable cuya lista de recursos no incluya este
+DWG requieren actualizar SINCAL o seleccionar el master manualmente en el
+diálogo de MARCA-DE; actualizar solo el LISP no instala un master ausente.

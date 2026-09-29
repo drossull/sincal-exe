@@ -1,0 +1,8 @@
+(setq scmt-root (getenv "SINCAL_TEST_ROOT"))
+(load (strcat scmt-root "/lisps/MARCAS-SC.lsp"))
+(SCM:BasicDefinition)
+(load (strcat scmt-root "/tools/cad/build_marca_sc.lsp"))
+(load (strcat scmt-root "/tools/cad/build_marca_de.lsp"))
+(SCMDB:Build)
+(command "_.-WBLOCK" (strcat scmt-root "/masters/SINCAL_MARCA_DE_V1.dwg") "SINCAL_MARCA_DE_V1")
+(if SCMT:Report (progn (write-line "DONE failures=0" SCMT:Report) (close SCMT:Report) (setq SCMT:Report nil)))

@@ -10,14 +10,16 @@ import win32com.client
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--keep-open", action="store_true", help="Leave scratch drawing for visual QA")
-    parser.add_argument("--workflow", choices=("dynamic", "workflow"), default="dynamic")
+    parser.add_argument("--workflow", choices=("dynamic", "workflow", "detail", "build_detail"), default="dynamic")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
+    if args.workflow == "build_detail" and (root / "masters/SINCAL_MARCA_DE_V1.dwg").exists():
+        parser.error("Detail master already exists; refusing to overwrite it.")
     report = Path(tempfile.gettempdir()) / f"marcas-dynamic-{time.time_ns()}.txt"
     app = win32com.client.DispatchEx("AutoCAD.Application.25")
-    app.Visible = False
     for attempt in range(20):
         try:
+            app.Visible = False
             doc = app.Documents.Add()
             break
         except Exception:
