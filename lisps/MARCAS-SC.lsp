@@ -150,9 +150,12 @@
       (cons 1005 (vla-get-Handle table)) (cons 1000 id) (cons 1000 mark)
       (cons 1000 (SCM:DocumentID T)) (cons 1000 (vla-get-Handle table))))))))
     (SCM:Fail "No se pudo guardar el vinculo del bloque.")))
+(defun SCM:FieldFormat (col)
+  (strcat "%lu2%pr" (if (= col "B") "0" "1") "%zs8"))
 (defun SCM:Field (table row col / oid)
   (setq oid (vla-GetObjectIdString (vla-get-Utility (SCM:Doc)) table :vlax-false))
-  (strcat "%<\\AcExpr (Table(%<\\_ObjId " oid ">%)." col (itoa (1+ row)) ")>%"))
+  (strcat "%<\\AcExpr (Table(%<\\_ObjId " oid ">%)." col (itoa (1+ row))
+    ") \\f \"" (SCM:FieldFormat col) "\">%"))
 (defun SCM:PutText (att text)
   (vla-put-TextString att text)
   (if (= :vlax-true (vla-get-MTextAttribute att))
@@ -197,7 +200,8 @@
     (if (= "AcExpr" (cdr (assoc 1 record))) (setq expressions (cons record expressions))))
   (setq good (= (length expressions) (length columns)))
   (foreach col columns
-    (setq expected (strcat "\\AcExpr (Table(%<\\_ObjIdx 0>%)." col (itoa (1+ row)) ")") refs 0)
+    (setq expected (strcat "\\AcExpr (Table(%<\\_ObjIdx 0>%)." col (itoa (1+ row))
+      ") \\f \"" (SCM:FieldFormat col) "\"") refs 0)
     (foreach record expressions
       (if (and (= expected (cdr (assoc 2 record)))
                (equal (cdr (assoc 331 record)) (vlax-vla-object->ename table)))

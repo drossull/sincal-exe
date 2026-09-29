@@ -68,3 +68,8 @@ marca. Se rechazan espacios internos, signos y fórmulas. La regresión verifica
 renombrado, vinculación a una fila insertada, edición de XX y duplicados mixtos.
 Se requiere cantidad entera positiva y diámetro/separación positivos; el sistema
 no calcula cantidades a partir del número de rótulos. Los ID existentes no cambian.
+
+Los campos de diámetro y separación muestran como máximo un decimal, sin ceros
+finales (`7.500000` se muestra como `7.5`, `20` como `20`). La cantidad no muestra
+decimales. Solo se redondea la presentación, sin modificar valores de la tabla.
+ACTUALIZAR-MARCAS reconstruye también los campos antiguos sin este formato.
