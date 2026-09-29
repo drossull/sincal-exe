@@ -1,10 +1,10 @@
 # SINCAL Suite — Ingeniería y estándares CAD
 
-**SINCAL Suite** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 2.0 y la secuencia técnica continúa en `v29.0.22` para conservar una actualización ordenada desde las instalaciones v28.
+**SINCAL Suite** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 2.0 y la secuencia técnica continúa en `v29.0.23` para conservar una actualización ordenada desde las instalaciones v28.
 
 ## Instalación web y distribución
 
-SINCAL Suite se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.22.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
+SINCAL Suite se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.23.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
 
 El programa base no incorpora los 125 MB de mapas regionales. El paquete web sí contiene una copia inicial del master DWG, LISPs, startup, scripts, plumilla, calibración y ayuda estructural para que el primer arranque sea funcional. GitHub mantiene esos recursos al día mediante actualizaciones menores. Cada mapa regional se descarga solamente cuando se selecciona por primera vez en el módulo Ubicación.
 
@@ -12,7 +12,7 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
 
 ## Primer inicio
 
-1. Ejecuta el instalador oficial de la release `v29.0.22`.
+1. Ejecuta el instalador oficial de la release `v29.0.23`.
 2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
 3. Abre **Diagnóstico**, verifica el motor CAD sugerido y cámbialo si necesitas otra versión.
 4. Pulsa **Preparar integración CAD**.
@@ -45,9 +45,11 @@ Al cerrar la ventana principal con **X**, SINCAL finaliza su proceso. La aplicac
 
 ### Interfaz Workbench
 
-La interfaz usa GT Pressura para títulos y Helvetica Neue para textos, campos y tablas, sobre una base visual `ttkbootstrap`. **Ver → Tema** ofrece únicamente los modos corporativos Oscuro, Claro cálido y Sistema. El fondo es uniforme: gris cálido en oscuro y beige en claro, con mostaza o terracota para selección, realces y la sombra inferior derecha de los botones. La iconografía es monocroma, consistente y escalable; los íconos de acción muestran su función al pasar el mouse.
+La interfaz comparte el sistema visual de Cadence sobre `ttkbootstrap`: Roboto para lectura, Roboto Condensed para títulos, Roboto Flex para botones y Roboto Mono para campos numéricos y consola. El cuerpo base es de 14 píxeles lógicos; Tk y ttk sincronizan sus tamaños con el zoom y el DPI de CustomTkinter. Las fuentes TrueType se cargan privadamente, sin cambiar el suavizado global de Windows; el motor Tk no reproduce exactamente el rasterizado de un navegador.
 
-El diseño responde al ancho disponible con tres zonas: navegación lateral retráctil, contenido central con márgenes de lectura e índice contextual **En esta página** a la derecha. El índice es fijo, sin scrollbar, y navega por destinos reales de cada módulo. El menú lateral se oculta automáticamente en ventanas angostas sin eliminar las franjas laterales de descanso visual. Los tres controles `Aa` aplican zoom pequeño, normal o grande. El menú superior reúne **Archivo, Editar, Ver y Ayuda**; el historial de releases y commits está en Home y la única consola puede mostrarse u ocultarse en la parte inferior.
+Al pie del menú izquierdo, el selector ofrece las mismas 16 familias de Cadence: Cadence, Bootstrap, PyData, Nord, Solarized, Catppuccin, Gruvbox, Dracula, Tokyo Night, One, Everforest, Vapor, Minty, Pulse, United y Sandstone. El botón sol/luna alterna claro/oscuro sin cambiar la familia. **Ver → Tema → Del sistema** sigue la apariencia del equipo. Las preferencias se conservan en `%LOCALAPPDATA%\SINCAL\ui_preferences.json`. Cambiar tema no reconstruye los formularios ni descarta cambios pendientes.
+
+El diseño responde al ancho disponible con tres zonas: navegación lateral retráctil, contenido central con márgenes de lectura e índice contextual **En esta página** a la derecha. El índice es fijo, sin scrollbar, y navega por destinos reales de cada módulo. El botón superior de menú oculta/restaura ambos paneles, con una transición cancelable de 180 ms; las ventanas angostas los ocultan automáticamente. Los botones con sombra tienen respuesta breve al pasar el mouse y pulsar. **Ver → Reducir movimiento** desactiva estas transiciones; también se respeta la preferencia de animaciones de Windows. **Ver → Zoom texto** ofrece 90 %, 100 % y 115 %. El historial está en Home y la consola opcional permanece abajo.
 
 ### Renombrado
 
@@ -221,10 +223,10 @@ ejecuta `python -m pytest tests/test_prospecciones_ocr.py -q` después de prepar
 
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v29.0.22.exe`
-- `SINCAL_App_v29.0.22.zip`
-- `SINCAL_AutoCAD_v29.0.22.zip`
-- `release-manifest_v29.0.22.json`
+- `Setup_SINCAL_v29.0.23.exe`
+- `SINCAL_App_v29.0.23.zip`
+- `SINCAL_AutoCAD_v29.0.23.zip`
+- `release-manifest_v29.0.23.json`
 - `SHA256SUMS.txt`
 
 No renombres los paquetes después de compilar: el instalador usa URLs versionadas y hashes fijados en el momento del build.

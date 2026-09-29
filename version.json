@@ -1,5 +1,5 @@
 {
-  "version": "v29.0.22",
+  "version": "v29.0.23",
   "product_version": "2.0",
   "archivos": [
     "main.py",
@@ -27,6 +27,9 @@
     "sincal/ui/display.py",
     "sincal/ui/scroll.py",
     "sincal/ui/theme.py",
+    "sincal/ui/cadence_palettes.py",
+    "sincal/ui/motion.py",
+    "sincal/ui/preferences.py",
     "sincal/ui/widgets.py",
     "sincal/ui/tabs/ubicacion.py",
     "sincal/ui/tabs/project.py",

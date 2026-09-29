@@ -998,6 +998,8 @@ class TabArmaduras(ctk.CTkFrame):
             text_color=COLOR_TEXTO_SUAVE, anchor="w", justify="left",
             wraplength=1180,
         ).pack(fill="x", padx=18, pady=(0, 12))
+        if hasattr(self.parent_app, "_schedule_typography"):
+            self.parent_app._schedule_typography()
 
     @staticmethod
     def _resolved_color(value):
@@ -1065,7 +1067,9 @@ class TabArmaduras(ctk.CTkFrame):
         render_points = polyline_render_points(piece)
 
         def redraw(_event=None):
+            canvas.configure(background=self._resolved_color(COLOR_FONDO))
             canvas.delete("all")
+            canvas_font = (FUENTE_NORMAL[0], -round(FUENTE_NORMAL[1] * self._get_widget_scaling()))
             width = max(1, canvas.winfo_width())
             height = max(1, canvas.winfo_height())
             xs = [point[0] for point in render_points]
@@ -1120,15 +1124,16 @@ class TabArmaduras(ctk.CTkFrame):
                     (ax1 + ax2) / 2.0 + nx * 11,
                     (ay1 + ay2) / 2.0 + ny * 11,
                     text=f"{partial} cm", fill=text_color,
-                    font=FUENTE_NORMAL,
+                    font=canvas_font,
                 )
             canvas.create_text(
                 width / 2.0, height - 18,
                 text=f"LONGITUD DESARROLLADA TOTAL  L={piece.total_cm} cm",
-                fill=accent, font=FUENTE_NORMAL,
+                fill=accent, font=canvas_font,
             )
 
         canvas.bind("<Configure>", redraw, add="+")
+        canvas._sincal_theme_refresh = redraw
         window.after_idle(redraw)
         return window
 

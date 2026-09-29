@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from sincal.ui.theme import COLOR_ACENTO, COLOR_MARCO_BOTON
+from sincal.ui.theme import COLOR_ACENTO, COLOR_MARCO_BOTON, FAMILIA_BOTONES, FUENTE_BOTON
+from sincal.ui.motion import Transition, system_reduces_motion
 
 
 class ShadowButton(ctk.CTkFrame):
@@ -32,6 +33,9 @@ class ShadowButton(ctk.CTkFrame):
         self._shadow_size = 0 if flat else max(0, shadow_size)
         self._button_width = button_width
         self._button_height = button_height
+        font = kwargs.get("font", FUENTE_BOTON)
+        if isinstance(font, tuple):
+            kwargs["font"] = (FAMILIA_BOTONES, *font[1:])
         kwargs["corner_radius"] = 0
         if flat:
             kwargs["border_width"] = 0
@@ -61,7 +65,30 @@ class ShadowButton(ctk.CTkFrame):
             **kwargs,
         )
         self._layout_layers()
+        self._motion = Transition(self)
+        self._lift = 0.0
+        self._button.bind("<Enter>", lambda e: self._animate_lift(1), add="+")
+        self._button.bind("<Leave>", lambda e: self._animate_lift(0), add="+")
+        self._button.bind("<ButtonPress-1>", lambda e: self._animate_lift(2), add="+")
+        self._button.bind("<ButtonRelease-1>", lambda e: self._animate_lift(0), add="+")
+        self._button._canvas.bind("<Return>", lambda e: self.invoke(), add="+")
+        self._button._canvas.bind("<space>", lambda e: self.invoke(), add="+")
         super().bind("<Configure>", self._resize_layers, add="+")
+
+    def _animate_lift(self, target):
+        if not self._shadow_size or self._button.cget("state") == "disabled":
+            return
+        start = self._lift
+        reduced = getattr(self.winfo_toplevel(), "_reduced_motion", False) or system_reduces_motion()
+        def draw(fraction):
+            self._lift = start + (target - start) * fraction
+            self._button.place_configure(x=round(self._lift), y=round(self._lift))
+        self._motion.run(draw, duration=0 if reduced else 150)
+
+    def destroy(self):
+        if hasattr(self, "_motion"):
+            self._motion.cancel()
+        super().destroy()
 
     def _layout_layers(self) -> None:
         size = self._shadow_size
@@ -120,10 +147,11 @@ class ShadowButton(ctk.CTkFrame):
         self._button.unbind(sequence, funcid)
 
     def focus(self):
-        return self._button.focus()
+        return self.focus_set()
 
     def focus_set(self):
-        return self._button.focus_set()
+        # CTkButton.focus_set assumes a text label, absent in icon-only buttons.
+        return self._button._canvas.focus_set()
 
     def invoke(self):
         return self._button.invoke()

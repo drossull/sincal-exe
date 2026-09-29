@@ -67,6 +67,8 @@ from sincal.ui.icons import obtener_icono
 from sincal.ui.activity import ActivityIndicator
 from sincal.ui.scroll import SafeScrollableFrame
 from sincal.ui.widgets import ShadowButton
+from sincal.ui.motion import Transition, system_reduces_motion
+from sincal.ui.preferences import load_preferences, save_preferences
 from sincal.runtime import (
     ruta_recurso as runtime_ruta_recurso,
 )
@@ -100,12 +102,12 @@ from sincal.ui.theme import (
     PALETA_OSCURA,
     RADIO_CONTROL,
     RADIO_PANEL,
-    TTK_PRESET_CLARO,
-    TTK_PRESET_OSCURO,
-    armonizar_estilos_ttk,
     crear_estilo_bootstrap,
     agregar_tooltip,
     registrar_fuentes,
+    aplicar_familia,
+    THEME_LABELS,
+    sincronizar_tipografia,
 )
 
 # --- CONFIGURACIÓN GLOBALES ---
@@ -164,8 +166,15 @@ class ActualizadorCAD(ctk.CTk):
             except Exception:
                 pass
         registrar_fuentes()
+        self._visual_preferences = load_preferences()
+        self._theme_family = self._visual_preferences["family"]
+        self._theme_mode = self._visual_preferences["mode"]
+        self._reduced_motion = self._visual_preferences["reduced_motion"]
+        ctk.set_appearance_mode(self._theme_mode)
         super().__init__()
         self.bootstrap_style = crear_estilo_bootstrap()
+        aplicar_familia(self.bootstrap_style, self._theme_family, ctk.get_appearance_mode() == "Dark")
+        self._panel_transition = Transition(self)
         asegurar_directorios()
         self.logger = configurar_logging()
         self.historial_logs = []
@@ -246,6 +255,11 @@ class ActualizadorCAD(ctk.CTk):
             self.tab_docs, parent_app=self, fg_color="transparent")
         self.vista_docs.pack(fill="both", expand=True)
         self.seleccionar_seccion("sincronizador")
+        self.cambiar_tema({"dark": "Tema oscuro", "light": "Tema claro", "system": "Tema del sistema"}[self._theme_mode], persist=False)
+        self._set_side_panels(self._visual_preferences["panels_expanded"], animate=False, persist=False)
+        self._last_resolved_mode = ctk.get_appearance_mode()
+        self._typography_job = None
+        self.after(1500, self._watch_system_theme)
         self.after(2_200, self._offer_last_project)
 
         self.iniciar_actividad("historial", "Cargando historial")
@@ -297,7 +311,8 @@ class ActualizadorCAD(ctk.CTk):
         self.brand_subtitle.pack(anchor="w", padx=16, pady=(0, 18))
         ttk.Separator(self.sidebar, orient="horizontal").pack(fill="x", padx=14, pady=(0, 16))
 
-        self.nav_container = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.nav_container = SafeScrollableFrame(self.sidebar, fg_color="transparent",
+            scrollbar_button_color=COLOR_BORDE, scrollbar_button_hover_color=COLOR_ACENTO)
         self.nav_container.pack(fill="both", expand=True, padx=8)
         self._project_sections = {"consulta", "estructural", "prospecciones", "sesiones"}
         self.nav_items = (
@@ -346,17 +361,41 @@ class ActualizadorCAD(ctk.CTk):
         self.sidebar_grip.bind("<B1-Motion>", self._redimensionar_menu)
 
         footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        footer.pack(fill="x", padx=12, pady=(8, 12))
+        self.nav_container.pack_forget()
+        footer.pack(side="bottom", fill="x", padx=12, pady=(8, 12))
+        self.nav_container.pack(fill="both", expand=True, padx=8)
+        # Cadence: familia independiente del botón claro/oscuro.
+        theme_controls = ctk.CTkFrame(footer, fg_color="transparent")
+        theme_controls.pack(fill="x", pady=(0, 12))
+        self.theme_family_var = tk.StringVar(value=THEME_LABELS[self._theme_family])
+        self.theme_selector = ttk.Combobox(
+            theme_controls, textvariable=self.theme_family_var,
+            values=list(THEME_LABELS.values()), state="readonly", width=17)
+        self.theme_selector.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.theme_selector.bind("<<ComboboxSelected>>", self._choose_theme_family)
+        agregar_tooltip(self.theme_selector, "Familia de tema. Conserva el modo claro u oscuro.")
+        self.theme_mode_button = ShadowButton(
+            theme_controls, text="☀", width=32, height=32, flat=True,
+            fg_color=COLOR_GRIS_BOTON, text_color=COLOR_TEXTO,
+            command=self._toggle_theme_mode)
+        self.theme_mode_button.pack(side="right")
+        agregar_tooltip(self.theme_mode_button, "Cambiar a modo claro")
         ctk.CTkLabel(
             footer, text=f"Versión {VERSION_ACTUAL}",
             font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
             anchor="w", justify="left",
         ).pack(fill="x")
-        ctk.CTkLabel(
+        credits = ctk.CTkLabel(
             footer, text="Por Gonzalo M. para SINCAL Ltda. 2026.",
             font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
-            anchor="w", justify="left",
-        ).pack(fill="x", pady=(8, 0))
+            anchor="w", justify="left", wraplength=235,
+        )
+        credits.pack(fill="x", pady=(8, 0))
+        def wrap_credits(event):
+            width = max(120, round(event.width / footer._get_widget_scaling()) - 4)
+            if credits.cget("wraplength") != width:
+                credits.configure(wraplength=width)
+        footer.bind("<Configure>", wrap_credits, add="+")
         self.workspace = ctk.CTkFrame(self, fg_color=COLOR_FONDO, corner_radius=0)
         self.workspace.pack(side="right", fill="both", expand=True)
         header = ctk.CTkFrame(self.workspace, height=64, fg_color=COLOR_PANEL, corner_radius=0)
@@ -369,7 +408,7 @@ class ActualizadorCAD(ctk.CTk):
             command=self.alternar_menu_lateral,
         )
         self.btn_mostrar_menu.pack(side="left", padx=(10, 0), pady=12)
-        agregar_tooltip(self.btn_mostrar_menu, "Mostrar u ocultar menú lateral")
+        agregar_tooltip(self.btn_mostrar_menu, "Ocultar paneles laterales")
         path_bar = ctk.CTkFrame(
             header, fg_color=COLOR_PANEL_OSCURO, corner_radius=RADIO_CONTROL,
         )
@@ -641,14 +680,37 @@ class ActualizadorCAD(ctk.CTk):
             self.sidebar.pack(side="left", fill="y", before=self.workspace)
 
     def alternar_menu_lateral(self):
-        if self.sidebar.winfo_manager():
-            self._sidebar_user_hidden = True
+        self._set_side_panels(not getattr(self, "_panels_expanded", True))
+
+    def _set_side_panels(self, expanded, animate=True, persist=True):
+        self._panel_transition.cancel()
+        self._panels_expanded = expanded
+        if persist:
+            self._sidebar_user_hidden = not expanded
             self._sidebar_auto_hidden = False
-            self.ocultar_menu_lateral()
-        else:
-            self._sidebar_user_hidden = False
-            self._sidebar_auto_hidden = False
-            self.mostrar_menu_lateral()
+            self._visual_preferences["panels_expanded"] = expanded
+            self._save_visual_preferences()
+        left_start = float(self.sidebar.cget("width")) if self.sidebar.winfo_manager() else 0
+        right_start = float(self.page_nav_column.cget("width")) if self.page_nav_column.winfo_manager() else 0
+        if expanded:
+            if not self.sidebar.winfo_manager():
+                self.sidebar.pack(side="left", fill="y", before=self.workspace)
+            if not self.page_nav_column.winfo_manager():
+                self.page_nav_column.pack(side="right", fill="y", padx=(18, 8), before=self.content_host)
+        left_end, right_end = (self._sidebar_width, 260) if expanded else (0, 0)
+        def draw(fraction):
+            self.sidebar.configure(width=max(1, round(left_start + (left_end-left_start)*fraction)))
+            self.page_nav_column.configure(width=max(1, round(right_start + (right_end-right_start)*fraction)))
+        def finish():
+            if not expanded:
+                self.sidebar.pack_forget()
+                self.page_nav_column.pack_forget()
+        # Evita dejar el foco en un control oculto.
+        self.btn_mostrar_menu.focus_set()
+        self.btn_mostrar_menu._sincal_tooltip.text = (
+            "Ocultar paneles laterales" if expanded else "Mostrar paneles laterales")
+        duration = 180 if animate and not self._reduced_motion and not system_reduces_motion() else 0
+        self._panel_transition.run(draw, finish, duration)
 
     def _adaptar_layout_principal(self, event):
         """Libera espacio de trabajo automáticamente en ventanas angostas."""
@@ -657,10 +719,10 @@ class ActualizadorCAD(ctk.CTk):
         width = event.width
         if width < 1080 and self.sidebar.winfo_manager() and not self._sidebar_user_hidden:
             self._sidebar_auto_hidden = True
-            self.ocultar_menu_lateral()
+            self._set_side_panels(False, animate=False, persist=False)
         elif width >= 1160 and self._sidebar_auto_hidden and not self._sidebar_user_hidden:
             self._sidebar_auto_hidden = False
-            self.mostrar_menu_lateral()
+            self._set_side_panels(True, animate=False, persist=False)
 
     def _iniciar_redimension_menu(self, event):
         self._sidebar_drag_origin = event.x_root
@@ -680,7 +742,18 @@ class ActualizadorCAD(ctk.CTk):
         self._zoom_target = max(0.85, min(1.25, escala))
         self._font_scale = self._zoom_target
         ctk.set_widget_scaling(self._font_scale)
+        sincronizar_tipografia(self, self.bootstrap_style, self.sidebar._get_widget_scaling())
         self._actualizar_indicador_zoom()
+
+    def _schedule_typography(self, _event=None):
+        if self._cerrando:
+            return
+        if self._typography_job is not None:
+            self.after_cancel(self._typography_job)
+        def apply():
+            self._typography_job = None
+            sincronizar_tipografia(self, self.bootstrap_style, self.sidebar._get_widget_scaling())
+        self._typography_job = self.after(80, apply)
 
     def _actualizar_indicador_zoom(self, value=None):
         percentage = round((self._font_scale if value is None else value) * 100)
@@ -693,18 +766,55 @@ class ActualizadorCAD(ctk.CTk):
             except tk.TclError:
                 pass
 
-    def cambiar_tema(self, value):
+    def _save_visual_preferences(self):
+        self._visual_preferences.update(family=self._theme_family, mode=self._theme_mode,
+                                        reduced_motion=self._reduced_motion)
+        if not save_preferences(self._visual_preferences):
+            self.logger.warning("No se pudieron guardar las preferencias visuales.")
+
+    def _choose_theme_family(self, _event=None):
+        self._theme_family = next((key for key, label in THEME_LABELS.items()
+            if label == self.theme_family_var.get()), "cadence")
+        self.cambiar_tema({"dark": "Tema oscuro", "light": "Tema claro", "system": "Tema del sistema"}[self._theme_mode])
+
+    def _toggle_theme_mode(self):
+        self.cambiar_tema("Tema claro" if ctk.get_appearance_mode() == "Dark" else "Tema oscuro")
+
+    def _watch_system_theme(self):
+        if self._cerrando:
+            return
+        if self._theme_mode == "system" and ctk.get_appearance_mode() != self._last_resolved_mode:
+            self.cambiar_tema("Tema del sistema", persist=False)
+        self.after(1500, self._watch_system_theme)
+
+    def cambiar_tema(self, value, persist=True):
         modo = {"Tema oscuro": "dark", "Tema claro": "light", "Tema del sistema": "system"}.get(value, "dark")
+        self._theme_mode = modo
         ctk.set_appearance_mode(modo)
         resolved_dark = ctk.get_appearance_mode() == "Dark"
-        ttk_theme = TTK_PRESET_OSCURO if resolved_dark else TTK_PRESET_CLARO
-        self.bootstrap_style.theme_use(ttk_theme)
-        armonizar_estilos_ttk(self.bootstrap_style, dark=resolved_dark)
+        aplicar_familia(self.bootstrap_style, self._theme_family, resolved_dark)
+        # Las listas de colores son compartidas: redibujar sin reconstruir
+        # formularios mantiene selección, valores, foco y sesiones sin guardar.
+        def refresh(widget):
+            if hasattr(widget, "_set_appearance_mode"):
+                widget._set_appearance_mode("Dark" if resolved_dark else "Light")
+            if hasattr(widget, "_sincal_theme_refresh"):
+                widget._sincal_theme_refresh()
+            for child in widget.winfo_children():
+                refresh(child)
+        self.configure(fg_color=COLOR_FONDO)
+        refresh(self)
+        sincronizar_tipografia(self, self.bootstrap_style, self.sidebar._get_widget_scaling())
+        self._last_resolved_mode = ctk.get_appearance_mode()
+        self.theme_mode_button.configure(text="☀" if resolved_dark else "☾")
+        self.theme_mode_button._sincal_tooltip.text = "Cambiar a modo " + ("claro" if resolved_dark else "oscuro")
         if hasattr(self, "_theme_mode_var"):
             self._theme_mode_var.set(value)
         self._actualizar_menu_nativo(modo)
         if hasattr(self, "activity_indicator"):
             self.activity_indicator.refresh_theme()
+        if persist:
+            self._save_visual_preferences()
 
     def _construir_menu_superior(self):
         self.menu_superior = tk.Menu(self, tearoff=False)
@@ -725,7 +835,14 @@ class ActualizadorCAD(ctk.CTk):
 
         self.menu_ver = tk.Menu(self.menu_superior, tearoff=False)
         self.menu_ver.add_command(
-            label="Mostrar/ocultar menú lateral", command=self.alternar_menu_lateral)
+            label="Mostrar/ocultar paneles laterales", command=self.alternar_menu_lateral)
+        self._reduce_motion_var = tk.BooleanVar(value=self._reduced_motion)
+        def reduce_motion():
+            self._reduced_motion = self._reduce_motion_var.get()
+            self._set_side_panels(self._panels_expanded, animate=False, persist=False)
+            self._save_visual_preferences()
+        self.menu_ver.add_checkbutton(label="Reducir movimiento", variable=self._reduce_motion_var,
+                                      command=reduce_motion)
         self.menu_ver.add_separator()
         self._console_visible_var = tk.BooleanVar(value=False)
         self.menu_ver.add_checkbutton(
@@ -1135,19 +1252,27 @@ class ActualizadorCAD(ctk.CTk):
         ctk.CTkLabel(
             portada, text="SINCAL SUITE", font=FUENTE_TITULO, text_color=COLOR_TEXTO,
         ).pack(pady=(4, 12))
-        ctk.CTkLabel(
+        intro = ctk.CTkLabel(
             portada,
             text=("Una suite de ingeniería para estandarizar dibujos CAD, automatizar planos, "
                   "organizar recursos de proyecto y generar armaduras con control del usuario."),
             font=FUENTE_NORMAL, text_color=COLOR_TEXTO, justify="center", wraplength=720,
-        ).pack(padx=30)
-        ctk.CTkLabel(
+        )
+        intro.pack(fill="x", padx=16)
+        summary = ctk.CTkLabel(
             portada,
             text=("Integra documentación, comandos en vivo, conversión DXF–DWG, renombrado, "
                   "ubicación, diagnóstico y herramientas estructurales en un solo entorno."),
             font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE,
             justify="center", wraplength=700,
-        ).pack(padx=30, pady=(7, 0))
+        )
+        summary.pack(fill="x", padx=16, pady=(7, 0))
+        def wrap_intro(event):
+            width = max(180, round(event.width / portada._get_widget_scaling()) - 32)
+            for label in (intro, summary):
+                if label.cget("wraplength") != width:
+                    label.configure(wraplength=width)
+        portada.bind("<Configure>", wrap_intro, add="+")
         ctk.CTkLabel(
             portada, text="Por Gonzalo M. para SINCAL Ltda. · 2026",
             font=FUENTE_NORMAL_PEQUENA, text_color=COLOR_TEXTO_SUAVE,
@@ -1159,11 +1284,17 @@ class ActualizadorCAD(ctk.CTk):
             self.tab_main, text="SINCRONIZADOR", font=FUENTE_SUBTITULO,
             text_color=COLOR_MOSTAZA, anchor="w",
         ).pack(fill="x", padx=46, pady=(0, 3))
-        ctk.CTkLabel(
+        sync_description = ctk.CTkLabel(
             self.tab_main,
             text="Mantiene el programa, los recursos CAD y el historial de distribución en un mismo lugar.",
-            font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE, anchor="w",
-        ).pack(fill="x", padx=46, pady=(0, 8))
+            font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE, anchor="w", justify="left",
+        )
+        sync_description.pack(fill="x", padx=46, pady=(0, 8))
+        def wrap_sync(event):
+            width = max(180, round(event.width / sync_description._get_widget_scaling()))
+            if sync_description.cget("wraplength") != width:
+                sync_description.configure(wraplength=width)
+        sync_description.bind("<Configure>", wrap_sync, add="+")
 
         botones_sec_frame = ctk.CTkFrame(self.tab_main, fg_color="transparent")
         botones_sec_frame.pack(fill="x", padx=46, pady=(4, 18))

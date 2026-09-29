@@ -69,8 +69,10 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('FAMILIA_PRESSURA = "GT Pressura"', theme)
         self.assertIn('(FAMILIA_TITULOS, 28, "bold")', theme)
         self.assertIn('FAMILIA_CUERPO = "Roboto"', theme)
-        self.assertIn('(FAMILIA_CUERPO, 13)', theme)
-        self.assertIn('("Consolas", 13)', theme)
+        self.assertIn('(FAMILIA_CUERPO, 14)', theme)
+        self.assertIn('(FAMILIA_NUMEROS, 14)', theme)
+        self.assertIn('"roboto-flex-400.ttf"', theme)
+        self.assertIn('"roboto-mono-400.ttf"', theme)
         self.assertIn("GT Pressura Regular.ttf", build)
         self.assertIn("HelveticaNeueRoman.ttf", build)
         self.assertIn("HelveticaNeueBold.ttf", build)
@@ -127,8 +129,8 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn("SINCAL.manifest", spec)
         init = app.split("class ActualizadorCAD", 1)[1].split("asegurar_directorios()", 1)[0]
         self.assertLess(init.index("registrar_fuentes()"), init.index("super().__init__()"))
-        self.assertIn('FUENTE_TTK_NORMAL = (FAMILIA_CUERPO, -13)', theme)
-        self.assertIn('FUENTE_TTK_TABLA = (FAMILIA_CUERPO, -12)', theme)
+        self.assertIn('FUENTE_TTK_NORMAL = (FAMILIA_CUERPO, -14)', theme)
+        self.assertIn('FUENTE_TTK_TABLA = (FAMILIA_CUERPO, -14)', theme)
         self.assertIn('f"{prefix}Table.Treeview"', theme)
 
     def test_bootstrap_preset_icons_and_responsive_shell_are_integrated(self):

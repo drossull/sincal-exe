@@ -268,7 +268,10 @@ function Assert-AppPayloadContents([string]$Path) {
             'assets/fonts/HelveticaNeueBold.ttf',
             'assets/fonts/roboto-400.ttf',
             'assets/fonts/roboto-700.ttf',
-            'assets/fonts/roboto-condensed-700.ttf'
+            'assets/fonts/roboto-condensed-700.ttf',
+            'assets/fonts/roboto-flex-400.ttf',
+            'assets/fonts/roboto-mono-400.ttf',
+            'assets/fonts/roboto-mono-700.ttf'
         )
         $missing = @($required | Where-Object { $_ -notin $entries })
         if ($missing.Count -gt 0) {
@@ -319,7 +322,7 @@ function New-ReleasePayloads(
     $fontStage = Join-Path $appStage 'assets\fonts'
     New-Item -ItemType Directory -Force -Path $fontStage | Out-Null
     Get-ChildItem (Join-Path $ProjectRoot 'assets\fonts') -File | Where-Object {
-        $_.Extension -in @('.ttf', '.otf') -or $_.Name -eq 'README.md'
+        $_.Extension -in @('.ttf', '.otf', '.txt') -or $_.Name -eq 'README.md'
     } | ForEach-Object {
         Copy-Item $_.FullName (Join-Path $fontStage $_.Name) -Force
     }
