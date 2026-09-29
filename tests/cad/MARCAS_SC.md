@@ -61,5 +61,10 @@ El XRecord SINCAL_MARCA_DOCUMENT_V1 identifica el dibujo. El bloque conserva un
 respaldo de su handle de tabla y de esa identidad: permite recuperar COPYCLIP
 cuando AutoCAD sustituye por cero un handle 1005 no incluido en la selección.
 Ese respaldo no se utiliza si la identidad del documento no coincide.
-Solo se admiten marcas numéricas, cantidad entera positiva y diámetro/separación
-positivos; el sistema no calcula cantidades a partir del número de rótulos.
+Se admiten marcas formadas por dígitos y un sufijo opcional de letras A-Z:
+`5`, `5a`, `5b`, `12AB`. Se conserva la escritura de la tabla, pero la búsqueda
+y los duplicados no distinguen mayúsculas/minúsculas: `5a` y `5A` son la misma
+marca. Se rechazan espacios internos, signos y fórmulas. La regresión verifica
+renombrado, vinculación a una fila insertada, edición de XX y duplicados mixtos.
+Se requiere cantidad entera positiva y diámetro/separación positivos; el sistema
+no calcula cantidades a partir del número de rótulos. Los ID existentes no cambian.
