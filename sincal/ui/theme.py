@@ -2,6 +2,7 @@
 
 import ctypes
 import os
+import tkinter as tk
 
 import customtkinter as ctk
 from ttkbootstrap import Style as BootstrapStyle
@@ -320,21 +321,28 @@ class Tooltip:
         widget.bind("<Enter>", self.show, add="+")
         widget.bind("<Leave>", self.hide, add="+")
         widget.bind("<ButtonPress>", self.hide, add="+")
+        widget.bind("<Destroy>", self.hide, add="+")
 
     def show(self, _event=None):
-        if self.window or self.show_job or not self.text:
+        if self.window or self.show_job or not self.text or not self.widget.winfo_exists():
             return
         self.show_job = self.widget.after(350, self._show_now)
 
     def _show_now(self):
         self.show_job = None
-        if self.window or not self.text:
+        if self.window or not self.text or not self.widget.winfo_exists():
             return
         try:
             x = self.widget.winfo_rootx() + 18
             y = self.widget.winfo_rooty() + self.widget.winfo_height() + 6
-            self.window = ctk.CTkToplevel(self.widget)
+            # No tiene barra de título: CTkToplevel programa una restauración
+            # nativa al cambiar de tema que puede ejecutarse después de hide().
+            # Un Toplevel simple evita ese callback y no roba/restaura el foco.
+            self.window = tk.Toplevel(self.widget)
+            self.window.withdraw()
             self.window.overrideredirect(True)
+            self.window._sincal_theme_refresh = self._refresh_theme
+            self._refresh_theme()
             self.window.attributes("-topmost", True)
             self.window.geometry(f"+{x}+{y}")
             ctk.CTkLabel(
@@ -343,9 +351,14 @@ class Tooltip:
                 corner_radius=4,
             ).pack(padx=7, pady=4)
             self.window.bind("<Leave>", self.hide, add="+")
+            self.window.deiconify()
             self.hide_job = self.widget.after(3500, self.hide)
         except Exception:
-            self.window = None
+            self.hide()
+
+    def _refresh_theme(self):
+        if self.window and self.window.winfo_exists():
+            self.window.configure(bg=COLOR_PANEL_OSCURO[int(ctk.get_appearance_mode() == "Dark")])
 
     def hide(self, _event=None):
         if self.show_job:
@@ -360,12 +373,12 @@ class Tooltip:
             except Exception:
                 pass
             self.hide_job = None
-        if self.window:
+        window, self.window = self.window, None
+        if window:
             try:
-                self.window.destroy()
+                window.destroy()
             except Exception:
                 pass
-            self.window = None
 
 
 def agregar_tooltip(widget, text: str):

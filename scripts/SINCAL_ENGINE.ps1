@@ -163,14 +163,27 @@ function Invoke-SincalCadScript {
         return Invoke-SincalZwcadScript -Engine $Engine -DrawingPath $DrawingPath -ScriptPath $ScriptPath -TimeoutSeconds $TimeoutSeconds
     }
     $arguments = "/i `"$DrawingPath`" /s `"$ScriptPath`""
-    $process = Start-Process -FilePath $Engine.Path -ArgumentList $arguments -NoNewWindow -PassThru
-    if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-        # El PID pertenece exclusivamente al Core Console iniciado arriba.
-        # Evita que un prompt inesperado bloquee todo el lote indefinidamente.
-        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-        throw "AutoCAD Core Console no terminó antes de $TimeoutSeconds segundos. Se cerró sólo el proceso de este DWG; revisa si el SCR dejó una pregunta sin responder."
+    # Windows PowerShell 5.1 puede devolver ExitCode=$null con Start-Process
+    # -NoNewWindow -PassThru, aun si CAD termina bien. Process.Start conserva
+    # el handle real y permite distinguir un error de CAD de una salida normal.
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo.FileName = $Engine.Path
+    $process.StartInfo.Arguments = $arguments
+    $process.StartInfo.WorkingDirectory = (Get-Location).Path
+    $process.StartInfo.UseShellExecute = $false
+    $process.StartInfo.CreateNoWindow = $true
+    try {
+        if (-not $process.Start()) { throw "No se pudo iniciar AutoCAD Core Console." }
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            # El PID pertenece exclusivamente al Core Console iniciado arriba.
+            # Evita que un prompt inesperado bloquee todo el lote indefinidamente.
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            throw "AutoCAD Core Console no terminó antes de $TimeoutSeconds segundos. Se cerró sólo el proceso de este DWG; revisa si el SCR dejó una pregunta sin responder."
+        }
+        if ($process.ExitCode -ne 0) { throw "AutoCAD Core Console terminó con código $($process.ExitCode)." }
+        return 0
     }
-    $process.Refresh()
-    if ($process.ExitCode -ne 0) { throw "AutoCAD Core Console terminó con código $($process.ExitCode)." }
-    return 0
+    finally {
+        $process.Dispose()
+    }
 }

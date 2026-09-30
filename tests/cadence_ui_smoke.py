@@ -47,6 +47,24 @@ def main():
                 assert app._theme_family == 'tokyo-night'
                 assert app._theme_mode == 'light'
                 assert load_preferences()['family'] == 'tokyo-night'
+                # Regression: a tooltip may expire while Windows redraws the
+                # main titlebar. No callback may revive its destroyed window.
+                tooltip = app.theme_mode_button._sincal_tooltip
+                for mode in ('Tema oscuro', 'Tema claro', 'Tema oscuro'):
+                    tooltip._show_now()
+                    assert tooltip.window is not None
+                    app.after(0, tooltip.hide)
+                    app.cambiar_tema(mode)
+                    app.update()
+                    assert tooltip.window is None
+                tooltip.show()
+                app.cambiar_tema('Tema claro')
+                deadline = time.monotonic() + .45
+                while time.monotonic() < deadline:
+                    app.update()
+                    time.sleep(.01)
+                tooltip.hide()
+                assert not errors, errors
                 app.seleccionar_seccion('estructural')
                 app.update()
                 content = app.vista_armaduras

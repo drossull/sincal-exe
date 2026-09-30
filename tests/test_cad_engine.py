@@ -61,6 +61,11 @@ class CadEngineTests(unittest.TestCase):
         self.assertIn('$application.Visible = $false', engine_helper)
         self.assertIn('Get-Process -Name ZWCAD', engine_helper)
         self.assertIn('Stop-Process -Id $createdProcessId', engine_helper)
+        self.assertIn('New-Object System.Diagnostics.Process', engine_helper)
+        self.assertIn('$process.StartInfo.UseShellExecute = $false', engine_helper)
+        self.assertIn('$process.StartInfo.CreateNoWindow = $true', engine_helper)
+        self.assertIn('$process.Dispose()', engine_helper)
+        self.assertNotIn('Start-Process -FilePath $Engine.Path', engine_helper)
         for script in scripts.glob("*.ps1"):
             if script.name == "SINCAL_ENGINE.ps1":
                 continue
