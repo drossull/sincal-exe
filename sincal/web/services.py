@@ -156,14 +156,18 @@ class Services:
         return {'plan': self.remember(self.plans, ('sync', plan)), **asdict(plan)}
 
     def sync_apply(self, job, payload):
-        from sincal.resources import apply_resource_updates
+        from sincal.resources import apply_resource_updates, materialize_cad_resources
         with self.lock:
             item = self.plans.pop(payload.get('plan'), None)
         if not item or item[0] != 'sync':
             raise ValueError('Vuelve a comprobar las actualizaciones.')
         job.check()
         job.update('Descargando y verificando recursos; espera a que termine esta etapa.')
-        return asdict(apply_resource_updates(item[1]))
+        result = apply_resource_updates(item[1])
+        job.update('Preparando carga automática de los comandos CAD actualizados.')
+        materialize_cad_resources()
+        return {**asdict(result), 'message':
+                'Recursos y carga automática actualizados. Abre un dibujo nuevo o reinicia CAD para cargar los comandos.'}
 
     def prepare(self, job, payload):
         if payload.get('confirm') is not True:

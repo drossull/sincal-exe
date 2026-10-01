@@ -5,6 +5,15 @@
 ;;; =========================================================================
 (vl-load-com)
 
+;; Compatibility with installed versions whose old acaddoc list omits PNDMAKE.
+;; This startup is itself an updateable resource and is already in that list.
+(if (not (member "C:PNDMAKE" (atoms-family 1)))
+  (progn
+    (setq sincal-pndmake-file
+      (findfile (strcat (getenv "APPDATA") "/Estandar SINCAL/lisps/PNDMAKE.lsp")))
+    (if sincal-pndmake-file
+      (autoload sincal-pndmake-file '("PNDMAKE")))))
+
 ;;; =========================================================================
 ;;; 1. ESCUDO SINCAL (VARIABLES DE ENTORNO)
 ;;; =========================================================================

@@ -68,6 +68,21 @@ class ResourceSyncTests(unittest.TestCase):
     def _installed_path(self, *parts):
         return os.path.join(self.installed, *parts)
 
+    def test_materialize_registers_new_commands_and_repairs_stale_loaders(self):
+        self._write_installed("lisps/PNDMAKE.lsp", b"(defun c:PNDMAKE () (princ))\n")
+        resource_sync.materialize_cad_resources()
+        for name in ("acaddoc.lsp", "zwcaddoc.lsp"):
+            with open(self._cad_path(name), encoding="utf-8") as source:
+                text = source.read()
+            self.assertIn("/lisps/PNDMAKE.lsp", text)
+            self.assertIn("vl-catch-all-apply", text)
+            with open(self._cad_path(name), "w", encoding="utf-8") as target:
+                target.write("; obsolete loader")
+        self.assertEqual(resource_sync.materialize_cad_resources(), ())
+        for name in ("acaddoc.lsp", "zwcaddoc.lsp"):
+            with open(self._cad_path(name), encoding="utf-8") as source:
+                self.assertIn("/lisps/PNDMAKE.lsp", source.read())
+
     def _effective_path(self, *parts):
         cached = os.path.join(self.cache, *parts)
         return cached if os.path.isfile(cached) else self._installed_path(*parts)

@@ -52,6 +52,7 @@ from sincal.resources import (
     distribution_manifest_revision,
     materialize_cad_resources,
     record_resource_state,
+    write_cad_loaders,
 )
 from sincal.runtime import (
     RUTA_DATOS_USUARIO,
@@ -2473,30 +2474,7 @@ class ActualizadorCAD(ctk.CTk):
         self.log("[!] Menú contextual deshabilitado hasta tener una ruta de ejecución validada.")
 
     def generar_archivos_lisp(self, archivos=None):
-        contenido_arranque = ""
-
-        if archivos is None:
-            archivos = active_resource_paths(("lisps/", "startup/"))
-
-        for a in archivos:
-            if a.lower().endswith('.lsp') and os.path.basename(a).lower() not in ["acaddoc.lsp", "zwcaddoc.lsp"]:
-                ruta_lisp = ruta_cad_usuario(*a.replace("\\", "/").split("/")).replace("\\", "/")
-                nombre = os.path.basename(a)
-                contenido_arranque += f'(princ (load "{ruta_lisp}" "\\n[X] SINCAL: Fallo al cargar {nombre}"))\n'
-
-        if "startup/SINCAL_STARTUP.lsp" in archivos or "SINCAL_STARTUP.lsp" in archivos:
-            contenido_arranque += '(princ "\\n[SINCAL] Políticas de empresa y variables aplicadas.")\n'
-
-        contenido_arranque += '(princ "\\n[OK] SINCAL: Todos los LISPs procesados correctamente.")\n(princ)\n'
-
-        r_acad = ruta_cad_usuario("acaddoc.lsp")
-        r_zwcad = ruta_cad_usuario("zwcaddoc.lsp")
-
-        with open(r_acad, 'w', encoding='utf-8') as f:
-            f.write(contenido_arranque)
-
-        with open(r_zwcad, 'w', encoding='utf-8') as f:
-            f.write(contenido_arranque)
+        write_cad_loaders(archivos)
 
     # ==========================================================
     # SISTEMA DE LOGS Y CONSOLA FLOTANTE

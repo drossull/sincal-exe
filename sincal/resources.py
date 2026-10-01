@@ -495,4 +495,28 @@ def materialize_cad_resources() -> tuple[str, ...]:
 
     payload = json.dumps({"resources": active}, indent=2, ensure_ascii=False).encode("utf-8")
     _atomic_write(_cad_state_path(), payload)
+    write_cad_loaders(active)
     return tuple(copied)
+
+
+def write_cad_loaders(paths=None) -> None:
+    """Regenerate document loaders even when no resource bytes changed."""
+    if paths is None:
+        paths = active_resource_paths(("lisps/", "startup/"))
+    lines = []
+    for relative in sorted(set(paths), key=str.lower):
+        if not relative.startswith(("lisps/", "startup/")) or not relative.lower().endswith(".lsp"):
+            continue
+        if relative.rsplit("/", 1)[-1].lower() in {"acaddoc.lsp", "zwcaddoc.lsp"}:
+            continue
+        path = ruta_cad_usuario(*relative.split("/")).replace("\\", "/")
+        # A broken LISP must not prevent later commands from being registered.
+        escaped = path.replace('"', '\\"')
+        label = relative.replace('"', '\\"')
+        lines.append(f'(setq sincal-load-result (vl-catch-all-apply \'load (list "{escaped}")))')
+        lines.append('(if (vl-catch-all-error-p sincal-load-result) '
+                     f'(princ (strcat "\\n[SINCAL] Error al cargar {label}: " '
+                     '(vl-catch-all-error-message sincal-load-result))))')
+    data = ('(vl-load-com)\n' + '\n'.join(lines) + '\n(princ)\n').encode("utf-8")
+    for name in ("acaddoc.lsp", "zwcaddoc.lsp"):
+        _atomic_write(ruta_cad_usuario(name), data)
