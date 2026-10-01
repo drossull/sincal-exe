@@ -2,6 +2,95 @@
 
 **SINCAL Suite** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 2.0 y la secuencia técnica continúa en `v29.0.23` para conservar una actualización ordenada desde las instalaciones v28.
 
+## Vista previa de escritorio con interfaz web
+
+La aplicación seguirá siendo de escritorio, no un portal público. La interfaz
+HTML/CSS se muestra dentro de una ventana propia mediante Microsoft Edge WebView2.
+Para ejecutar esta vista previa desde el repositorio en Windows:
+
+```powershell
+python -m pip install -r requirements-desktop-web.txt
+python -m sincal.web.desktop
+```
+
+Requiere Microsoft Edge WebView2 Runtime instalado. Después de instalar las
+dependencias, la interfaz y sus operaciones locales funcionan sin Internet.
+No abre el navegador externo ni modifica el arranque de la versión Tk instalada.
+Al cerrar la ventana se pide confirmación y se apaga el servidor interno. Sus
+sesiones usan el mismo almacén del piloto, privado al perfil de Windows.
+El empaquetado firmado y reemplazo del instalador de producción siguen pendientes.
+
+## Funciones de la nueva interfaz de escritorio
+
+La vista previa incorpora todos los módulos del menú. Reutiliza los cálculos,
+recursos y generadores Python/LISP existentes; no convierte SINCAL en un sitio
+público ni modifica el repositorio Cadence.
+
+- **Home:** presentación, comprobación/aplicación de recursos, preparación CAD
+  e historial de operaciones con descarga del registro.
+- **Documentación:** búsqueda en contenido e índice agrupado por categorías;
+  instrucciones adaptadas a los controles de esta interfaz.
+- **Comandos en vivo:** glosario, Enter para ejecutar, comando autónomo personalizado,
+  dibujo activo o recorrido secuencial de todos los dibujos confirmados.
+- **Conversión DXF–DWG:** selección nativa múltiple, carpeta de salida, elección
+  AutoCAD/ZWCAD, instancia temporal y rechazo de sobrescrituras. Requiere cerrar CAD.
+- **Renombrado:** selección de carpeta, vista previa, comprobación de colisiones,
+  revalidación antes de aplicar e intento de reversión si falla.
+- **Ubicación:** KML/KMZ, selección de punto/mapa, ajustes y exportación PNG con
+  calibración existente. No interpreta coordenadas PTL como geográficas.
+- **Consulta:** JSON de solo lectura, OT/revisión/estructura y exportación TXT;
+  dimensiones compatibles del JSON se convierten de mm a cm para las armaduras.
+- **Armaduras:** entrada/salida independientes, marcas editables, diámetros,
+  separación, ganchos, origen, cantidades, áreas, pesos, tabla ampliada y detalle
+  SVG por marca. Dibujo de vistas FR/AA/BB/CC/EE y despiece de zapata.
+- **Travesaños:** los cinco cuadrantes y sus despieces, con los generadores
+  extraídos sin alterar sus plantillas a `sincal/cad/crossbeam.py`.
+- **Prospecciones:** extracción PDF/TXT y OCR local, tablas, avisos, imagen/texto
+  de evidencia, confianza por celda, cotejo explícito, vista del perfil e inserción CAD.
+- **Sesiones:** instantáneas privadas por perfil Windows, búsqueda, tarjetas,
+  paginación, carga, importación no destructiva de sesiones anteriores, exportación,
+  recuperación periódica y oferta de reabrir el último guardado.
+- **Diagnóstico:** resumen/ZIP redactado y detección/selección del motor de scripts.
+
+La conexión usa COM en procesos aislados. La comprobación tiene límite de
+15 segundos y nunca inicia CAD. Cada envío revalida instancia y dibujo;
+los moldajes se vuelven a comprobar antes de generar. Una orden incierta no se
+reenvía automáticamente. Cancelar deja de esperar, no deshace una orden enviada
+ni mata CAD. El comando elegido puede guardar/exportar por sí mismo: el retorno
+de control no certifica que haya producido un dibujo correcto.
+
+La interfaz conserva fuentes locales, paletas de Cadence, modos oscuro/claro/
+sistema, zoom 90/100/115 %, paneles ocultables por separado, márgenes de lectura,
+botones rectos con sombra y una animación vectorial de actividad. El progreso
+muestra porcentaje solamente cuando existe una medida real. Preferencias y
+sesiones permanecen en `%LOCALAPPDATA%\SINCAL\web-pilot\sessions.sqlite3`.
+Quienes comparten una cuenta Windows comparten ese almacén; no hay cuentas
+remotas ni sincronización en nube.
+
+Los trabajos generan registros JSONL redactados en `web-pilot/logs`, con máximo
+100 registros y 30 días; los temporales propios de `web-pilot/operations` vencen
+a los 7 días. No se borran DWG ni sesiones formales. Los archivos solo se autorizan
+mediante selección nativa, con identificadores opacos; la API no acepta rutas de
+disco ni comandos de shell arbitrarios. Host, Origin y token se verifican.
+
+Para pruebas de frontend también existe `python -m sincal.web.server`, que abre
+un navegador **solo para desarrollo**. El arranque normal es la ventana nativa.
+El servidor se limita a loopback: no es apto para publicarlo en Internet.
+
+### Validación y compilación pendiente
+
+El inventario, las pruebas y limitaciones se mantienen en
+[Estado de la migración](docs/MIGRACION_WEB.md).
+La versión instalada sigue sin reemplazarse. No se ha ejecutado compilación,
+firma, publicación ni instalación de esta migración.
+
+Se prepararon `desktop_main.py`, el trabajador CAD empaquetable y
+`packaging/windows/SINCAL_Web.spec`. Tras autorizar la compilación, instalar las
+dependencias de escritorio, asignar una versión nueva y validar WebView2, el
+pipeline permite elegir esta interfaz con `tools/build_release.ps1 -DesktopWeb`.
+Sin esa opción conserva el arranque Tk anterior. No publicar sin probar el
+ejecutable y las operaciones CAD sobre dibujos de ensayo.
+
 ## Instalación web y distribución
 
 SINCAL Suite se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.23.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
@@ -168,6 +257,30 @@ Lee puntos desde un KMZ de Google Earth, permite escoger un mapa MOP calibrado y
 5. Generar y guardar el croquis.
 
 La primera utilización de una región solicita descargar su mapa y lo valida antes de guardarlo localmente.
+
+### Registros del procesamiento por CMD
+
+Cada ejecución de `AUDIT`, `ZE`, `PURGEALL`, `BV`, `DL2`, `PAGESETUP-A1` o
+`PUBLISH-A1` crea **un solo `.log` para todo el lote** en
+`%LOCALAPPDATA%\SINCAL\logs\scripts`. La consola muestra su ruta al comenzar y
+al terminar. Puedes pegar esa carpeta en el Explorador y abrir el registro más
+reciente con el Bloc de notas.
+
+El registro contiene comando, carpeta, motor/version CAD, cada DWG, duración,
+salida normal y de error de AutoCAD Core Console, código de salida, fallos y
+resumen. ZWCAD conserva el diagnóstico de automatización COM, no su consola
+interna. «Proceso terminado» no certifica que el dibujo esté libre de corrupción
+ni sustituye la comprobación de los cambios esperados. Si se interrumpe Windows
+o se fuerza el cierre, puede quedar un registro parcial sin resumen.
+
+Al iniciar otra ejecución se eliminan únicamente registros propios de más de
+**30 días** o los más antiguos que excedan **100 ejecuciones** (exceptuando los
+asociados a procesos todavía activos). La salida detallada de CAD se limita a
+5 millones de caracteres por ejecución, con aviso de truncamiento; los estados
+y errores del lanzador siguen registrándose. No se borran DWG, respaldos ni
+archivos ajenos. Para conservar una evidencia, copia el `.log` fuera de esa
+carpeta antes de que expire. Los registros permanecen locales; pueden contener
+rutas y nombres de proyectos, así que revísalos antes de compartirlos.
 
 ### Diagnóstico y soporte
 

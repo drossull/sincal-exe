@@ -38,3 +38,9 @@ La corrección de PURGEALL separa las respuestas de SCALELISTEDIT mediante salto
 de línea. El controlador compartido utiliza `System.Diagnostics.Process` para
 evitar el `ExitCode` nulo que se reprodujo con `Start-Process -NoNewWindow` en
 Windows PowerShell 5.1.
+
+Registro de ejecución: probado PURGEALL con AutoCAD Core Console 2025 sobre
+una copia temporal de `acadiso.dwt`. El `.log` conserva salida UTF-16LE decodificada,
+comandos, código de salida y resumen. `tests/test_script_logs.py` prueba con un
+ejecutable simulado la lectura concurrente stdout/stderr, fallo con código 7,
+timeout, retención por edad/cantidad y preservación de archivos ajenos/activos.

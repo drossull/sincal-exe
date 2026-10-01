@@ -3,7 +3,8 @@ param(
     [string]$CertificateSubject = 'Gonzalo Mardones',
     [string]$CertificateThumbprint = '',
     [string]$InnoSetupPath = '',
-    [switch]$SkipSigning
+    [switch]$SkipSigning,
+    [switch]$DesktopWeb
 )
 
 Set-StrictMode -Version Latest
@@ -455,7 +456,8 @@ Remove-ArtifactIfExists (Join-Path $releaseOutputDir 'SHA256SUMS.txt')
 Write-Step "Compilando ejecutable"
 Push-Location $projectRoot
 try {
-    & python -m PyInstaller --noconfirm 'packaging\windows\SINCAL.spec'
+    $applicationSpec = if ($DesktopWeb) { 'packaging\windows\SINCAL_Web.spec' } else { 'packaging\windows\SINCAL.spec' }
+    & python -m PyInstaller --noconfirm $applicationSpec
     if ($LASTEXITCODE -ne 0) {
         throw 'PyInstaller terminó con error.'
     }

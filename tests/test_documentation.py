@@ -123,7 +123,8 @@ class MassProcessingConfigurationTests(unittest.TestCase):
 
     def test_core_console_runner_enforces_its_timeout(self):
         engine = (ROOT / "scripts" / "SINCAL_ENGINE.ps1").read_text(encoding="utf-8")
-        self.assertIn("$process.WaitForExit($TimeoutSeconds * 1000)", engine)
+        self.assertIn("[DateTime]::UtcNow.AddSeconds($TimeoutSeconds)", engine)
+        self.assertIn("[DateTime]::UtcNow -ge $deadline", engine)
         self.assertIn("Stop-Process -Id $process.Id", engine)
 
 

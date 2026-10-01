@@ -1,6 +1,8 @@
 ﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "SINCAL_ENGINE.ps1")
+Start-SincalScriptLog 'PAGESETUP-A1'
+try {
 
 $appPath = if ($PSScriptRoot) { Split-Path $PSScriptRoot -Parent } else { (Get-Location).Path }
 $scrPath = Join-Path $appPath "scripts\PAGESETUP-A1.scr"
@@ -55,3 +57,9 @@ if ($errores -gt 0) {
 }
 
 Write-Host "`n[OK] Tarea finalizada exitosamente." -ForegroundColor Green
+} catch {
+    Write-Host "[ERROR] $($_.Exception.Message)" -ForegroundColor Red
+    throw
+} finally {
+    Stop-SincalScriptLog
+}

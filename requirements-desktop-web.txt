@@ -1,0 +1,2 @@
+# Optional desktop shell; the existing Tk build remains unchanged.
+pywebview==6.2.1

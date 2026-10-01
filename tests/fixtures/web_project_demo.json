@@ -1,0 +1,11 @@
+{
+  "version": "demo-web-1",
+  "parametros_generales": {"ancho_mm": 11800, "angulo_esviaje_puente": 15},
+  "elementos_comunes": {},
+  "cepas": {"lista": []},
+  "estribos": {"tipo_estribo_entrada": "Prueba sintética", "tipo_estribo_salida": "Prueba sintética"},
+  "tableros": [],
+  "materiales": {},
+  "planos": {},
+  "meta": {"descripcion": "Datos ficticios para probar el piloto web, no usar para diseño."}
+}

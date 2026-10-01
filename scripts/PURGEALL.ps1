@@ -1,6 +1,8 @@
 ﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "SINCAL_ENGINE.ps1")
+Start-SincalScriptLog 'PURGEALL'
+try {
 
 $dwgFiles = Get-ChildItem -Path .\ -Filter *.dwg
 if ($dwgFiles.Count -eq 0) {
@@ -79,3 +81,9 @@ if ($errores -gt 0) {
 
 Write-Host "Proceso finalizado con éxito." -ForegroundColor Cyan
 Write-Host "===================================================" -ForegroundColor Cyan
+} catch {
+    Write-Host "[ERROR] $($_.Exception.Message)" -ForegroundColor Red
+    throw
+} finally {
+    Stop-SincalScriptLog
+}

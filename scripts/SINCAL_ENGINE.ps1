@@ -14,6 +14,62 @@
     }
 }
 
+function Get-SincalScriptLogDirectory {
+    return Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'SINCAL\logs\scripts'
+}
+
+function Start-SincalScriptLog {
+    param([string]$Name)
+    $root = Get-SincalScriptLogDirectory
+    New-Item -ItemType Directory -Path $root -Force | Out-Null
+    # Only our own logs; active processes and unrelated files are never removed.
+    $logs = @(Get-ChildItem -LiteralPath $root -File | Where-Object {
+        $_.Name -match '^SINCAL-\d{8}-\d{6}-\d+-[a-f0-9]{32}\.log$'
+    } | Sort-Object LastWriteTime -Descending)
+    $index = 0
+    foreach ($log in $logs) {
+        $ownerId = [int]($log.BaseName.Split('-')[3])
+        if (Get-Process -Id $ownerId -ErrorAction SilentlyContinue) { continue }
+        $index++
+        if ($index -ge 100 -or $log.LastWriteTime -lt (Get-Date).AddDays(-30)) {
+            Remove-Item -LiteralPath $log.FullName -Force -ErrorAction SilentlyContinue
+        }
+    }
+    $script:SincalLogPath = Join-Path $root ('SINCAL-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + "-$PID-" + [guid]::NewGuid().ToString('N') + '.log')
+    $script:SincalLogStart = Get-Date
+    $script:SincalRawCharacters = 0
+    $script:SincalLogTruncated = $false
+    $script:SincalCompletedDrawings = 0
+    $script:SincalFailedDrawings = 0
+    Start-Transcript -LiteralPath $script:SincalLogPath -ErrorAction Stop | Out-Null
+    Write-Host "Registro: $script:SincalLogPath"
+    Write-Host "Script: $Name | Carpeta: $((Get-Location).Path)"
+}
+
+function Stop-SincalScriptLog {
+    if ($script:SincalLogPath) {
+        Write-Host "Resumen CAD: $script:SincalCompletedDrawings procesos terminados; $script:SincalFailedDrawings fallidos."
+        Write-Host "Fin del lanzador. Duracion: $([math]::Round(((Get-Date) - $script:SincalLogStart).TotalSeconds, 2)) s. Consulte el resumen y los errores anteriores."
+        Stop-Transcript | Out-Null
+        Write-Host "Registro guardado: $script:SincalLogPath"
+        $script:SincalLogPath = $null
+    }
+}
+
+function Write-SincalCadOutput {
+    param([string]$Text, [string]$Channel)
+    # Keep draining both pipes after the log limit to avoid blocking CAD.
+    if ($script:SincalRawCharacters -lt 5000000) {
+        $remaining = 5000000 - $script:SincalRawCharacters
+        if ($Text.Length -gt $remaining) { $Text = $Text.Substring(0, $remaining) }
+        $script:SincalRawCharacters += $Text.Length + 1
+        Write-Host "[$Channel] $Text"
+    } elseif (-not $script:SincalLogTruncated) {
+        $script:SincalLogTruncated = $true
+        Write-Host '[AVISO] Salida CAD truncada a 5 millones de caracteres. Se conservan estados y errores del lanzador.'
+    }
+}
+
 function Get-SincalCadEngine {
     [CmdletBinding()]
     param()
@@ -156,7 +212,7 @@ function Invoke-SincalZwcadScript {
     }
 }
 
-function Invoke-SincalCadScript {
+function Invoke-SincalCadScriptCore {
     [CmdletBinding()]
     param($Engine, [string]$DrawingPath, [string]$ScriptPath, [int]$TimeoutSeconds = 900)
     if ($Engine.Mode -eq "ZWCAD_COM") {
@@ -172,18 +228,74 @@ function Invoke-SincalCadScript {
     $process.StartInfo.WorkingDirectory = (Get-Location).Path
     $process.StartInfo.UseShellExecute = $false
     $process.StartInfo.CreateNoWindow = $true
+    $process.StartInfo.RedirectStandardOutput = $true
+    $process.StartInfo.RedirectStandardError = $true
+    # Core Console writes redirected text as UTF-16LE, without a BOM.
+    if ([IO.Path]::GetFileName($Engine.Path) -ieq 'accoreconsole.exe') {
+        $process.StartInfo.StandardOutputEncoding = [Text.Encoding]::Unicode
+        $process.StartInfo.StandardErrorEncoding = [Text.Encoding]::Unicode
+    }
     try {
         if (-not $process.Start()) { throw "No se pudo iniciar AutoCAD Core Console." }
-        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+        $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        $stdout = $process.StandardOutput.ReadLineAsync()
+        $stderr = $process.StandardError.ReadLineAsync()
+        while ($stdout -or $stderr -or -not $process.HasExited) {
+            if ($stdout -and $stdout.IsCompleted) {
+                $line = $stdout.GetAwaiter().GetResult()
+                $stdout = $null
+                if ($null -ne $line) {
+                    Write-SincalCadOutput $line 'CAD'
+                    $stdout = $process.StandardOutput.ReadLineAsync()
+                }
+            }
+            if ($stderr -and $stderr.IsCompleted) {
+                $line = $stderr.GetAwaiter().GetResult()
+                $stderr = $null
+                if ($null -ne $line) {
+                    Write-SincalCadOutput $line 'CAD STDERR'
+                    $stderr = $process.StandardError.ReadLineAsync()
+                }
+            }
+            if ([DateTime]::UtcNow -ge $deadline) { break }
+            if (($stdout -and -not $stdout.IsCompleted) -or ($stderr -and -not $stderr.IsCompleted)) {
+                Start-Sleep -Milliseconds 10
+            }
+        }
+        if (-not $process.HasExited) {
             # El PID pertenece exclusivamente al Core Console iniciado arriba.
             # Evita que un prompt inesperado bloquee todo el lote indefinidamente.
             Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
             throw "AutoCAD Core Console no terminó antes de $TimeoutSeconds segundos. Se cerró sólo el proceso de este DWG; revisa si el SCR dejó una pregunta sin responder."
         }
+        Write-Host "Codigo de salida CAD: $($process.ExitCode)"
         if ($process.ExitCode -ne 0) { throw "AutoCAD Core Console terminó con código $($process.ExitCode)." }
         return 0
     }
     finally {
         $process.Dispose()
+    }
+}
+
+function Invoke-SincalCadScript {
+    [CmdletBinding()]
+    param($Engine, [string]$DrawingPath, [string]$ScriptPath, [int]$TimeoutSeconds = 900)
+    $started = Get-Date
+    Write-Host "INICIO DWG: $DrawingPath"
+    Write-Host "Motor: $($Engine.Path) | Version: $($Engine.Year) | Modo: $($Engine.Mode) | SCR: $ScriptPath"
+    if ($Engine.Mode -eq 'ZWCAD_COM') {
+        Write-Host 'ZWCAD: registro de automatizacion COM; no incluye la consola interna del dibujo.'
+    }
+    try {
+        $result = Invoke-SincalCadScriptCore @PSBoundParameters
+        $script:SincalCompletedDrawings++
+        Write-Host 'PROCESO TERMINADO: no certifica ausencia de corrupcion ni verifica todos los cambios del dibujo.'
+        return $result
+    } catch {
+        $script:SincalFailedDrawings++
+        Write-Host "FALLO DWG: $DrawingPath | $($_.Exception.Message)" -ForegroundColor Red
+        throw
+    } finally {
+        Write-Host "FIN DWG: $DrawingPath | Duracion: $([math]::Round(((Get-Date) - $started).TotalSeconds, 2)) s"
     }
 }
