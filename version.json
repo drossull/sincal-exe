@@ -59,6 +59,7 @@
     "lisps/P0.lsp",
     "lisps/PLOTYA.lsp",
     "lisps/PND.lsp",
+    "lisps/PNDMAKE.lsp",
     "lisps/CEVIADA.lsp",
     "lisps/EXTRIMOUT.lsp",
     "lisps/RMLAY.lsp",

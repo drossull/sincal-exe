@@ -270,6 +270,13 @@
       "notas": ["El signo depende del orden geométrico de los extremos."],
       "tags": ["linea", "porcentaje"]
     },
+    "PNDMAKE": {
+      "titulo": "Aplicar pendiente porcentual",
+      "descripcion": "Rota un objeto completo hasta dar a su eje de referencia una pendiente absoluta respecto de la horizontal del UCS actual.",
+      "pasos": ["Selecciona un objeto y escribe PNDMAKE, o selecciónalo al ejecutar el comando.", "En una línea se reconocen sus extremos. Para polilíneas, bloques u otros objetos indica dos puntos del tramo o eje que quieres orientar.", "Indica el punto fijo de giro o pulsa Enter para usar el primer punto del eje.", "Escribe la pendiente sin el símbolo %: 10 sube hacia la derecha, -10 baja y 0 deja horizontal el eje."],
+      "notas": ["10% equivale aproximadamente a 5,7106 grados, no a 10 grados. Se aplica atan(porcentaje/100).", "Rota sin deformar ni cambiar longitudes: no conserva la proyección horizontal. En polilíneas curvas o quebradas, solo el eje indicado adquiere esa pendiente; no todos sus tramos.", "Trabaja en XY del UCS, no asigna elevaciones ni pendientes longitudinales Z. Los dos puntos de referencia deben estar en un plano paralelo a XY.", "Solo afecta al objeto seleccionado. Omite capas bloqueadas y viewports; permite deshacer el giro con UNDO. Esc cancela sin modificar el objeto."],
+      "tags": ["pendiente", "rotacion", "porcentaje", "linea", "polilinea"]
+    },
     "PURGEALL": {
       "titulo": "Limpieza profunda del dibujo",
       "descripcion": "Ejecuta AUDIT, purga definiciones y aplicaciones registradas sin uso, encuadra y guarda.",
