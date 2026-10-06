@@ -346,6 +346,32 @@ No renombres los paquetes después de compilar: el instalador usa URLs versionad
 
 ## Seguridad y diagnóstico
 
+### Editor independiente de DWGPROPS
+
+#### Nueva revisión de viñetas
+
+- Abre **Nueva revisión**, debajo del editor DWGPROPS, y selecciona uno o varios DWG locales. Los archivos no se envían a Internet.
+- Requiere un único layout y una única inserción de viñeta dinámica compatible, con tabla de seis columnas: revisión, fecha, dibujante, revisor, aprobador y descripción. Se admite la familia de tabla inspeccionada en VIÑETA G130; los formatos ambiguos o historiales distintos entre variantes se rechazan sin sobrescribir.
+- Escribe la nueva revisión manualmente y completa los seis datos. Revisa las tablas de antes/después y confirma la lista de archivos.
+- Conserva la cantidad de filas, dimensiones y expresiones FIELD de la primera fila. Congela la revisión vigente como valores fijos antes de desplazarla al historial. Las variantes internas compatibles se mantienen coherentes.
+- La última fila sale del cuadro visible, pero se conserva en el respaldo completo del DWG anterior y se registra en el historial de ejecución. Los archivos originales se reemplazan solo después de verificar la copia guardada.
+- No renombra el archivo, no modifica Fecha_Inf ni otras propiedades ajenas. Si la revisión ya coincide, el plano cambió desde la lectura, está bloqueado o el texto no cabe sin agrandar el cuadro, se omite y se informa. Cancelar termina entre archivos, sin revertir los ya guardados.
+- Prueba nativa optativa: define `SINCAL_TEST_REVISION_DWG` con un DWG de ejemplo y ejecuta `python -m pytest tests/test_revisions.py -q`. Solo se modifican copias temporales, nunca el ejemplo original.
+
+#### Edición de propiedades
+
+- Abre **Editor DWGPROPS**, selecciona una carpeta y espera la lectura de sus DWG (sin subcarpetas, hasta 500 archivos).
+- Requiere Windows y AutoCAD 2025 o 2027 con Core Console y el conector DWGPROPS correspondiente. El selector permite elegir la versión disponible; no usa COM, los dibujos abiertos del usuario ni ZWCAD.
+- Selecciona un archivo para editarlo individualmente o varios para aplicar cambios comunes. El buscador y **Seleccionar visibles** permiten preparar un lote específico.
+- Los valores diferentes se indican como tales. Solo las propiedades marcadas se modifican; un valor vacío no equivale a eliminar. Puedes crear propiedades o marcar su eliminación.
+- Confirma la lista de planos y cambios antes de guardar. Se edita una copia temporal, se reabre para verificarla y se crea un respaldo en `SINCAL_Backups/<ejecución>` junto al original antes de reemplazarlo.
+- Si el original cambió desde la lectura, está abierto/bloqueado o falla CAD, el archivo no se reemplaza. Los resultados son por archivo; no se revierte automáticamente un lote parcialmente completado.
+- Se reutiliza un único Core Console por lote, procesando las copias temporales secuencialmente. Se cierra al terminar, cancelar o fallar; no interviene en AutoCAD abierto por el usuario.
+- Los archivos cuyos valores ya coinciden se muestran como **Sin cambios**: se verifica que el original siga intacto, pero no se inicia CAD ni se crea un respaldo o se reescribe ese DWG innecesariamente.
+- Cancelar se atiende entre dibujos. El conector reabre cada archivo guardado, comprueba propiedades, formato DWG e inventario de entidades y señala que cerró las bases de datos. Un timeout anterior a esa confirmación nunca reemplaza el original. Los registros se consultan en el historial de ejecuciones de Home.
+- Las propiedades estándar de DWGPROPS y las propiedades personalizadas no marcadas se conservan. La actualización visual de los FIELD depende de la evaluación de campos del propio DWG al abrir o regenerar.
+- Prueba nativa optativa (usa únicamente copias temporales de fixtures del repositorio): define `SINCAL_TEST_NATIVE_DWGPROPS=1` y ejecuta `python -m pytest tests/test_dwgprops_native.py -q`. Requiere conectores compilados y firmados en `src/Sincal.DwgProps/bin/2025` y `2027`. La compilación del instalador los firma e incluye automáticamente.
+
 El repositorio de desarrollo puede ser privado. El canal público contiene únicamente recursos autorizados y binarios de release; no recibe fuentes Python/.NET ni secretos. Protege `main`, limita el acceso de escritura y conserva la revisión de los LISPs y scripts, ya que son código ejecutable.
 
 Los registros locales están en `%LOCALAPPDATA%\SINCAL\logs\sincal.log` y los incidentes estructurados en `%LOCALAPPDATA%\SINCAL\diagnostics\incidents.jsonl`. Ninguno se transmite automáticamente. Si los comandos CAD no aparecen, actualiza recursos, ejecuta Diagnóstico, vuelve a preparar la integración y reinicia CAD. Si una descarga falla, revisa conexión, proxy y antivirus antes de reintentar.

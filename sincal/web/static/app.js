@@ -7,6 +7,13 @@ sessionStorage.setItem('sincal-local-token', token);
 history.replaceState(null, '', '/');
 let project = null, result = null, dirty = false, page = 'home';
 const titles = {home:'Home', docs:'Documentación', live:'Comandos en vivo', convert:'Conversión DXF–DWG', rename:'Renombrado', location:'Ubicación', prospect:'Proyecto > Prospecciones', diagnostics:'Diagnóstico', consulta:'Proyecto > Consulta', rebar:'Proyecto > Generador de armadura', cad:'Conexión CAD'};
+titles.dwgprops='Editor DWGPROPS';
+const propsNav=document.createElement('button');propsNav.dataset.page='dwgprops';
+propsNav.append(document.querySelector('[data-page="rename"] svg').cloneNode(true));
+const propsLabel=document.createElement('span');propsLabel.textContent='Editor DWGPROPS';propsNav.append(propsLabel);
+document.querySelector('[data-page="rename"]').after(propsNav);
+titles.revisions='Nueva revisión';
+const revisionsNav=propsNav.cloneNode(true);revisionsNav.dataset.page='revisions';revisionsNav.classList.add('subnav');revisionsNav.querySelector('span').textContent='Nueva revisión';propsNav.after(revisionsNav);
 function node(tag, text, className){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(className)e.className=className;return e;}
 function notify(text){$('#notice').textContent=text;}
 async function api(path, payload){const response=await fetch('/api/'+path,{method:payload?'POST':'GET',headers:{'X-Sincal-Token':token,'Content-Type':'application/json'},body:payload?JSON.stringify(payload):undefined});const data=await response.json();if(!response.ok)throw Error(data.error);return data;}
@@ -30,9 +37,11 @@ const motion=document.createElementNS('http://www.w3.org/2000/svg','svg');motion
 function animateBridge(now=0){
   if(!activeJob)return;motion.replaceChildren();const guide=x=>.78-.67*Math.pow(Math.max(0,Math.min(1,x)),1.72);
   function polygon(points){const shape=document.createElementNS(motion.namespaceURI,'polygon');shape.setAttribute('points',points.map(([x,y])=>`${x*88},${y*54}`).join(' '));motion.append(shape);}
-  const end=Array.from({length:81},(_,i)=>i/80).filter(x=>guide(x)>=.18);polygon([[0,.18],[end.at(-1),.18],...end.toReversed().map(x=>[x,guide(x)])]);
+  const deckTop=.18,deckEnd=Math.pow((.78-deckTop)/.67,1/1.72),barWidth=.047*1.15;
+  const end=Array.from({length:81},(_,i)=>deckEnd*i/80);polygon([[0,deckTop],[deckEnd,deckTop],...end.toReversed().map(x=>[x,guide(x)])]);
   const phase=matchMedia('(prefers-reduced-motion: reduce)').matches?0:(now%1200)/1200*.145;
-  for(let x=-.145+phase;x<=1;x+=.145)if(x>=0&&x+.047<=1)polygon([[x,1],[x+.047,1],[x+.047,guide(x+.047)],[x,guide(x)]]);
+  // Keep every column inside the deck's footprint, including animated edge frames.
+  for(let x=-.145+phase;x<=deckEnd;x+=.145){const left=Math.max(0,x),right=Math.min(deckEnd,x+barWidth);if(right>left)polygon([[left,1],[right,1],[right,Math.max(deckTop,guide(right))],[left,Math.max(deckTop,guide(left))]]);}
   if(!matchMedia('(prefers-reduced-motion: reduce)').matches)requestAnimationFrame(animateBridge);
 }
 async function artifact(path,name){const response=await fetch('/api/'+path,{headers:{'X-Sincal-Token':token}});if(!response.ok)throw Error('No se pudo obtener el resultado.');const url=URL.createObjectURL(await response.blob());const a=node('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);}
@@ -53,10 +62,11 @@ function toolContext(currentPage){return {api,node,button,section,notify,job,art
 function download(name,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 async function show(next){page=next;$('#main').replaceChildren();$('#anchors').replaceChildren();$('#breadcrumb').textContent=titles[page];document.querySelectorAll('[data-page]').forEach(b=>b.setAttribute('aria-current',b.dataset.page===page?'page':'false'));$('#main').append(node('span','SINCAL SUITE 3.0 / ESCRITORIO','eyebrow'));window.scrollTo(0,0);
 if(page==='home'){
+await renderTools('shell-batch',toolContext('home'));if(page!=='home')return;
 await renderTools('sync',toolContext('home'));if(page!=='home')return;
 section('privacidad','Privacidad del piloto').append(node('p','Los datos quedan en este equipo y en el perfil de Windows actual. No existe todavía login web, sincronización ni aislamiento entre personas que compartan la misma cuenta de Windows.'));
 section('creditos','Créditos').append(node('p','Por Gonzalo M. para SINCAL Ltda. 2026.'));
-}else if(['docs','live','convert','rename','location','prospect','diagnostics'].includes(page)){
+}else if(['docs','live','convert','rename','location','prospect','diagnostics','dwgprops','revisions'].includes(page)){
 if(page==='prospect'&&!project)project={data:{},identification:{ot:'',revision:'',structure_name:''}};
 await renderTools(page,toolContext(page));
 }else if(page==='consulta'){

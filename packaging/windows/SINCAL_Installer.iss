@@ -46,7 +46,47 @@ ArchiveExtraction=full
 PrivilegesRequired=admin
 CloseApplications=yes
 RestartApplications=no
+ChangesEnvironment=yes
 
+; Classic Explorer integration; the DLL only forwards the selected DWG list.
+#if defined(DesktopWebSetup) && DesktopWebSetup == "1"
+[Registry]
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL"; ValueType: string; ValueName: "MUIVerb"; ValueData: "SINCAL Suite"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL"; ValueType: string; ValueName: "SubCommands"; ValueData: ""
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\SINCAL.exe,0"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\01"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Configurar A1"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\01"; ValueType: string; ValueName: "ExplorerCommandHandler"; ValueData: "{{8549E221-34D5-4E21-937C-22D8F0300101}"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\01"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300101}"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300101}\InprocServer32"; ValueType: string; ValueData: "{app}\SincalShell.dll"
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300101}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Apartment"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\02"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Plotear a PDF"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\02"; ValueType: string; ValueName: "ExplorerCommandHandler"; ValueData: "{{8549E221-34D5-4E21-937C-22D8F0300102}"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\02"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300102}"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300102}\InprocServer32"; ValueType: string; ValueData: "{app}\SincalShell.dll"
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300102}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Apartment"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\03"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Configurar A1 y plotear"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\03"; ValueType: string; ValueName: "ExplorerCommandHandler"; ValueData: "{{8549E221-34D5-4E21-937C-22D8F0300103}"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\03"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300103}"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300103}\InprocServer32"; ValueType: string; ValueData: "{app}\SincalShell.dll"
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300103}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Apartment"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\04"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Encuadrar y guardar"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\04"; ValueType: string; ValueName: "ExplorerCommandHandler"; ValueData: "{{8549E221-34D5-4E21-937C-22D8F0300104}"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\04"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300104}"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300104}\InprocServer32"; ValueType: string; ValueData: "{app}\SincalShell.dll"
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300104}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Apartment"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\05"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Limpiar y guardar"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\05"; ValueType: string; ValueName: "ExplorerCommandHandler"; ValueData: "{{8549E221-34D5-4E21-937C-22D8F0300105}"
+Root: HKLM; Subkey: "Software\Classes\SystemFileAssociations\.dwg\shell\SINCAL\shell\05"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300105}"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300105}\InprocServer32"; ValueType: string; ValueData: "{app}\SincalShell.dll"
+Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300105}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Apartment"
+
+#endif
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
@@ -124,12 +164,29 @@ begin
   RegDeleteKeyIncludingSubkeys(HKCR, LegacyMenuDir);
   RegDeleteKeyIncludingSubkeys(HKCR, LegacyMenuBg);
 
-  RemovePathEntry(ExpandConstant('{userappdata}\Estandar SINCAL\scripts'));
+  { This is an active CAD resource directory, not a legacy PATH entry. }
   RemovePathEntry(ExpandConstant('{userappdata}\Estandar SINCAL'));
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  CurrentPath, ScriptsPath: String;
 begin
   if CurStep = ssInstall then
     RemoveLegacyArtifacts;
+  if CurStep = ssPostInstall then begin
+    ScriptsPath := ExpandConstant('{app}\scripts');
+    RemovePathEntry(ScriptsPath);
+    RegQueryStringValue(HKCU, 'Environment', 'Path', CurrentPath);
+    if CurrentPath <> '' then
+      ScriptsPath := ScriptsPath + ';' + CurrentPath;
+    if not RegWriteExpandStringValue(HKCU, 'Environment', 'Path', ScriptsPath) then
+      Log('No se pudo registrar scripts en el PATH del usuario.');
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usPostUninstall then
+    RemovePathEntry(ExpandConstant('{app}\scripts'));
 end;

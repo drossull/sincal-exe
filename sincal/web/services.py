@@ -43,7 +43,10 @@ class Services:
         self.plans = {}
         self.artifacts = {}
         self.detections = {}
+        self.property_snapshots = {}
+        self.revision_snapshots = {}
         self.cad_lock = threading.Lock()
+        self.shell_selection = None
         self.lock = threading.RLock()
         self.clean_runtime()
 
@@ -144,7 +147,10 @@ class Services:
                     'cad-command': self.command, 'cad-detect': self.detect,
                     'cad-rebar': self.rebar, 'cad-profile': self.profile,
                     'cad-prepare': self.prepare, 'cad-crossbeam': self.crossbeam,
-                    'engines': self.engines, 'engine-select': self.engine_select}
+                    'engines': self.engines, 'engine-select': self.engine_select,
+                    'shell-batch': self.shell_batch,
+                    'dwgprops-read': self.properties_read, 'dwgprops-write': self.properties_write,
+                    'revision-read': self.revisions_read, 'revision-write': self.revisions_write}
         if operation not in handlers:
             raise ValueError('Operación no permitida.')
         return self.jobs.submit(operation, lambda job: handlers[operation](job, payload))
@@ -154,6 +160,102 @@ class Services:
         job.update('Consultando manifiesto de recursos. Requiere Internet.')
         plan = check_resource_updates()
         return {'plan': self.remember(self.plans, ('sync', plan)), **asdict(plan)}
+
+    def properties_read(self, job, payload):
+        from sincal.cad.dwgprops import process_file, CadUnavailable, CadBatch
+        folder = self.files.get(payload.get('folder'), 'folder')
+        engine = payload.get('engine')
+        options = {'engine': engine} if engine else {}
+        paths = sorted((p for p in folder.iterdir() if p.suffix.lower() == '.dwg' and p.is_file() and not p.is_symlink()), key=lambda p: p.name.casefold())
+        if not 1 <= len(paths) <= 500:
+            raise ValueError('Selecciona una carpeta con entre 1 y 500 DWG, sin subcarpetas.')
+        if not self.cad_lock.acquire(blocking=False):
+            raise ValueError('Hay otra operación CAD en curso.')
+        rows, snapshots = [], {}
+        batch = CadBatch(self.runtime / job.id, engine)
+        options['worker'] = batch
+        try:
+            for index, path in enumerate(paths):
+                if job.cancelled.is_set():
+                    break
+                job.update(f'Leyendo propiedades · {path.name}', index * 100 / len(paths))
+                key = uuid.uuid4().hex
+                try:
+                    value = process_file(path, self.runtime / job.id / key, **options)
+                    snapshots[key] = {'path': path, 'engine': engine, **value}
+                    rows.append({'id': key, 'name': path.name, 'properties': value['properties']})
+                except Exception as error:
+                    rows.append({'name': path.name, 'error': str(error)})
+                    job.update(f'{path.name}: {error}')
+                    if isinstance(error, CadUnavailable):
+                        rows.extend({'name': rest.name, 'error': 'No leído: AutoCAD dejó de responder.'} for rest in paths[index + 1:])
+                        break
+            snapshot = self.remember(self.property_snapshots, snapshots)
+            return {'snapshot': snapshot, 'files': rows, 'cancelled': job.cancelled.is_set()}
+        finally:
+            try:
+                batch.close()
+            finally:
+                self.cad_lock.release()
+
+    def revisions_read(self, job, payload):
+        from .revisions import read
+        return read(self, job, payload)
+
+    def revisions_write(self, job, payload):
+        from .revisions import write
+        return write(self, job, payload)
+
+    def properties_write(self, job, payload):
+        from sincal.cad.dwgprops import process_file, changeset, CadUnavailable, CadBatch
+        if payload.get('confirm') is not True:
+            raise ValueError('Confirma el guardado de los DWG seleccionados.')
+        with self.lock:
+            snapshot = self.property_snapshots.get(payload.get('snapshot'))
+            ids = payload.get('ids')
+            if not snapshot or not isinstance(ids, list) or not ids or any(not isinstance(key, str) or key not in snapshot for key in ids):
+                raise ValueError('Vuelve a leer y seleccionar los DWG.')
+            selected = [(key, dict(snapshot[key])) for key in dict.fromkeys(ids)]
+        changes = changeset(payload.get('changes'))
+        if not self.cad_lock.acquire(blocking=False):
+            raise ValueError('Hay otra operación CAD en curso.')
+        rows = []
+        batch = CadBatch(self.runtime / job.id, selected[0][1].get('engine'))
+        try:
+            for index, (key, item) in enumerate(selected):
+                if job.cancelled.is_set():
+                    break
+                path = item['path']
+                job.update(f'Guardando propiedades · {path.name}', index * 100 / len(selected))
+                try:
+                    options = {'engine': item['engine']} if item.get('engine') else {}
+                    result = process_file(path, self.runtime / job.id / key, changes, item['fingerprint'],
+                                          worker=batch, known_properties=item['properties'], **options)
+                    with self.lock:
+                        snapshot[key] = {'path': path, 'engine': item.get('engine'), **result}
+                    status = 'Sin cambios' if result.get('unchanged') else 'Guardado'
+                    rows.append({'id': key, 'name': path.name, 'status': status, **result})
+                    job.update(f'{path.name}: sin cambios; no se reescribió.' if result.get('unchanged')
+                               else f'{path.name}: guardado con respaldo {result["backup"]}')
+                except Exception as error:
+                    rows.append({'id': key, 'name': path.name, 'status': 'No guardado', 'error': str(error)})
+                    job.update(f'{path.name}: {error}')
+                    if isinstance(error, CadUnavailable):
+                        rows.extend({'id': rest_key, 'name': rest['path'].name, 'status': 'No guardado', 'error': 'No procesado: AutoCAD dejó de responder.'} for rest_key, rest in selected[index + 1:])
+                        break
+            return {'files': rows, 'cancelled': job.cancelled.is_set()}
+        finally:
+            try:
+                batch.close()
+            finally:
+                self.cad_lock.release()
+
+    def shell_batch(self, job, payload):
+        from sincal.cad.batch import execute
+        if not self.shell_selection or payload.get('confirm') is not True:
+            raise ValueError('No hay una selección confirmada del Explorador.')
+        with self.cad_lock:
+            return execute(job, self.shell_selection, payload.get('overwrite', False), self.runtime)
 
     def sync_apply(self, job, payload):
         from sincal.resources import apply_resource_updates, materialize_cad_resources

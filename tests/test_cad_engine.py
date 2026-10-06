@@ -67,7 +67,7 @@ class CadEngineTests(unittest.TestCase):
         self.assertIn('$process.Dispose()', engine_helper)
         self.assertNotIn('Start-Process -FilePath $Engine.Path', engine_helper)
         for script in scripts.glob("*.ps1"):
-            if script.name == "SINCAL_ENGINE.ps1":
+            if script.name in {"SINCAL_ENGINE.ps1", "SINCAL_SELECTION.ps1"}:
                 continue
             source = script.read_text(encoding="utf-8")
             self.assertIn("Invoke-SincalCadScript", source, script.name)

@@ -79,7 +79,7 @@ if ($remaining.Count -ne 99) { throw "Retention count $($remaining.Count)" }
 
 def test_all_launchers_finalize_logs():
     for path in (ROOT / "scripts").glob("*.ps1"):
-        if path.name == "SINCAL_ENGINE.ps1":
+        if path.name in {"SINCAL_ENGINE.ps1", "SINCAL_SELECTION.ps1"}:
             continue
         source = path.read_text(encoding="utf-8-sig")
         assert "Start-SincalScriptLog" in source

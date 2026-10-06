@@ -1,0 +1,4 @@
+LIBRARY SincalShell
+EXPORTS
+    DllGetClassObject PRIVATE
+    DllCanUnloadNow PRIVATE

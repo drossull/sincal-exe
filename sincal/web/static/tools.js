@@ -1,5 +1,9 @@
 // Module renderers use the shared local API; no shell or filesystem paths are executed by JS.
+import {renderDwgProps} from '/dwgprops.js';
+import {renderRevisions} from '/revisions.js';
 export async function renderTools(page, ctx){
+  if(page==='dwgprops')return renderDwgProps(ctx);
+  if(page==='revisions')return renderRevisions(ctx);
   const {api,node,button,section,notify,job,artifact,project,changed,current}=ctx;
   function field(parent, title, type='text', value=''){
     const label=node('label',title),input=node('input');input.type=type;input.value=value;label.append(input);parent.append(label);return input;
@@ -11,7 +15,16 @@ export async function renderTools(page, ctx){
   function table(parent,headers,rows){const wrap=node('div',undefined,'table-wrap'),t=node('table'),head=node('tr');headers.forEach(h=>head.append(node('th',h)));const th=node('thead');th.append(head);t.append(th);const body=node('tbody');rows.forEach(values=>{const row=node('tr');values.forEach(value=>row.append(node('td',String(value))));body.append(row);});t.append(body);wrap.append(t);parent.append(wrap);}
   async function choose(kind){return api('files/choose',{kind});}
   async function target(scope='active'){const result=await api('cad/status');if(result.status!=='ready')throw Error(result.message);const destination=scope==='all'?`TODOS los dibujos abiertos (${result.documents.length}):\n${result.documents.map(d=>d.name).join('\n')}`:`SOLO ${result.active.name}\n${result.active.path||'Dibujo sin guardar'}`;if(!confirm(`Enviar a ${destination}\n\nLa orden puede modificar, guardar o exportar según su función. ¿Continuar?`))return null;return result;}
-  if(page==='docs'){
+  if(page==='shell-batch'){
+    const data=await api('shell-selection');if(!current()||!data.selection)return;
+    const names={setup:'Configurar A1',plot:'Plotear PDF con configuración actual',publish:'Configurar A1 y plotear',ze:'Encuadrar y guardar',purge:'Limpiar y guardar'};
+    const s=section('lote-explorador','Lote seleccionado en el Explorador');
+    s.append(node('h3',names[data.selection.operation]),node('p','Motor: '+data.engine),node('p','Solo se procesarán estos archivos, uno por uno. Los planos bloqueados se omiten. Se crea respaldo antes de modificar DWG. Cancelar termina después del plano en curso.'));
+    table(s,['DWG seleccionado'],data.selection.files.map(path=>[path]));
+    const overwrite=field(s,'Autorizar reemplazo de PDF existentes (el nombre será idéntico al DWG)','checkbox');
+    overwrite.parentElement.hidden=!['plot','publish'].includes(data.selection.operation);
+    s.append(button('Ejecutar lote',async()=>{if(!confirm(`¿Procesar exclusivamente estos ${data.selection.files.length} planos?`))return;const result=await job('shell-batch',{confirm:true,overwrite:overwrite.checked});if(current())table(s,['Plano','Resultado','Detalle'],result.files.map(x=>[x.file,x.status,x.message||'Terminado']));},true));
+  }else if(page==='docs'){
     const s=section('buscar','Documentación');const search=field(s,'Buscar en títulos y contenido','search');
     const manual=await api('documentation');if(!current())return;
     const topics=[...(manual.temas||[]),...Object.entries(manual.comandos_lisp||{}).sort(([a],[b])=>a.localeCompare(b,'es')).map(([command,entry])=>({

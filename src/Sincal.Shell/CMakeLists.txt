@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.20)
+project(SincalShell LANGUAGES CXX)
+add_library(SincalShell SHARED Shell.cpp Shell.def)
+target_compile_features(SincalShell PRIVATE cxx_std_17)
+target_compile_definitions(SincalShell PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(SincalShell PRIVATE ole32 shell32 shlwapi uuid)
+set_property(TARGET SincalShell PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

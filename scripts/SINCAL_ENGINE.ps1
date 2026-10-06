@@ -132,7 +132,7 @@ function New-SincalZwcadScript {
 
 function Invoke-SincalZwcadScript {
     [CmdletBinding()]
-    param($Engine, [string]$DrawingPath, [string]$ScriptPath, [int]$TimeoutSeconds = 900)
+    param($Engine, [string]$DrawingPath, [string]$ScriptPath, [int]$TimeoutSeconds = 900, [switch]$SkipSave)
 
     if (@(Get-Process -Name ZWCAD -ErrorAction SilentlyContinue).Count -gt 0) {
         throw "Cierra ZWCAD antes de iniciar el procesamiento masivo. SINCAL usa una instancia invisible aislada para no interferir con dibujos abiertos."
@@ -181,7 +181,7 @@ function Invoke-SincalZwcadScript {
         if (-not $completed) {
             throw "ZWCAD no confirmó el término antes de $TimeoutSeconds segundos. Puede existir un diálogo oculto, una licencia pendiente o un comando incompleto."
         }
-        $document.Save()
+        if (-not $SkipSave) { $document.Save() }
         $document.Close($false)
         $document = $null
         $completedSuccessfully = $true
@@ -214,9 +214,9 @@ function Invoke-SincalZwcadScript {
 
 function Invoke-SincalCadScriptCore {
     [CmdletBinding()]
-    param($Engine, [string]$DrawingPath, [string]$ScriptPath, [int]$TimeoutSeconds = 900)
+    param($Engine, [string]$DrawingPath, [string]$ScriptPath, [int]$TimeoutSeconds = 900, [switch]$SkipSave)
     if ($Engine.Mode -eq "ZWCAD_COM") {
-        return Invoke-SincalZwcadScript -Engine $Engine -DrawingPath $DrawingPath -ScriptPath $ScriptPath -TimeoutSeconds $TimeoutSeconds
+        return Invoke-SincalZwcadScript -Engine $Engine -DrawingPath $DrawingPath -ScriptPath $ScriptPath -TimeoutSeconds $TimeoutSeconds -SkipSave:$SkipSave
     }
     $arguments = "/i `"$DrawingPath`" /s `"$ScriptPath`""
     # Windows PowerShell 5.1 puede devolver ExitCode=$null con Start-Process
@@ -277,10 +277,45 @@ function Invoke-SincalCadScriptCore {
     }
 }
 
+function Get-SincalDrawingLockFiles {
+    param([string]$DrawingPath)
+    $fullPath = [IO.Path]::GetFullPath($DrawingPath)
+    return @([IO.Path]::ChangeExtension($fullPath, '.dwl'), [IO.Path]::ChangeExtension($fullPath, '.dwl2'))
+}
+
+function Remove-SincalResidualDrawingLocks {
+    param([string]$DrawingPath, [string[]]$ExistingBefore = @())
+    $drawing = $null
+    try {
+        $fullPath = [IO.Path]::GetFullPath($DrawingPath)
+        $item = Get-Item -LiteralPath $fullPath -ErrorAction Stop
+        if ($item.Extension -ine '.dwg' -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { return }
+        # Keep the DWG exclusively open throughout cleanup: another CAD cannot
+        # acquire it between the availability check and deletion of its sidecars.
+        $drawing = [IO.File]::Open($fullPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+        foreach ($lockPath in (Get-SincalDrawingLockFiles $fullPath)) {
+            if ($lockPath -in $ExistingBefore -or -not (Test-Path -LiteralPath $lockPath -PathType Leaf)) { continue }
+            $lockFile = Get-Item -LiteralPath $lockPath -Force -ErrorAction Stop
+            if ($lockFile.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+            try {
+                Remove-Item -LiteralPath $lockPath -Force -ErrorAction Stop
+                Write-Host "[LIMPIEZA] Residuo eliminado: $lockPath"
+            } catch {
+                Write-Host "[AVISO] Se conserva el residuo $lockPath : $($_.Exception.Message)"
+            }
+        }
+    } catch {
+        Write-Host "[AVISO] Sin limpieza DWL: el DWG no admite acceso exclusivo o no esta disponible. $DrawingPath"
+    } finally {
+        if ($drawing) { $drawing.Dispose() }
+    }
+}
+
 function Invoke-SincalCadScript {
     [CmdletBinding()]
-    param($Engine, [string]$DrawingPath, [string]$ScriptPath, [int]$TimeoutSeconds = 900)
+    param($Engine, [string]$DrawingPath, [string]$ScriptPath, [int]$TimeoutSeconds = 900, [switch]$SkipSave)
     $started = Get-Date
+    $existingLocks = @(Get-SincalDrawingLockFiles $DrawingPath | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
     Write-Host "INICIO DWG: $DrawingPath"
     Write-Host "Motor: $($Engine.Path) | Version: $($Engine.Year) | Modo: $($Engine.Mode) | SCR: $ScriptPath"
     if ($Engine.Mode -eq 'ZWCAD_COM') {
@@ -288,6 +323,9 @@ function Invoke-SincalCadScript {
     }
     try {
         $result = Invoke-SincalCadScriptCore @PSBoundParameters
+        # Only a successful, finished invocation may clean its new sidecars.
+        # Pre-existing files are never claimed as belonging to this execution.
+        Remove-SincalResidualDrawingLocks -DrawingPath $DrawingPath -ExistingBefore $existingLocks
         $script:SincalCompletedDrawings++
         Write-Host 'PROCESO TERMINADO: no certifica ausencia de corrupcion ni verifica todos los cambios del dibujo.'
         return $result

@@ -1,6 +1,8 @@
-﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+﻿param([string]$DrawingListFile)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "SINCAL_ENGINE.ps1")
+. (Join-Path $PSScriptRoot "SINCAL_SELECTION.ps1")
 Start-SincalScriptLog 'PAGESETUP-A1'
 try {
 
@@ -27,7 +29,7 @@ if (-not (Test-Path $scrPath)) {
 
 # 2. Buscar todos los archivos DWG en la carpeta actual
 $rutaActual = (Get-Location).Path
-$archivos = @(Get-ChildItem -Path $rutaActual -Filter *.dwg)
+$archivos = @(Get-SincalDrawingSelection $DrawingListFile)
 
 if ($archivos.Count -eq 0) {
     Write-Host "`n[!] No se encontraron archivos DWG en: $rutaActual" -ForegroundColor Yellow

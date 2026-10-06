@@ -136,6 +136,19 @@ function Invoke-AutoCAD2025PluginBuild([string]$ProjectRoot) {
     }
 }
 
+function Invoke-DwgPropsBuild([string]$ProjectRoot) {
+    $project = Join-Path $ProjectRoot 'src\Sincal.DwgProps\Sincal.DwgProps.csproj'
+    foreach ($year in @(2025, 2027)) {
+        $cadDirectory = Join-Path $env:ProgramFiles "Autodesk\AutoCAD $year"
+        if (-not (Test-Path -LiteralPath (Join-Path $cadDirectory 'acdbmgd.dll'))) {
+            throw "Falta el SDK instalado de AutoCAD $year para el conector DWGPROPS."
+        }
+        $framework = if ($year -eq 2025) { 'net8.0-windows' } else { 'net10.0-windows' }
+        & dotnet build $project -c Release "-p:AutoCADDir=$cadDirectory" "-p:CadTargetFramework=$framework" -o (Join-Path $ProjectRoot "src\Sincal.DwgProps\bin\$year") --nologo
+        if ($LASTEXITCODE -ne 0) { throw "No se pudo compilar DWGPROPS para AutoCAD $year." }
+    }
+}
+
 function Get-SigningCertificate([string]$Subject, [string]$Thumbprint) {
     $certs = Get-ChildItem Cert:\CurrentUser\My |
         Where-Object {
@@ -275,6 +288,14 @@ function Assert-AppPayloadContents([string]$Path) {
             'assets/fonts/roboto-mono-700.ttf'
         )
         $missing = @($required | Where-Object { $_ -notin $entries })
+        if ($DesktopWeb -and 'SincalShell.dll' -notin $entries) {
+            throw 'El paquete no contiene la extensión del Explorador.'
+        }
+        if ($DesktopWeb) {
+            foreach ($year in @(2025, 2027)) {
+                if ("native/dwgprops/$year/Sincal.DwgProps.dll" -notin $entries) { throw "Falta el conector DWGPROPS $year." }
+            }
+        }
         if ($missing.Count -gt 0) {
             throw "El paquete de aplicación no contiene recursos esenciales: $($missing -join ', ')"
         }
@@ -319,6 +340,14 @@ function New-ReleasePayloads(
     New-Item -ItemType Directory -Force -Path $iconStage | Out-Null
     Copy-Item (Join-Path $ProjectRoot 'assets\icons\logo.ico') (Join-Path $iconStage 'logo.ico') -Force
     Copy-Item $DistExe (Join-Path $appStage 'SINCAL.exe') -Force
+    if ($DesktopWeb) {
+        Copy-Item (Join-Path $ProjectRoot 'shell_build\Release\SincalShell.dll') (Join-Path $appStage 'SincalShell.dll') -Force
+        foreach ($year in @(2025, 2027)) {
+            $target = Join-Path $appStage "native\dwgprops\$year"
+            New-Item -ItemType Directory -Path $target -Force | Out-Null
+            Copy-Item (Join-Path $ProjectRoot "src\Sincal.DwgProps\bin\$year\Sincal.DwgProps.dll") $target
+        }
+    }
     Copy-Item (Join-Path $ProjectRoot 'ocr_runtime') (Join-Path $appStage 'ocr_runtime') -Recurse -Force
     $fontStage = Join-Path $appStage 'assets\fonts'
     New-Item -ItemType Directory -Force -Path $fontStage | Out-Null
@@ -438,6 +467,24 @@ Invoke-SelfCheck -ProjectRoot $projectRoot
 
 Write-Step "Compilando plugin AutoCAD 2025"
 Invoke-AutoCAD2025PluginBuild -ProjectRoot $projectRoot
+if ($DesktopWeb) { Invoke-DwgPropsBuild -ProjectRoot $projectRoot }
+if ($DesktopWeb) {
+    Write-Step 'Compilando integración del Explorador'
+    $cmake = Get-Command cmake -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
+    if (-not $cmake) {
+        $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+        if (Test-Path $vswhere) {
+            $cmake = & $vswhere -latest -products '*' -find 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe' | Select-Object -First 1
+        }
+    }
+    if (-not $cmake) { throw 'Instala Visual C++ Build Tools con CMake antes de compilar.' }
+    & $cmake -S (Join-Path $projectRoot 'src\Sincal.Shell') -B (Join-Path $projectRoot 'shell_build') -A x64
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudo configurar SincalShell: instala CMake y Visual C++ Build Tools.' }
+    & $cmake --build (Join-Path $projectRoot 'shell_build') --config Release
+    if ($LASTEXITCODE -ne 0) { throw 'Falló SincalShell.' }
+    & python (Join-Path $projectRoot 'tests\selfcheck_shell.py') (Join-Path $projectRoot 'shell_build\Release\SincalShell.dll')
+    if ($LASTEXITCODE -ne 0) { throw 'Falló la comprobación COM aislada de SincalShell.' }
+}
 
 Write-Step "Preparando runtime OCR local"
 & python (Join-Path $projectRoot 'tools\build_ocr_runtime.py')
@@ -478,6 +525,12 @@ if (-not $SkipSigning) {
 
     Write-Step "Firmando plugin AutoCAD 2025"
     Sign-File -Path $pluginDll -Certificate $certificate
+    if ($DesktopWeb) {
+        Sign-File -Path (Join-Path $projectRoot 'shell_build\Release\SincalShell.dll') -Certificate $certificate
+        foreach ($year in @(2025, 2027)) {
+            Sign-File -Path (Join-Path $projectRoot "src\Sincal.DwgProps\bin\$year\Sincal.DwgProps.dll") -Certificate $certificate
+        }
+    }
 }
 
 Write-Step "Creando paquetes remotos"
@@ -500,6 +553,7 @@ $normalizedVersion = $version.TrimStart('v', 'V')
 Push-Location $projectRoot
 try {
     & $iscc `
+        "/DDesktopWebSetup=$([int][bool]$DesktopWeb)" `
         "/DAppVersion=$normalizedVersion" `
         "/DAppVersionTag=$version" `
         "/DReleaseOutputDir=$releaseOutputDir" `

@@ -28,4 +28,31 @@ def documentation():
                 'A la izquierda está Revisión y marcas; a la derecha, una página desplazable reúne Zapata, Muros, Consolas, Topes y Contrafuerte.',
                 'La página central reúne dimensiones, reglas, marcas y envío CAD. TRAVESAÑOS aparece como sección independiente. Los componentes aún sin lógica definida no se generan.')
         topic['contenido'] = topic['contenido'].replace('Consulta, sesiones, documentación y cálculo', 'Consulta, documentación y cálculo')
+    data['temas'].append({
+        'id': 'editor-dwgprops', 'titulo': 'Editor de propiedades DWGPROPS',
+        'categoria': 'Herramientas CAD', 'tags': ['dwgprops', 'propiedades', 'custom', 'lote', 'viñeta'],
+        'contenido': '\n'.join([
+            '- Selecciona AutoCAD 2025 o 2027 en Motor y pulsa Elegir carpeta y leer DWG. Se leen solo los DWG de esa carpeta, no sus subcarpetas.',
+            '- Selecciona un archivo para editarlo individualmente o varios para aplicar valores comunes. El buscador permite filtrar y seleccionar los planos visibles.',
+            '- Los valores diferentes o las propiedades ausentes se indican expresamente. Marca Cambiar para aplicar un valor; un texto vacío no elimina la propiedad.',
+            '- Usa Eliminar para quitar una propiedad o Añadir al cambio para crear una nueva. Las propiedades no marcadas se conservan.',
+            '- Pulsa Guardar en seleccionados y revisa la lista exacta de archivos y cambios. Se verifica la copia guardada antes de reemplazar el original.',
+            '- Cada DWG modificado tiene un respaldo en SINCAL_Backups junto a la carpeta de planos. Si un plano cambió desde su lectura o está abierto, se omite y se informa el motivo.',
+            '- El lote reutiliza un único Core Console. Los archivos cuyos valores ya coinciden aparecen como Sin cambios y no se reescriben ni generan respaldos adicionales.',
+            '- Cancelar detiene el lote entre archivos; no deshace los ya guardados. Consulta los resultados por plano y Home → Historial para los registros.',
+            '- Core Console trabaja con copias temporales y no interviene en los dibujos abiertos. Los FIELD se evaluarán según la configuración del propio DWG al abrir o regenerar.'
+        ])
+    })
+    data['temas'].append({
+        'id': 'nueva-revision', 'titulo': 'Nueva revisión de viñetas',
+        'categoria': 'Herramientas CAD', 'tags': ['revisión', 'viñeta', 'historial', 'fields'],
+        'contenido': '\n'.join([
+            '- Abre Nueva revisión y selecciona uno o varios DWG locales. Requiere un único layout y una viñeta dinámica compatible con tabla de seis columnas.',
+            '- Selecciona los planos y escribe revisión y fecha; comprueba dibujante, revisor, aprobador y descripción. No se incrementa la revisión automáticamente.',
+            '- Revisa la vista previa de antes/después. La nueva fila queda arriba, conserva sus Fields y las anteriores bajan como valores fijos. No cambia el tamaño del cuadro.',
+            '- La última fila deja de verse, pero queda conservada en el respaldo completo SINCAL_Backups. Confirma explícitamente antes de sobrescribir los originales.',
+            '- No se renombra el archivo ni se modifica Fecha_Inf. Si el texto no cabe, la viñeta no es compatible o el plano cambió o está bloqueado, se omite sin sobrescribir.',
+            '- Cancelar se atiende entre archivos. Los resultados y respaldos se indican por plano; los ya guardados no se revierten.'
+        ])
+    })
     return data

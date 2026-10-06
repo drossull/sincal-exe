@@ -6,8 +6,9 @@ import threading
 from .server import ROOT, Server
 
 
-def run(webview, directory):
+def run(webview, directory, selection=None):
     server = Server(0, directory)
+    server.services.shell_selection = selection
     worker = threading.Thread(target=server.serve_forever, name="sincal-local-api", daemon=True)
     worker.start()
     try:
@@ -26,7 +27,7 @@ def run(webview, directory):
                 return window.create_file_dialog(webview.FileDialog.FOLDER)
             extensions = server.services.files.TYPES[kind]
             pattern = ';'.join('*' + ext for ext in extensions)
-            return window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=kind == 'dxf',
+            return window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=kind in ('dxf','dwg'),
                                              file_types=(f'Archivos compatibles ({pattern})',))
         server.services.files.picker = picker
         # No Python JS bridge: only the token-protected, typed local HTTP API.
@@ -41,7 +42,7 @@ def run(webview, directory):
         worker.join(timeout=5)
 
 
-def main():
+def main(selection=None):
     if os.name != 'nt':
         raise SystemExit('Esta vista previa de escritorio requiere Windows y Microsoft Edge WebView2.')
     try:
@@ -50,7 +51,7 @@ def main():
         raise SystemExit('Instala las dependencias: python -m pip install -r requirements-desktop-web.txt') from error
     directory = Path(os.environ['LOCALAPPDATA']) / 'SINCAL/web-pilot'
     try:
-        run(webview, directory)
+        run(webview, directory, selection)
     except Exception as error:
         # No automatic browser fallback; show actionable native feedback.
         import ctypes

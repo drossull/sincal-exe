@@ -38,3 +38,4 @@ assets/fonts/OFL-Lekton.txt
 # 4. Archivos de sistema operativo (Basura de Windows)
 Thumbs.db
 desktop.ini
+shell_build/

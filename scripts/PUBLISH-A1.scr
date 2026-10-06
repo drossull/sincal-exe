@@ -67,12 +67,12 @@
 )
 
 ;; 3. Registrar Transparencia
-(if (not (tblsearch "APPID" "PLOTTRANSPARENCY"))
+(if (and (not sincalKeepSetup) (not (tblsearch "APPID" "PLOTTRANSPARENCY")))
   (regapp "PLOTTRANSPARENCY")
 )
 
 ;; 4. Inyectar configuracion directa a los Layouts
-(foreach layout layouts
+(if (not sincalKeepSetup) (foreach layout layouts
   (setq layoutName (vla-get-Name layout))
   
   (if (/= (strcase layoutName) "MODEL")
@@ -116,9 +116,10 @@
   )
 )
 
-;; 5. Publicacion masiva de los Layouts a PDF
+)
+;; 5. Paginas temporales; el lanzador las une en <nombre DWG>.pdf.
 (setq lays nil)
-(setq statusPath (strcat (getvar "DWGPREFIX") (vl-filename-base (getvar "DWGNAME")) "__publish_status.txt"))
+(setq statusPath (strcat sincalOutputDir "status.txt"))
 (setq statusFile (open statusPath "w"))
 (foreach x layoutData
   (if (and (= (car x) 3) (/= (strcase (cdr x)) "MODEL")) 
@@ -129,7 +130,7 @@
 (setq idx 1)
 (foreach lay lays
   (setq safeLay (SINCAL:SanitizeFileName lay))
-  (setq outPath (strcat (getvar "DWGPREFIX") (vl-filename-base (getvar "DWGNAME")) "__" (if (< idx 10) "0" "") (itoa idx) "__" safeLay ".pdf"))
+  (setq outPath (strcat sincalOutputDir (itoa idx) ".pdf"))
   (command "_.-PLOT" "_N" lay "" "" outPath "_N" "_Y")
   (if (findfile outPath)
     (write-line (strcat "PDF|" outPath) statusFile)
@@ -145,7 +146,7 @@
 (setvar "CMDDIA" old_cmddia)
 (setvar "BACKGROUNDPLOT" old_backgroundplot)
 (setvar "EXPERT" old_expert)
-(vl-cmdf "_.QSAVE")
+(if (not sincalKeepSetup) (vl-cmdf "_.QSAVE"))
 (princ)
 _.QUIT
 _Y

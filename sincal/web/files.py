@@ -6,7 +6,7 @@ import uuid
 
 class Files:
     TYPES = {'folder': (), 'report': ('.pdf', '.txt'), 'location': ('.kmz', '.kml'),
-             'session': ('.json',), 'image': ('.png', '.jpg', '.jpeg'), 'dxf': ('.dxf',)}
+             'session': ('.json',), 'image': ('.png', '.jpg', '.jpeg'), 'dxf': ('.dxf',), 'dwg': ('.dwg',)}
 
     def __init__(self):
         self.picker = None

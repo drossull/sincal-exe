@@ -174,6 +174,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, rebar_defaults())
         if path == "/api/cad/status":
             return self.send(200, connection_status())
+        if path == '/api/dwgprops/engines':
+            from sincal.cad.dwgprops import autocad_engines
+            return self.send(200, autocad_engines())
         if path == '/api/commands':
             from sincal.runtime import ruta_recurso
             document = json.loads(Path(ruta_recurso('tutoriales.json')).read_text(encoding='utf-8'))
@@ -182,6 +185,11 @@ class Handler(BaseHTTPRequestHandler):
                                    for key, description in COMMANDS.items()})
         if path == '/api/preferences':
             return self.send(200, self.server.store.preferences())
+        if path == '/api/shell-selection':
+            from sincal.cad.engine import load_engine_state
+            engine = load_engine_state()
+            return self.send(200, {'selection': self.server.services.shell_selection,
+                                   'engine': engine.label if engine else 'No seleccionado; usa Diagnóstico.'})
         if path == '/api/palettes':
             from sincal.ui.cadence_palettes import FAMILIES
             return self.send(200, list(FAMILIES))
@@ -216,6 +224,8 @@ class Handler(BaseHTTPRequestHandler):
                   "/app.js": (STATIC / "app.js", "text/javascript; charset=utf-8"),
                   "/rebar.js": (STATIC / "rebar.js", "text/javascript; charset=utf-8"),
                   "/tools.js": (STATIC / "tools.js", "text/javascript; charset=utf-8"),
+                  "/dwgprops.js": (STATIC / "dwgprops.js", "text/javascript; charset=utf-8"),
+                  "/revisions.js": (STATIC / "revisions.js", "text/javascript; charset=utf-8"),
                   "/app.css": (STATIC / "app.css", "text/css; charset=utf-8"),
                   "/logo.ico": (ROOT / "assets/icons/logo.ico", "image/x-icon")}
         for font in ("roboto-400.ttf", "roboto-700.ttf", "roboto-condensed-700.ttf", "roboto-flex-400.ttf", "roboto-mono-400.ttf"):
