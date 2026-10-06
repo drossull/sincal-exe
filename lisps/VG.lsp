@@ -1,4 +1,4 @@
-;;; VG: elimina referencias VIÑETA G130 en Modelo y layouts, luego PURGEALL.
+;;; VG: elimina referencias con prefijo VIÑETA en Modelo y layouts, luego PURGEALL.
 ;;; No modifica definiciones de otros bloques ni referencias externas.
 (vl-load-com)
 
@@ -6,7 +6,7 @@
   (and (= "AcDbBlockReference" (vla-get-ObjectName obj))
     (setq name (if (vlax-property-available-p obj 'EffectiveName)
                  (vla-get-EffectiveName obj) (vla-get-Name obj)))
-    (= (strcase name) (strcat "VI" (chr 209) "ETA G130"))))
+    (wcmatch (strcase name) (strcat "VI" (chr 209) "ETA*"))))
 
 (defun VG:Remove (doc / layout obj targets count skipped result definition)
   (setq count 0 skipped 0)
@@ -59,5 +59,5 @@
       (princ "\n[VG] Operacion terminada. El dibujo no se ha guardado automaticamente.")))
   (princ))
 
-(princ "\nVG cargado: eliminar VIÑETA G130 y purgar el dibujo actual.")
+(princ "\nVG cargado: eliminar bloques con prefijo VIÑETA y purgar el dibujo actual.")
 (princ)

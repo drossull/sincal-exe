@@ -278,11 +278,11 @@
       "tags": ["pendiente", "rotacion", "porcentaje", "linea", "polilinea"]
     },
     "VG": {
-      "titulo": "Eliminar viñeta G130 y purgar",
-      "descripcion": "Elimina las inserciones del bloque VIÑETA G130 en Modelo y todos los layouts del dibujo actual; después ejecuta el LISP PURGEALL.",
+      "titulo": "Eliminar viñetas y purgar",
+      "descripcion": "Elimina las inserciones de bloques cuyo nombre comienza con VIÑETA en Modelo y todos los layouts del dibujo actual; después ejecuta el LISP PURGEALL.",
       "pasos": ["Guarda una copia de seguridad antes de limpiar.", "Escribe VG. No pide selección ni confirmación adicional.", "Revisa el recuento de eliminadas y omitidas; guarda el DWG cuando estés conforme."],
-      "notas": ["Coincide con el nombre completo VIÑETA G130, sin distinguir mayúsculas. Reconoce el nombre efectivo de bloques dinámicos.", "No desbloquea capas, no modifica referencias externas y no elimina viñetas anidadas en otros bloques.", "PURGEALL se ejecuta incluso si no encuentra viñetas. Limpia definiciones y escalas no utilizadas; no guarda automáticamente. UNDO permite deshacer la operación."],
-      "tags": ["viñeta", "bloque", "purga", "G130"]
+      "notas": ["Coincide con el prefijo VIÑETA, sin distinguir mayúsculas: VIÑETA G130, VIÑETA G131, etc. Reconoce el nombre efectivo de bloques dinámicos.", "No desbloquea capas, no modifica referencias externas y no elimina viñetas anidadas en otros bloques.", "PURGEALL se ejecuta incluso si no encuentra viñetas. Limpia definiciones y escalas no utilizadas; no guarda automáticamente. UNDO permite deshacer la operación."],
+      "tags": ["viñeta", "bloque", "purga"]
     },
     "PURGEALL": {
       "titulo": "Limpieza profunda del dibujo",
