@@ -151,6 +151,34 @@ class ResourceSyncTests(unittest.TestCase):
         self.assertEqual(kwargs["params"], {"minute": 2})
         self.assertEqual(kwargs["headers"]["Cache-Control"], "no-cache")
 
+    def test_reuses_crlf_installed_startup_as_verified_lf(self):
+        path = "startup/SINCAL_STARTUP.lsp"
+        published = b"(vl-load-com)\n(princ)\n"
+        self._write_installed(path, published.replace(b"\n", b"\r\n"))
+        entry = resource_sync.ResourceEntry(path, resource_sync.git_blob_sha(published), len(published))
+        plan = resource_sync.ResourceUpdatePlan("a" * 40, (entry,), (entry,), (), False)
+        session = FakeSession({})
+        resource_sync.apply_resource_updates(plan, session=session)
+        with open(os.path.join(self.cache, *path.split("/")), "rb") as source:
+            self.assertEqual(source.read(), published)
+        self.assertEqual(session.calls, [])
+
+    def test_preserves_exact_published_crlf(self):
+        data = b"(princ)\r\n"
+        self._write_installed("lisps/EXACT.lsp", data)
+        entry = resource_sync.ResourceEntry("lisps/EXACT.lsp", resource_sync.git_blob_sha(data), len(data))
+        self.assertEqual(resource_sync._download_resource(entry, FakeSession({})), data)
+
+    def test_does_not_normalize_downloaded_or_binary_bytes(self):
+        for path, data in (("lisps/REMOTE.lsp", b"(princ)\n"),
+                           ("masters/FORMATOS ANOTATIVOS ACAD_2025.dwg", b"AC1032\nbody")):
+            with self.subTest(path=path):
+                changed = data.replace(b"\n", b"\r\n")
+                self._write_installed(path, changed if path.endswith(".dwg") else b"old")
+                entry = resource_sync.ResourceEntry(path, resource_sync.git_blob_sha(data), len(data))
+                with self.assertRaisesRegex(ValueError, "Tamaño|SHA"):
+                    resource_sync._download_resource(entry, FakeSession({}, {path: changed}))
+
     def test_rejects_invalid_distribution_revision(self):
         session = FakeSession({}, manifest={"source_commit": "not-a-sha"})
 

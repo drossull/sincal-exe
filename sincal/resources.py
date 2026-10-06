@@ -330,16 +330,15 @@ def _raw_url(path: str) -> str:
 def _download_resource(entry: ResourceEntry, client) -> bytes:
     installed = ruta_recurso_instalado(*entry.path.split("/"))
     try:
-        installed_size = os.path.getsize(installed)
-        extension = os.path.splitext(entry.path.lower())[1]
-        installed_sha = _file_git_blob_sha(
-            installed,
-            installed_size,
-            normalize_text=extension in TEXT_EXTENSIONS,
-        )
-        if installed_sha == entry.sha:
-            with open(installed, "rb") as source:
-                data = source.read()
+        with open(installed, "rb") as source:
+            data = source.read()
+        # Validate the same bytes that matched the published SHA. Windows
+        # installers can contain CRLF while Git publishes LF. Keep exact bytes
+        # when they already match (including resources published with CRLF).
+        if (git_blob_sha(data) != entry.sha
+                and os.path.splitext(entry.path.lower())[1] in TEXT_EXTENSIONS):
+            data = data.replace(b"\r\n", b"\n")
+        if git_blob_sha(data) == entry.sha:
             _validate_resource_data(entry, data)
             return data
     except OSError:
