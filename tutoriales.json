@@ -277,6 +277,13 @@
       "notas": ["10% equivale aproximadamente a 5,7106 grados, no a 10 grados. Se aplica atan(porcentaje/100).", "Rota sin deformar ni cambiar longitudes: no conserva la proyección horizontal. En polilíneas curvas o quebradas, solo el eje indicado adquiere esa pendiente; no todos sus tramos.", "Trabaja en XY del UCS, no asigna elevaciones ni pendientes longitudinales Z. Los dos puntos de referencia deben estar en un plano paralelo a XY.", "Solo afecta al objeto seleccionado. Omite capas bloqueadas y viewports; permite deshacer el giro con UNDO. Esc cancela sin modificar el objeto."],
       "tags": ["pendiente", "rotacion", "porcentaje", "linea", "polilinea"]
     },
+    "VG": {
+      "titulo": "Eliminar viñeta G130 y purgar",
+      "descripcion": "Elimina las inserciones del bloque VIÑETA G130 en Modelo y todos los layouts del dibujo actual; después ejecuta el LISP PURGEALL.",
+      "pasos": ["Guarda una copia de seguridad antes de limpiar.", "Escribe VG. No pide selección ni confirmación adicional.", "Revisa el recuento de eliminadas y omitidas; guarda el DWG cuando estés conforme."],
+      "notas": ["Coincide con el nombre completo VIÑETA G130, sin distinguir mayúsculas. Reconoce el nombre efectivo de bloques dinámicos.", "No desbloquea capas, no modifica referencias externas y no elimina viñetas anidadas en otros bloques.", "PURGEALL se ejecuta incluso si no encuentra viñetas. Limpia definiciones y escalas no utilizadas; no guarda automáticamente. UNDO permite deshacer la operación."],
+      "tags": ["viñeta", "bloque", "purga", "G130"]
+    },
     "PURGEALL": {
       "titulo": "Limpieza profunda del dibujo",
       "descripcion": "Ejecuta AUDIT, purga definiciones y aplicaciones registradas sin uso, encuadra y guarda.",
