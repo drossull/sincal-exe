@@ -10,7 +10,7 @@ import win32com.client
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--keep-open", action="store_true", help="Leave scratch drawing for visual QA")
-    parser.add_argument("--workflow", choices=("dynamic", "workflow", "detail", "build_detail", "build_presentation", "presentation", "upgrade", "settings"), default="dynamic")
+    parser.add_argument("--workflow", choices=("dynamic", "workflow", "detail", "build_detail", "build_presentation", "presentation", "upgrade", "upgrade_metric", "settings"), default="dynamic")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     if args.workflow == "build_presentation" and any((root / "masters" / name).exists() for name in ("SINCAL_MARCA_SC_V3.dwg", "SINCAL_MARCA_DE_V2.dwg")):
@@ -41,7 +41,7 @@ def main():
         undo_sent = False
         for _ in range(120):
             content = report.read_text(errors="replace") if report.exists() else ""
-            if args.workflow == "upgrade" and "READY_UNDO" in content and not undo_sent:
+            if args.workflow.startswith("upgrade") and "READY_UNDO" in content and not undo_sent:
                 # SCRIPT owns an outer undo group. Test U only after it returns.
                 time.sleep(1)
                 doc.SendCommand(f'(setq SCMT:Report (open "{report.as_posix()}" "a"))\nMARCA-UP\nTodas\nNo\n(SCMT:CheckUndo)\nMARCA-UP\nTodas\nSi\n(SCMT:CheckUp)\n_.U\n(SCMT:CheckUndo)\n(SCMT:ForceFailure)\nMARCA-UP\nTodas\nSi\n(SCMT:CheckUndo)\n(SCMT:CheckRollback)\n(write-line (strcat "DONE failures=" (itoa SCMT:Failures)) SCMT:Report)\n(close SCMT:Report)\n(setq SCMT:Report nil)\n')

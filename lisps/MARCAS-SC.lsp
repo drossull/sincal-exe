@@ -544,7 +544,16 @@
     (if (not (member name scales))
       (vl-cmdf "_.-OBJECTSCALE" ss "" "_Delete" name "")))
   (if (not (equal scales (SCM:UpScales obj))) (SCM:Fail "No se conservaron las escalas anotativas.")))
-(defun SCM:UpOne (old / issue binding owner new attrs a prop values scales target)
+(defun SCM:UpPaperFactors (obj / context scale paper drawing)
+  ;; Context factors are model-sized. InsertBlock expects paper-sized factors.
+  ;; Read the actual SCALE ratio; names such as "1:25 (m)" are not numeric ratios.
+  (setq context (car (SCM:UpContexts obj))
+        scale (entget (cdr (assoc 340 context)))
+        paper (cdr (assoc 140 scale)) drawing (cdr (assoc 141 scale)))
+  (if (not (and paper drawing (> paper 0.0) (> drawing 0.0)))
+    (SCM:Fail "Escala anotativa sin relacion papel/dibujo valida."))
+  (mapcar '(lambda (code) (* (cdr (assoc code context)) (/ paper drawing))) '(41 42 43)))
+(defun SCM:UpOne (old / issue binding owner new attrs a prop values scales target factors)
   (if (setq issue (SCM:UpIssue old)) (SCM:Fail issue))
   ;; OBJECTSCALE only accepts references in the current space.
   (SCM:RestoreView (list (cdr (assoc 410 (entget (vlax-vla-object->ename old)))) 1))
@@ -554,8 +563,9 @@
   ;; Mark before the first write, including importing the definition, for rollback.
   (setq SCM:changed T)
   (SCM:DefinitionNamed target)
+  (setq factors (SCM:UpPaperFactors old))
   (setq new (vla-InsertBlock owner (vla-get-InsertionPoint old) target
-    (vla-get-XScaleFactor old) (vla-get-YScaleFactor old) (vla-get-ZScaleFactor old) (vla-get-Rotation old)))
+    (car factors) (cadr factors) (caddr factors) (vla-get-Rotation old)))
   (foreach prop '(Layer Linetype LinetypeScale Lineweight Visible EntityTransparency)
     (vlax-put-property new prop (vlax-get-property old prop)))
   (vla-put-TrueColor new (vla-get-TrueColor old))
@@ -567,11 +577,14 @@
       (SCM:PutText (cdr (assoc (car a) attrs)) (vla-get-TextString (cdr a)))))
   (SCM:Bind new (car binding) (cadr binding))
   (SCM:Evaluate (list new))
-  (if (not (and (SCM:Healthy new binding) (= target (SCM:UpName new))
-               (equal scales (SCM:UpScales new))
-               (equal (SCM:UpGeometry old) (SCM:UpGeometry new) 1e-8)
-               (equal (vlax-get old 'InsertionPoint) (vlax-get new 'InsertionPoint) 1e-8)))
-    (SCM:Fail "La marca nueva no supera la verificacion; se revierte el comando."))
+  (cond
+    ((not (SCM:Healthy new binding)) (SCM:Fail "Verificacion: vinculo o atributos incompatibles; se revierte el comando."))
+    ((/= target (SCM:UpName new)) (SCM:Fail "Verificacion: maestro de destino incorrecto; se revierte el comando."))
+    ((not (equal scales (SCM:UpScales new))) (SCM:Fail "Verificacion: escalas anotativas diferentes; se revierte el comando."))
+    ((not (equal (SCM:UpGeometry old) (SCM:UpGeometry new) 1e-8))
+      (SCM:Fail "Verificacion: tamano, giro o posicion anotativa diferentes; se revierte el comando."))
+    ((not (equal (vlax-get old 'InsertionPoint) (vlax-get new 'InsertionPoint) 1e-8))
+      (SCM:Fail "Verificacion: punto de insercion diferente; se revierte el comando.")))
   (foreach a (SCM:Attrs old)
     (if (and (member (car a) '("CANT_TOTAL" "LARGO"))
              (/= (vla-get-TextString (cdr a)) (vla-get-TextString (cdr (assoc (car a) attrs)))))

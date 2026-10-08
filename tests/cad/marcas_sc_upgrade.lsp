@@ -37,7 +37,7 @@
     (SCMT:Assert (SCM:Healthy obj (SCM:Resolve obj)) "replacement link healthy")
     (SCMT:Assert (equal (vlax-get obj 'InsertionPoint) '(22.0 33.0 0.0) 1e-8) "insertion preserved")
     (SCMT:Assert (equal (vla-get-Rotation obj) 0.42 1e-8) "rotation preserved")
-    (SCMT:Assert (equal (vla-get-XScaleFactor obj) 2.5 1e-8) "scale preserved")
+    (SCMT:Assert (equal (vla-get-XScaleFactor obj) (if (and SCMT:Metric (not (SCM:DetailP obj))) 0.0625 2.5) 1e-8) "scale preserved")
     (SCMT:Assert (= (if (SCM:DetailP obj) 1 2) (length (SCM:UpScales obj))) "annotation scales preserved")
     (if (SCM:DetailP obj)
       (progn (SCMT:Assert (/= "Model" (cdr (assoc 410 (entget (vlax-vla-object->ename obj))))) "inactive layout preserved")

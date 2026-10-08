@@ -152,6 +152,13 @@ Prueba nativa: `python tools/cad/test_marcas_native.py --workflow upgrade`.
 Comprueba ambos maestros antiguos, marcas alfanuméricas, dos escalas, flip,
 rotación, valores manuales, vínculos y UNDO en una instancia desechable.
 
+La variante `--workflow upgrade_metric` prueba una escala con 1000 unidades de
+papel y 25 de dibujo, además de una segunda representación 1:2 y el caso en
+papel. La migración calcula los factores de inserción en papel usando la razón
+real de la escala, no su nombre ni el factor del bloque ya escalado. Evita
+aplicar dos veces la anotatividad. Las verificaciones finales distinguen
+vínculos, maestro, lista de escalas, geometría anotativa y punto de inserción.
+
 ## Configuración única por dibujo
 
 MARCA-SC y MARCA-DE guardan configuraciones separadas en XRecords del DWG,
