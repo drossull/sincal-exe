@@ -389,6 +389,20 @@
       "notas": ["Todos los seleccionados se asignan a la misma marca: para migrar un plano existente trabaja por grupos de marca.", "No migra automáticamente los rótulos antiguos. Conserva TEXTO y los parámetros dinámicos.", "Rechaza capas bloqueadas. Una operación se deshace con U."],
       "tags": ["armaduras", "reasignar", "campos", "migración"]
     },
+    "MARCA-CONFIG": {
+      "titulo": "Cambiar la configuración guardada de las marcas",
+      "descripcion": "Reinicia la configuración de MARCA-SC, MARCA-DE o ambas sin cambiar las marcas existentes.",
+      "pasos": ["Escribe MARCA-CONFIG.", "Elige Vista, Despiece o Ambas.", "La siguiente inserción del tipo elegido pedirá nuevamente tabla, modelo o altura y, para despiece, cantidad total y largo iniciales."],
+      "notas": ["MARCA-SC y MARCA-DE se configuran una sola vez por dibujo y por tipo. Las siguientes inserciones solo piden la marca y el punto de colocación.", "La configuración se guarda dentro del DWG al guardar el dibujo; se conserva al volver a abrirlo. Si la tabla o el modelo desaparecen, la próxima inserción solicita una nueva configuración.", "MARCA-DE reutiliza la cantidad total y el largo iniciales: no los calcula ni los toma de la tabla. Revisa y edita CANT_TOTAL y LARGO en Propiedades para cada pieza.", "Si se eligió un bloque modelo, debe permanecer disponible en el espacio de inserción. Para cambiar de tabla, altura, modelo o valores iniciales usa este comando. U permite deshacer el reinicio."],
+      "tags": ["armaduras", "configuración", "inserción", "tabla"]
+    },
+    "MARCA-UP": {
+      "titulo": "Actualizar bloques de marca antiguos",
+      "descripcion": "Migra MARCA-SC V2 a V3 y MARCA-DE V1 a V2 sin borrar ni purgar manualmente los bloques.",
+      "pasos": ["Actualiza los recursos de SINCAL y vuelve a abrir el dibujo para cargar el LISP nuevo.", "Escribe MARCA-UP y elige Seleccion o Todas (modelo y layouts).", "Revisa las omisiones y confirma con Si. Por defecto no realiza cambios.", "Usa Propiedades para elegir los nuevos estados de visibilidad. U deshace la operación completa."],
+      "notas": ["Conserva tabla/fila vinculada, cantidad total y largo manuales, posición, rotación, escala, capa, apariencia del bloque, escalas anotativas y parámetros dinámicos compatibles. Las nuevas opciones quedan inicialmente sin sufijo ni suple.", "Solo migra los maestros antiguos reconocidos. Omite capas bloqueadas, vínculos inválidos, atributos personalizados, datos de otras aplicaciones, normales 3D, escalas negativas y representaciones anotativas desplazadas individualmente. No recorre bloques anidados ni referencias externas.", "Sustituye las referencias verificadas: sus handles cambian. No usar si otros objetos o herramientas dependen de esos handles; tales dependencias externas no se migran. No purga las definiciones anteriores ni guarda automáticamente el dibujo.", "Si falla una verificación durante la migración, revierte el grupo completo. ACTUALIZAR-MARCAS sigue reparando campos; MARCA-UP cambia la versión del bloque."],
+      "tags": ["armaduras", "migración", "bloques", "actualizar", "visibilidad"]
+    },
     "ACTUALIZAR-MARCAS": {
       "titulo": "Reparar referencias por identidad de fila",
       "descripcion": "Localiza la fila original por su identificador y reconstruye las referencias de los campos de las marcas seleccionadas.",

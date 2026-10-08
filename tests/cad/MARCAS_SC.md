@@ -129,3 +129,40 @@ La nueva plantilla está autorizada en `sincal/runtime.py` y en `version.json`.
 Las versiones antiguas del ejecutable cuya lista de recursos no incluya este
 DWG requieren actualizar SINCAL o seleccionar el master manualmente en el
 diálogo de MARCA-DE; actualizar solo el LISP no instala un master ausente.
+
+## Migración de referencias existentes: MARCA-UP
+
+`MARCA-UP` ofrece Seleccion (incluida preselección) o Todas, para referencias
+directas de modelo y layouts. Migra exclusivamente SC V2 → V3 y DE V1 → V2;
+las versiones vigentes se dejan intactas. Solicita confirmación, por defecto No.
+No redefine ni purga bloques. La referencia nueva se verifica antes de borrar
+la antigua: tabla/fila, Fields, valores manuales, geometría de cada contexto
+anotativo y propiedades dinámicas. Conserva apariencia del bloque y ubicación.
+La sustitución cambia el handle: referencias externas a ese handle no se migran.
+No utilizar en bloques con dependencias externas no controladas por SINCAL.
+
+Omite capas bloqueadas, vínculos no válidos, XX pendiente de sincronización,
+atributos extra, Fields manuales, XData de terceros, escalas negativas, normales
+3D y representaciones anotativas desplazadas individualmente. No migra bloques
+anidados/Xrefs ni diseños personalizados con otro nombre. Las personalizaciones
+internas de una definición con el nombre oficial se sustituyen por el maestro.
+No guarda el DWG. Un error revierte el grupo completo; U restaura los originales.
+
+Prueba nativa: `python tools/cad/test_marcas_native.py --workflow upgrade`.
+Comprueba ambos maestros antiguos, marcas alfanuméricas, dos escalas, flip,
+rotación, valores manuales, vínculos y UNDO en una instancia desechable.
+
+## Configuración única por dibujo
+
+MARCA-SC y MARCA-DE guardan configuraciones separadas en XRecords del DWG,
+solo después de una inserción exitosa. Se reutilizan tabla y modelo/altura;
+en DE también cantidad total y largo iniciales. Las siguientes inserciones
+piden únicamente marca y punto. Los manuales del despiece deben revisarse por
+pieza en Propiedades, no son cantidades calculadas. Guardar el dibujo conserva
+los ajustes entre sesiones. Una tabla/modelo eliminado invalida los ajustes.
+Un modelo de otro espacio requiere MARCA-CONFIG o volver a su espacio.
+
+MARCA-CONFIG reinicia Vista, Despiece o Ambas; no cambia referencias existentes.
+Prueba: `python tools/cad/test_marcas_native.py --workflow settings`, que verifica
+los prompts reducidos, independencia de los tipos, valores manuales, recarga
+del LISP, reinicio selectivo e invalidación al borrar la tabla.

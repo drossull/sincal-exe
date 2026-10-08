@@ -1,0 +1,46 @@
+(setq scmt-root (getenv "SINCAL_TEST_ROOT"))
+(load (strcat scmt-root "/lisps/MARCAS-SC.lsp"))
+(load (strcat scmt-root "/tests/cad/marcas_sc_regression.lsp"))
+(load (strcat scmt-root "/tests/cad/marcas_sc_detail.lsp"))
+(setq SCMT:Picks 0)
+(defun SCM:PickTable () (setq SCMT:Picks (1+ SCMT:Picks)) SCMDT:Table)
+(vla-SetText SCMDT:Table 2 1 "20")
+(vla-SetText SCMDT:Table 2 3 "15")
+(vla-SetText SCMDT:Table 3 1 "30")
+(vla-SetText SCMDT:Table 3 3 "10")
+MARCA-SC
+7a
+
+3.0
+0,0,0
+(SCMT:Assert (= SCMT:Picks 1) "SC first insertion selects table once")
+(SCMT:Assert (SCM:SettingsRead nil) "SC settings stored in drawing")
+MARCA-SC
+8
+0,10,0
+(SCMT:Assert (= SCMT:Picks 1) "SC repeat asks only mark and insertion point")
+(SCMT:Assert (equal 3.0 (vla-get-XScaleFactor (vlax-ename->vla-object (entlast))) 1e-8) "SC height remembered")
+MARCA-DE
+7a
+
+2.5
+172
+368
+0,20,0
+(SCMT:Assert (= SCMT:Picks 2) "DE has separate first-time configuration")
+MARCA-DE
+8
+0,30,0
+(setq obj (vlax-ename->vla-object (entlast)))
+(SCMT:Assert (= SCMT:Picks 2) "DE repeat asks only mark and insertion point")
+(SCMT:Assert (SCMDT:ManualP obj) "DE configured manual defaults reused")
+(SCMT:Assert (= "8" (SCMDT:Text obj "XX")) "DE repeat uses new mark")
+(SCMT:Assert (SCM:Healthy obj (SCM:Resolve obj)) "DE repeat links correct row")
+(load (strcat scmt-root "/lisps/MARCAS-SC.lsp"))
+(SCMT:Assert (and (SCM:SettingsRead nil) (SCM:SettingsRead T)) "settings survive LISP reload via XRecords")
+MARCA-CONFIG
+Vista
+(SCMT:Assert (and (not (SCM:SettingsRead nil)) (SCM:SettingsRead T)) "reset only selected kind")
+(vla-Delete SCMDT:Table)
+(SCMT:Assert (not (SCM:SettingsRead T)) "deleted table invalidates configuration")
+(if SCMT:Report (progn (write-line (strcat "DONE failures=" (itoa SCMT:Failures)) SCMT:Report) (close SCMT:Report) (setq SCMT:Report nil)))

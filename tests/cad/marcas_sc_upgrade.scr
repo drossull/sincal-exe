@@ -1,0 +1,5 @@
+(setq scmt-root (getenv "SINCAL_TEST_ROOT"))
+(load (strcat scmt-root "/lisps/MARCAS-SC.lsp"))
+(load (strcat scmt-root "/tests/cad/marcas_sc_regression.lsp"))
+(load (strcat scmt-root "/tests/cad/marcas_sc_upgrade.lsp"))
+(if SCMT:Report (progn (write-line "READY_UNDO" SCMT:Report) (close SCMT:Report) (setq SCMT:Report nil)))
