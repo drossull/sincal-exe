@@ -1,0 +1,10 @@
+(setq scmt-root (getenv "SINCAL_TEST_ROOT"))
+(load (strcat scmt-root "/lisps/MARCAS-SC.lsp"))
+(load (strcat scmt-root "/tests/cad/marcas_sc_regression.lsp"))
+(load (strcat scmt-root "/tests/cad/marcas_sc_presentation.lsp"))
+SCMP-VIS
+(SCMT:Assert (SCM:Healthy obj (SCM:Resolve obj)) "visibility repaired automatically after command")
+SCMP-MANUAL
+(SCMT:Assert (= "S. 200" (vla-get-TextString (cdr (assoc "CANT_TOTAL" (SCM:Attrs obj))))) "edited quantity gets suple prefix automatically")
+(SCMT:Assert (= "L=450 (SUP.)" (vla-get-TextString (cdr (assoc "LARGO" (SCM:Attrs obj))))) "edited length gets suffix automatically")
+(if SCMT:Report (progn (write-line (strcat "DONE failures=" (itoa SCMT:Failures)) SCMT:Report) (close SCMT:Report) (setq SCMT:Report nil)))

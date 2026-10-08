@@ -1,7 +1,7 @@
 ;;; Run after build_marca_sc.lsp in a disposable document with RomanD loaded.
 ;;; Reuses the SC circle, attribute authoring, masks and native flip workflow.
 (defun SCMDB:Build (/ name obj en descriptions)
-  (setq name "SINCAL_MARCA_DE_V1")
+  (setq name (if SCMB:NewPresentation "SINCAL_MARCA_DE_V2" "SINCAL_MARCA_DE_V1"))
   (if (tblsearch "BLOCK" name) (progn (princ "\nDefinition already exists") (quit)))
   (if (not (tblsearch "STYLE" "RomanD")) (progn (princ "\nRomanD required") (quit)))
   (entmake (list '(0 . "BLOCK") (cons 2 name) '(70 . 2) '(10 0.0 0.0 0.0)))
@@ -33,6 +33,9 @@
   (setq descriptions (ssget "_X" '((0 . "ATTDEF") (2 . "CANT_TOTAL,MARCA,LARGO"))))
   (command "_.BPARAMETER" "_Flip" '(0 -2 0) '(0 3 0) '(-2 -3 0) 1)
   (command "_.BACTION" '(0 2 0) descriptions "")
+  (if SCMB:NewPresentation
+    (progn (command "_.BPARAMETER" "_Visibility" '(2 3 0) 1)
+      (SCMB:States T nil nil)))
   (command "_.BSAVE")
   (command "_.BCLOSE")
   (princ "\nSCMDB_BUILD_COMPLETE")

@@ -76,9 +76,28 @@ ACTUALIZAR-MARCAS reconstruye también los campos antiguos sin este formato.
 
 ## MARCA-DE: despiece
 
-`MARCA-DE` utiliza la variante `masters/SINCAL_MARCA_DE_V1.dwg`, derivada del
+### Presentación superior/inferior y suple
+
+Las nuevas inserciones utilizan SC V3 y DE V2. En Propiedades > Personalizado,
+seleccionar la visibilidad: SC combina SIN_CANTIDAD/CON_CANTIDAD con SUP/INF
+y SUPLE; DE ofrece NORMAL, SUP, INF y sus variantes terminadas en _SUPLE.
+Ejemplos: `CON_CANTIDAD_SUP_SUPLE` → `S. 163 ø8@20 (SUP.)`;
+`SUP_SUPLE` en despiece → `S. 172 ø12 L=368 (SUP.)`.
+Sin cantidad, S. precede al diámetro. Cambiar de estado conserva valores y campos.
+En DE, editar CANT_TOTAL y LARGO desde Propiedades; los adornos se regeneran
+al confirmar. La longitud base sigue incluyendo L=. Requiere MARCAS-SC cargado
+para regenerar la descripción al cambiar visibilidad (REGEN fuerza sincronización).
+
+Las definiciones antiguas se conservan: no se redefinen ni se usa ATTSYNC.
+Para obtener los estados nuevos, insertar con MARCA-SC/MARCA-DE y pulsar Enter
+en la selección de modelo; copiar un modelo antiguo conserva sus estados antiguos.
+Los nuevos masters deben estar instalados. Ejecutables antiguos con lista cerrada
+de masters requieren un release actualizado o seleccionar el nuevo DWG manualmente.
+Regresión: `python tools/cad/test_marcas_native.py --workflow presentation`.
+
+`MARCA-DE` utiliza la variante `masters/SINCAL_MARCA_DE_V2.dwg`, derivada del
 mismo diseño: círculo rojo, RomanD, máscara del diámetro y flip nativo, bloque anotativo.
-Siempre muestra cantidad y largo (sin estados de visibilidad). Sus atributos
+Siempre muestra cantidad y largo; la visibilidad elige posición y suple. Sus atributos
 son XX (marca vinculada), MARCA (solo diámetro vinculado), CANT_TOTAL y LARGO
 (manuales). Actualizar, reasignar, copiar y editar XX no sobrescribe los manuales.
 LARGO incluye el prefijo en su texto (por ejemplo `L=368`); conservarlo al editar

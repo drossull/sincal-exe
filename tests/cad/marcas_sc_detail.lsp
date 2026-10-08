@@ -44,7 +44,7 @@
   (SCMT:Assert (SCM:DetailEditableP obj) "manual attributes stay single-line after flip")
   (foreach tag '("MARCA" "CANT_TOTAL" "LARGO")
     (SCMT:Assert (equal 0.0 (vla-get-Rotation (cdr (assoc tag (SCM:Attrs obj)))) 1e-8) (strcat "upright after flip " tag)))
-  (setq ed (entget (vlax-vla-object->ename (vla-item (vla-get-Blocks (SCM:Doc)) "SINCAL_MARCA_DE_V1")) '("AcadAnnotative")))
+  (setq ed (entget (vlax-vla-object->ename (vla-item (vla-get-Blocks (SCM:Doc)) "SINCAL_MARCA_DE_V2")) '("AcadAnnotative")))
   (SCMT:Assert (assoc -3 ed) "detail annotative metadata")
   (vla-SetText SCMDT:Table 2 2 "12.5")
   (SCM:Evaluate (list obj))

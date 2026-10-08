@@ -12,6 +12,7 @@ on:
       - "plotstyles/**"
       - "mapas/**"
       - "masters/FORMATOS ANOTATIVOS ACAD_2025.dwg"
+      - "masters/SINCAL_MARCA_*.dwg"
       - "tutoriales.json"
       - "version.json"
       - "sincal/runtime.py"

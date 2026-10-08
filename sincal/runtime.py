@@ -57,6 +57,8 @@ RECURSOS_EXACTOS = {
     "masters/FORMATOS ANOTATIVOS ACAD_2025.dwg",
     "masters/SINCAL_MARCA_SC_V2.dwg",
     "masters/SINCAL_MARCA_DE_V1.dwg",
+    "masters/SINCAL_MARCA_SC_V3.dwg",
+    "masters/SINCAL_MARCA_DE_V2.dwg",
 }
 RECURSOS_POR_CARPETA = {
     "lisps/": {".lsp"},
