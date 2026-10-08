@@ -38,6 +38,10 @@ class FakeSession:
         if url.endswith("/manifest.json") and self.manifest is not None:
             return FakeResponse(payload=self.manifest)
         for path, content in self.downloads.items():
+            entries = self.tree.get('tree', [])
+            expected_sha = next((e['sha'] for e in entries if e['path'] == path), resource_sync.git_blob_sha(content))
+            if url.endswith('/git/blobs/' + expected_sha):
+                return FakeResponse(content=content)
             if url.endswith(path.replace(" ", "%20")):
                 return FakeResponse(content=content)
         return FakeResponse(status_code=404)
@@ -177,7 +181,15 @@ class ResourceSyncTests(unittest.TestCase):
                 self._write_installed(path, changed if path.endswith(".dwg") else b"old")
                 entry = resource_sync.ResourceEntry(path, resource_sync.git_blob_sha(data), len(data))
                 with self.assertRaisesRegex(ValueError, "Tamaño|SHA"):
-                    resource_sync._download_resource(entry, FakeSession({}, {path: changed}))
+                    resource_sync._download_resource(entry, FakeSession({'tree':[{'path':path,'sha':entry.sha}]}, {path: changed}))
+
+    def test_download_is_pinned_to_planned_blob_not_mutable_branch(self):
+        data=b'(princ "pinned")\n'
+        entry=resource_sync.ResourceEntry('lisps/PINNED.lsp',resource_sync.git_blob_sha(data),len(data))
+        session=FakeSession({}, {entry.path:data})
+        self.assertEqual(resource_sync._download_resource(entry,session),data)
+        self.assertTrue(session.calls[0][0].endswith('/git/blobs/'+entry.sha))
+        self.assertEqual(session.calls[0][1]['headers']['Accept'],'application/vnd.github.raw+json')
 
     def test_rejects_invalid_distribution_revision(self):
         session = FakeSession({}, manifest={"source_commit": "not-a-sha"})
@@ -214,7 +226,7 @@ class ResourceSyncTests(unittest.TestCase):
             removed=(),
             initial=False,
         )
-        session = FakeSession({}, {entry.path: tampered})
+        session = FakeSession({'tree':[{'path':entry.path,'sha':entry.sha}]}, {entry.path: tampered})
 
         with self.assertRaisesRegex(ValueError, "SHA|Tamaño"):
             resource_sync.apply_resource_updates(plan, session=session)

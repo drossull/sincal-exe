@@ -184,7 +184,7 @@ class CadBatch:
         result = json.loads(output.read_text(encoding='utf-8'))
         if not result.get('ok'):
             raise RuntimeError(result.get('error', 'No se pudo procesar la copia DWG.'))
-        if changes is not None or self.request_options.get('revisionValues') is not None:
+        if changes is not None or self.request_options.get('revisionValues') is not None or self.request_options.get('revisionEdits') is not None:
             if not saved.is_file():
                 raise RuntimeError('No se generó el DWG verificado; el original no se modificó.')
             os.replace(saved, path)

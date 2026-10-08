@@ -53,7 +53,7 @@ class TabProspecciones(ctk.CTkFrame):
     def _build_ui(self):
         header = ctk.CTkFrame(self, fg_color='transparent')
         header.pack(fill='x', padx=20, pady=(14, 8))
-        ctk.CTkLabel(header, text='PROSPECCIONES', font=FUENTE_SUBTITULO,
+        ctk.CTkLabel(header, text='PERFILES GEOFÍSICOS', font=FUENTE_SUBTITULO,
                      text_color=COLOR_MOSTAZA).pack(anchor='w')
         ctk.CTkLabel(header, text='Perfiles Vs del informe de mecánica de suelos · Valores oficiales de solo lectura',
                      font=FUENTE_NORMAL, text_color=COLOR_TEXTO_SUAVE).pack(anchor='w')

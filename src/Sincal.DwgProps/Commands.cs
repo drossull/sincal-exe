@@ -15,6 +15,8 @@ public class Commands
         public Dictionary<string, string?>? changes { get; set; }
         public bool revisionRead { get; set; }
         public string[]? revisionValues { get; set; }
+        public bool revisionEditorRead { get; set; }
+        public RevisionEditor.Change[]? revisionEdits { get; set; }
     }
 
     private static Dictionary<string, string> Properties(Database database)
@@ -101,10 +103,39 @@ public class Commands
             database.ReadDwgFile(request.file, FileOpenMode.OpenForReadAndAllShare, true, "");
             database.CloseInput(true);
             var original = Properties(database);
+            var viewports = ViewportIntegrity.Read(database);
             var standard = StandardProperties(database);
             var inventory = request.changes is null ? "" : EntityInventory(database);
             var desired = new Dictionary<string, string>(original, StringComparer.Ordinal);
             object? revisionResult = null;
+            object? editorResult = null;
+            if(request.revisionEditorRead || request.revisionEdits is not null)
+            {
+                if(request.changes is not null || request.revisionRead || request.revisionValues is not null)
+                    throw new InvalidOperationException("No se pueden mezclar operaciones de edición.");
+                var previous=RevisionEditor.Read(database);editorResult=previous;
+                if(request.revisionEdits is not null)
+                {
+                    var allowed=RevisionEditor.DesiredProperties(previous,request.revisionEdits);
+                    var stableInventory=EntityInventory(database,true);
+                    try {
+                        HostApplicationServices.WorkingDatabase=database;
+                        RevisionEditor.Apply(database,previous,request.revisionEdits);
+                        RevisionEditor.Verify(database,previous,request.revisionEdits);
+                        database.SaveAs(request.saved,true,database.OriginalFileVersion,database.SecurityParameters);
+                    } finally { HostApplicationServices.WorkingDatabase=opened; }
+                    using var verified=new Database(false,true);
+                    verified.ReadDwgFile(request.saved,FileOpenMode.OpenForReadAndAllShare,true,"");verified.CloseInput(true);
+                    ViewportIntegrity.Verify(verified,viewports);
+                    RevisionEditor.Verify(verified,previous,request.revisionEdits);
+                    if(StandardProperties(verified)!=standard || EntityInventory(verified,true)!=stableInventory || verified.OriginalFileVersion!=database.OriginalFileVersion)
+                        throw new InvalidOperationException("Cambió la estructura del DWG; no se reemplazará el original.");
+                    desired=Properties(verified);
+                    if(original.Count!=desired.Count || original.Any(p=>!desired.TryGetValue(p.Key,out var value) || value!=(allowed.TryGetValue(p.Key,out var edited)?edited:p.Value)))
+                        throw new InvalidOperationException("Cambió una propiedad DWG ajena a la edición.");
+                    editorResult=RevisionEditor.Read(verified);
+                }
+            }
             if (request.revisionRead || request.revisionValues is not null)
             {
                 var previous = RevisionTable.Read(database);
@@ -118,12 +149,15 @@ public class Commands
                         RevisionTable.Apply(database, request.revisionValues);
                         try { RevisionTable.Verify(database, previous, request.revisionValues); }
                         catch (System.Exception error) { throw new InvalidOperationException("Antes de guardar: " + error.Message); }
-                        database.SaveAs(request.saved, database.OriginalFileVersion);
+                        // The short SaveAs overload can import the bootstrap drawing's
+                        // viewport state into side databases in a heterogeneous batch.
+                        database.SaveAs(request.saved, true, database.OriginalFileVersion, database.SecurityParameters);
                     }
                     finally { HostApplicationServices.WorkingDatabase = opened; }
                     using var verified = new Database(false, true);
                     verified.ReadDwgFile(request.saved, FileOpenMode.OpenForReadAndAllShare, true, "");
                     verified.CloseInput(true);
+                    ViewportIntegrity.Verify(verified, viewports);
                     RevisionTable.Verify(verified, previous, request.revisionValues);
                     if (StandardProperties(verified) != standard || EntityInventory(verified,true) != stableInventory
                         || verified.OriginalFileVersion != database.OriginalFileVersion)
@@ -156,19 +190,21 @@ public class Commands
                 try
                 {
                     HostApplicationServices.WorkingDatabase = database;
-                    database.SaveAs(request.saved, database.OriginalFileVersion);
+                    // Preserve side-database viewport state; verify it on reopening.
+                    database.SaveAs(request.saved, true, database.OriginalFileVersion, database.SecurityParameters);
                 }
                 finally { HostApplicationServices.WorkingDatabase = opened; }
                 using var verify = new Database(false, true);
                 verify.ReadDwgFile(request.saved, FileOpenMode.OpenForReadAndAllShare, true, "");
                 verify.CloseInput(true);
+                ViewportIntegrity.Verify(verify, viewports);
                 var actual = Properties(verify);
                 if (actual.Count != desired.Count || desired.Any(p => !actual.TryGetValue(p.Key, out var value) || value != p.Value))
                     throw new InvalidOperationException("La lectura del DWG guardado no coincide con los cambios.");
                 if (StandardProperties(verify) != standard || EntityInventory(verify) != inventory || verify.OriginalFileVersion != database.OriginalFileVersion)
                     throw new InvalidOperationException("La verificación detectó cambios ajenos a las propiedades personalizadas. No se reemplazará el original.");
             }
-            File.WriteAllText(request.output, JsonSerializer.Serialize(new { ok = true, properties = desired, revision = revisionResult }));
+            File.WriteAllText(request.output, JsonSerializer.Serialize(new { ok = true, properties = desired, revision = revisionResult, revisionEditor = editorResult }));
         }
         catch (System.Exception error)
         {

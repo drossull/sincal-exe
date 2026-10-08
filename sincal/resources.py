@@ -345,8 +345,10 @@ def _download_resource(entry: ResourceEntry, client) -> bytes:
         pass
 
     response = client.get(
-        _raw_url(entry.path),
-        headers={"User-Agent": _headers()["User-Agent"]},
+        # The branch may advance between planning and downloading. Fetch the
+        # immutable blob we validated instead of whatever main contains now.
+        distribution_api_url(f"git/blobs/{entry.sha}"),
+        headers={**_headers(), "Accept": "application/vnd.github.raw+json"},
         timeout=REQUEST_TIMEOUT,
         stream=True,
     )

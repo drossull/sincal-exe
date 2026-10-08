@@ -23,9 +23,6 @@ try {
             $keep = if ($KeepSetup) { 'T' } else { 'nil' }
             $script = Join-Path $temp 'publish.scr'
             $source = '(setq sincalOutputDir "' + $out + '" sincalKeepSetup ' + $keep + ')' + [Environment]::NewLine + $template
-            if ($KeepSetup) {
-                $source = [regex]::Replace($source, '(?im)(^_\.QUIT\s*\r?\n)_Y', '${1}_N')
-            }
             [IO.File]::WriteAllText($script, $source, (New-Object Text.UTF8Encoding($false)))
             Invoke-SincalCadScript -Engine $engine -DrawingPath $file.FullName -ScriptPath $script -SkipSave:$KeepSetup | Out-Null
             $status = @(Get-Content -LiteralPath (Join-Path $temp 'status.txt') -Encoding UTF8)

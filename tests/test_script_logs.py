@@ -21,6 +21,7 @@ $fake = Join-Path 'DIRECTORY' 'accoreconsole.exe'
 Add-Type -OutputAssembly $fake -OutputType ConsoleApplication -TypeDefinition @'
 using System;
 using System.Threading;
+using System.IO;
 class FakeCAD {
     static int Main(string[] args) {
         Console.OutputEncoding = System.Text.Encoding.Unicode;
@@ -32,17 +33,26 @@ class FakeCAD {
             Console.Error.WriteLine("error-" + i);
         }
         Console.WriteLine("OUTPUT-END");
+        Console.WriteLine("Command: [SINCAL ERROR] test expression echo, not an error");
+        if (args[1] == "ok" || args[1] == "confirmedhang" || args[1] == "caderror") File.WriteAllText(Environment.GetEnvironmentVariable("SINCAL_COMPLETION_PATH"), Environment.GetEnvironmentVariable("SINCAL_COMPLETION_TOKEN"));
+        if (args[1] == "caderror") Console.WriteLine("; error: synthetic failure");
+        if (args[1] == "confirmedhang") Thread.Sleep(10000);
         return args[1] == "fail" ? 7 : 0;
     }
 }
 '@
 $engine = New-SincalCadEngineDescriptor -Path $fake
+$dummy = Join-Path 'DIRECTORY' 'dummy.scr'
+Set-Content -LiteralPath $dummy -Value "_.QSAVE`n_.QUIT`n_Y`n"
 Start-SincalScriptLog 'test'
 $first = $script:SincalLogPath
 try {
-    Invoke-SincalCadScript -Engine $engine -DrawingPath ok -ScriptPath dummy | Out-Null
-    try { Invoke-SincalCadScript -Engine $engine -DrawingPath fail -ScriptPath dummy | Out-Null } catch { Write-Host $_ }
-    try { Invoke-SincalCadScript -Engine $engine -DrawingPath timeout -ScriptPath dummy -TimeoutSeconds 1 | Out-Null } catch { Write-Host $_ }
+    Invoke-SincalCadScript -Engine $engine -DrawingPath ok -ScriptPath $dummy | Out-Null
+    Invoke-SincalCadScript -Engine $engine -DrawingPath confirmedhang -ScriptPath $dummy | Out-Null
+    try { Invoke-SincalCadScript -Engine $engine -DrawingPath missing -ScriptPath $dummy | Out-Null } catch { Write-Host $_ }
+    try { Invoke-SincalCadScript -Engine $engine -DrawingPath caderror -ScriptPath $dummy | Out-Null } catch { Write-Host $_ }
+    try { Invoke-SincalCadScript -Engine $engine -DrawingPath fail -ScriptPath $dummy | Out-Null } catch { Write-Host $_ }
+    try { Invoke-SincalCadScript -Engine $engine -DrawingPath timeout -ScriptPath $dummy -TimeoutSeconds 1 | Out-Null } catch { Write-Host $_ }
 } finally { Stop-SincalScriptLog }
 Copy-Item -LiteralPath $first -Destination (Join-Path 'DIRECTORY' 'verified.txt')
 # Seed only owned log names and unrelated files; preserve a log of this active PID.
@@ -73,7 +83,7 @@ if ($remaining.Count -ne 99) { throw "Retention count $($remaining.Count)" }
     log = (tmp_path / "verified.txt").read_text(encoding="utf-8-sig")
     for expected in ("OUTPUT-START", "OUTPUT-END", "normal-1999", "error-1999",
                      "ERROR-CHANNEL", "Codigo de salida CAD: 7", "FALLO DWG: timeout",
-                     "1 procesos terminados; 2 fallidos", "Duracion:"):
+                     "2 procesos terminados; 4 fallidos", "Duracion:", "cierre controlado", "sin confirmar", "CAD notifico errores"):
         assert expected in log
 
 

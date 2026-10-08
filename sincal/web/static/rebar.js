@@ -1,9 +1,8 @@
 // UI only: all quantities and geometry are calculated by the Python domain model.
 export async function renderRebar(ctx){
   const {project,api,node,button,section,notify,job,changed,current}=ctx;
-  const intro=section('armaduras','Generador de armadura');
-  ctx.projectLoader(intro);
-  if(!project){intro.append(node('p','Carga aquí el JSON del proyecto para configurar sus armaduras. También estará disponible en Consulta.'));return;}
+  const intro=section('armaduras','Estribos');
+  if(!project?.data||!Object.keys(project.data).length){intro.append(node('p','Incorpora el JSON del puente en Proyecto para configurar sus armaduras.'));return;}
   intro.append(node('p',project.identification.structure_name||'Proyecto sin nombre'));
   intro.append(node('p','Las dimensiones disponibles vienen del JSON (mm → cm). Completa las ausentes y revisa el cálculo antes de dibujar. El programa documenta armaduras; no sustituye la revisión del ingeniero.','muted'));
   const defaults=await api('rebar/from-project',project.data);if(!current())return;
@@ -79,7 +78,14 @@ export async function renderRebar(ctx){
     dialog.append(node('p','Geometría del núcleo Python; etiquetas de parciales desarrolladas, no cotas CAD.','muted'),button('Cerrar',()=>dialog.close()));dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.tabIndex=-1;dialog.showModal();dialog.scrollTop=0;dialog.focus({preventScroll:true});
   }
   draw();
+}
+export async function renderCrossbeam(ctx){
+  const {project,api,node,button,section,notify,job,changed}=ctx;
   const trav=section('travesanos','TRAVESAÑOS');
+  if(!project){trav.append(node('p','Carga primero el JSON en la página inicial del Generador de armadura.'));return;}
+  const types=node('div',undefined,'actions'),status=node('p');trav.append(types,status);
+  for(const label of ['Sobre apoyos','Intermedio'])types.append(button(label,()=>{status.textContent=label+': configuración específica pendiente de desarrollo. Las herramientas existentes de cuadrantes se mantienen debajo; no distinguen automáticamente esta tipología.';}));
+  status.textContent='Sobre apoyos e intermedio: la configuración específica de estas tipologías está pendiente. Se conservan las herramientas existentes de cuadrantes.';
   trav.append(node('p','Generadores existentes de cuadrantes y despieces, con selección de polilínea en CAD. Antes del despiece genera el mismo cuadrante en el mismo dibujo; el núcleo conserva su referencia.'));
   const saved=project.legacy_snapshot?.workspace?.crossbeam||{};
   project.crossbeam??={recub:Number(saved.ent_t_rec??2.5),espesor:Number(saved.ent_t_espesor??25),esviaje:Number(saved.ent_t_esviaje??0),phi_ext:Number(saved.ent_t_phi_ext??22),phi_horiz:Number(saved.ent_t_phi_horiz??12),phi_estr:Number(saved.ent_t_phi_estr??12),largo_viga:Number(saved.ent_viga_largo??200),cant_trav:Number(saved.ent_t_cantidad??1)};

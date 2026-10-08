@@ -504,6 +504,12 @@
 (defun SCM:LispEnded (reactor params)
   (if (and SCM:pending (not SCM:busy) (= 0 (getvar "BLOCKEDITOR")))
     (vl-catch-all-apply 'SCM:Sync nil)))
-(SCM:EnableAuto)
+(defun SCM:EnableIfInteractive (/ doc)
+  ;; Core Console has no ActiveDocument. Do not leave partially installed
+  ;; reactors behind when this file is loaded by a non-interactive worker.
+  (setq doc (vl-catch-all-apply 'SCM:Doc nil))
+  (if (and (not (vl-catch-all-error-p doc)) (= (type doc) 'VLA-OBJECT))
+    (SCM:EnableAuto)))
+(SCM:EnableIfInteractive)
 (princ "\n[SINCAL] Marcas: vinculacion automatica al confirmar XX. MARCA-SC / MARCA-DE / REASIGNAR-MARCA / ACTUALIZAR-MARCAS / REVISAR-MARCAS.")
 (princ)

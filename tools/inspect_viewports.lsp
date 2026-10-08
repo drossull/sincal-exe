@@ -1,0 +1,35 @@
+;;; Diagnostic only: write viewport DXF values, never modify or save a drawing.
+(vl-load-com)
+(defun SINCAL:VPValue (v)
+  (cond ((= (type v) 'REAL) (rtos v 2 16))
+        ((= (type v) 'LIST) (strcat "(" (apply 'strcat (mapcar '(lambda (x) (strcat (SINCAL:VPValue x) " ")) v)) ")"))
+        ((= (type v) 'ENAME) (cdr (assoc 5 (entget v))))
+        (T (vl-prin1-to-string v))))
+(defun c:SINCAL_VP_INSPECT (/ out ss i data handle layout code pair obj low high result filename)
+  (setq filename (if SINCAL:VPReport SINCAL:VPReport (getenv "SINCAL_VP_REPORT")))
+  (setq out (open (if SINCAL:VPReport SINCAL:VPReport (getenv "SINCAL_VP_REPORT")) "w"))
+  (if (not out) (exit))
+  (setq ss (ssget "_X" '((0 . "VIEWPORT"))) i 0)
+  (if ss
+    (repeat (sslength ss)
+      (setq data (entget (ssname ss i))
+            handle (cdr (assoc 5 data)) layout (cdr (assoc 410 data)))
+      (foreach code '(10 40 41 12 16 17 45 51 68 69 90 331 340)
+        (foreach pair data
+          (if (= (car pair) code)
+            (write-line (strcat handle "|" layout "|" (itoa code) "|"
+              (SINCAL:VPValue (cdr pair))) out))))
+      (setq i (1+ i))))
+  (close out)
+  (if (not SINCAL:VPSkipModel) (progn
+  (setq out (open (strcat filename ".model") "w"))
+  (setq ss (ssget "_X" '((410 . "Model"))) i 0)
+  (if ss (repeat (sslength ss)
+    (setq data (entget (ssname ss i)) handle (cdr (assoc 5 data)))
+    (foreach pair data
+      (if (member (car pair) '(0 2 10 11 12 13 14 15 16 17 18 38 39 40 41 42 43 44 45 46 47 48 49 50 51 210))
+        (write-line (strcat handle "|" (itoa (car pair)) "|" (SINCAL:VPValue (cdr pair))) out)))
+    (setq i (1+ i))))
+  (close out)))
+  (setq out (open (strcat filename ".done") "w")) (write-line "done" out) (close out)
+  (princ))

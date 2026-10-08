@@ -39,3 +39,6 @@ assets/fonts/OFL-Lekton.txt
 Thumbs.db
 desktop.ini
 shell_build/
+ErrorReports/
+tools/ViewportRecovery/bin/
+tools/ViewportRecovery/obj/

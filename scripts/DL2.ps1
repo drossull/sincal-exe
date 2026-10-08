@@ -1,10 +1,11 @@
 ﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "SINCAL_ENGINE.ps1")
+. (Join-Path $PSScriptRoot "SINCAL_SELECTION.ps1")
 Start-SincalScriptLog 'DL2'
 try {
 
-$dwgFiles = Get-ChildItem -Path .\ -Filter *.dwg
+$dwgFiles = @(Get-SincalDrawingSelection)
 if ($dwgFiles.Count -eq 0) {
     Write-Host "[ERROR] No hay archivos DWG en esta carpeta." -ForegroundColor Yellow
     exit

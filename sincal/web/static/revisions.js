@@ -1,7 +1,8 @@
+import {destination as pageDestination} from '/navigation.js';
 export async function renderRevisions(ctx){
   const {api,node,button,section,job,current,notify}=ctx;
   const intro=section('revisions','Nueva revisión de planos');
-  intro.append(node('p','Selecciona DWG locales con un único layout y una viñeta dinámica compatible. No se suben a Internet. La nueva revisión queda arriba; el historial baja una fila y mantiene su tamaño.'));
+  intro.append(node('p','Selecciona DWG incorporados en Proyecto, con un único layout y una viñeta dinámica compatible. No se suben a Internet. La nueva revisión queda arriba; el historial baja una fila y mantiene su tamaño.'));
   intro.append(node('p','Los Fields de la primera fila se conservan. La última fila deja de verse, pero queda en el respaldo completo SINCAL_Backups. No se renombra el archivo ni se modifica Fecha_Inf.'));
   const engineLabel=node('label','Motor AutoCAD'),engine=node('select');engine.setAttribute('aria-label','Motor de revisiones');engineLabel.append(engine);intro.append(engineLabel);
   const list=section('revision-files','Archivos'),editor=section('revision-input','Datos de la nueva revisión'),preview=section('revision-preview','Vista previa'),results=section('revision-results','Resultados');
@@ -9,8 +10,8 @@ export async function renderRevisions(ctx){
   let files=[],snapshot=null,selected=new Set(),values=Array(6).fill(''),busy=false,dirty=false;
   const lifecycle=new AbortController();
   const discard=()=>!dirty||confirm('Hay datos de una nueva revisión sin aplicar. ¿Descartarlos?');
-  document.querySelector('#sidebar').addEventListener('click',e=>{
-    const dest=e.target.closest('[data-page]');if(!dest||dest.dataset.page==='revisions')return;
+  document.addEventListener('click',e=>{
+    const dest=e.target.closest('[data-page]');if(!dest||pageDestination(dest.dataset.page)==='revisions')return;
     if(busy||!discard()){e.preventDefault();e.stopImmediatePropagation();if(busy)notify('Espera o cancela el procesamiento entre archivos.');}
   },{capture:true,signal:lifecycle.signal});
   window.addEventListener('beforeunload',e=>{if(busy||dirty){e.preventDefault();e.returnValue='';}},{signal:lifecycle.signal});

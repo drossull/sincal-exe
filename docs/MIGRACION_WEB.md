@@ -34,7 +34,7 @@ de prueba, no para publicar datos o instalar una release automáticamente.
   Las coordenadas PTL del proyecto no se usan como coordenadas geográficas.
 - Consulta importa JSON sin modificarlo y muestra información ordenada de lo
   general a lo particular. Conserva OT, revisión y nombre, exporta TXT y comparte
-  el mismo proyecto con Armaduras y Prospecciones.
+  el mismo proyecto con Armaduras, Perfiles geofísicos y Estratigrafía.
 - Armaduras mantiene entrada y salida independientes. Importa las dimensiones
   compatibles de zapata y esviaje del JSON; deja vacías las que no existen.
   Permite editar marca base, diámetro, separación, gancho, origen y estado activo.
@@ -47,9 +47,23 @@ de prueba, no para publicar datos o instalar una release automáticamente.
 - Travesaños conserva los cinco cuadrantes y sus despieces. Las dos plantillas
   LISP se extrajeron intactas de Tk a un módulo compartido. El despiece exige
   haber generado ese cuadrante con esos parámetros en el dibujo.
-- Prospecciones reutiliza lectura PDF/TXT y OCR local. Muestra tablas, valores
+- Perfiles geofísicos (antes Prospecciones) reutiliza lectura PDF/TXT y OCR local. Muestra tablas, valores
   oficiales, avisos, evidencia y confianza por celda; dibuja la vista del perfil.
   La inserción CAD requiere cotejar el OCR y no acepta perfiles con errores.
+- Estratigrafía lee las tablas resumen VISAN de perforación y SPT de PDF con texto
+  o TXT (validado con los cuatro sondajes de IMS Calera de Tango). No admite aún
+  escaneos ni otros esquemas de tablas. Conserva las cifras publicadas: recuperación
+  porcentual en azul, NSPT independiente y rechazo como R, sin convertirlo a 50.
+  Los intervalos provienen del registro del operador, no de límites estimados de
+  la figura general. Cada intervalo permite confirmar su hatch antes de insertar.
+  La vista previa y el dibujo comparten las profundidades; se pueden incluir las
+  tablas completas. La evidencia conserva páginas originales y avisos de diferencias
+  entre resumen y partes diarios, sin corregirlas. El reconocimiento se puede
+  guardar y abrir en JSON. La inserción exige cotejo, dibujo activo en metros y
+  Model; crea un grupo editable, sin guardar el DWG. Copia los patrones del bloque
+  PROSPECCIONES del maestro instalado y crea textos RomanD anotativos de 2,5 mm
+  de altura de papel, según la escala anotativa activa. Se probó en AutoCAD 2025;
+  la ejecución nativa en ZWCAD queda pendiente de verificación.
 - Sesiones guarda instantáneas independientes, busca por estructura/OT/revisión,
   muestra tarjetas paginadas y permite cargar, importar y exportar. La importación
   antigua conserva el documento original dentro de la instantánea, pero no activa

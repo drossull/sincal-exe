@@ -326,7 +326,7 @@ class ActualizadorCAD(ctk.CTk):
             ("proyecto", "structure", "Proyecto", "Proyecto"),
             ("consulta", "query", "Consulta", "Consulta"),
             ("estructural", "structure", "Generador de armadura", "Generador de armadura"),
-            ("prospecciones", "query", "Prospecciones", "Prospecciones"),
+            ("prospecciones", "query", "Perfiles geofísicos", "Perfiles geofísicos"),
             ("sesiones", "sessions", "Sesiones", "Sesiones"),
             ("diagnostico", "diagnostic", "Diagnóstico", "Diagnóstico"),
         )
@@ -500,7 +500,7 @@ class ActualizadorCAD(ctk.CTk):
             ("ubicacion", "Ubicación"),
             ("consulta", "Consulta"),
             ("estructural", "Generador de armadura"),
-            ("prospecciones", "Prospecciones"),
+            ("prospecciones", "Perfiles geofísicos"),
             ("sesiones", "Sesiones"),
             ("diagnostico", "Diagnóstico"),
         )

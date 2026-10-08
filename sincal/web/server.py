@@ -87,6 +87,9 @@ class Store:
         if isinstance(payload.get('prospecciones'), dict) and payload['prospecciones'].get('report'):
             from sincal.prospecciones import VsReport
             VsReport.from_dict(payload['prospecciones']['report'])
+        if isinstance(payload.get('stratigraphy'), dict) and payload['stratigraphy'].get('report'):
+            from sincal.stratigraphy import StratigraphyReport
+            StratigraphyReport.from_dict(payload['stratigraphy']['report'])
         if "rebar" in payload:
             if not isinstance(payload["rebar"], dict) or set(payload["rebar"]) - {"entrada", "salida"}:
                 raise ValueError("Estado de estribos no válido.")
@@ -224,8 +227,12 @@ class Handler(BaseHTTPRequestHandler):
                   "/app.js": (STATIC / "app.js", "text/javascript; charset=utf-8"),
                   "/rebar.js": (STATIC / "rebar.js", "text/javascript; charset=utf-8"),
                   "/tools.js": (STATIC / "tools.js", "text/javascript; charset=utf-8"),
+                  "/navigation.js": (STATIC / "navigation.js", "text/javascript; charset=utf-8"),
+                  "/project_files.js": (STATIC / "project_files.js", "text/javascript; charset=utf-8"),
+                  "/stratigraphy.js": (STATIC / "stratigraphy.js", "text/javascript; charset=utf-8"),
                   "/dwgprops.js": (STATIC / "dwgprops.js", "text/javascript; charset=utf-8"),
                   "/revisions.js": (STATIC / "revisions.js", "text/javascript; charset=utf-8"),
+                  "/revision_editor.js": (STATIC / "revision_editor.js", "text/javascript; charset=utf-8"),
                   "/app.css": (STATIC / "app.css", "text/css; charset=utf-8"),
                   "/logo.ico": (ROOT / "assets/icons/logo.ico", "image/x-icon")}
         for font in ("roboto-400.ttf", "roboto-700.ttf", "roboto-condensed-700.ttf", "roboto-flex-400.ttf", "roboto-mono-400.ttf"):
@@ -256,6 +263,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/api/prospect/preview':
                 from sincal.prospecciones import VsReport
                 return self.send(200, self.server.services.describe_report(VsReport.from_dict(payload)))
+            if self.path == '/api/stratigraphy/preview':
+                from sincal.stratigraphy import StratigraphyReport
+                report = StratigraphyReport.from_dict(payload.get('report'))
+                return self.send(200, self.server.services.describe_stratigraphy(report, payload.get('table') is True))
             if self.path == '/api/preferences':
                 return self.send(200, self.server.store.preferences(payload))
             if self.path == '/api/files/choose':

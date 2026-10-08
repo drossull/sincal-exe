@@ -29,9 +29,14 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
       else await route.fulfill({status:404,body:''});
     });
     await page.goto('http://sincal.test/#token=test');
+  await page.locator('[data-page="project"]').click();
+  await page.getByRole('button',{name:'Añadir Carpetas',exact:true}).click();
+  await page.locator('#archivos-proyecto table').waitFor();
     await page.locator('[data-page="dwgprops"]').click();
     await page.getByLabel('Motor DWGPROPS').selectOption('test-core');
     await page.getByRole('button',{name:'Elegir carpeta y leer DWG'}).click();
+  for(const check of await page.locator('dialog .asset-choice input').all())await check.check();
+  await page.getByRole('button',{name:'Usar selección',exact:true}).click();
     try{await page.getByLabel('Seleccionar A.dwg').waitFor({timeout:5000});}catch(error){console.log('Aviso',await page.locator('#notice').innerText(),errors);throw error;}
     await page.getByRole('button',{name:'Seleccionar visibles'}).click();
     assert.equal(await page.getByLabel('Valor de REV',{exact:true}).getAttribute('placeholder'),'Valores distintos o propiedad ausente');

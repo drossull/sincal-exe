@@ -2,6 +2,7 @@
 (setq layFound nil)
 (foreach x (dictsearch (namedobjdict) "ACAD_LAYOUT") (if (and (= (car x) 3) (= (strcase (cdr x)) "LAYOUT2")) (setq layFound T)))
 (if layFound (command "_.-LAYOUT" "_D" "Layout2"))
+(if (and (member "A1" (layoutlist)) (> (length (layoutlist)) 1)) (command "_.-LAYOUT" "_D" "A1"))
 
 (setq dict (dictsearch (namedobjdict) "ACAD_LAYOUT"))
 (setq minOrd 9999 firstLay nil)

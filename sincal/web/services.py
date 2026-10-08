@@ -45,6 +45,7 @@ class Services:
         self.detections = {}
         self.property_snapshots = {}
         self.revision_snapshots = {}
+        self.revision_editor_snapshots = {}
         self.cad_lock = threading.Lock()
         self.shell_selection = None
         self.lock = threading.RLock()
@@ -111,6 +112,8 @@ class Services:
             except ValueError as error:
                 raise RuntimeError('El proceso CAD no devolvió un resultado válido. Revisa CAD; no se reenvió la orden.') from error
             if not result.get('ok'):
+                if result.get('details'):
+                    job.update(result['details'])
                 raise RuntimeError(result.get('error', 'Error CAD'))
             job.update(result['result']['message'])
             return result['result']
@@ -119,7 +122,7 @@ class Services:
                 process.kill()
                 process.communicate()
 
-    def cad(self, job, expected, command, metres=False, candidate=None, scope='active'):
+    def cad(self, job, expected, command, metres=False, candidate=None, scope='active', completion=None, clipboard=False):
         if not isinstance(expected, dict) or expected.get('status') != 'ready' or not expected.get('instance'):
             raise ValueError('Comprueba y confirma el dibujo de destino antes de enviar.')
         if not self.cad_lock.acquire(blocking=False):
@@ -127,7 +130,7 @@ class Services:
         try:
             job.update('Preparando envío a los destinos confirmados. Si pide un punto, selecciónalo en CAD.')
             count = len(expected.get('documents', [])) if scope == 'all' else 1
-            return self.run_worker(job, dict(expected=expected, command=command, metres=metres, candidate=candidate, scope=scope),
+            return self.run_worker(job, dict(expected=expected, command=command, metres=metres, candidate=candidate, scope=scope, completion=completion, clipboard=clipboard),
                                    timeout=min(3600, max(195, count * 195)))
         finally:
             self.cad_lock.release()
@@ -144,13 +147,15 @@ class Services:
                     'diagnostics': self.diagnostics, 'rename': self.rename,
                     'convert': self.convert, 'location': self.location,
                     'location-render': self.location_render, 'prospect': self.prospect,
+                    'stratigraphy': self.stratigraphy, 'cad-stratigraphy': self.stratigraphy_insert,
                     'cad-command': self.command, 'cad-detect': self.detect,
                     'cad-rebar': self.rebar, 'cad-profile': self.profile,
                     'cad-prepare': self.prepare, 'cad-crossbeam': self.crossbeam,
                     'engines': self.engines, 'engine-select': self.engine_select,
                     'shell-batch': self.shell_batch,
                     'dwgprops-read': self.properties_read, 'dwgprops-write': self.properties_write,
-                    'revision-read': self.revisions_read, 'revision-write': self.revisions_write}
+                    'revision-read': self.revisions_read, 'revision-write': self.revisions_write,
+                    'revision-editor-read': self.revision_editor_read, 'revision-editor-write': self.revision_editor_write}
         if operation not in handlers:
             raise ValueError('Operación no permitida.')
         return self.jobs.submit(operation, lambda job: handlers[operation](job, payload))
@@ -163,10 +168,18 @@ class Services:
 
     def properties_read(self, job, payload):
         from sincal.cad.dwgprops import process_file, CadUnavailable, CadBatch
-        folder = self.files.get(payload.get('folder'), 'folder')
+        if payload.get('folder') and payload.get('files'):
+            raise ValueError('Selecciona archivos o una carpeta, no ambos.')
+        if payload.get('folder'):
+            folder = self.files.get(payload.get('folder'), 'folder')
+            paths = sorted((p for p in folder.iterdir() if p.suffix.lower() == '.dwg' and p.is_file() and not p.is_symlink()), key=lambda p: p.name.casefold())
+        else:
+            keys = payload.get('files')
+            if not isinstance(keys, list) or not 1 <= len(keys) <= 500 or not all(isinstance(k, str) for k in keys):
+                raise ValueError('Selecciona entre 1 y 500 archivos DWG.')
+            paths = list(dict.fromkeys(self.files.get(key, 'dwg') for key in keys))
         engine = payload.get('engine')
         options = {'engine': engine} if engine else {}
-        paths = sorted((p for p in folder.iterdir() if p.suffix.lower() == '.dwg' and p.is_file() and not p.is_symlink()), key=lambda p: p.name.casefold())
         if not 1 <= len(paths) <= 500:
             raise ValueError('Selecciona una carpeta con entre 1 y 500 DWG, sin subcarpetas.')
         if not self.cad_lock.acquire(blocking=False):
@@ -201,6 +214,14 @@ class Services:
     def revisions_read(self, job, payload):
         from .revisions import read
         return read(self, job, payload)
+
+    def revision_editor_read(self, job, payload):
+        from .revision_editor import read
+        return read(self, job, payload)
+
+    def revision_editor_write(self, job, payload):
+        from .revision_editor import write
+        return write(self, job, payload)
 
     def revisions_write(self, job, payload):
         from .revisions import write
@@ -389,15 +410,53 @@ class Services:
 
     def prospect(self, job, payload):
         from sincal.prospecciones import read_report
+        from sincal.prospecciones_ocr import ImportCancelled
         path = self.files.get(payload.get('file'), 'report')
         if path.stat().st_size > 100 * 1024 * 1024:
             raise ValueError('Informe demasiado grande (máximo 100 MB).')
         def progress(*args):
             job.update(' · '.join(map(str, args)))
-        report = read_report(str(path), ocr=True, exhaustive=payload.get('exhaustive') is True,
-                             progress=progress, cancel=job.cancelled.is_set)
+        try:
+            report = read_report(str(path), ocr=True, exhaustive=payload.get('exhaustive') is True,
+                                 progress=progress, cancel=job.cancelled)
+        except ImportCancelled as error:
+            raise Cancelled(str(error)) from error
         job.check()
         return self.describe_report(report)
+
+    def stratigraphy(self, job, payload):
+        from sincal.stratigraphy import read_report
+        from sincal.prospecciones_ocr import ImportCancelled
+        try:
+            report = read_report(self.files.get(payload.get('file'), 'report'),
+                                 progress=job.update, cancel=job.cancelled)
+        except ImportCancelled as error:
+            raise Cancelled(str(error)) from error
+        job.check()
+        return {'report': report.to_dict(), **self.describe_stratigraphy(report)}
+
+    @staticmethod
+    def describe_stratigraphy(report, include_table=False):
+        from sincal.cad.stratigraphy import stratigraphy_scene
+        from sincal.stratigraphy_hatches import HATCHES
+        from sincal.stratigraphy_patterns import PATTERNS
+        hatches = {key: dict(value, lines=PATTERNS[value['pattern']]) for key, value in HATCHES.items()}
+        return {'hatches': hatches, 'checks': [dict(key=h.key, errors=h.errors(), warnings=h.warnings,
+                scene=stratigraphy_scene(h, include_table) if not h.errors() else None) for h in report.boreholes]}
+
+    def stratigraphy_insert(self, job, payload):
+        from sincal.stratigraphy import StratigraphyReport
+        from sincal.cad.stratigraphy import build_stratigraphy_lisp
+        from sincal.runtime import ruta_recurso_instalado
+        report = StratigraphyReport.from_dict(payload.get('report'))
+        hole = next((h for h in report.boreholes if h.key == payload.get('key')), None)
+        if not hole or hole.errors() or not hole.reviewed:
+            raise ValueError('Coteja las tablas, profundidades, discrepancias y hatch antes de insertar.')
+        # This module is validated against the master's bundled version. A stale
+        # downloadable override must not shadow the newly installed master.
+        master = ruta_recurso_instalado('masters', 'FORMATOS ANOTATIVOS ACAD_2025.dwg')
+        path = self.lisp(job, build_stratigraphy_lisp(hole, master, payload.get('table') is True))
+        return self.cad(job, payload.get('expected'), f'(progn (load "{path}") (c:SINCAL-ESTRATIGRAFIA))\n', True, completion='stratigraphy-v1')
 
     @staticmethod
     def describe_report(report):
@@ -408,11 +467,22 @@ class Services:
     def command(self, job, payload):
         from sincal.cad.commands import normalizar_comando_cad_autonomo
         command = normalizar_comando_cad_autonomo(payload.get('command'))
-        if command.upper() == 'STO':
+        canonical = command.upper().lstrip('_.')
+        if canonical == 'STO':
             command = 'ST0'
+            canonical = 'ST0'
         if command.upper().lstrip('_.') not in (*COMMANDS, 'ST0') and payload.get('autonomous') is not True:
             raise ValueError('Confirma que el comando personalizado no requiere interacción.')
-        return self.cad(job, payload.get('expected'), command + '\n', scope='all' if payload.get('scope') == 'all' else 'active')
+        completion = None
+        if canonical in (*COMMANDS, 'ST0'):
+            from sincal.runtime import ruta_recurso_instalado
+            from sincal.cad.prospecciones import lisp_string
+            source = Path(ruta_recurso_instalado('lisps', canonical + '.lsp'))
+            if not source.is_file():
+                raise ValueError(f'Falta la rutina instalada de {canonical}. Repara la instalación de SINCAL.')
+            command = f'(progn (load {lisp_string(source.as_posix())}) (c:{canonical}))'
+            completion = 'live-v1'
+        return self.cad(job, payload.get('expected'), command + '\n', scope='all' if payload.get('scope') == 'all' else 'active', completion=completion, clipboard=canonical == 'P0')
 
     def crossbeam(self, job, payload):
         from sincal.cad.crossbeam import build_crossbeam_lisp, build_crossbeam_detail_lisp

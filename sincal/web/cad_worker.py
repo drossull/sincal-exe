@@ -3,6 +3,81 @@ import json
 from pathlib import Path
 import sys
 import time
+from .cad_readiness import active_document, read_when_ready, wait_for_document
+
+
+def ensure_cad_clipboard():
+    """Inspect format names only; never consume, replace or persist clipboard data."""
+    import win32clipboard
+    try:
+        win32clipboard.OpenClipboard()
+    except Exception as error:
+        raise ValueError('No se pudo consultar el portapapeles. Espera un momento y vuelve a intentar P0.') from error
+    try:
+        format_id = 0
+        while True:
+            format_id = win32clipboard.EnumClipboardFormats(format_id)
+            if not format_id:
+                break
+            if format_id < 0xc000:
+                continue
+            name = win32clipboard.GetClipboardFormatName(format_id).lower()
+            if name.startswith(('autocad.', 'zwcad.')):
+                return
+        raise ValueError('P0 requiere objetos copiados desde CAD con COPYCLIP/Ctrl+C. '
+                         'El portapapeles no contiene un dibujo CAD; no se envió la orden.')
+    finally:
+        win32clipboard.CloseClipboard()
+
+
+def command_with_completion(request):
+    """Keep Lisp continuations in the same form, never in getpoint's input queue."""
+    from sincal.cad.prospecciones import lisp_string
+    marker = lisp_string(str(request['marker']).replace('\\', '/'))
+    token = lisp_string(request['token'])
+    command = request['command'].strip()
+    if request.get('completion') == 'live-v1':
+        if not command.startswith('(') or not command.endswith(')'):
+            raise ValueError('El comando de catálogo requiere una expresión LISP.')
+        return (
+            '(progn (setq *SINCAL_LIVE_RESULT* nil) '
+            f"(setq SINCAL_LIVE_ERROR (vl-catch-all-apply '(lambda () {command}) nil)) "
+            f'(setq SINCAL_LIVE_OUT (open {marker} "w")) '
+            '(if SINCAL_LIVE_OUT (progn '
+            f'(write-line {token} SINCAL_LIVE_OUT) '
+            '(cond ((vl-catch-all-error-p SINCAL_LIVE_ERROR) '
+            '(write-line "error" SINCAL_LIVE_OUT) '
+            '(write-line (vl-catch-all-error-message SINCAL_LIVE_ERROR) SINCAL_LIVE_OUT)) '
+            '(*SINCAL_LIVE_RESULT* '
+            '(write-line (if (car *SINCAL_LIVE_RESULT*) "ok" "error") SINCAL_LIVE_OUT) '
+            '(write-line (cadr *SINCAL_LIVE_RESULT*) SINCAL_LIVE_OUT)) '
+            '(T (write-line "ok" SINCAL_LIVE_OUT) '
+            '(write-line "CAD devolvio el control; revisa el resultado en el dibujo." SINCAL_LIVE_OUT))) '
+            '(close SINCAL_LIVE_OUT))) (princ))\n')
+    if request.get('completion') == 'stratigraphy-v1':
+        if not command.startswith('(') or not command.endswith(')'):
+            raise ValueError('La confirmación de estratigrafía requiere una expresión LISP.')
+        return f'(progn (setq *SINCAL_ESTRAT_COMPLETION* (list {marker} {token})) {command})\n'
+    suffix = f'(progn (setq f (open {marker} "w")) (if f (progn (write-line {token} f) (close f))) (princ))'
+    if command.startswith('(') and command.endswith(')'):
+        return f'(progn {command} {suffix})\n'
+    return request['command'] + suffix + '\n'
+
+
+def read_completion(request):
+    marker = Path(request['marker'])
+    if not marker.exists():
+        return None
+    lines = marker.read_text(encoding='utf-8', errors='replace').splitlines()
+    if not lines or lines[0] != request['token']:
+        return None
+    if request.get('completion') in ('stratigraphy-v1', 'live-v1'):
+        if len(lines) < 3:
+            return None  # Writer may not have closed the marker yet.
+        if lines[1] != 'ok':
+            raise RuntimeError(lines[2] or 'CAD no completó la estratigrafía.')
+        return {'message': lines[2]}
+    return {'message': 'CAD devolvió el control. Revisa la línea de comandos y el resultado. SINCAL no añade un guardado; la orden elegida puede guardar por sí misma.'}
 
 
 def execute_all(request):
@@ -11,22 +86,24 @@ def execute_all(request):
     targets = expected.get('documents', [])
     if not targets or len(targets) > 100:
         raise ValueError('La selección debe contener entre 1 y 100 dibujos.')
-    if str(app.HWND) != expected['instance'] or str(app.ActiveDocument.FullName) != expected['active']['path'] or str(app.ActiveDocument.Name) != expected['active']['name']:
+    initial = active_document(app)
+    if read_when_ready(lambda: (str(app.HWND), str(initial.FullName), str(initial.Name))) != (expected['instance'], expected['active']['path'], expected['active']['name']):
         raise ValueError('Cambió la instancia o el dibujo activo antes de iniciar el recorrido.')
-    documents = app.Documents
-    opened = {(str(documents.Item(i).Name), str(documents.Item(i).FullName)) for i in range(documents.Count)}
+    documents = read_when_ready(lambda: app.Documents)
+    opened = read_when_ready(lambda: {(str(documents.Item(i).Name), str(documents.Item(i).FullName)) for i in range(documents.Count)})
     if opened != {(item['name'], item['path']) for item in targets}:
         raise ValueError('Cambió la lista de dibujos abiertos. Confirma nuevamente los destinos.')
     completed = []
     for index, target in enumerate(targets):
-        if int(app.ActiveDocument.GetVariable('CMDACTIVE')):
+        if read_when_ready(lambda: int(active_document(app).GetVariable('CMDACTIVE'))):
             raise ValueError('Hay un comando activo; se detuvo el recorrido sin enviar otra orden.')
-        documents = app.Documents
-        doc = next((documents.Item(i) for i in range(documents.Count)
-                    if str(documents.Item(i).Name) == target['name'] and str(documents.Item(i).FullName) == target['path']), None)
+        documents = read_when_ready(lambda: app.Documents)
+        doc = read_when_ready(lambda: next((documents.Item(i) for i in range(documents.Count)
+                    if str(documents.Item(i).Name) == target['name'] and str(documents.Item(i).FullName) == target['path']), None))
         if doc is None:
             raise ValueError('Se cerró o cambió uno de los dibujos pendientes.')
         doc.Activate()
+        wait_for_document(app, target)
         child = dict(request, expected={**expected, 'active':target}, scope='active',
                      marker=str(Path(request['marker']).with_name(f'done-{index}.txt')), token=request['token']+str(index))
         execute(child)
@@ -55,13 +132,14 @@ def active_application():
 
 
 def execute(request):
+    if request.get('clipboard'):
+        ensure_cad_clipboard()
     app = active_application()
-    doc = app.ActiveDocument
+    doc = active_document(app)
     expected = request['expected']
-    if (str(app.HWND) != expected['instance'] or str(doc.FullName) != expected['active']['path']
-            or str(doc.Name) != expected['active']['name']):
+    if read_when_ready(lambda: (str(app.HWND), str(doc.FullName), str(doc.Name))) != (expected['instance'], expected['active']['path'], expected['active']['name']):
         raise ValueError('Cambió el dibujo o la instancia activa. Comprueba la conexión otra vez.')
-    if int(doc.GetVariable('CMDACTIVE')):
+    if read_when_ready(lambda: int(doc.GetVariable('CMDACTIVE'))):
         raise ValueError('CAD está ocupado. Termina el comando actual primero.')
     if request.get('metres') and (int(doc.GetVariable('INSUNITS')) != 6 or int(doc.GetVariable('TILEMODE')) != 1):
         raise ValueError('Abre Model en un dibujo con INSUNITS = 6 (metros).')
@@ -74,18 +152,15 @@ def execute(request):
                 or any(abs(coords[i * 2 + j] - point[j]) > 1e-7 for i, point in enumerate(vertices) for j in (0, 1))
                 or any(abs(float(entity.GetBulge(i))) > 1e-7 for i in range(len(vertices)))):
             raise ValueError('El moldaje cambió. Detecta y confirma nuevamente.')
-    marker = Path(request['marker'])
-    token = request['token']
-    # This expression only comes from our Python generators, never browser input.
-    suffix = '(progn (setq f (open "' + str(marker).replace('\\', '/') + '" "w")) (if f (progn (write-line "' + token + '" f) (close f))) (princ))\n'
     try:
-        doc.SendCommand(request['command'] + suffix)
+        doc.SendCommand(command_with_completion(request))
     except Exception as error:
         raise RuntimeError('CAD puede haber recibido la orden. No se reenvió. Revisa el dibujo antes de repetir.') from error
     deadline = time.monotonic() + request.get('timeout', 180)
     while time.monotonic() < deadline:
-        if marker.exists() and marker.read_text(encoding='utf-8').strip() == token:
-            return {'message': 'CAD devolvió el control. Revisa la línea de comandos y el resultado. SINCAL no añade un guardado; la orden elegida puede guardar por sí misma.'}
+        result = read_completion(request)
+        if result is not None:
+            return result
         time.sleep(.25)
     raise TimeoutError('CAD no confirmó el fin. Puede estar esperando un punto/opción o haber fallado. No se reenviará ni se cerrará CAD.')
 
@@ -120,7 +195,8 @@ def main():
                   execute_all(request) if request.get('scope') == 'all' else execute(request))
         response = {'ok': True, 'result': result}
     except Exception as error:
-        response = {'ok': False, 'error': str(error)}
+        import traceback
+        response = {'ok': False, 'error': str(error), 'details': traceback.format_exc()}
     finally:
         pythoncom.CoUninitialize()
     Path(sys.argv[1]).with_name('result.json').write_text(json.dumps(response, ensure_ascii=True), encoding='utf-8')

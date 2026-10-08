@@ -1,3 +1,5 @@
+;; On a layout, frame the sheet, never the content of a floating viewport.
+(if (= 0 (getvar "TILEMODE")) (command "_.PSPACE"))
 _.ZOOM
 _E
 (setvar "DYNMODE" 3)

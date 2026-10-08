@@ -1,151 +1,49 @@
 (vl-load-com)
-
-(setq old_filedia (getvar "FILEDIA"))
-(setq old_cmddia (getvar "CMDDIA"))
-(setq old_backgroundplot (getvar "BACKGROUNDPLOT"))
-(setq old_expert (getvar "EXPERT"))
-
 (setvar "FILEDIA" 0)
 (setvar "CMDDIA" 0)
 (setvar "BACKGROUNDPLOT" 0)
-(setvar "EXPERT" 5)
-
-(defun *error* (msg)
-  (if statusFile (close statusFile))
-  (setvar "FILEDIA" old_filedia)
-  (setvar "CMDDIA" old_cmddia)
-  (setvar "BACKGROUNDPLOT" old_backgroundplot)
-  (setvar "EXPERT" old_expert)
-  (if msg (princ (strcat "\n[X] " msg)))
-  (princ)
-)
-
-(defun SINCAL:SanitizeFileName (s / chars)
-  ;; (chr 34) evita insertar una comilla literal que rompe el lector de SCR.
-  (setq chars (list "<" ">" ":" (chr 34) "/" "\\" "|" "?" "*"))
-  (foreach c chars
-    (setq s (vl-string-subst "_" c s))
-  )
-  (while (and (> (strlen s) 0) (= (substr s (strlen s) 1) " "))
-    (setq s (substr s 1 (1- (strlen s))))
-  )
-  (while (and (> (strlen s) 0) (= (substr s (strlen s) 1) "."))
-    (setq s (substr s 1 (1- (strlen s))))
-  )
-  (if (= s "") (setq s "Layout"))
-  s
-)
-
-;; 1. Obtener los layouts desde su diccionario. AcCoreConsole no siempre
-;; expone ActiveDocument ni permite convertir el NOD completo a VLA.
 (setq layoutData (dictsearch (namedobjdict) "ACAD_LAYOUT"))
-(setq layouts nil)
-(foreach item layoutData
-  (if (= (car item) 350)
-    (progn
-      (setq layoutObject (vl-catch-all-apply 'vlax-ename->vla-object (list (cdr item))))
-      (if (not (vl-catch-all-error-p layoutObject))
-        (setq layouts (cons layoutObject layouts))
-      )
-    )
-  )
-)
-
-;; 2. Deteccion del Software (AutoCAD vs ZWCAD)
-(setq rrp (vl-catch-all-apply 'getvar '("ROAMABLEROOTPREFIX")))
-(setq isZWCAD (if (vl-catch-all-error-p rrp) nil (vl-string-search "ZWCAD" (strcase rrp))))
-
-(if isZWCAD
-  (progn
-    (setq plotterName "ZWCAD PDF(High Quality Print).pc5")
-    (setq paperName "ISO_full_bleed_A1_(841.00_x_594.00_MM)") 
-  )
-  (progn
-    (setq plotterName "AutoCAD PDF (High Quality Print).pc3")
-    (setq paperName "ISO_full_bleed_A1_(841.00_x_594.00_MM)")
-  )
-)
-
-;; 3. Registrar Transparencia
-(if (and (not sincalKeepSetup) (not (tblsearch "APPID" "PLOTTRANSPARENCY")))
-  (regapp "PLOTTRANSPARENCY")
-)
-
-;; 4. Inyectar configuracion directa a los Layouts
-(if (not sincalKeepSetup) (foreach layout layouts
-  (setq layoutName (vla-get-Name layout))
-  
-  (if (/= (strcase layoutName) "MODEL")
-    (progn
-      ;; Impresora y Papel
-      (vl-catch-all-apply 'vlax-put-property (list layout 'ConfigName plotterName))
-      (vl-catch-all-apply 'vlax-put-property (list layout 'CanonicalMediaName paperName))
-      
-      ;; Plumilla SINCAL
-      (vl-catch-all-apply 'vlax-put-property (list layout 'StyleSheet "SINCAL_A1 (2025).ctb"))
-      
-      ;; Area y Escala (5 = acLayout, 16 = ac1_1)
-      (vl-catch-all-apply 'vla-put-PlotType (list layout 5))
-      (vl-catch-all-apply 'vla-put-UseStandardScale (list layout :vlax-true))
-      (vl-catch-all-apply 'vla-put-StandardScale (list layout 16))
-      
-      ;; Opciones de Trazado Regulares
-      (vl-catch-all-apply 'vla-put-PlotWithLineweights (list layout :vlax-true))  
-      (vl-catch-all-apply 'vla-put-PlotWithPlotStyles (list layout :vlax-true))   
-      (vl-catch-all-apply 'vla-put-PlotViewportsFirst (list layout :vlax-false))  
-      (vl-catch-all-apply 'vla-put-PlotRotation (list layout 0))
-
-      ;; Calidad Custom a 300 DPI
-      (vl-catch-all-apply 'vlax-put-property (list layout 'ShadePlotResolutionLevel 5))
-      (vl-catch-all-apply 'vlax-put-property (list layout 'ShadePlotCustomDPI 300))
-      
-      ;; Inyeccion de Transparencia XDATA
-      (vl-catch-all-apply
-        (function
-          (lambda ()
-            (setq xType (vlax-make-safearray 2 '(0 . 1)))
-            (vlax-safearray-fill xType '(1001 1071))
-            (setq xData (vlax-make-safearray 12 '(0 . 1)))
-            (vlax-safearray-fill xData (list (vlax-make-variant "PLOTTRANSPARENCY") (vlax-make-variant 1)))
-            
-            (vla-SetXdata layout xType xData)
-          )
-        )
-      )
-    )
-  )
-)
-
-)
-;; 5. Paginas temporales; el lanzador las une en <nombre DWG>.pdf.
 (setq lays nil)
-(setq statusPath (strcat sincalOutputDir "status.txt"))
-(setq statusFile (open statusPath "w"))
-(foreach x layoutData
-  (if (and (= (car x) 3) (/= (strcase (cdr x)) "MODEL")) 
-    (setq lays (cons (cdr x) lays))
-  )
-)
+(foreach item layoutData (if (and (= (car item) 3) (/= (strcase (cdr item)) "MODEL")) (setq lays (cons (cdr item) lays))))
 (setq lays (acad_strlsort lays))
+(setq rrp (getvar "ROAMABLEROOTPREFIX"))
+(setq isZWCAD (and rrp (vl-string-search "ZWCAD" (strcase rrp))))
+(setq plotterName (if isZWCAD "ZWCAD PDF(High Quality Print).pc5" "AutoCAD PDF (High Quality Print).pc3"))
+(defun SINCAL:SetupLayout (lay / data changed section pair)
+  ;; Save the setup without COM and without emitting a PDF.
+  (command "_.-PLOT" "_Y" lay plotterName "ISO full bleed A1 (841.00 x 594.00 MM)" "_M" "_L" "_N" "_Layout" "1:1" "0,0" "_Y" "SINCAL_A1 (2025).ctb" "_Y" "_N" "_N" "_N" "" "_Y" "_N")
+  (setq data (dictsearch (cdr (assoc -1 layoutData)) lay))
+  (if (or (/= (cdr (assoc 2 data)) plotterName) (/= (cdr (assoc 4 data)) "ISO_full_bleed_A1_(841.00_x_594.00_MM)"))
+    (progn (princ "\n[SINCAL ERROR] No se pudo configurar el layout A1.") (exit)))
+  ;; Only PlotSettings; never layout origins or viewports.
+  ;; Autodesk DXF: 77 = resolution level, 78 = custom DPI.
+  (setq changed nil section nil)
+  (foreach pair data
+    (if (= (car pair) 100) (setq section (cdr pair)))
+    (if (= section "AcDbPlotSettings")
+      (cond ((= (car pair) 77) (setq pair '(77 . 5)))
+            ((= (car pair) 78) (setq pair '(78 . 300)))))
+    (setq changed (cons pair changed)))
+  (if (not (entmod (reverse changed))) (progn (princ "\n[SINCAL ERROR] No se pudo guardar la calidad de ploteo.") (exit)))
+  (regapp "PLOTTRANSPARENCY")
+  (setq data (entget (cdr (assoc -1 data)) '("PLOTTRANSPARENCY")))
+  (setq data (vl-remove-if '(lambda (x) (= (car x) -3)) data))
+  (if (not (entmod (append data '((-3 ("PLOTTRANSPARENCY" (1071 . 1)))))))
+    (progn (princ "\n[SINCAL ERROR] No se pudo activar transparencia.") (exit)))
+)
+(setq statusFile (open (strcat sincalOutputDir "status.txt") "w"))
+(if (not sincalKeepSetup) (foreach lay lays (SINCAL:SetupLayout lay)))
 (setq idx 1)
 (foreach lay lays
-  (setq safeLay (SINCAL:SanitizeFileName lay))
   (setq outPath (strcat sincalOutputDir (itoa idx) ".pdf"))
-  (command "_.-PLOT" "_N" lay "" "" outPath "_N" "_Y")
+  ;; Override physical printers even with KeepSetup, without saving that change.
+  (command "_.-PLOT" "_N" lay "" plotterName outPath "_N" "_Y")
   (if (findfile outPath)
     (write-line (strcat "PDF|" outPath) statusFile)
-    (write-line (strcat "ERROR|" lay "|PDF no generado") statusFile)
-  )
-  (setq idx (1+ idx))
-)
+    (write-line (strcat "ERROR|" lay "|PDF no generado") statusFile))
+  (setq idx (1+ idx)))
 (write-line (strcat "OK|" (itoa (length lays))) statusFile)
 (close statusFile)
-
-;; 6. Limpieza y Guardado
-(setvar "FILEDIA" old_filedia)
-(setvar "CMDDIA" old_cmddia)
-(setvar "BACKGROUNDPLOT" old_backgroundplot)
-(setvar "EXPERT" old_expert)
 (if (not sincalKeepSetup) (vl-cmdf "_.QSAVE"))
 (princ)
 _.QUIT

@@ -1,9 +1,13 @@
 // Module renderers use the shared local API; no shell or filesystem paths are executed by JS.
 import {renderDwgProps} from '/dwgprops.js';
 import {renderRevisions} from '/revisions.js';
+import {renderRevisionEditor} from '/revision_editor.js';
+import {renderStratigraphy} from '/stratigraphy.js';
 export async function renderTools(page, ctx){
   if(page==='dwgprops')return renderDwgProps(ctx);
   if(page==='revisions')return renderRevisions(ctx);
+  if(page==='revision-editor')return renderRevisionEditor(ctx);
+  if(page==='stratigraphy')return renderStratigraphy(ctx);
   const {api,node,button,section,notify,job,artifact,project,changed,current}=ctx;
   function field(parent, title, type='text', value=''){
     const label=node('label',title),input=node('input');input.type=type;input.value=value;label.append(input);parent.append(label);return input;
@@ -66,8 +70,8 @@ export async function renderTools(page, ctx){
     const result=node('div'),actions=node('div',undefined,'actions sync-actions');let plan=null;
     const apply=button('Aplicar actualización',async()=>{if(!plan)throw Error('Comprueba los recursos antes de actualizar.');if(!confirm('¿Descargar y activar estos recursos CAD?'))return;const selected=plan;plan=null;const applied=await job('sync-apply',{plan:selected});notify(`${applied.updated.length} recursos actualizados.`);});apply.disabled=true;
     const check=button('Comprobar recursos',async()=>{plan=null;apply.disabled=true;const data=await job('sync-check');if(!current())return;plan=data.plan;apply.disabled=false;result.replaceChildren(node('p',`Revisión ${data.tree_sha.slice(0,12)} · ${data.changed.length} cambios · ${data.removed.length} retirados`));table(result,['Recurso','Bytes'],data.changed.map(r=>[r.path,r.size]));});
-    actions.append(check,apply,button('Preparar integración CAD',async()=>{if(confirm('Se modificarán las rutas de soporte/confianza CAD y PATH de tu usuario. ¿Continuar?')){const data=await job('cad-prepare',{confirm:true});notify(data.message);}}));
-    s.insertBefore(actions,s.querySelector('p'));s.append(node('p','La integración CAD registra recursos y rutas de confianza para el usuario actual. Reinicia CAD después.','muted'),result);
+    actions.append(check,apply);
+    s.insertBefore(actions,s.querySelector('p'));s.append(result);
     const history=section('historial','Historial de ejecuciones');history.append(button('Actualizar historial',async()=>{const entries=await api('jobs');log.replaceChildren();for(const item of entries){const row=node('p',`${item.operation} · ${item.state} · ${item.message}`);row.append(button('Registro',()=>artifact('jobs/'+item.id+'/log',`sincal-${item.id}.log`)));log.append(row);}}));const log=node('div');history.append(log);
   }else if(page==='live'){
     const s=section('comandos','Comandos en vivo');s.append(node('p','Por defecto se ejecuta en el dibujo activo. Puedes elegir todos los dibujos abiertos de esa instancia, revisando los destinos antes de enviar. Guarda una copia antes de limpiar un plano. Nunca se repite automáticamente una orden con resultado incierto.'));
@@ -92,19 +96,20 @@ export async function renderTools(page, ctx){
   }else if(page==='convert'){
     const s=section('conversion','Conversión DXF–DWG');s.append(node('p','Crea DWG nuevos con una instancia CAD independiente. No modifica los DXF ni sobrescribe DWG. Si cancelas mientras CAD trabaja, revisa la instancia de conversión; no se fuerza el cierre de CAD.'));
     let files=[],folder=null;const list=node('p','Sin archivos');s.append(button('Seleccionar DXF',async()=>{files=await choose('dxf');list.textContent=files.map(f=>f.name).join(', ')||'Sin archivos';}),list);
-    const destination=node('p','Sin carpeta de salida');s.append(button('Carpeta de salida',async()=>{folder=(await choose('folder'))[0]||null;destination.textContent=folder?.path||'Sin carpeta';}),destination);
+    const destination=node('p','Sin carpeta de salida');s.append(button('Carpeta de salida',async()=>{folder=(await (ctx.chooseOutput?ctx.chooseOutput():choose('folder')))[0]||null;destination.textContent=folder?.path||'Sin carpeta';}),destination);
     const engine=select(s,'Motor instalado',[['AutoCAD','AutoCAD'],['ZWCAD','ZWCAD']]);s.append(button('Convertir',async()=>{if(!files.length||!folder)throw Error('Selecciona DXF y carpeta de salida.');if(confirm(`¿Convertir ${files.length} DXF a ${folder.path}?`)){const result=await job('convert',{files:files.map(f=>f.id),folder:folder.id,engine:engine.value});notify(`${result.files.length} DWG generados.`);}},true));
   }else if(page==='location'){
     const s=section('ubicacion','Ubicación geográfica');s.append(node('p','Carga puntos geográficos desde KML/KMZ. Estas coordenadas no son las coordenadas PTL del JSON del puente.'));
     const data=section('puntos','Puntos y mapa');let points={};const point=select(data,'Punto',[]);const maps=await api('maps');if(!current())return;const map=select(data,'Mapa calibrado',maps.map(m=>[m,m]));const dx=field(data,'Ajuste horizontal · px','number',0),dy=field(data,'Ajuste vertical · px','number',0);
-    s.append(button('Cargar KML / KMZ',async()=>{const file=(await choose('location'))[0];if(!file)return;const result=await job('location',{file:file.id});points=result.points;point.replaceChildren();for(const name of Object.keys(points)){const option=node('option',name);option.value=name;point.append(option);}notify(`${Object.keys(points).length} puntos; ${result.ignored} ignorados.`);}));
+    s.append(button('Usar KML / KMZ de Proyecto',async()=>{const file=(await choose('location'))[0];if(!file)return;const result=await job('location',{file:file.id});points=result.points;point.replaceChildren();for(const name of Object.keys(points)){const option=node('option',name);option.value=name;point.append(option);}notify(`${Object.keys(points).length} puntos; ${result.ignored} ignorados.`);}));
     data.append(button('Generar croquis PNG',async()=>{if(!points[point.value])throw Error('Selecciona un punto.');const result=await job('location-render',{point:points[point.value],map:map.value,dx:Number(dx.value),dy:Number(dy.value)});await artifact('artifacts/'+result.artifact,result.name);},true));if(!maps.length)data.append(node('p','No se encontraron mapas calibrados válidos. Actualiza los recursos CAD.'));
   }else if(page==='diagnostics'){
+    const integration=section('integracion-cad','Integración AutoCAD / ZWCAD');integration.append(node('p','Registra recursos y rutas de confianza para el usuario actual. Reinicia CAD después.'));integration.append(button('Preparar integración CAD',async()=>{if(confirm('Se modificarán las rutas de soporte/confianza CAD y PATH de tu usuario. ¿Continuar?')){const data=await job('cad-prepare',{confirm:true});notify(data.message);}}));
     const s=section('diagnostico','Diagnóstico y soporte');s.append(node('p','El informe no adjunta DWG. Las rutas personales del diagnóstico se anonimizan. Revisa el contenido antes de compartirlo.'));const description=field(s,'Describe el problema');const output=section('resultado','Resultado');s.append(button('Generar diagnóstico',async()=>{const result=await job('diagnostics',{description:description.value});if(!current())return;output.replaceChildren(node('pre',result.summary));output.append(button('Guardar ZIP',()=>artifact('artifacts/'+result.artifact,result.name)));},true));
     section('registros','Registros por ejecución').append(node('p','Las tareas tienen un registro individual local. Se conservan hasta 100 registros durante 30 días; los archivos del usuario no participan de esa limpieza. Los registros están disponibles en Home → Historial.'));
     const engines=section('motores','Motor para scripts por carpeta'),choices=node('div');engines.append(button('Detectar motores instalados',async()=>{const result=await job('engines');choices.replaceChildren(node('p',result.selected?'Actual: '+result.selected.label:'Sin motor seleccionado'));for(const engine of result.engines){const row=node('p',engine.label);row.append(button('Usar este motor',async()=>{if(confirm('¿Usar '+engine.label+' para los scripts por carpeta?')){const value=await job('engine-select',{id:engine.id});notify('Motor guardado: '+value.label);}}));choices.append(row);}}),choices);
   }else if(page==='prospect'){
-    const s=section('informe','Prospecciones');if(!project){s.append(node('p','Carga un proyecto en Consulta primero.'));return;}
+    const s=section('informe','Perfiles geofísicos');if(!project){s.append(node('p','Carga un proyecto en Consulta primero.'));return;}
     s.append(node('p','Extracción local PDF/TXT, con OCR cuando sea necesario. Se conserva el valor oficial publicado; el cálculo es solo un control.'));
     const exhaustive=field(s,'OCR en todas las páginas (más lento)','checkbox');const output=section('arreglos','Arreglos, tabla y evidencia');
     if(project.prospecciones?.report){const checked=await api('prospect/preview',project.prospecciones.report);project.prospecciones.checks=checked.checks;if(!current())return;}
@@ -124,7 +129,7 @@ export async function renderTools(page, ctx){
         const include=field(part,'Incluir tabla en CAD','checkbox');include.checked=true;
         part.append(button('Insertar perfil en CAD',async()=>{const expected=await target();if(expected)await job('cad-profile',{report,key:profile.key,table:include.checked,expected});}));output.append(part);
       }}
-    s.append(node('p','Carga directamente el informe PDF (también se admite TXT). No necesitas cargar un JSON. El informe se conserva solo mientras la aplicación esté abierta.'));
-    s.append(button('Cargar informe PDF / TXT',async()=>{if(project.prospecciones?.report&&!confirm('¿Reemplazar el informe de prospecciones actual? El informe actual será descartado.'))return;const file=(await choose('report'))[0];if(!file)return;const result=await job('prospect',{file:file.id,exhaustive:exhaustive.checked});project.prospecciones=result;changed();if(current())draw();},true));draw();
+    s.append(node('p','Selecciona un informe PDF/TXT incorporado en Proyecto. No necesitas cargar un JSON. El informe se conserva solo mientras la aplicación esté abierta.'));
+    s.append(button('Usar informe de Proyecto',async()=>{if(project.prospecciones?.report&&!confirm('¿Reemplazar el informe de prospecciones actual? El informe actual será descartado.'))return;const file=(await choose('report'))[0];if(!file)return;const result=await job('prospect',{file:file.id,exhaustive:exhaustive.checked});project.prospecciones=result;changed();if(current())draw();},true));draw();
   }
 }

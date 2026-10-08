@@ -212,13 +212,33 @@ function Invoke-SincalZwcadScript {
     }
 }
 
+function New-SincalCoreScript {
+    param([string]$SourcePath, [switch]$SkipSave)
+    $source = Get-Content -LiteralPath $SourcePath -Raw -Encoding UTF8
+    $source = [regex]::Replace($source, '(?ims)\r?\n\s*_?\.?\s*(CLOSE|QUIT)\s*(?:\r?\n\s*_?[YN]\s*)?\z', '')
+    $saved = if ($SkipSave) { 'T' } else { '(= 0 (getvar "DBMOD"))' }
+    $completion = @"
+
+(if $saved (progn (setq SINCAL_DONE_FILE (open (getenv "SINCAL_COMPLETION_PATH") "w")) (if SINCAL_DONE_FILE (progn (write-line (getenv "SINCAL_COMPLETION_TOKEN") SINCAL_DONE_FILE) (close SINCAL_DONE_FILE)))) (princ "[SINCAL ERROR] El dibujo sigue modificado; guardado no confirmado."))
+_.QUIT
+_Y
+
+"@
+    $temporary = Join-Path ([IO.Path]::GetTempPath()) ('SINCAL-CORE-' + [guid]::NewGuid().ToString('N') + '.scr')
+    [IO.File]::WriteAllText($temporary, $source.TrimEnd() + $completion, (New-Object Text.UTF8Encoding($false)))
+    return $temporary
+}
+
 function Invoke-SincalCadScriptCore {
     [CmdletBinding()]
     param($Engine, [string]$DrawingPath, [string]$ScriptPath, [int]$TimeoutSeconds = 900, [switch]$SkipSave)
     if ($Engine.Mode -eq "ZWCAD_COM") {
         return Invoke-SincalZwcadScript -Engine $Engine -DrawingPath $DrawingPath -ScriptPath $ScriptPath -TimeoutSeconds $TimeoutSeconds -SkipSave:$SkipSave
     }
-    $arguments = "/i `"$DrawingPath`" /s `"$ScriptPath`""
+    $token = [guid]::NewGuid().ToString('N')
+    $marker = Join-Path ([IO.Path]::GetTempPath()) ("SINCAL-CORE-$token.done")
+    $temporaryScript = New-SincalCoreScript -SourcePath $ScriptPath -SkipSave:$SkipSave
+    $arguments = "/i `"$DrawingPath`" /s `"$temporaryScript`" /l en-US"
     # Windows PowerShell 5.1 puede devolver ExitCode=$null con Start-Process
     # -NoNewWindow -PassThru, aun si CAD termina bien. Process.Start conserva
     # el handle real y permite distinguir un error de CAD de una salida normal.
@@ -230,22 +250,30 @@ function Invoke-SincalCadScriptCore {
     $process.StartInfo.CreateNoWindow = $true
     $process.StartInfo.RedirectStandardOutput = $true
     $process.StartInfo.RedirectStandardError = $true
+    $process.StartInfo.EnvironmentVariables['SINCAL_COMPLETION_PATH'] = $marker
+    $process.StartInfo.EnvironmentVariables['SINCAL_COMPLETION_TOKEN'] = $token
     # Core Console writes redirected text as UTF-16LE, without a BOM.
     if ([IO.Path]::GetFileName($Engine.Path) -ieq 'accoreconsole.exe') {
         $process.StartInfo.StandardOutputEncoding = [Text.Encoding]::Unicode
         $process.StartInfo.StandardErrorEncoding = [Text.Encoding]::Unicode
     }
+    $workerStarted = $false
     try {
         if (-not $process.Start()) { throw "No se pudo iniciar AutoCAD Core Console." }
+        $workerStarted = $true
         $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
         $stdout = $process.StandardOutput.ReadLineAsync()
         $stderr = $process.StandardError.ReadLineAsync()
+        $confirmedAt = $null
+        $controlledExit = $false
+        $cadError = $false
         while ($stdout -or $stderr -or -not $process.HasExited) {
             if ($stdout -and $stdout.IsCompleted) {
                 $line = $stdout.GetAwaiter().GetResult()
                 $stdout = $null
                 if ($null -ne $line) {
                     Write-SincalCadOutput $line 'CAD'
+                    if ($line -match '(?i)^\s*(;\s*error:|Unknown command|\[SINCAL ERROR\])') { $cadError = $true }
                     $stdout = $process.StandardOutput.ReadLineAsync()
                 }
             }
@@ -254,8 +282,26 @@ function Invoke-SincalCadScriptCore {
                 $stderr = $null
                 if ($null -ne $line) {
                     Write-SincalCadOutput $line 'CAD STDERR'
+                    if ($line -match '(?i)^\s*(;\s*error:|Unknown command|\[SINCAL ERROR\])') { $cadError = $true }
                     $stderr = $process.StandardError.ReadLineAsync()
                 }
+            }
+            if (-not $confirmedAt -and (Test-Path -LiteralPath $marker)) {
+                try {
+                    $actual = [IO.File]::ReadAllText($marker).Trim()
+                    if ($actual -eq $token) { $confirmedAt = [DateTime]::UtcNow }
+                } catch [System.IO.IOException] {
+                    # The CAD worker may still be closing the marker file.
+                    # Retry on the next poll; never accept a partial marker.
+                }
+            }
+            if ($confirmedAt -and -not $process.HasExited -and ([DateTime]::UtcNow - $confirmedAt).TotalSeconds -ge 3) {
+                # The marker is written only after the script returned and its
+                # save was confirmed. Stop this worker, never another CAD PID.
+                Stop-Process -Id $process.Id -Force -ErrorAction Stop
+                $process.WaitForExit()
+                $controlledExit = $true
+                Write-Host '[CAD] Fin confirmado; cierre controlado del trabajador que no respondio a QUIT.'
             }
             if ([DateTime]::UtcNow -ge $deadline) { break }
             if (($stdout -and -not $stdout.IsCompleted) -or ($stderr -and -not $stderr.IsCompleted)) {
@@ -269,11 +315,19 @@ function Invoke-SincalCadScriptCore {
             throw "AutoCAD Core Console no terminó antes de $TimeoutSeconds segundos. Se cerró sólo el proceso de este DWG; revisa si el SCR dejó una pregunta sin responder."
         }
         Write-Host "Codigo de salida CAD: $($process.ExitCode)"
-        if ($process.ExitCode -ne 0) { throw "AutoCAD Core Console terminó con código $($process.ExitCode)." }
+        if ($process.ExitCode -ne 0 -and -not $controlledExit) { throw "AutoCAD Core Console terminó con código $($process.ExitCode)." }
+        if (-not (Test-Path -LiteralPath $marker) -or [IO.File]::ReadAllText($marker).Trim() -ne $token) { throw 'CAD salio sin confirmar el termino y guardado del script.' }
+        if ($cadError) { throw 'CAD notifico errores durante el script; revisa el registro. No se certifica el resultado.' }
         return 0
     }
     finally {
+        if ($workerStarted -and -not $process.HasExited) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            $process.WaitForExit()
+        }
         $process.Dispose()
+        Remove-Item -LiteralPath $temporaryScript -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
     }
 }
 

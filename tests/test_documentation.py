@@ -97,10 +97,11 @@ class MassProcessingConfigurationTests(unittest.TestCase):
         purge = (ROOT / "scripts" / "PURGEALL.ps1").read_text(encoding="utf-8")
         self.assertNotIn('Start-Process -FilePath "cmd.exe"', purge)
 
-    def test_publish_script_represents_double_quote_without_breaking_scr_input(self):
+    def test_publish_script_uses_numeric_temporary_page_names(self):
         publish = (ROOT / "scripts" / "PUBLISH-A1.scr").read_text(encoding="utf-8")
-        self.assertIn("(chr 34)", publish)
+        self.assertIn('(strcat sincalOutputDir (itoa idx) ".pdf")', publish)
         self.assertNotIn("'\"'", publish)
+        self.assertIn('(command "_.-PLOT" "_N" lay "" plotterName outPath', publish)
 
     def test_page_setup_scripts_do_not_require_active_document_com(self):
         for name in ("PUBLISH-A1.scr", "PAGESETUP-A1.scr"):

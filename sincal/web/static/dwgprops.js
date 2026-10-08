@@ -1,4 +1,5 @@
 // A field is written only when explicitly included in the pending patch.
+import {destination as pageDestination} from '/navigation.js';
 export async function renderDwgProps(ctx){
   const {api,node,button,section,job,current,notify}=ctx;
   const intro=section('dwgprops','Propiedades personalizadas DWGPROPS');
@@ -14,9 +15,9 @@ export async function renderDwgProps(ctx){
   function dirty(){return Object.keys(pending).length>0;}
   function discard(){return !dirty()||confirm('Hay cambios sin aplicar. ¿Descartarlos para cambiar la selección?');}
   const lifecycle=new AbortController();
-  document.querySelector('#sidebar').addEventListener('click',event=>{
+  document.addEventListener('click',event=>{
     const destination=event.target.closest('[data-page]');
-    if(!destination||destination.dataset.page==='dwgprops')return;
+    if(!destination||pageDestination(destination.dataset.page)==='dwgprops')return;
     if(busy||!discard()){event.preventDefault();event.stopImmediatePropagation();if(busy)notify('Espera a que termine la operación o cancélala entre archivos.');}
   },{capture:true,signal:lifecycle.signal});
   window.addEventListener('beforeunload',event=>{if(dirty()||busy){event.preventDefault();event.returnValue='';}},{signal:lifecycle.signal});
@@ -72,18 +73,20 @@ export async function renderDwgProps(ctx){
     for(const element of [name,value,add,save])element.disabled=busy;
     editor.append(name,value,add,added,save);
   }
-  intro.append(button('Elegir carpeta y leer DWG',async()=>{
+  async function load(kind){
     if(busy||!discard())return;if(!engine.value)throw Error('No hay un motor AutoCAD compatible con el conector instalado.');
-    const [folder]=await api('files/choose',{kind:'folder'});if(!folder||!current())return;
-    busy=true;pending={};files=[];selected.clear();snapshot=null;folderText.textContent=folder.path;drawList();drawEditor();
+    const picked=await api('files/choose',{kind});if(!picked.length||!current())return;
+    const folder=kind==='folder'?picked[0]:null;
+    busy=true;pending={};files=[];selected.clear();snapshot=null;folderText.textContent=folder?.path||picked.map(f=>f.name).join(', ');drawList();drawEditor();
     try{
-      const listing=await api('files/list',{folder:folder.id});if(!current())return;
+      const listing=folder?await api('files/list',{folder:folder.id}):picked;if(!current())return;
       files=listing.filter(f=>f.name.toLowerCase().endsWith('.dwg')).map(f=>({name:f.name,error:'Pendiente de lectura…'}));drawList();
-      const data=await job('dwgprops-read',{folder:folder.id,engine:engine.value});if(!current())return;
+      const data=await job('dwgprops-read',{...(folder?{folder:folder.id}:{files:picked.map(f=>f.id)}),engine:engine.value});if(!current())return;
       files=data.files;snapshot=data.snapshot;if(data.cancelled)notify('Lectura cancelada; se muestran los archivos ya leídos.');
     }
     finally{busy=false;if(current()){drawList();drawEditor();}}
-  }),folderText);
+  }
+  intro.append(button('Elegir carpeta y leer DWG',()=>load('folder')),button('Seleccionar DWG del proyecto',()=>load('dwg')),folderText);
   list.insertBefore(button('Seleccionar visibles',()=>{if(busy||!discard())return;pending={};selected=new Set(files.filter(f=>f.id&&f.name.toLocaleLowerCase().includes(search.value.toLocaleLowerCase())).map(f=>f.id));drawList();drawEditor();}),counter);
   list.insertBefore(button('Quitar selección',()=>{if(busy||!discard())return;pending={};selected.clear();drawList();drawEditor();}),counter);
   search.addEventListener('input',drawList);drawList();drawEditor();

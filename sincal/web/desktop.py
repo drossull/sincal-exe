@@ -27,7 +27,7 @@ def run(webview, directory, selection=None):
                 return window.create_file_dialog(webview.FileDialog.FOLDER)
             extensions = server.services.files.TYPES[kind]
             pattern = ';'.join('*' + ext for ext in extensions)
-            return window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=kind in ('dxf','dwg'),
+            return window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=kind in ('dxf','dwg','report','location','reference'),
                                              file_types=(f'Archivos compatibles ({pattern})',))
         server.services.files.picker = picker
         # No Python JS bridge: only the token-protected, typed local HTTP API.

@@ -1,5 +1,6 @@
 """Read-only CAD probe, isolated so a blocked COM call cannot freeze the UI."""
 import json
+from .cad_readiness import read_when_ready
 
 
 def inspect_application(app):
@@ -24,6 +25,7 @@ def probe():
     import pythoncom
     import win32com.client
     pythoncom.CoInitialize()
+    app = wmi = processes = None
     try:
         # Do not create a CAD instance. Multiple running instances are ambiguous.
         wmi = win32com.client.GetObject('winmgmts:')
@@ -39,11 +41,13 @@ def probe():
                 app = win32com.client.GetActiveObject(prog_id)
             except Exception:
                 continue
-            result = inspect_application(app)
-            result['instance'] = str(app.HWND)
+            result = read_when_ready(lambda: inspect_application(app))
+            result['instance'] = read_when_ready(lambda: str(app.HWND))
             return result
         return {"status": "unavailable", "message": "CAD está abierto pero COM no está accesible. Comprueba que ambas aplicaciones usen el mismo usuario y nivel de permisos."}
     finally:
+        # Release COM wrappers while this thread's apartment still exists.
+        app = wmi = processes = None
         pythoncom.CoUninitialize()
 
 
