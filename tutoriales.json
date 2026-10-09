@@ -270,6 +270,13 @@
       "notas": ["El signo depende del orden geométrico de los extremos."],
       "tags": ["linea", "porcentaje"]
     },
+    "CSV-SC": {
+      "titulo": "Importar tabla de armaduras CSV o XSR",
+      "descripcion": "Crea una tabla nativa editable con el estilo TENSIONES del master de formatos anotativos desde un informe Tekla CSV separado por punto y coma o XSR de ancho fijo.",
+      "pasos": ["Actualiza los recursos CAD y abre un dibujo nuevo o vuelve a abrir el actual. Escribe CSV-SC y selecciona el archivo .csv o .xsr. El selector muestra todos los archivos; solo admite esas dos extensiones.", "Acepta ANSI para el informe original de Tekla; elige UTF8 si el archivo se guardó con esa codificación.", "Confirma el factor de tamaño: en un layout se propone 1; en Modelo, el factor de la escala anotativa actual. Esto cambia el tamaño gráfico, no los datos.", "Indica la esquina superior izquierda de la tabla. Revisa el resultado y guarda el DWG cuando estés conforme."],
+      "notas": ["Conserva las 16 columnas y su orden: Cant., diámetro, Long., Pos, Calidad, Forma, Peso/ud, Peso, A max, A min, B max, B min, C max, C min, TOTAL MIN y TOTAL MAX. Forma se muestra como código; no se convierten unidades ni se agrupan marcas.", "Omite el encabezado del informe, separadores y encabezados repetidos. Conserva el total declarado y coloca kg junto al peso, no en A max. Rechaza filas incompletas o desconocidas para evitar una importación parcial.", "Importa TENSIONES si falta; si ya existe, respeta su definición en el dibujo. Conserva sus fuentes, colores, alineaciones y bordes, ajustando los anchos al contenido. La tabla se orienta según los ejes WCS.", "Permite celdas vacías y comillas CSV; no admite campos entre comillas que ocupen varias líneas. Los valores se insertan como texto literal para conservar códigos y precisión del origen.", "Funciona en el espacio actual, no modifica el CSV y no guarda automáticamente el DWG. UNDO permite deshacer la inserción. No hay vínculo automático con el archivo: una nueva importación crea otra tabla."],
+      "tags": ["csv", "xsr", "tekla", "armaduras", "tabla", "tensiones"]
+    },
     "PNDMAKE": {
       "titulo": "Aplicar pendiente porcentual",
       "descripcion": "Rota un objeto completo hasta dar a su eje de referencia una pendiente absoluta respecto de la horizontal del UCS actual.",
