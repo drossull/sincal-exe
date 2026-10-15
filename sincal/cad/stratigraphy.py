@@ -20,13 +20,27 @@ def mtext_label(value):
     return re.sub(r'\bNSPT\b', lambda _: r'N{\H0.7x;\S^SPT;}', safe).replace('\n', '\\P')
 
 
-def stratigraphy_scene(hole, include_table=False):
+def annotation_scale_value(value):
+    """CAD paper/model ratio; names such as 1:200 (m) are not parsed."""
+    if isinstance(value, bool):
+        raise ValueError('La escala anotativa no es válida.')
+    try:
+        value = float(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError('No se pudo leer la escala anotativa de CAD.') from error
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError('La escala anotativa debe ser positiva y finita.')
+    return value
+
+
+def stratigraphy_scene(hole, include_table=False, annotation_scale=10.0):
+    annotation_scale = annotation_scale_value(annotation_scale)
     errors = hole.errors()
     if errors:
         raise ValueError('\n'.join(errors))
     if hole.drawing_format == 'octay-intervals-v1':
         from sincal.cad.stratigraphy_octay import interval_scene
-        return interval_scene(hole, include_table)
+        return interval_scene(hole, include_table, annotation_scale)
     if hole.drawing_format != 'visan-summary-v1':
         raise ValueError('Formato de dibujo no reconocido. Vuelve a cargar el informe.')
     scene = []
@@ -38,7 +52,8 @@ def stratigraphy_scene(hole, include_table=False):
     soil_depth = max(number(r.end) for r in strata)
     drilled_depth = max(soil_depth, max((number(r.end) for r in recovery_rows), default=0))
     depth = max(drilled_depth, max((number(b.end) for b in hole.vs_bands), default=0))
-    height = max(150, depth*8)
+    # Paper coordinates: dividing by the CAD ratio restores real model metres.
+    height = depth*annotation_scale
     top, gx, width = 27, 38, 80
     def y(d):
         return top+number(d)*height/depth
@@ -57,7 +72,7 @@ def stratigraphy_scene(hole, include_table=False):
             text(x, 23, i*10)
             text(x, 10, f'{nmax*i/10:g}')
     line([gx, 13], [gx+width, 13])
-    step = max(1, math.ceil(depth/40))
+    step = max(1, math.ceil(depth/40), math.ceil(4/annotation_scale))
     for d in sorted(set([*range(0, math.ceil(depth), step), depth])):
         yy = y(d)
         if d <= drilled_depth:
@@ -103,9 +118,11 @@ def stratigraphy_scene(hole, include_table=False):
             mid = (a+b)/2
             line([134,a], [182,a], 1)
             line([134,b], [182,b], 1)
-            line([158,a], [158,mid-2], 1)
-            line([158,mid+2], [158,b], 1)
-            for tip, inside in [(a,a+1.6),(b,b-1.6)]:
+            gap = min(2, (b-a)/4)
+            arrow = min(1.6, (b-a)/4)
+            line([158,a], [158,mid-gap], 1)
+            line([158,mid+gap], [158,b], 1)
+            for tip, inside in [(a,a+arrow),(b,b-arrow)]:
                 scene.append(dict(kind='triangle', points=[[158,tip],[157.4,inside],[158.6,inside]], color=1))
             text(158, mid, band.label)
         for bound in dict.fromkeys(v for b in hole.vs_bands for v in (b.start,b.end)):
@@ -122,7 +139,7 @@ def stratigraphy_scene(hole, include_table=False):
         text(legend_x, legend_y+19, f'Napa: {hole.water_depth} m (pág. {hole.water_page})', 'left')
     if hole.horizons and soil_depth < drilled_depth:
         text(legend_x, legend_y+27, f'Horizontes hasta {soil_depth:g} m; sin extrapolar.', 'left')
-    bottom = top+height
+    bottom = max(top+height, legend_y+27)
     text(0, bottom+7, 'Fuente: tablas del informe, págs. '+', '.join(map(str, sorted({r.page for r in [*strata,*recovery_rows,*hole.tests]}))), 'left')
     text(0, bottom+13, 'Cifras oficiales sin recalcular. Revisar avisos de discrepancia.', 'left')
     if hole.vs_bands:
@@ -130,7 +147,8 @@ def stratigraphy_scene(hole, include_table=False):
         text(0, bottom+19, f'Vs: figura pág. {band.page}; límites: {band.profile}, tabla pág. {band.table_page}.', 'left')
     if include_table:
         bottom = append_tables(hole, bottom+28, line, text)
-    return dict(items=scene, viewbox=[-5, -6, 310 if hole.vs_bands else 235, bottom+30], depth=depth, nspt_max=nmax, format=hole.drawing_format)
+    return dict(items=scene, viewbox=[-5, -6, 310 if hole.vs_bands else 235, bottom+30], depth=depth, nspt_max=nmax, format=hole.drawing_format,
+                annotation_scale=annotation_scale, depth_scale=annotation_scale, depth_origin=top)
 
 
 def append_tables(hole, cursor, line, text):
@@ -170,10 +188,11 @@ def append_tables(hole, cursor, line, text):
     return cursor
 
 
-def build_stratigraphy_lisp(hole, master_path, include_table=False):
+def build_stratigraphy_lisp(hole, master_path, include_table=False, annotation_scale=10.0, scale_name=None):
     if not hole.ready_to_insert:
         raise ValueError('Coteja las tablas, profundidades, discrepancias y hatch antes de insertar.')
-    scene = stratigraphy_scene(hole, include_table)
+    annotation_scale = annotation_scale_value(annotation_scale)
+    scene = stratigraphy_scene(hole, include_table, annotation_scale)
     commands = []
     def pt(point):
         return f'(se:p {point[0]:.10g} {point[1]:.10g})'
@@ -200,7 +219,12 @@ def build_stratigraphy_lisp(hole, master_path, include_table=False):
                         dict.fromkeys(item['material'] for item in scene['items'] if item['kind'] == 'hatch'))
     master = lisp_string(str(master_path).replace('\\','/'))
     return '''(vl-load-com)
-(defun c:SINCAL-ESTRATIGRAFIA (/ *error* se:p se:add se:text se:hatch se:dbx se:source se:finish doc ms db base k created grp arr oldecho undo obj result)
+(defun c:SINCAL-ESTRATIGRAFIA (/ *error* se:p se:add se:text se:hatch se:dbx se:source se:finish se:scale doc ms db base k created grp arr oldecho undo obj result scale-name scale-value)
+  (defun se:scale ()
+    (if (or (not (equal (getvar "CANNOSCALEVALUE") EXPECTED_SCALE 1e-10))
+            (and EXPECTED_NAME (/= (getvar "CANNOSCALE") EXPECTED_NAME)))
+      (progn (setq result "Cambio la escala anotativa. Actualiza la vista previa y vuelve a insertar.") (exit)))
+    (setq scale-name (getvar "CANNOSCALE") scale-value (getvar "CANNOSCALEVALUE") k (/ 1.0 scale-value)))
   (defun se:finish (status message / completion f)
     (if (and (boundp '*SINCAL_ESTRAT_COMPLETION*) *SINCAL_ESTRAT_COMPLETION*)
       (progn
@@ -233,7 +257,7 @@ def build_stratigraphy_lisp(hole, master_path, include_table=False):
     (if (vl-catch-all-error-p result)
       (progn (regapp "AcadAnnotative")
         (if (not (entmod (append (entget ent) '((-3 ("AcadAnnotative" (1000 . "AnnotativeData") (1002 . "{") (1070 . 1) (1070 . 1) (1002 . "}"))))))) (exit))))
-    (vl-cmdf "_.-OBJECTSCALE" ent "" "_Add" (getvar "CANNOSCALE") "")
+    (vl-cmdf "_.-OBJECTSCALE" ent "" "_Add" scale-name "")
     (vla-put-Height txt (* k 2.5)) (vla-put-InsertionPoint txt pt))
   (defun se:source (pattern / source item)
     (vlax-for item (vla-Item (vla-get-Blocks db) "PROSPECCIONES")
@@ -281,6 +305,7 @@ def build_stratigraphy_lisp(hole, master_path, include_table=False):
     ((= (getvar "CVPORT") 1) (se:finish "error" "Activa Model antes de insertar."))
     ((/= 0 (logand 5 (cdr (assoc 70 (tblsearch "LAYER" "0")))) ) (se:finish "error" "Desbloquea y descongela la capa 0."))
     (T
+      (se:scale)
       (setq db (se:dbx))
       (if (not db) (progn (setq result "No se pudo abrir el master instalado en lectura") (exit)))
       (vla-Open db MASTER_PATH)
@@ -290,7 +315,8 @@ def build_stratigraphy_lisp(hole, master_path, include_table=False):
       (setq base (getpoint "\\nPunto superior izquierdo de la estratigrafia: "))
       (if base
         (progn
-          (setq base (trans base 1 0) k (/ 1.0 (getvar "CANNOSCALEVALUE")) oldecho (getvar "CMDECHO"))
+          (se:scale)
+          (setq base (trans base 1 0) oldecho (getvar "CMDECHO"))
           (vla-StartUndoMark doc) (setq undo T) (setvar "CMDECHO" 0)
           (if (not (tblsearch "STYLE" "RomanD"))
             (progn (setq arr (vlax-make-safearray vlax-vbObject '(0 . 0)))
@@ -302,7 +328,7 @@ def build_stratigraphy_lisp(hole, master_path, include_table=False):
           (vlax-safearray-fill arr (reverse created)) (vla-AppendItems grp arr)
           (vla-EndUndoMark doc) (setq undo nil) (setvar "CMDECHO" oldecho)
           (vlax-release-object db) (setq db nil) (vla-Regen doc 1)
-          (se:finish "ok" "Estratigrafia vectorial insertada. Valores oficiales conservados."))
+          (se:finish "ok" (strcat "Estratigrafia insertada a profundidad real. Escala anotativa: " scale-name ". Texto: 2.5 mm en papel. Valores oficiales conservados.")))
         (progn (vlax-release-object db) (setq db nil) (se:finish "cancelled" "Insercion cancelada sin elegir un punto.")))))
   (princ))
-'''.replace('MASTER_PATH', master).replace('REQUIRED_PATTERNS', patterns).replace('SCENE_BODY', body).replace('GROUP_NAME', 'SINCAL_ESTRAT_'+uuid.uuid4().hex)
+'''.replace('EXPECTED_SCALE', format(annotation_scale, '.17g')).replace('EXPECTED_NAME', lisp_string(scale_name) if scale_name else 'nil').replace('MASTER_PATH', master).replace('REQUIRED_PATTERNS', patterns).replace('SCENE_BODY', body).replace('GROUP_NAME', 'SINCAL_ESTRAT_'+uuid.uuid4().hex)

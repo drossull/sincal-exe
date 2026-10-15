@@ -271,7 +271,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/api/stratigraphy/preview':
                 from sincal.stratigraphy import StratigraphyReport
                 report = StratigraphyReport.from_dict(payload.get('report'))
-                return self.send(200, self.server.services.describe_stratigraphy(report, payload.get('table') is True))
+                return self.send(200, self.server.services.describe_stratigraphy(report, payload.get('table') is True, payload.get('annotation_scale', 10.0)))
             if self.path == '/api/preferences':
                 return self.send(200, self.server.store.preferences(payload))
             if self.path == '/api/files/choose':

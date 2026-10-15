@@ -12,13 +12,14 @@ def test_probe_reads_active_drawing_without_commands():
     doc = Mock()
     doc.Name='prueba.dwg'
     doc.FullName='C:/prueba.dwg'
-    doc.GetVariable.side_effect=lambda name: {'CMDACTIVE':0,'INSUNITS':6,'CTAB':'Model'}[name]
+    doc.GetVariable.side_effect=lambda name: {'CMDACTIVE':0,'INSUNITS':6,'CTAB':'Model','CANNOSCALE':'1:200 (m)','CANNOSCALEVALUE':5}[name]
     app.ActiveDocument=doc
     app.Documents.Count=1
     app.Documents.Item.return_value=doc
     result=inspect_application(app)
     assert result['status']=='ready'
     assert result['active']['insunits']==6
+    assert result['active']['annotation_scale']=={'name':'1:200 (m)','value':5}
     doc.SendCommand.assert_not_called()
     doc.Save.assert_not_called()
     app.Quit.assert_not_called()

@@ -62,7 +62,7 @@ def test_scene_shared_depth_and_no_fake_zero_recovery_at_refusal():
     scene = stratigraphy_scene(h)
     hatches = [i for i in scene['items'] if i['kind']=='hatch']
     assert hatches[0]['bounds'][1] == 27
-    assert hatches[0]['bounds'][3] == pytest.approx(27+150*1.05/3.5)
+    assert hatches[0]['bounds'][3] == pytest.approx(27+10*1.05)
     assert all(i['bounds'][3]>i['bounds'][1] for i in hatches)
     recovery = [i for i in scene['items'] if i['kind']=='line' and i['color']==5]
     assert recovery[0]['points'][0][0] == pytest.approx(38+80*.57)
@@ -107,9 +107,9 @@ def test_vs_bands_extend_only_vs_axis_not_soil_or_recovery():
     assert sum(i['kind']=='triangle' for i in scene['items']) == 4
     assert any(i.get('text')=='VS = 608 - 676 m/s' for i in scene['items'])
     recovery = [i for i in scene['items'] if i['kind']=='line' and i['color']==5]
-    assert max(p[1] for item in recovery for p in item['points']) == 27+3.5*8
+    assert max(p[1] for item in recovery for p in item['points']) == 27+3.5*10
     soil = [i for i in scene['items'] if i['kind']=='hatch' and i['bounds'][0]==12]
-    assert max(i['bounds'][3] for i in soil) == 27+3.5*8
+    assert max(i['bounds'][3] for i in soil) == 27+3.5*10
     r = report()
     r.boreholes[0] = h
     assert StratigraphyReport.from_dict(r.to_dict()).to_dict() == r.to_dict()
@@ -151,9 +151,14 @@ def test_insertion_uses_installed_master_and_native_completion(tmp_path, monkeyp
     monkeypatch.setattr('sincal.runtime.ruta_recurso_instalado',lambda *parts:str(tmp_path/'installed-master.dwg'))
     job=Mock(id='fixture')
     try:
-        service.stratigraphy_insert(job,{'report':r.to_dict(),'key':r.boreholes[0].key})
+        with pytest.raises(ValueError, match='escala anotativa'):
+            service.stratigraphy_insert(job,{'report':r.to_dict(),'key':r.boreholes[0].key})
+        service.cad.assert_not_called()
+        service.stratigraphy_insert(job,{'report':r.to_dict(),'key':r.boreholes[0].key,
+                                        'expected':{'active':{'annotation_scale':{'name':'1:200 (m)','value':5}}}})
         source=(service.runtime/'fixture/operation.lsp').read_text(encoding='utf-8')
         assert 'installed-master.dwg' in source
+        assert '(getvar "CANNOSCALEVALUE") 5 ' in source
         assert source.index('(foreach obj (list') < source.index('(setq base (getpoint')
         assert '(se:finish "error"' in source and '(se:finish "ok"' in source
         assert service.cad.call_args.kwargs['completion']=='stratigraphy-v1'

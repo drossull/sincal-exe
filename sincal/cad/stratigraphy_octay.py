@@ -7,7 +7,7 @@ from sincal.stratigraphy_hatches import HATCHES
 from sincal.cad.stratigraphy import append_tables, drawing_label
 
 
-def interval_scene(hole, include_table=False):
+def interval_scene(hole, include_table=False, annotation_scale=10.0):
     items = []
     def line(a, b, color=8, **metadata):
         items.append(dict(kind='line', points=[a,b], color=color, **metadata))
@@ -20,8 +20,8 @@ def interval_scene(hole, include_table=False):
     depth = max(drilled_depth, *(number(b.end) for b in hole.vs_bands)) if hole.vs_bands else drilled_depth
     labels = [textwrap.wrap(f'{r.method}: '+(r.description or f'Sin descripción recuperada (pág. {r.page})'), 68)
               for r in hole.samples]
-    # Fixed paper text height; expand the depth scale when dense/long labels need it.
-    height = max(210, depth*12, sum(max(4,len(lines)*4)+1.5 for lines in labels)+12)
+    # Never stretch the borehole to fit descriptions: move labels with leaders.
+    height = depth*annotation_scale
     top, gx, width, rx, rw = 27, 38, 80, 280, 50
     def y(value):
         return top+number(value)*height/depth
@@ -39,7 +39,7 @@ def interval_scene(hole, include_table=False):
             if start==gx or i%2==0:
                 text(xx,23,f'{maximum*i/10:g}')
                 line([xx,top-2],[xx,top],1)
-    step=max(1,math.ceil(depth/40))
+    step=max(1,math.ceil(depth/40),math.ceil(4/annotation_scale))
     for d in sorted(set([*range(0,math.ceil(depth),step),depth])):
         yy=y(d)
         if d<=drilled_depth:
@@ -91,8 +91,9 @@ def interval_scene(hole, include_table=False):
         for band in hole.vs_bands:
             a,b=y(band.start),y(band.end);mid=(a+b)/2
             line([343,a],[391,a],1);line([343,b],[391,b],1)
-            line([367,a],[367,mid-2],1);line([367,mid+2],[367,b],1)
-            for tip,inside in [(a,a+1.6),(b,b-1.6)]:
+            gap=min(2,(b-a)/4);arrow=min(1.6,(b-a)/4)
+            line([367,a],[367,mid-gap],1);line([367,mid+gap],[367,b],1)
+            for tip,inside in [(a,a+arrow),(b,b-arrow)]:
                 items.append(dict(kind='triangle',points=[[367,tip],[366.4,inside],[367.6,inside]],color=1))
             text(367,mid,band.label)
 
@@ -113,5 +114,5 @@ def interval_scene(hole, include_table=False):
     bottom+=12
     if include_table: bottom=append_tables(hole,bottom+10,line,text)
     return dict(items=items,viewbox=[-5,-6,410 if hole.vs_bands else 345,bottom+15],depth=depth,
-                nspt_max=nmax,format=hole.drawing_format,depth_scale=height/depth,depth_origin=top,
+                nspt_max=nmax,format=hole.drawing_format,depth_scale=annotation_scale,depth_origin=top,annotation_scale=annotation_scale,
                 accessible_label='Puerto Octay: NSPT por intervalo, rechazo, descripciones, estratos y recuperación separada')

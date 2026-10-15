@@ -7,6 +7,14 @@ export async function renderStratigraphy(ctx){
   input.append(node('p','Formatos: tablas resumen VISAN e informes individuales tipo Puerto Octay. Puedes mantener hasta 10 informes en la sesión. No se estiman cifras desde curvas; los escaneos sin texto todavía no son compatibles.','muted'));
   const output=section('estratigrafia-revision','Sondajes, vista previa y evidencia');
   let selected=project.stratigraphy?.report?.boreholes?.[0]?.key, includeTable=false, revision=0;
+  let annotationScale={name:'1:100 (m) · referencia de vista previa',value:10};
+  function cadScale(expected){
+    if(expected.status!=='ready')throw Error(expected.message);
+    if(expected.active?.insunits!==6)throw Error('La estratigrafía requiere un dibujo en metros (INSUNITS=6).');
+    const scale=expected.active?.annotation_scale;
+    if(!scale?.name||!Number.isFinite(scale.value)||scale.value<=0)throw Error('No se pudo leer la escala anotativa de CAD.');
+    return scale;
+  }
   function table(parent,headers,rows){
     const wrap=node('div',undefined,'table-wrap'),t=node('table'),head=node('tr'),body=node('tbody');
     headers.forEach(h=>head.append(node('th',h)));const th=node('thead');th.append(head);t.append(th);
@@ -15,9 +23,9 @@ export async function renderStratigraphy(ctx){
   async function refresh(){
     const ticket=++revision,state=project.stratigraphy;
     if(!state?.report)return;
-    const result=await api('stratigraphy/preview',{report:state.report,table:includeTable});
+    const result=await api('stratigraphy/preview',{report:state.report,table:includeTable,annotation_scale:annotationScale.value});
     if(ticket!==revision||project.stratigraphy!==state||!current())return;
-    Object.assign(state,result);draw();
+    Object.assign(state,result);draw();return true;
   }
   function draw(){
     output.replaceChildren(node('h2','Sondajes, vista previa y evidencia'));
@@ -44,6 +52,10 @@ export async function renderStratigraphy(ctx){
     for(const error of checks?.errors||[])output.append(node('p',error,'badge'));
     const toggle=node('label','Incluir tablas de valores debajo del gráfico'),inc=node('input');inc.type='checkbox';inc.checked=includeTable;toggle.prepend(inc);output.append(toggle);
     inc.addEventListener('change',async()=>{includeTable=inc.checked;try{await refresh();}catch(e){notify(e.message);}});
+    output.append(node('p',`Escala de vista previa: ${annotationScale.name}. Profundidades reales en metros; textos de 2,5 mm en papel.`,'badge'));
+    output.append(button('Tomar escala anotativa de CAD',async()=>{
+      annotationScale=cadScale(await api('cad/status'));await refresh();
+    }));
     if(checks?.scene){output.append(renderScene(checks.scene, state.hatches));output.append(node('p','Hatch de la simbología PROSPECCIONES del maestro. CAD consulta el DWG instalado; si actualizas sus patrones, la vista previa puede variar. Textos CAD: RomanD anotativo, altura de papel 2,5. Los bolones y bloques descritos se superponen al suelo principal, sin inferir porcentajes.','muted'));}
     const drilling=node('details');drilling.append(node('summary','Intervalos de perforación y asignación de hatch (revisar)'));output.append(drilling);
     if(hole.horizons?.length){
@@ -76,8 +88,10 @@ export async function renderStratigraphy(ctx){
     const review=node('label','He cotejado el formato identificado, las cifras, profundidades, avisos de discrepancia y hatch con el informe original.'),check=node('input');check.type='checkbox';check.checked=hole.reviewed&&(format?.id==='visan-summary-v1'||hole.reviewed_format===format?.id);review.prepend(check);output.append(review);
     const insert=button('Insertar este sondaje en AutoCAD / ZWCAD',async()=>{
       if(!check.checked||checks?.errors?.length)throw Error('Revisa el formato y el sondaje antes de insertar.');
-      const expected=await api('cad/status');if(expected.status!=='ready')throw Error(expected.message);
-      if(!confirm(`¿Insertar ${hole.name} exclusivamente en ${expected.active.name}?\nFormato: ${format?.label}\nSe crearán entidades vectoriales agrupadas, sin guardar ni modificar otros dibujos. Selecciona el punto de inserción en CAD.`))return;
+      const expected=await api('cad/status');annotationScale=cadScale(expected);
+      if(!await refresh())return;
+      if(!current()||project.stratigraphy!==state||selected!==hole.key||!hole.reviewed)return;
+      if(!confirm(`¿Insertar ${hole.name} exclusivamente en ${expected.active.name}?\nFormato: ${format?.label}\nEscala anotativa: ${annotationScale.name}. Profundidades reales (1 m = 1 unidad); texto de 2,5 mm en papel.\nSe actualizó la vista previa con esta escala. Se crearán entidades vectoriales agrupadas, sin guardar ni modificar otros dibujos. Selecciona el punto de inserción en CAD.`))return;
       const result=await job('cad-stratigraphy',{report,key:hole.key,table:includeTable,expected});notify(result.message);
     },true);
     const setEnabled=()=>{insert.disabled=!check.checked||!format?.id||!checks?.scene||Boolean(checks?.errors?.length);};

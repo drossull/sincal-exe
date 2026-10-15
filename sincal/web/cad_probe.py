@@ -13,10 +13,18 @@ def inspect_application(app):
         return {"status": "no_document", "message": "CAD está abierto sin dibujos.", "documents": []}
     active = app.ActiveDocument
     busy = int(active.GetVariable("CMDACTIVE")) != 0
+    # Optional for unrelated tools; stratigraphy requires a valid ratio to insert.
+    try:
+        from sincal.cad.stratigraphy import annotation_scale_value
+        annotation = {'name': str(active.GetVariable('CANNOSCALE')),
+                      'value': annotation_scale_value(active.GetVariable('CANNOSCALEVALUE'))}
+    except Exception:
+        annotation = None
     return {"status": "busy" if busy else "ready", "product": str(app.Name),
             "version": str(app.Version), "documents": opened,
             "active": {"name": str(active.Name), "path": str(active.FullName),
                        "insunits": int(active.GetVariable("INSUNITS")),
+                       "annotation_scale": annotation,
                        "layout": str(active.GetVariable("CTAB"))},
             "message": "CAD tiene un comando activo." if busy else "Conexión disponible. No se modificó ningún dibujo."}
 
