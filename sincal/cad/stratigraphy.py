@@ -24,6 +24,11 @@ def stratigraphy_scene(hole, include_table=False):
     errors = hole.errors()
     if errors:
         raise ValueError('\n'.join(errors))
+    if hole.drawing_format == 'octay-intervals-v1':
+        from sincal.cad.stratigraphy_octay import interval_scene
+        return interval_scene(hole, include_table)
+    if hole.drawing_format != 'visan-summary-v1':
+        raise ValueError('Formato de dibujo no reconocido. Vuelve a cargar el informe.')
     scene = []
     def line(a, b, color=8):
         scene.append(dict(kind='line', points=[a, b], color=color))
@@ -124,45 +129,49 @@ def stratigraphy_scene(hole, include_table=False):
         band = hole.vs_bands[0]
         text(0, bottom+19, f'Vs: figura pág. {band.page}; límites: {band.profile}, tabla pág. {band.table_page}.', 'left')
     if include_table:
-        import textwrap
-        cursor = bottom+28
-        columns = [0, 15, 31, 48, 65, 82, 215]
-        def table_row(values, row_height=6):
-            nonlocal cursor
-            line([0,cursor],[215,cursor])
-            for i, value in enumerate(values):
-                text(columns[i]+1, cursor+row_height/2, value, 'left')
-            for x in columns:
-                line([x,cursor],[x,cursor+row_height])
-            cursor += row_height
-            line([0,cursor],[215,cursor])
-        if hole.horizons:
-            columns = [0, 15, 31, 48, 65, 215]
-            table_row(['N.º','Desde m','Hasta m','Espesor m','Horizonte / página'])
-            for row in hole.horizons:
-                lines = textwrap.wrap(row.description+f' (p. {row.page})', 75)
-                table_row([row.index,row.start,row.end,row.thickness,'\n'.join(lines)], max(6,4*len(lines)+2))
-            cursor += 10
-            columns = [0, 15, 31, 48, 80, 105, 130, 215]
-            table_row(['Muestra','Desde m','Hasta m','Método','Rec. cm','Rec. %','Página'])
-            for row in hole.samples:
-                table_row([row.index,row.start,row.end,row.method,row.recovered,row.recovery,row.page])
-        else:
-            table_row(['Desde m','Hasta m','Perf. m','Rec. m','Rec. %','Descripción / página'])
-            for row in hole.intervals:
-                lines = textwrap.wrap(row.description+f' (p. {row.page})', 75)
-                table_row([row.start,row.end,row.drilled,row.recovered,row.recovery,'\n'.join(lines)], max(6,4*len(lines)+2))
+        bottom = append_tables(hole, bottom+28, line, text)
+    return dict(items=scene, viewbox=[-5, -6, 310 if hole.vs_bands else 235, bottom+30], depth=depth, nspt_max=nmax, format=hole.drawing_format)
+
+
+def append_tables(hole, cursor, line, text):
+    """The same documentary tables are available in every drawing format."""
+    import textwrap
+    columns = [0, 15, 31, 48, 65, 82, 215]
+    def table_row(values, row_height=6):
+        nonlocal cursor
+        line([0,cursor],[215,cursor])
+        for i, value in enumerate(values):
+            text(columns[i]+1, cursor+row_height/2, value, 'left')
+        for x in columns:
+            line([x,cursor],[x,cursor+row_height])
+        cursor += row_height
+        line([0,cursor],[215,cursor])
+    if hole.horizons:
+        columns = [0, 15, 31, 48, 65, 215]
+        table_row(['N.º','Desde m','Hasta m','Espesor m','Horizonte / página'])
+        for row in hole.horizons:
+            lines = textwrap.wrap(row.description+f' (p. {row.page})', 75)
+            table_row([row.index,row.start,row.end,row.thickness,'\n'.join(lines)], max(6,4*len(lines)+2))
         cursor += 10
-        columns = [0, 15, 31, 48, 65, 82, 99, 117, 139, 155, 215]
-        table_row(['N.º','Desde m','Hasta m','Hinc. m','Rec. cm' if hole.samples else 'Rec. m','N1','N2','N3','NSPT','Página'])
-        for row in hole.tests:
-            table_row([row.index,row.start,row.end,row.driven,row.recovered,row.n1,row.n2,row.n3,row.nspt,row.page])
-        bottom = cursor
-    return dict(items=scene, viewbox=[-5, -6, 310 if hole.vs_bands else 235, bottom+30], depth=depth, nspt_max=nmax)
+        columns = [0, 15, 31, 48, 80, 105, 130, 215]
+        table_row(['Muestra','Desde m','Hasta m','Método','Rec. cm','Rec. %','Página'])
+        for row in hole.samples:
+            table_row([row.index,row.start,row.end,row.method,row.recovered,row.recovery,row.page])
+    else:
+        table_row(['Desde m','Hasta m','Perf. m','Rec. m','Rec. %','Descripción / página'])
+        for row in hole.intervals:
+            lines = textwrap.wrap(row.description+f' (p. {row.page})', 75)
+            table_row([row.start,row.end,row.drilled,row.recovered,row.recovery,'\n'.join(lines)], max(6,4*len(lines)+2))
+    cursor += 10
+    columns = [0, 15, 31, 48, 65, 82, 99, 117, 139, 155, 215]
+    table_row(['N.º','Desde m','Hasta m','Hinc. m','Rec. cm' if hole.samples else 'Rec. m','N1','N2','N3','NSPT','Página'])
+    for row in hole.tests:
+        table_row([row.index,row.start,row.end,row.driven,row.recovered,row.n1,row.n2,row.n3,row.nspt,row.page])
+    return cursor
 
 
 def build_stratigraphy_lisp(hole, master_path, include_table=False):
-    if not hole.reviewed:
+    if not hole.ready_to_insert:
         raise ValueError('Coteja las tablas, profundidades, discrepancias y hatch antes de insertar.')
     scene = stratigraphy_scene(hole, include_table)
     commands = []

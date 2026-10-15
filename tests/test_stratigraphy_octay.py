@@ -57,15 +57,16 @@ def test_independent_horizons_sampling_units_and_refusal():
 def test_scene_keeps_depths_separate_and_no_false_cementation():
     hole = parse_individual_report(PAGES).boreholes[0]
     scene = stratigraphy_scene(hole, True)
-    assert scene['depth'] == 2.25 and scene['nspt_max'] == 90
+    assert scene['depth'] == 2.25 and scene['nspt_max'] == 100
     layers = [r for r in scene['items'] if r['kind']=='hatch' and r['bounds'][0]==12]
     assert len(layers) == 3  # two horizons, plus explicitly described bolones
     assert all(r['material'] != 'cementacion' for r in layers)
-    assert max(r['bounds'][3] for r in layers) == pytest.approx(27+2/2.25*150)
-    recovery = [r for r in scene['items'] if r['kind']=='line' and r['color']==5]
-    assert max(p[1] for r in recovery for p in r['points']) == 177
+    assert max(r['bounds'][3] for r in layers) == pytest.approx(27+2*scene['depth_scale'])
+    recovery = [r for r in scene['items'] if r.get('series')=='recovery']
+    assert max(p[1] for r in recovery for p in r['points']) == 27+scene['depth_scale']*2.25
     assert any(r.get('text')=='REC. cm' or r.get('text')=='REC. CM' for r in scene['items'])
     hole.reviewed = True
+    hole.reviewed_format = hole.drawing_format
     lisp = build_stratigraphy_lisp(hole, 'master.dwg', True)
     assert 'RomanD' in lisp and '(* k 2.5)' in lisp and 'QSAVE' not in lisp
 
@@ -135,4 +136,10 @@ def test_real_individual_pdf(name,horizons,samples,tests,depth,max_nf,water):
     assert stratigraphy_scene(hole)['depth'] == depth
     assert len(report.pages) == (9 if name=='S7' else 8)
     assert all(p['image_png'] for p in report.pages.values())
+    assert all(s.description for s in hole.samples)
+    assert hole.samples[0].description.startswith('Arenas' if name=='S7' else 'Gravas')
+    if name=='S7':
+        assert hole.samples[-2].description == 'Rechazo'
+        assert [t.nspt for t in hole.tests] == ['7','10','15','25','30','16','17','19','15',*(['R']*5),'87','88','77','87','90','92','85','R','R']
+        assert [(t.start,t.end) for t in hole.tests[-2:]] == [('32,50','32,50'),('34,00','34,00')]
     assert StratigraphyReport.from_dict(report.to_dict()).to_dict() == report.to_dict()

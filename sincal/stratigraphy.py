@@ -18,6 +18,13 @@ NUM = r'\d+(?:[.,]\d+)?'
 DRILL = re.compile(rf'^\s*({NUM})\s+({NUM})\s+({NUM})\s+({NUM})\s+({NUM})\s+(.+)$')
 SPT = re.compile(rf'^\s*(\d+)\s+({NUM})\s+({NUM})\s+({NUM})\s+({NUM})\s+(.+)$')
 MATERIALS = (*HATCHES, 'sin_asignar')
+DRAWING_FORMATS = {
+    'visan-summary-v1': {'label': 'VISAN · resumen de perforación',
+                         'description': 'Estratos por intervalo, recuperación porcentual y NSPT puntual.'},
+    'octay-intervals-v1': {'label': 'Puerto Octay · ensayos por intervalo',
+                          'description': 'NSPT azul por intervalo, descripciones de muestras y recuperación en un panel separado. Sin correcciones calculadas.'},
+}
+SAMPLE_DESCRIPTION_WARNING = 'Hay muestras sin descripción recuperada. Vuelve a cargar el PDF original si abriste un reconocimiento antiguo; no se inventan descripciones.'
 
 
 def material(description):
@@ -113,6 +120,7 @@ class Sample:
     recovered: str  # Published centimetres, not silently converted to metres.
     recovery: str
     page: int
+    description: str = ''
 
 
 @dataclass
@@ -130,6 +138,21 @@ class Borehole:
     samples: list[Sample] = field(default_factory=list)
     water_depth: str = ''
     water_page: int = 0
+    reviewed_format: str = ''
+
+    @property
+    def drawing_format(self):
+        # Recognized data structure, never the filename or a client-supplied label.
+        if self.horizons and self.samples and not self.intervals:
+            return 'octay-intervals-v1'
+        if self.intervals and not (self.horizons or self.samples):
+            return 'visan-summary-v1'
+        return ''
+
+    @property
+    def ready_to_insert(self):
+        return self.reviewed and (self.drawing_format == 'visan-summary-v1' or
+                                  self.reviewed_format == self.drawing_format != '')
 
     @property
     def strata(self):
@@ -220,7 +243,9 @@ class Borehole:
 
     def audit(self):
         """Diagnostics only: keep published numbers, including discrepancies."""
-        warnings = list(self.warnings)
+        warnings = [w for w in self.warnings if w != SAMPLE_DESCRIPTION_WARNING]
+        if self.samples and any(not row.description.strip() for row in self.samples):
+            warnings.append(SAMPLE_DESCRIPTION_WARNING)
         for row in self.horizons:
             if abs(number(row.end)-number(row.start)-number(row.thickness)) > .011:
                 warnings.append(f'Horizonte {row.index}, pág. {row.page}: espesor publicado y cotas no coinciden. No se corrigió.')
@@ -302,6 +327,9 @@ class StratigraphyReport:
                     setattr(hole, key, [cls_(**row) for row in rows])
                 hole.water_depth = item.get('water_depth', '')
                 hole.water_page = item.get('water_page', 0)
+                hole.reviewed_format = item.get('reviewed_format', '')
+                if not isinstance(hole.reviewed_format, str) or len(hole.reviewed_format) > 100:
+                    raise ValueError('Revisión de formato no válida.')
                 if not isinstance(hole.water_depth, str) or len(hole.water_depth) > 40 or type(hole.water_page) is not int:
                     raise ValueError('Napa no válida.')
                 for band in hole.vs_bands:
@@ -446,6 +474,9 @@ def read_report(path, *, progress=None, cancel=None):
     check()
     if path.suffix.lower() == '.pdf':
         import pypdfium2 as pdfium
+        if any(h.drawing_format == 'octay-intervals-v1' for h in report.boreholes):
+            from sincal.stratigraphy_octay import attach_sample_descriptions
+            attach_sample_descriptions(report, data, check=check)
         from sincal.stratigraphy_vs import attach_vs_bands
         attach_vs_bands(report, data, pages, check=check)
         # Keep source pages (including the overview figure) available for review.

@@ -3,7 +3,7 @@
 export async function renderStratigraphy(ctx){
   const {api,node,button,section,notify,job,project,changed,current}=ctx;
   const input=section('estratigrafia-informe','Estratigrafía');
-  input.append(node('p','Carga el informe de mecánica de suelos y selecciona un sondaje. La recuperación (%), NSPT (golpes/pie) y los tramos Vs disponibles se dibujan como magnitudes independientes, alineadas por profundidad.'));
+  input.append(node('p','Carga el informe de mecánica de suelos y selecciona un sondaje. Se identifica el formato por sus tablas antes de insertar; la vista previa y el dibujo CAD usan el mismo formato.'));
   input.append(node('p','Formatos: tablas resumen VISAN e informes individuales tipo Puerto Octay. Puedes mantener hasta 10 informes en la sesión. No se estiman cifras desde curvas; los escaneos sin texto todavía no son compatibles.','muted'));
   const output=section('estratigrafia-revision','Sondajes, vista previa y evidencia');
   let selected=project.stratigraphy?.report?.boreholes?.[0]?.key, includeTable=false, revision=0;
@@ -37,6 +37,9 @@ export async function renderStratigraphy(ctx){
     select.value=selected;select.addEventListener('change',()=>{selected=select.value;draw();});
     const hole=report.boreholes.find(h=>h.key===selected);if(!hole)return;
     const checks=state.checks?.find(c=>c.key===hole.key);
+    const format=checks?.format;
+    output.append(node('p',`Formato identificado: ${format?.label||'No reconocido'}`,'badge'));
+    if(format?.description)output.append(node('p',format.description,'muted'));
     for(const warning of checks?.warnings||[])output.append(node('p',warning,'badge'));
     for(const error of checks?.errors||[])output.append(node('p',error,'badge'));
     const toggle=node('label','Incluir tablas de valores debajo del gráfico'),inc=node('input');inc.type='checkbox';inc.checked=includeTable;toggle.prepend(inc);output.append(toggle);
@@ -46,7 +49,7 @@ export async function renderStratigraphy(ctx){
     if(hole.horizons?.length){
       table(drilling,['Horizonte','Desde m','Hasta m','Espesor m','Descripción oficial','Pág.'],hole.horizons.map(r=>[r.index,r.start,r.end,r.thickness,r.description,r.page]));
       const samples=node('details');samples.append(node('summary','Pasadas y recuperación — no son los límites de los estratos'));output.append(samples);
-      table(samples,['Muestra','Desde m','Hasta m','Método','Recuperado cm','Recuperación %','Pág.'],hole.samples.map(r=>[r.index,r.start,r.end,r.method,r.recovered,r.recovery,r.page]));
+      table(samples,['Muestra','Desde m','Hasta m','Método','Recuperado cm','Recuperación %','Descripción oficial','Pág.'],hole.samples.map(r=>[r.index,r.start,r.end,r.method,r.recovered,r.recovery,r.description||'No recuperada',r.page]));
       if(hole.water_depth)output.append(node('p',`Napa publicada: ${hole.water_depth} m · pág. ${hole.water_page}`));
     }else table(drilling,['Desde m','Hasta m','Perforado m','Recuperado m','Recuperación %','Descripción oficial','Pág.'],hole.intervals.map(r=>[r.start,r.end,r.drilled,r.recovered,r.recovery,r.description,r.page]));
     const choices=node('div',undefined,'strata-materials');drilling.append(choices);
@@ -70,15 +73,15 @@ export async function renderStratigraphy(ctx){
       const part=node('details');part.append(node('summary','Página PDF '+page));
       part.addEventListener('toggle',()=>{if(!part.open||part.dataset.loaded)return;part.dataset.loaded='true';if(data.image_png){const img=node('img');img.src='data:image/png;base64,'+data.image_png;img.alt='Página original '+page;img.className='evidence';part.append(img);}part.append(node('pre',data.text||''));});evidence.append(part);
     }
-    const review=node('label','He cotejado las cifras, profundidades, avisos de discrepancia y hatch con el informe original.'),check=node('input');check.type='checkbox';check.checked=hole.reviewed;review.prepend(check);output.append(review);
+    const review=node('label','He cotejado el formato identificado, las cifras, profundidades, avisos de discrepancia y hatch con el informe original.'),check=node('input');check.type='checkbox';check.checked=hole.reviewed&&(format?.id==='visan-summary-v1'||hole.reviewed_format===format?.id);review.prepend(check);output.append(review);
     const insert=button('Insertar este sondaje en AutoCAD / ZWCAD',async()=>{
-      if(!hole.reviewed||checks?.errors?.length)throw Error('Revisa el sondaje antes de insertar.');
+      if(!check.checked||checks?.errors?.length)throw Error('Revisa el formato y el sondaje antes de insertar.');
       const expected=await api('cad/status');if(expected.status!=='ready')throw Error(expected.message);
-      if(!confirm(`¿Insertar ${hole.name} exclusivamente en ${expected.active.name}?\nSe crearán entidades vectoriales agrupadas, sin guardar ni modificar otros dibujos. Selecciona el punto de inserción en CAD.`))return;
+      if(!confirm(`¿Insertar ${hole.name} exclusivamente en ${expected.active.name}?\nFormato: ${format?.label}\nSe crearán entidades vectoriales agrupadas, sin guardar ni modificar otros dibujos. Selecciona el punto de inserción en CAD.`))return;
       const result=await job('cad-stratigraphy',{report,key:hole.key,table:includeTable,expected});notify(result.message);
     },true);
-    const setEnabled=()=>{insert.disabled=!hole.reviewed||!checks?.scene||Boolean(checks?.errors?.length);};
-    check.addEventListener('change',()=>{hole.reviewed=check.checked;changed();setEnabled();});setEnabled();output.append(insert);
+    const setEnabled=()=>{insert.disabled=!check.checked||!format?.id||!checks?.scene||Boolean(checks?.errors?.length);};
+    check.addEventListener('change',()=>{hole.reviewed=check.checked;hole.reviewed_format=check.checked?format?.id:'';changed();setEnabled();});setEnabled();output.append(insert);
   }
   input.append(button('Añadir informes de Proyecto',async()=>{
     const files=await api('files/choose',{kind:'report',multiple:true});if(!files.length)return;
@@ -101,7 +104,7 @@ export async function renderStratigraphy(ctx){
 
 export function renderScene(scene,hatches){
   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
-  svg.setAttribute('viewBox',scene.viewbox.join(' '));svg.setAttribute('class','stratigraphy-preview');svg.setAttribute('role','img');svg.setAttribute('aria-label','Estratigrafía, recuperación porcentual, ensayos NSPT y tramos Vs disponibles');
+  svg.setAttribute('viewBox',scene.viewbox.join(' '));svg.setAttribute('class','stratigraphy-preview');svg.setAttribute('role','img');svg.setAttribute('aria-label',scene.accessible_label||'Estratigrafía, recuperación porcentual, ensayos NSPT y tramos Vs disponibles');
   const colors={1:'#ff5959',3:'#68f778',5:'#579bff',7:'#ffffff',8:'#808080'};
   function shape(name,attrs,parent=svg){const el=document.createElementNS(ns,name);for(const [k,v]of Object.entries(attrs))el.setAttribute(k,v);parent.append(el);return el;}
   for(const item of scene.items){const stroke=colors[item.color]||'#fff';

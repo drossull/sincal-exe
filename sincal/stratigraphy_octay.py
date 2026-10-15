@@ -71,7 +71,11 @@ def parse_individual_report(pages, source='', sha256=''):
             if not re.match(r'^\s*(HQ3\b|SPT\s*N)',line,re.I):
                 continue
             match = SAMPLE.fullmatch(line.strip())
-            values = match[5].split() if match else []
+            # TXT may have observations on the same line. PDF observations are
+            # linked by table cells below: extraction order is NOT row order.
+            parts = re.split(r'(?<=%)\s+', match[5], maxsplit=1) if match else []
+            values = parts[0].split() if parts else []
+            description = parts[1].strip() if len(parts) == 2 else ''
             spt = bool(match and match[2])
             valid = (len(values)==(7 if spt else 3) and
                      re.fullmatch(r'\d+',values[-3]) and re.fullmatch(NUM,values[-2]) and re.fullmatch(NUM+'%',values[-1]))
@@ -81,7 +85,7 @@ def parse_individual_report(pages, source='', sha256=''):
                 hole.extraction_errors.append(f'Pág. {page}: fila de muestreo no reconocida: {line.strip()}')
                 continue
             method,index,a,b,_ = match.groups()
-            sample = Sample(int(values[-3]),a,b,method,values[-2],values[-1][:-1],page)
+            sample = Sample(int(values[-3]),a,b,method,values[-2],values[-1][:-1],page,description)
             hole.samples.append(sample);count += 1
             if spt:
                 n1,n2,n3,nf = values[:4]
@@ -105,3 +109,51 @@ def parse_individual_report(pages, source='', sha256=''):
         'La imagen del Anexo C se conserva como evidencia; no reemplaza los valores de las tablas. No se inventan velocidades Vs.'
     ]
     return report
+
+
+def match_sample_descriptions(hole, page, rows):
+    """Join observations only after the complete numeric row matches its source."""
+    from sincal.prospecciones import number
+    candidates = {}
+    for row in rows:
+        if len(row) < 11 or not re.fullmatch(r'(?:HQ3|SPT\s*N[º°o.]?\s*\d+)', row[0] or '', re.I):
+            continue
+        try:
+            sample = next(s for s in hole.samples if s.page == page and s.index == int(row[7]))
+            if normalized(row[0]) != normalized(sample.method):
+                continue
+            if any(number(a) != number(b) for a,b in zip(
+                    (row[1],row[2],row[8],(row[9] or '').replace('%','')),
+                    (sample.start,sample.end,sample.recovered,sample.recovery))):
+                continue
+            if sample.method.upper().startswith('SPT'):
+                index = int(re.search(r'\d+', sample.method)[0])
+                test = next(t for t in hole.tests if t.index == index and t.page == page)
+                if [v.strip() for v in row[3:7]] != [test.n1,test.n2,test.n3,test.nspt]:
+                    continue
+            description = ' '.join((row[10] or '').split())
+            # Extra populated cells signal an unexpected table structure.
+            if description and not any(row[11:]):
+                candidates.setdefault(sample.index, []).append(description)
+        except (ValueError, TypeError, StopIteration, AttributeError):
+            continue
+    for sample in hole.samples:
+        if sample.page == page:
+            descriptions = candidates.get(sample.index, [])
+            if len(descriptions) == 1:
+                sample.description = descriptions[0]
+            else:
+                sample.description = ''
+                hole.warnings.append(f'Muestra {sample.index}, pág. {page}: descripción ausente o ambigua; cotejar la página original.')
+
+
+def attach_sample_descriptions(report, data, *, check):
+    from io import BytesIO
+    import pdfplumber
+    with pdfplumber.open(BytesIO(data)) as document:
+        for hole in report.boreholes:
+            for page in sorted({s.page for s in hole.samples}):
+                check()
+                rows = [row for table in document.pages[page-1].extract_tables() for row in table]
+                match_sample_descriptions(hole, page, rows)
+            hole.warnings = hole.audit()

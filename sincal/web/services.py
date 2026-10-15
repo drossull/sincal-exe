@@ -449,8 +449,10 @@ class Services:
         from sincal.cad.stratigraphy import stratigraphy_scene
         from sincal.stratigraphy_hatches import HATCHES
         from sincal.stratigraphy_patterns import PATTERNS
+        from sincal.stratigraphy import DRAWING_FORMATS
         hatches = {key: dict(value, lines=PATTERNS[value['pattern']]) for key, value in HATCHES.items()}
-        return {'hatches': hatches, 'checks': [dict(key=h.key, errors=h.errors(), warnings=h.warnings,
+        return {'hatches': hatches, 'checks': [dict(key=h.key, errors=h.errors(), warnings=h.audit(),
+                format=dict(id=h.drawing_format, **DRAWING_FORMATS.get(h.drawing_format, {'label':'No reconocido', 'description':'No se puede insertar.'})),
                 scene=stratigraphy_scene(h, include_table) if not h.errors() else None) for h in report.boreholes]}
 
     def stratigraphy_insert(self, job, payload):
@@ -459,7 +461,7 @@ class Services:
         from sincal.runtime import ruta_recurso_instalado
         report = StratigraphyReport.from_dict(payload.get('report'))
         hole = next((h for h in report.boreholes if h.key == payload.get('key')), None)
-        if not hole or hole.errors() or not hole.reviewed:
+        if not hole or hole.errors() or not hole.ready_to_insert:
             raise ValueError('Coteja las tablas, profundidades, discrepancias y hatch antes de insertar.')
         # This module is validated against the master's bundled version. A stale
         # downloadable override must not shadow the newly installed master.

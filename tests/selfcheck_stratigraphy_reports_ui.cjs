@@ -41,9 +41,13 @@ const fixtures=JSON.parse(execFileSync('python',['-c',python],{encoding:'utf8',m
   await page.getByRole('button',{name:'Añadir informes de Proyecto'}).click();
   await page.getByLabel('Informe de estratigrafía').waitFor();
   assert.equal(await page.locator('.stratigraphy-preview').count(),1);
+  assert(await page.getByText('Formato identificado: Puerto Octay · ensayos por intervalo',{exact:true}).isVisible());
+  assert(await page.getByRole('button',{name:'Insertar este sondaje en AutoCAD / ZWCAD'}).isDisabled());
   const patterns=await page.locator('.stratigraphy-preview path').evaluateAll(paths=>paths.map(p=>p.getAttribute('d')));
   assert(patterns.length>0&&patterns.every(d=>d.length>0),'Every hatch must produce visible pattern geometry');
   await page.getByLabel('He cotejado',{exact:false}).check();
+  assert.equal(await page.evaluate(()=>window.testProject.stratigraphy.report.boreholes[0].reviewed_format),'octay-intervals-v1');
+  if(process.env.SINCAL_UI_SCREENSHOT_S7)await page.locator('.stratigraphy-preview').screenshot({path:process.env.SINCAL_UI_SCREENSHOT_S7});
   await page.getByLabel('Informe de estratigrafía').selectOption('1');
   await page.waitForFunction(()=>window.testProject.stratigraphy.report.boreholes[0].name==='S-08');
   assert.equal(await page.getByLabel('He cotejado',{exact:false}).isChecked(),false);
@@ -62,6 +66,7 @@ const fixtures=JSON.parse(execFileSync('python',['-c',python],{encoding:'utf8',m
   const saved=JSON.parse(Buffer.concat(chunks).toString());
   assert.equal(saved.schema,'sincal-stratigraphy-2');assert.equal(saved.reports.length,2);
   assert.equal(saved.reports[0].boreholes[0].reviewed,true);
+  assert.equal(saved.reports[0].boreholes[0].reviewed_format,'octay-intervals-v1');
   assert.deepEqual(errors,[]);
   console.log('OK: independent reports, preview, cm units, review state, deduplication and multi-report export.');
  }finally{await browser.close();}

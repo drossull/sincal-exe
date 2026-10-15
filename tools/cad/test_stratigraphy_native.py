@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))
 import win32com.client
 from sincal.stratigraphy import Borehole, Interval, Spt, VsBand
 from sincal.stratigraphy_hatches import HATCHES
-from sincal.cad.stratigraphy import build_stratigraphy_lisp
+from sincal.cad.stratigraphy import build_stratigraphy_lisp, stratigraphy_scene
 from sincal.web.cad_worker import command_with_completion, read_completion
 
 
@@ -62,6 +62,7 @@ def main():
             hole = read_report(os.environ['SINCAL_TEST_STRATIGRAPHY_PDF']).boreholes[0]
             assert not hole.errors(), hole.errors()
             hole.reviewed = True
+            hole.reviewed_format = hole.drawing_format
         source = build_stratigraphy_lisp(hole, ROOT/'masters/FORMATOS ANOTATIVOS ACAD_2025.dwg')
         path = folder/'draw.lsp'
         path.write_text(source, encoding='utf-8')
@@ -88,6 +89,13 @@ def main():
         assert any(r'N{\H0.7x;\S^SPT;}' in t.TextString for t in texts)
         assert all(o.Color==1 for o in entities if o.ObjectName=='AcDbSolid')
         assert all(o.Color in (1,5,8) for o in entities if o.ObjectName=='AcDbLine')
+        expected_blue=[i for i in stratigraphy_scene(hole)['items'] if i['kind']=='line' and i['color']==5]
+        actual_blue=[o for o in entities if o.ObjectName=='AcDbLine' and o.Color==5]
+        assert len(actual_blue)==len(expected_blue)
+        for actual,expected in zip(actual_blue,expected_blue):
+            for native,point in zip((actual.StartPoint,actual.EndPoint),expected['points']):
+                assert abs(native[0]-point[0]/scale)<1e-6 and abs(native[1]+point[1]/scale)<1e-6
+        print('PREVIEW_CAD_BLUE_GEOMETRY_MATCH',len(actual_blue),flush=True)
         if hole.vs_bands:
             assert any('VS = 608 - 676 m/s' in t.TextString for t in texts)
         log = Path(doc.GetVariable('LOGFILENAME')).read_text(errors='replace')
@@ -123,8 +131,10 @@ def main():
             except Exception:
                 pass
         try:
-            if app.Documents.Count == 0:
-                app.Quit()
+            # This PID was proven private before entering the try block.
+            for extra in list(app.Documents):
+                extra.Close(False)
+            app.Quit()
         except Exception:
             pass
 

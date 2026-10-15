@@ -2,8 +2,8 @@
 <ApplicationPackage SchemaVersion="1.0"
                     AutodeskProduct="AutoCAD"
                     Name="SINCAL Suite"
-                    Description="SINCAL Suite para AutoCAD 2025 (release 3.0.19)"
-                    AppVersion="3.0.19"
+                    Description="SINCAL Suite para AutoCAD 2025 (release 3.0.20)"
+                    AppVersion="3.0.20"
                     ProductCode="{2E8D9BA6-5E86-4FF0-9E09-4B0A36CBBF01}"
                     UpgradeCode="{4F2C4E0E-BC2F-49F8-A9C1-91E7C8272101}"
                     Author="Gonzalo Mardones V.">
