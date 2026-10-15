@@ -4,7 +4,7 @@ export async function renderStratigraphy(ctx){
   const {api,node,button,section,notify,job,project,changed,current}=ctx;
   const input=section('estratigrafia-informe','Estratigrafía');
   input.append(node('p','Carga el informe de mecánica de suelos y selecciona un sondaje. La recuperación (%), NSPT (golpes/pie) y los tramos Vs disponibles se dibujan como magnitudes independientes, alineadas por profundidad.'));
-  input.append(node('p','Formato inicial: tablas resumen VISAN (como IMS Calera de Tango), PDF con texto o TXT. No se estiman cifras desde curvas; los escaneos sin texto todavía no son compatibles.','muted'));
+  input.append(node('p','Formatos: tablas resumen VISAN e informes individuales tipo Puerto Octay. Puedes mantener hasta 10 informes en la sesión. No se estiman cifras desde curvas; los escaneos sin texto todavía no son compatibles.','muted'));
   const output=section('estratigrafia-revision','Sondajes, vista previa y evidencia');
   let selected=project.stratigraphy?.report?.boreholes?.[0]?.key, includeTable=false, revision=0;
   function table(parent,headers,rows){
@@ -23,10 +23,16 @@ export async function renderStratigraphy(ctx){
     output.replaceChildren(node('h2','Sondajes, vista previa y evidencia'));
     const state=project.stratigraphy,report=state?.report;
     if(!report){output.append(node('p','Aún no has cargado un informe.'));return;}
+    const reports=[report,...(state.library||[])];
+    if(reports.length>1){
+      const fileLabel=node('label','Informe'),fileSelect=node('select');fileSelect.setAttribute('aria-label','Informe de estratigrafía');fileLabel.append(fileSelect);output.append(fileLabel);
+      reports.forEach((r,i)=>{const option=node('option',`${r.source} · ${r.boreholes.map(h=>h.name).join(', ')}`);option.value=i;fileSelect.append(option);});
+      fileSelect.addEventListener('change',async()=>{const index=Number(fileSelect.value);project.stratigraphy={report:reports[index],library:reports.filter((_,i)=>i!==index)};selected=reports[index].boreholes[0]?.key;changed();try{await refresh();}catch(e){notify(e.message);}});
+    }
     output.append(node('p',report.source));
     for(const notice of report.notices||[])output.append(node('p',notice,'muted'));
     const label=node('label','Sondaje'),select=node('select');label.append(select);output.append(label);
-    for(const hole of report.boreholes){const option=node('option',`${hole.name} · ${hole.intervals.length} registros · ${hole.tests.length} ensayos SPT`);option.value=hole.key;select.append(option);}
+    for(const hole of report.boreholes){const option=node('option',`${hole.name} · ${hole.horizons?.length||hole.intervals.length} estratos · ${hole.tests.length} ensayos SPT`);option.value=hole.key;select.append(option);}
     if(!report.boreholes.some(h=>h.key===selected))selected=report.boreholes[0]?.key;
     select.value=selected;select.addEventListener('change',()=>{selected=select.value;draw();});
     const hole=report.boreholes.find(h=>h.key===selected);if(!hole)return;
@@ -37,9 +43,14 @@ export async function renderStratigraphy(ctx){
     inc.addEventListener('change',async()=>{includeTable=inc.checked;try{await refresh();}catch(e){notify(e.message);}});
     if(checks?.scene){output.append(renderScene(checks.scene, state.hatches));output.append(node('p','Hatch de la simbología PROSPECCIONES del maestro. CAD consulta el DWG instalado; si actualizas sus patrones, la vista previa puede variar. Textos CAD: RomanD anotativo, altura de papel 2,5. Los bolones y bloques descritos se superponen al suelo principal, sin inferir porcentajes.','muted'));}
     const drilling=node('details');drilling.append(node('summary','Intervalos de perforación y asignación de hatch (revisar)'));output.append(drilling);
-    table(drilling,['Desde m','Hasta m','Perforado m','Recuperado m','Recuperación %','Descripción oficial','Pág.'],hole.intervals.map(r=>[r.start,r.end,r.drilled,r.recovered,r.recovery,r.description,r.page]));
+    if(hole.horizons?.length){
+      table(drilling,['Horizonte','Desde m','Hasta m','Espesor m','Descripción oficial','Pág.'],hole.horizons.map(r=>[r.index,r.start,r.end,r.thickness,r.description,r.page]));
+      const samples=node('details');samples.append(node('summary','Pasadas y recuperación — no son los límites de los estratos'));output.append(samples);
+      table(samples,['Muestra','Desde m','Hasta m','Método','Recuperado cm','Recuperación %','Pág.'],hole.samples.map(r=>[r.index,r.start,r.end,r.method,r.recovered,r.recovery,r.page]));
+      if(hole.water_depth)output.append(node('p',`Napa publicada: ${hole.water_depth} m · pág. ${hole.water_page}`));
+    }else table(drilling,['Desde m','Hasta m','Perforado m','Recuperado m','Recuperación %','Descripción oficial','Pág.'],hole.intervals.map(r=>[r.start,r.end,r.drilled,r.recovered,r.recovery,r.description,r.page]));
     const choices=node('div',undefined,'strata-materials');drilling.append(choices);
-    hole.intervals.forEach((row,index)=>{
+    (hole.horizons?.length?hole.horizons:hole.intervals).forEach((row,index)=>{
       if(Number(row.end.replace(',','.'))<=Number(row.start.replace(',','.')))return;
       const label=node('label',`${row.start}–${row.end} m · ${row.description}`),choice=node('select');
       const unset=node('option','Sin asignar — requiere revisión');unset.value='sin_asignar';choice.append(unset);
@@ -48,7 +59,7 @@ export async function renderStratigraphy(ctx){
       choice.addEventListener('change',async()=>{row.material=choice.value;hole.reviewed=false;changed();try{await refresh();}catch(e){notify(e.message);}});
     });
     const tests=node('details');tests.append(node('summary','Tabla oficial NSPT — no es la recuperación'));output.append(tests);
-    table(tests,['N.º','Desde m','Hasta m','Hincado m','Rec. m','N1','N2','N3','NSPT','Pág.'],hole.tests.map(r=>[r.index,r.start,r.end,r.driven,r.recovered,r.n1,r.n2,r.n3,r.nspt,r.page]));
+    table(tests,['N.º','Desde m','Hasta m','Hincado m','Recuperado (unidad)','N1','N2','N3','NSPT / NF','Pág.'],hole.tests.map(r=>[r.index,r.start,r.end,r.driven||'—',r.recovered+' '+(r.recovered_unit||'m'),r.n1,r.n2,r.n3,r.nspt,r.page]));
     const vs=node('details');vs.append(node('summary','Vs por tramo — valores y rangos de la figura'));output.append(vs);
     if(hole.vs_bands?.length){
       table(vs,['Desde m','Hasta m','Vs m/s (figura)','Pág. figura','Tabla de profundidades'],hole.vs_bands.map(r=>[r.start,r.end,r.low===r.high?r.low:`${r.low} - ${r.high}`,r.page,`${r.profile} · pág. ${r.table_page}`]));
@@ -69,14 +80,19 @@ export async function renderStratigraphy(ctx){
     const setEnabled=()=>{insert.disabled=!hole.reviewed||!checks?.scene||Boolean(checks?.errors?.length);};
     check.addEventListener('change',()=>{hole.reviewed=check.checked;changed();setEnabled();});setEnabled();output.append(insert);
   }
-  input.append(button('Usar informe de Proyecto',async()=>{
-    if(project.stratigraphy?.report&&!confirm('¿Reemplazar el informe de estratigrafía actual? Puedes guardar el reconocimiento antes de continuar.'))return;
-    const file=(await api('files/choose',{kind:'report'}))[0];if(!file)return;
-    const result=await job('stratigraphy',{file:file.id});project.stratigraphy=result;selected=result.report.boreholes[0]?.key;changed();if(current())draw();
+  input.append(button('Añadir informes de Proyecto',async()=>{
+    const files=await api('files/choose',{kind:'report',multiple:true});if(!files.length)return;
+    if(files.length>10)throw Error('Selecciona hasta 10 informes.');
+    const result=await job('stratigraphy',{files:files.map(f=>f.id)});
+    const state=project.stratigraphy,reports=state?.report?[state.report,...(state.library||[])]:[];
+    for(const r of result.reports)if(!reports.some(old=>old.sha256&&old.sha256===r.sha256))reports.push(r);
+    if(reports.length>10)throw Error('La sesión admite 10 informes; no se reemplazó el reconocimiento actual.');
+    if(new Blob([JSON.stringify(reports)]).size>45*1024*1024)throw Error('La evidencia supera 45 MB; divide los informes en sesiones separadas. Se conserva el reconocimiento anterior.');
+    project.stratigraphy={report:reports[0],library:reports.slice(1)};selected=reports[0].boreholes[0]?.key;changed();if(current())await refresh();
   },true));
   input.append(button('Guardar reconocimiento',()=>{
     if(!project.stratigraphy?.report)throw Error('Carga un informe primero.');
-    const blob=new Blob([JSON.stringify({schema:'sincal-stratigraphy-1',report:project.stratigraphy.report},null,2)],{type:'application/json'});
+    const blob=new Blob([JSON.stringify({schema:'sincal-stratigraphy-2',reports:[project.stratigraphy.report,...(project.stratigraphy.library||[])]},null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob),a=node('a');a.href=url;a.download='estratigrafia-sincal.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }));
   input.append(node('p','Los informes y reconocimientos guardados se incorporan desde Proyecto.'));

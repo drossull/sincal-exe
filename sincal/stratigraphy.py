@@ -64,6 +64,7 @@ class Spt:
     n3: str
     nspt: str
     page: int
+    recovered_unit: str = 'm'
 
     @property
     def refusal(self):
@@ -87,6 +88,34 @@ class VsBand:
 
 
 @dataclass
+class Horizon:
+    index: int
+    start: str
+    end: str
+    thickness: str
+    description: str
+    page: int
+    material: str = 'sin_asignar'
+
+    @property
+    def inclusions(self):
+        # Negated cementation in this format must not produce a cement hatch.
+        text = normalized(self.description)
+        return ['bolones'] if re.search(r'presencia de bolones', text) and not re.search(r'(?:sin|no hay) presencia de bolones', text) else []
+
+
+@dataclass
+class Sample:
+    index: int
+    start: str
+    end: str
+    method: str
+    recovered: str  # Published centimetres, not silently converted to metres.
+    recovery: str
+    page: int
+
+
+@dataclass
 class Borehole:
     key: str
     name: str
@@ -97,10 +126,24 @@ class Borehole:
     reviewed: bool = False
     method: str = 'text'
     vs_bands: list[VsBand] = field(default_factory=list)
+    horizons: list[Horizon] = field(default_factory=list)
+    samples: list[Sample] = field(default_factory=list)
+    water_depth: str = ''
+    water_page: int = 0
+
+    @property
+    def strata(self):
+        return self.horizons or self.intervals
+
+    @property
+    def recovery_rows(self):
+        return self.samples or self.intervals
 
     def errors(self):
         result = list(self.extraction_errors)
-        if not self.intervals:
+        if self.intervals and (self.horizons or self.samples):
+            result.append('No se pueden mezclar intervalos VISAN y registros de informes individuales en un mismo sondaje.')
+        if not self.intervals and not self.horizons:
             result.append('No se reconocieron intervalos de perforación.')
         if not self.tests:
             result.append('No se reconoció la tabla NSPT; no se deduce de la recuperación.')
@@ -117,8 +160,38 @@ class Borehole:
                     result.append(f'Intervalo {i}: confirma el material y su hatch.')
             except (ValueError, TypeError):
                 result.append(f'Intervalo {i}: magnitudes no válidas.')
+        if self.horizons:
+            previous = 0.0
+            for i, row in enumerate(self.horizons, 1):
+                try:
+                    a, b = number(row.start), number(row.end)
+                    if row.index != i or not 0 <= a < b <= 1000 or abs(a-previous) > .011 or number(row.thickness) <= 0:
+                        raise ValueError()
+                    previous = b
+                    if row.material not in MATERIALS[:-1]:
+                        result.append(f'Horizonte {i}: confirma el material y su hatch.')
+                except (ValueError, TypeError):
+                    result.append(f'Horizonte {i}: profundidad o espesor no válido/discontinuo.')
         if previous <= 0:
             result.append('El sondaje debe tener profundidad positiva.')
+        sample_depth = 0.0
+        for i, row in enumerate(self.samples, 1):
+            try:
+                a, b = number(row.start), number(row.end)
+                if row.index != i or not 0 <= a <= b <= 1000 or abs(a-sample_depth) > .011 or number(row.recovered) < 0 or not 0 <= number(row.recovery) <= 100:
+                    raise ValueError()
+                sample_depth = b
+            except (ValueError, TypeError):
+                result.append(f'Muestra {i}: magnitudes no válidas o discontinuas.')
+        if self.horizons and not self.samples:
+            result.append('No se reconoció el registro de recuperación de los partes diarios.')
+        previous = max(previous, sample_depth)
+        if self.water_depth:
+            try:
+                if not 0 <= number(self.water_depth) <= previous or not 1 <= self.water_page <= 2000:
+                    raise ValueError()
+            except (ValueError, TypeError):
+                result.append('Profundidad de napa no válida.')
         vs_previous = 0.0
         for band in self.vs_bands:
             try:
@@ -135,9 +208,11 @@ class Borehole:
                     raise ValueError()
                 seen.add(row.index)
                 if row.refusal:
-                    if not re.fullmatch(r'R\s*:?\s*N[123]', row.nspt, re.I):
+                    if not re.fullmatch(r'R(?:\s*:?\s*N[123])?', row.nspt, re.I):
                         raise ValueError()
                 elif not 0 <= number(row.nspt) <= 1000:
+                    raise ValueError()
+                if row.recovered_unit != ('cm' if self.samples else 'm'):
                     raise ValueError()
             except (ValueError, TypeError):
                 result.append(f'SPT {row.index}: profundidad, rechazo o NSPT no válido.')
@@ -146,6 +221,20 @@ class Borehole:
     def audit(self):
         """Diagnostics only: keep published numbers, including discrepancies."""
         warnings = list(self.warnings)
+        for row in self.horizons:
+            if abs(number(row.end)-number(row.start)-number(row.thickness)) > .011:
+                warnings.append(f'Horizonte {row.index}, pág. {row.page}: espesor publicado y cotas no coinciden. No se corrigió.')
+        if self.horizons and self.samples:
+            end, sample_end = self.horizons[-1].end, self.samples[-1].end
+            if abs(number(end)-number(sample_end)) > .011:
+                warnings.append(f'Los horizontes terminan a {end} m y el muestreo a {sample_end} m. Se conservan ambas fuentes; no se extrapola el hatch.')
+        for row in self.samples:
+            length = number(row.end)-number(row.start)
+            if length > 0 and abs(number(row.recovered)/length-number(row.recovery)) > 1.01:
+                warnings.append(f'Muestra {row.index}, pág. {row.page}: recuperación publicada no coincide con longitud recuperada/avance. No se corrigió.')
+        for test in self.tests:
+            if not test.refusal and all(re.fullmatch(NUM, v) for v in (test.n2,test.n3,test.nspt)) and abs(number(test.n2)+number(test.n3)-number(test.nspt)) > .01:
+                warnings.append(f'SPT {test.index}, pág. {test.page}: NF publicado no coincide con N2+N3. No se corrigió.')
         for row in self.intervals:
             a, b, drilled, recovered, pct = map(number, (row.start, row.end, row.drilled, row.recovered, row.recovery))
             if abs(b-a-drilled) > .011:
@@ -206,21 +295,32 @@ class StratigraphyReport:
                 if not isinstance(bands, list) or len(bands) > 200:
                     raise ValueError('Tramos Vs no válidos.')
                 hole.vs_bands = [VsBand(**row) for row in bands]
+                for key, cls_ in [('horizons', Horizon), ('samples', Sample)]:
+                    rows = item.get(key, [])
+                    if not isinstance(rows, list) or len(rows) > 2000:
+                        raise ValueError('Demasiadas filas o formato no válido.')
+                    setattr(hole, key, [cls_(**row) for row in rows])
+                hole.water_depth = item.get('water_depth', '')
+                hole.water_page = item.get('water_page', 0)
+                if not isinstance(hole.water_depth, str) or len(hole.water_depth) > 40 or type(hole.water_page) is not int:
+                    raise ValueError('Napa no válida.')
                 for band in hole.vs_bands:
                     if any(not isinstance(getattr(band, name), str) or len(getattr(band, name)) > 200
                            for name in ('start', 'end', 'low', 'high', 'profile')):
                         raise ValueError('Valores Vs no válidos.')
                     if any(type(p) is not int or not 1 <= p <= 2000 for p in (band.page, band.table_page)):
                         raise ValueError('Páginas Vs no válidas.')
-                for row in [*hole.intervals, *hole.tests]:
+                for row in [*hole.intervals, *hole.tests, *hole.horizons, *hole.samples]:
                     if type(row.page) is not int or not 1 <= row.page <= 2000:
                         raise ValueError('Página no válida.')
                     for attr, field_value in vars(row).items():
                         if attr not in ('page', 'index') and (not isinstance(field_value, str) or len(field_value) > 5000):
                             raise ValueError('Los valores publicados deben conservarse como texto.')
-                    for attr in ('start', 'end', 'recovered'):
+                    for attr in ('start', 'end'):
                         number(getattr(row, attr))
-                if any(type(row.index) is not int or row.index < 1 for row in hole.tests):
+                    if hasattr(row, 'recovered'):
+                        number(row.recovered)
+                if any(type(row.index) is not int or row.index < 1 for row in [*hole.tests, *hole.horizons, *hole.samples]):
                     raise ValueError('Número de ensayo no válido.')
                 if hole.key in keys or not hole.key or len(hole.key) > 200 or len(hole.name) > 200:
                     raise ValueError('Identificador repetido o no válido.')
@@ -339,7 +439,10 @@ def read_report(path, *, progress=None, cancel=None):
             pages.append(page.extract_text() or '')
     report = parse_pages(pages, path.name, hashlib.sha256(data).hexdigest())
     if not report.boreholes:
-        raise ValueError('No se reconocieron tablas de perforación/SPT del formato VISAN. No se estiman valores desde dibujos. Los escaneos sin texto y otros formatos requieren un adaptador de extracción.')
+        from sincal.stratigraphy_octay import parse_individual_report
+        report = parse_individual_report(pages, path.name, hashlib.sha256(data).hexdigest())
+    if not report.boreholes:
+        raise ValueError('No se reconocieron tablas de los formatos VISAN o informe individual Puerto Octay. No se estiman valores desde dibujos. Los escaneos sin texto y otros formatos requieren un adaptador de extracción.')
     check()
     if path.suffix.lower() == '.pdf':
         import pypdfium2 as pdfium

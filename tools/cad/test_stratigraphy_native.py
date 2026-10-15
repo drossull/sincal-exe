@@ -5,6 +5,7 @@ user drawings. Tests the exact completion expression used by the web worker.
 """
 import ctypes
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -45,7 +46,7 @@ def main():
     try:
         wait_for(lambda: app.GetAcadState().IsQuiescent)
         app.Visible = False
-        doc = app.Documents.Add()
+        doc = wait_for(lambda: app.Documents.Add())
         wait_for(lambda: app.GetAcadState().IsQuiescent)
         doc.SetVariable('INSUNITS', 6)
         doc.SetVariable('CANNOSCALE', '1:100 (m)')
@@ -56,6 +57,11 @@ def main():
                       VsBand('1.49','3.59','608','676',19,'Arreglo 3-2',117),
                       VsBand('3.59','9.10','744','786',19,'Arreglo 3-2',117),
                       VsBand('9.10','30','854','896',19,'Arreglo 3-2',117)])
+        if os.environ.get('SINCAL_TEST_STRATIGRAPHY_PDF'):
+            from sincal.stratigraphy import read_report
+            hole = read_report(os.environ['SINCAL_TEST_STRATIGRAPHY_PDF']).boreholes[0]
+            assert not hole.errors(), hole.errors()
+            hole.reviewed = True
         source = build_stratigraphy_lisp(hole, ROOT/'masters/FORMATOS ANOTATIVOS ACAD_2025.dwg')
         path = folder/'draw.lsp'
         path.write_text(source, encoding='utf-8')
@@ -71,22 +77,25 @@ def main():
         entities = list(groups[0])
         texts = [o for o in entities if o.ObjectName == 'AcDbMText']
         hatches = [o for o in entities if o.ObjectName == 'AcDbHatch']
-        assert {h.PatternName for h in hatches} == {v['pattern'] for v in HATCHES.values()}
+        expected_patterns = {HATCHES[m]['pattern'] for r in hole.strata for m in [r.material,*r.inclusions]}
+        assert {h.PatternName for h in hatches} == expected_patterns
         assert all(h.Area > 0 for h in hatches)
-        assert sum(o.ObjectName=='AcDbSolid' for o in entities) == 8
+        assert sum(o.ObjectName=='AcDbSolid' for o in entities) == 2*len(hole.vs_bands)
         scale = doc.GetVariable('CANNOSCALEVALUE')
         assert all(t.StyleName=='RomanD' and abs(t.Height*scale-2.5)<1e-8 for t in texts)
-        assert any('608 - 676' in t.TextString for t in texts)
+        if hole.vs_bands:
+            assert any('608 - 676' in t.TextString for t in texts)
         assert any(r'N{\H0.7x;\S^SPT;}' in t.TextString for t in texts)
         assert all(o.Color==1 for o in entities if o.ObjectName=='AcDbSolid')
         assert all(o.Color in (1,5,8) for o in entities if o.ObjectName=='AcDbLine')
-        assert any('VS = 608 - 676 m/s' in t.TextString for t in texts)
+        if hole.vs_bands:
+            assert any('VS = 608 - 676 m/s' in t.TextString for t in texts)
         log = Path(doc.GetVariable('LOGFILENAME')).read_text(errors='replace')
         assert "Can't reenter LISP" not in log and 'Invalid point' not in log
         print('SUCCESS', json.dumps(result), len(entities), 'entities', flush=True)
         before = doc.ModelSpace.Count
         bad = folder/'missing.lsp'
-        bad.write_text(source.replace('"ANSI31"', '"SINCAL_MISSING_TEST"'), encoding='utf-8')
+        bad.write_text(source.replace('"'+sorted(expected_patterns)[0]+'"', '"SINCAL_MISSING_TEST"'), encoding='utf-8')
         failed = dict(request, command=f'(progn (load "{bad.as_posix()}") (c:SINCAL-ESTRATIGRAFIA))\n',
                       marker=str(folder/'error.txt'),token='qa-failure')
         doc.SendCommand(command_with_completion(failed))

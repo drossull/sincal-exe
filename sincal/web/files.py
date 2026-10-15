@@ -1,5 +1,7 @@
 """Opaque native-picker grants; HTTP never accepts arbitrary filesystem paths."""
 from pathlib import Path
+import json
+import os
 import threading
 import uuid
 
@@ -32,7 +34,10 @@ class Files:
             raise ValueError('Archivo no compatible.')
         key = uuid.uuid4().hex
         with self.lock:
-            if len(self.items) >= 500:
+            for existing, item in self.items.items():
+                if item == (target, kind):
+                    return {'id': existing, 'name': target.name, 'path': str(target)}
+            if len(self.items) >= 20000:
                 raise ValueError('Demasiados archivos seleccionados; reinicia la vista previa.')
             self.items[key] = (target, kind)
         return {'id': key, 'name': target.name, 'path': str(target)}
@@ -45,6 +50,57 @@ class Files:
         if item[0].resolve(strict=True) != item[0]:
             raise ValueError('Cambió el destino del archivo o carpeta. Selecciónalo de nuevo.')
         return item[0]
+
+    def project_catalog(self, key):
+        """Index a picker-authorized root; never follow junctions/symlinks."""
+        root = self.get(key, 'folder')
+        entries, warnings, pending = [], [], [root]
+        visited = 0
+        excluded = {'.git', '.venv', 'node_modules', '__pycache__', 'sincal_backups', '$recycle.bin'}
+        def add(path, kinds):
+            entries.append({'name': path.name, 'path': str(path),
+                            'relative': str(path.relative_to(root)) if path != root else '.',
+                            'grants': {kind:self.grant(path,kind)['id'] for kind in kinds}})
+        add(root, ['folder'])
+        while pending and visited < 5000:
+            folder = pending.pop()
+            try:
+                if folder != root and (folder.is_symlink() or folder.is_junction() or not folder.resolve(strict=True).is_relative_to(root)):
+                    continue
+                with os.scandir(folder) as scan:
+                    for item in scan:
+                        if visited >= 5000:
+                            break
+                        visited += 1
+                        path = Path(item.path)
+                        if item.is_symlink() or path.is_junction():
+                            continue
+                        if not path.resolve(strict=True).is_relative_to(root):
+                            continue
+                        if item.is_dir(follow_symlinks=False):
+                            if item.name.lower() not in excluded:
+                                add(path,['folder']);pending.append(path)
+                        elif item.is_file(follow_symlinks=False):
+                            kinds = [kind for kind, extensions in self.TYPES.items() if path.suffix.lower() in extensions]
+                            if kinds:
+                                add(path,kinds)
+            except OSError:
+                warnings.append('No se pudo leer: '+str(folder.relative_to(root)))
+        if visited >= 5000:
+            warnings.append('Se alcanzó el límite de 5000 elementos examinados. Selecciona una carpeta de proyecto más específica para ver los restantes.')
+        return {'root':{'id':key,'name':root.name,'path':str(root)},
+                'entries':sorted(entries,key=lambda e:e['relative'].casefold()),'warnings':warnings}
+
+    def read_json(self, key):
+        path = self.get(key, 'session')
+        if path.stat().st_size > 48*1024*1024:
+            raise ValueError('El JSON supera 48 MB.')
+        value = json.loads(path.read_text(encoding='utf-8-sig'))
+        if not isinstance(value, dict):
+            raise ValueError('El JSON debe contener un objeto.')
+        if value.get('schema') not in ('sincal-stratigraphy-1','sincal-stratigraphy-2') and path.stat().st_size > 4*1024*1024:
+            raise ValueError('El JSON del proyecto supera 4 MB.')
+        return {'name':path.name,'value':value}
 
     def list_folder(self, key):
         folder = self.get(key, 'folder')

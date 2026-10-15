@@ -16,7 +16,8 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
     else if(p==='/api/palettes'||p==='/api/jobs'&&route.request().method()==='GET')data=[];
     else if(p==='/api/shell-selection')data={selection:null};
     else if(p==='/api/dwgprops/engines')data=[{id:'core',name:'AutoCAD de prueba'}];
-    else if(p==='/api/files/choose'){assert.equal(route.request().postDataJSON().kind,'dwg');data=[{id:'file1',name:'A.dwg'},{id:'file2',name:'B.dwg'}];}
+    else if(p==='/api/files/choose'){assert.equal(route.request().postDataJSON().kind,'folder');data=[{id:'folder',name:'Planos'}];}
+    else if(p==='/api/files/project')data={root:{id:'folder',path:'C:/Planos'},entries:['A','B'].map((n,i)=>({name:n+'.dwg',relative:n+'.dwg',path:'C:/Planos/'+n+'.dwg',grants:{dwg:'file'+(i+1)}}))};
     else if(p==='/api/jobs'){
      const body=route.request().postDataJSON();operation=body.operation;if(operation==='revision-write')saved=body.payload;data={id:'job'};
     }else if(p==='/api/jobs/job')data={state:'completed',progress:100,message:'Listo',result:operation==='revision-read'?{snapshot:'snapshot',files:[{id:'a',name:'A.dwg',revision},{id:'b',name:'B.dwg',revision}]}:{files:['a','b'].map((id,i)=>({id,name:i?'B.dwg':'A.dwg',status:'Revisión creada',backup:'backup.dwg',revision:{...revision,rows:[saved.values,revision.rows[0]]}}))}};
@@ -28,7 +29,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
   });
   await page.goto('http://sincal.test/#token=test');
   await page.locator('[data-page="project"]').click();
-  await page.getByRole('button',{name:'Añadir Planos DWG',exact:true}).click();
+  await page.getByRole('button',{name:'Abrir carpeta de proyecto',exact:true}).click();
   await page.locator('#archivos-proyecto table').waitFor();
   await page.locator('[data-page="revisiones"]').click();
   await page.locator('[data-page="revisions"]').click();

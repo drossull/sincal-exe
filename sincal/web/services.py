@@ -427,12 +427,21 @@ class Services:
     def stratigraphy(self, job, payload):
         from sincal.stratigraphy import read_report
         from sincal.prospecciones_ocr import ImportCancelled
+        ids = payload.get('files', [payload.get('file')])
+        if not isinstance(ids, list) or not 1 <= len(ids) <= 10 or any(not isinstance(k, str) for k in ids):
+            raise ValueError('Selecciona entre 1 y 10 informes.')
+        paths = [self.files.get(k, 'report') for k in dict.fromkeys(ids)]
+        reports = []
         try:
-            report = read_report(self.files.get(payload.get('file'), 'report'),
-                                 progress=job.update, cancel=job.cancelled)
+            for path in paths:
+                job.check()
+                report = read_report(path, progress=job.update, cancel=job.cancelled)
+                reports.append(report)
         except ImportCancelled as error:
             raise Cancelled(str(error)) from error
         job.check()
+        if 'files' in payload:
+            return {'reports': [r.to_dict() for r in reports]}
         return {'report': report.to_dict(), **self.describe_stratigraphy(report)}
 
     @staticmethod

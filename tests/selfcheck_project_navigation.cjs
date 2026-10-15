@@ -14,7 +14,14 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
     if(p==='/api/preferences')data={theme:'dark',palette:'sincal',zoom:'100'};
     else if(['/api/palettes','/api/jobs','/api/maps','/api/dwgprops/engines'].includes(p)&&route.request().method()==='GET')data=[];
     else if(p==='/api/shell-selection')data={selection:null};
-    else if(p==='/api/files/choose'){const kind=route.request().postDataJSON().kind;picks.push(kind);data=kind==='report'?[{id:'ims',name:'IMS.pdf',path:'C:/Proyecto/IMS.pdf'},{id:'vs',name:'Vs.pdf',path:'C:/Proyecto/Vs.pdf'}]:[{id:kind,name:kind==='folder'?'Planos':'Mapa.kmz',path:'C:/Proyecto/'+kind}];}
+    else if(p==='/api/files/choose'){const kind=route.request().postDataJSON().kind;assert.equal(kind,'folder');picks.push(kind);data=[{id:'folder',name:'Proyecto',path:'C:/Proyecto'}];}
+    else if(p==='/api/files/project')data={root:{id:'folder',name:'Proyecto',path:'C:/Proyecto'},entries:[
+      {name:'Proyecto',relative:'.',path:'C:/Proyecto',grants:{folder:'folder'}},
+      {name:'IMS.pdf',relative:'Informes/IMS.pdf',path:'C:/Proyecto/Informes/IMS.pdf',grants:{report:'ims',memory_pdf:'mem-pdf'}},
+      {name:'Vs.pdf',relative:'Informes/Vs.pdf',path:'C:/Proyecto/Informes/Vs.pdf',grants:{report:'vs'}},
+      {name:'puente.json',relative:'puente.json',path:'C:/Proyecto/puente.json',grants:{session:'json'}},
+      {name:'memoria.xlsx',relative:'memoria.xlsx',path:'C:/Proyecto/memoria.xlsx',grants:{memory_excel:'excel'}}]};
+    else if(p==='/api/files/json')data={name:'puente.json',value:{bridge:'test'}};
     else if(p==='/api/files/list')data=[{name:'Plano.dwg',bytes:1024}];
     else if(p==='/api/jobs'&&route.request().method()==='POST'){({operation,payload}=route.request().postDataJSON());data={id:'test'};}
     else if(p==='/api/jobs/test')data={state:'completed',message:'OK',progress:100,result:{report:{profiles:[],notices:[]},checks:[]}};
@@ -36,21 +43,23 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
   await page.locator('[data-page="archivo"]').click();
   await page.getByRole('button',{name:'Elegir carpeta',exact:true}).click();
   assert.equal(picks.length,0);assert.equal(await page.locator('input[type=file]').count(),0);
-  await page.getByText('No hay archivos disponibles de este tipo: Carpetas. Añádelos primero en Proyecto.',{exact:true}).waitFor();
+  await page.getByText('No hay Carpetas en la carpeta. Abre o actualiza la carpeta desde Proyecto.',{exact:true}).waitFor();
   await page.locator('[data-page="rebar"]').click();await page.getByRole('heading',{name:'Generador de armadura',exact:true}).waitFor();
   await page.locator('[data-page="consulta"]').click();await page.getByRole('heading',{name:'Consulta del proyecto',exact:true}).waitFor();
   assert.equal(await page.locator('input[type=file]').count(),0);
   await page.locator('[data-page="project"]').click();
-  await page.getByRole('button',{name:'Añadir Informes PDF / TXT',exact:true}).click();
-  await page.getByRole('button',{name:'Añadir Carpetas',exact:true}).click();
-  await page.locator('#archivos-proyecto').getByText('Planos',{exact:true}).waitFor();
-  assert.equal(await page.locator('#archivos-proyecto tr').count(),4);
+  assert.equal(await page.locator('input[type=file]').count(),0);
+  await page.getByRole('button',{name:'Abrir carpeta de proyecto',exact:true}).click();
+  await page.locator('#archivos-proyecto').getByText('Informes/IMS.pdf',{exact:true}).waitFor();
+  assert.equal(await page.locator('#archivos-proyecto tr').count(),6);
   await page.locator('[data-page="archivo"]').click();assert.equal(await page.locator('.module-tabs button').count(),2);
   await page.getByRole('button',{name:'Elegir carpeta',exact:true}).click();
   await page.locator('dialog .asset-choice input').check();await page.getByRole('button',{name:'Usar selección',exact:true}).click();
   await page.getByText('Plano.dwg',{exact:true}).waitFor();assert.equal(picks.filter(k=>k==='folder').length,1);
   await page.locator('[data-page="convert"]').click();await page.getByRole('heading',{name:'Conversión DXF–DWG',exact:true}).waitFor();
-  await page.getByRole('button',{name:'Carpeta de salida',exact:true}).click();assert.equal(picks.filter(k=>k==='folder').length,2);assert.equal(await page.locator('dialog').count(),0);
+  await page.getByRole('button',{name:'Carpeta de salida',exact:true}).click();
+  await page.locator('dialog .asset-choice input').check();await page.getByRole('button',{name:'Usar selección',exact:true}).click();
+  assert.equal(picks.length,1);
   await page.locator('[data-page="revisiones"]').click();await page.getByRole('heading',{name:'Editor de revisiones',exact:true}).waitFor();
   await page.locator('[data-page="revisions"]').click();await page.getByRole('heading',{name:'Nueva revisión de planos',exact:true}).waitFor();
   await page.locator('[data-page="prospecciones"]').click();await page.locator('[data-page="prospect"]').click();
@@ -58,26 +67,23 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
   await page.locator('dialog .asset-choice').filter({hasText:'Vs.pdf'}).locator('input').check();
   assert.equal(await page.getByRole('button',{name:'Añadir desde el equipo'}).count(),0);
   await page.getByRole('button',{name:'Usar selección',exact:true}).click();await page.locator('#activity').waitFor({state:'hidden'});
-  assert.equal(operation,'prospect');assert.equal(payload.file,'vs');assert.equal(picks.filter(k=>k==='report').length,1);
+  assert.equal(operation,'prospect');assert.equal(payload.file,'vs');assert.equal(picks.length,1);
   await page.locator('[data-page="location"]').click();await page.getByRole('heading',{name:'Ubicación geográfica',exact:true}).waitFor();
   await page.locator('[data-page="diagnostics"]').click();await page.getByRole('button',{name:'Comprobar conexión',exact:true}).click();await page.getByText('Sin CAD abierto',{exact:true}).waitFor();
   assert.equal(await page.locator('#sidebar [data-page="cad"]').count(),0);
   assert.equal(await page.getByRole('button',{name:'Preparar integración CAD',exact:true}).count(),1);
-  await page.locator('[data-page="project"]').click();assert.equal(await page.locator('#archivos-proyecto tr').count(),4);
-  await page.locator('#archivos-proyecto tr').filter({hasText:'IMS.pdf'}).getByRole('button',{name:'Quitar'}).click();assert.equal(await page.locator('#archivos-proyecto tr').count(),3);
+  await page.locator('[data-page="project"]').click();assert.equal(await page.locator('#archivos-proyecto tr').count(),6);
+  await page.getByRole('button',{name:'Actualizar archivos'}).click();assert.equal(picks.length,1);
   if(process.env.SINCAL_UI_SCREENSHOT)await page.screenshot({path:process.env.SINCAL_UI_SCREENSHOT,fullPage:true});
   acceptDialog=false;await page.getByRole('button',{name:'Descartar proyecto actual',exact:true}).click();
-  assert.equal(await page.locator('#archivos-proyecto tr').count(),3);
+  assert.equal(await page.locator('#archivos-proyecto tr').count(),6);
   acceptDialog=true;await page.getByRole('button',{name:'Descartar proyecto actual',exact:true}).click();
-  await page.getByText('Todavía no hay archivos incorporados.',{exact:true}).waitFor();
+  await page.getByText('Todavía no hay una carpeta abierta.',{exact:true}).waitFor();
   await page.locator('[data-page="rebar-abutments"]').click();
   await page.getByText('Incorpora el JSON del puente en Proyecto para configurar sus armaduras.',{exact:true}).waitFor();
-  await page.locator('[data-page="rebar"]').click();
-  await page.getByRole('button',{name:'Añadir Memoria PDF',exact:true}).click();
-  await page.locator('#memorias table').waitFor();
-  await page.getByRole('button',{name:'Añadir Memoria Excel',exact:true}).click();
-  await page.locator('#memorias tr').nth(2).waitFor();
-  await page.getByLabel('Cargar JSON del proyecto',{exact:true}).setInputFiles({name:'puente.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({bridge:'test'}))});
+  await page.locator('[data-page="project"]').click();
+  await page.getByRole('button',{name:'Abrir carpeta de proyecto',exact:true}).click();
+  await page.getByRole('button',{name:'Usar JSON',exact:true}).click();
   await page.getByText('JSON activo: puente.json',{exact:true}).waitFor();
   await page.locator('[data-page="rebar-abutments"]').click();
   await page.getByLabel('Largo',{exact:true}).fill('1100');

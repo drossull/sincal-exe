@@ -20,6 +20,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
     else if(p==='/api/shell-selection')data={selection:null};
     else if(p==='/api/dwgprops/engines')data=[{id:'core',name:'AutoCAD de prueba'}];
     else if(p==='/api/files/choose'){kind=route.request().postDataJSON().kind;data=[{id:'folder',name:'Barrancón'}];}
+    else if(p==='/api/files/project')data={root:{id:'folder',path:'C:/Barrancon'},entries:[{name:'Barrancón',relative:'.',path:'C:/Barrancon',grants:{folder:'folder'}}]};
     else if(p==='/api/jobs'){
      const body=route.request().postDataJSON();operation=body.operation;if(operation==='revision-editor-write')saved=body.payload;data={id:'job'};
     }else if(p==='/api/jobs/job'){
@@ -34,7 +35,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
   });
   await page.goto('http://sincal.test/#token=test');
   await page.locator('[data-page="project"]').click();
-  await page.getByRole('button',{name:'Añadir Carpetas',exact:true}).click();
+  await page.getByRole('button',{name:'Abrir carpeta de proyecto',exact:true}).click();
   await page.locator('#archivos-proyecto table').waitFor();
   await page.locator('[data-page="revisiones"]').click();
   await page.getByRole('button',{name:'Seleccionar carpeta',exact:true}).click();

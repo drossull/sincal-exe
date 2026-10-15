@@ -18,15 +18,27 @@ function section(id,title){const s=node('section');s.id=id;s.append(node('h2',ti
 function acceptReplacement(){if(activeJob){notify('Termina o cancela la operación en curso antes de cambiar de proyecto.');return false;}return !dirty||confirm('Hay trabajo cargado o modificado. Al continuar se descartará; no se guardan sesiones. ¿Continuar?');}
 function identity(){const output={};for(const key of ['ot','revision','structure_name'])output[key]=$('#'+key)?.value??project?.identification?.[key]??'';return output;}
 function projectLoader(parent){
-  const label=node('label','Cargar JSON del proyecto'),input=node('input');input.type='file';input.accept='.json,application/json';label.append(input);parent.append(label);
-  input.addEventListener('change',async()=>{try{
-    const file=input.files[0];if(!file||!acceptReplacement())return;
-    if(file.size>4*1024*1024)throw Error('El límite del JSON es 4 MB.');
-    const previous=project,candidate={data:JSON.parse(await file.text()),identification:{...identity()},sourceName:file.name};
+  parent.append(button('Usar JSON de la carpeta del proyecto',async()=>{const file=(await projectFiles.choose('session'))[0];if(file)await loadProjectJson(file);}));
+}
+async function loadProjectJson(file){
+  if(!acceptReplacement())return;
+  const previous=project,{value:saved}=await api('files/json',{file:file.id});
+  if(['sincal-stratigraphy-1','sincal-stratigraphy-2'].includes(saved.schema)){
+    const reports=saved.schema==='sincal-stratigraphy-1'?[saved.report]:saved.reports;
+    if(!Array.isArray(reports)||!reports.length||reports.length>10)throw Error('Reconocimiento no compatible (máximo 10 informes).');
+    let checked;for(const report of reports){const value=await api('stratigraphy/preview',{report,table:false});checked??=value;}
+    if(project!==previous)throw Error('El proyecto cambió durante la carga.');
+    project??={data:{},identification:{ot:'',revision:'',structure_name:''}};
+    project.stratigraphy={report:reports[0],library:reports.slice(1),...checked};dirty=true;
+    notify('Reconocimiento incorporado. Disponible en Prospecciones → Estratigrafía.');
+  }else{
+    const candidate={data:saved,identification:{...identity()},sourceName:file.name};
     const preview=await api('project/preview',candidate);candidate.rebar=await api('rebar/from-project',candidate.data);
-    if(project!==previous)throw Error('El proyecto cambió durante la carga. Selecciona el archivo nuevamente.');
-    project=candidate;result=preview;dirty=true;await show(page);notify('JSON cargado. Consulta y Generador de armadura comparten este proyecto.');
-  }catch(error){notify(error.message);}finally{input.value='';}});
+    if(project!==previous)throw Error('El proyecto cambió durante la carga.');
+    // Loading bridge data does not discard independently loaded borehole reports.
+    project={...project,...candidate};result=preview;dirty=true;
+    await show(page);notify('JSON cargado. Consulta y Generador de armadura comparten este proyecto.');
+  }
 }
 let activeJob=null;
 const motion=document.createElementNS('http://www.w3.org/2000/svg','svg');motion.setAttribute('viewBox','0 0 88 54');motion.setAttribute('width','88');motion.setAttribute('height','54');motion.setAttribute('aria-hidden','true');$('#activity img').replaceWith(motion);
@@ -54,7 +66,7 @@ async function job(operation,payload={}){
   }finally{activeJob=null;$('#activity').hidden=true;}
 }
 $('#cancel-job').addEventListener('click',()=>{if(activeJob&&activeJob!=='starting')api('jobs/cancel',{id:activeJob}).then(()=>notify('Cancelación solicitada. CAD podría seguir ejecutando la orden.')).catch(e=>notify(e.message));});
-function toolContext(currentPage){return {api:(path,payload)=>path==='files/choose'?projectFiles.choose(payload.kind):api(path,payload),chooseOutput:()=>api('files/choose',{kind:'folder'}),node,button,section,notify,job,artifact,project,changed:()=>{dirty=true;},current:()=>page===currentPage};}
+function toolContext(currentPage){return {api:(path,payload)=>path==='files/choose'?projectFiles.choose(payload.kind,payload):api(path,payload),chooseOutput:()=>projectFiles.choose('folder'),node,button,section,notify,job,artifact,project,changed:()=>{dirty=true;},current:()=>page===currentPage};}
 function download(name,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 async function show(next){page=destination(next);$('#main').replaceChildren();$('#anchors').replaceChildren();$('#breadcrumb').textContent=title(page);document.querySelectorAll('#sidebar [data-page]').forEach(b=>b.setAttribute('aria-current',b.dataset.page===owner(page)?'page':'false'));$('#main').append(node('span','SINCAL SUITE 3.0 / ESCRITORIO','eyebrow'));renderTabs(page,node);window.scrollTo(0,0);
 if(page==='home'){
@@ -63,21 +75,15 @@ await renderTools('sync',toolContext('home'));if(page!=='home')return;
 section('privacidad','Privacidad del piloto').append(node('p','Los datos quedan en este equipo y en el perfil de Windows actual. No existe todavía login web, sincronización ni aislamiento entre personas que compartan la misma cuenta de Windows.'));
 section('creditos','Créditos').append(node('p','Por Gonzalo M. para SINCAL Ltda. 2026.'));
 }else if(page==='project'){
-const s=section('proyecto','Proyecto');s.append(node('p','Reúne los archivos que utilizarás en las herramientas. Incorporar un archivo no ejecuta procesos ni modifica su contenido.'));
-projectLoader(s);if(project?.sourceName)s.append(node('p','JSON activo: '+project.sourceName));
-const restoreLabel=node('label','Incorporar reconocimiento de estratigrafía guardado (JSON)'),restore=node('input');restore.type='file';restore.accept='.json,application/json';restoreLabel.append(restore);s.append(restoreLabel);
-restore.addEventListener('change',async()=>{try{
-  const file=restore.files[0];if(!file||!acceptReplacement())return;if(file.size>48*1024*1024)throw Error('El reconocimiento supera 48 MB.');
-  const saved=JSON.parse(await file.text());if(saved.schema!=='sincal-stratigraphy-1')throw Error('Formato de reconocimiento no compatible.');
-  const checked=await api('stratigraphy/preview',{report:saved.report,table:false});
-  project??={data:{},identification:{ot:'',revision:'',structure_name:''}};project.stratigraphy={report:saved.report,...checked};dirty=true;notify('Reconocimiento incorporado. Disponible en Proyecto → Prospecciones → Estratigrafía.');
-}catch(e){notify(e.message);}finally{restore.value='';}});
+const s=section('proyecto','Proyecto');s.append(node('p','Trabaja desde una única carpeta con informes, JSON, mapas, planos y hojas de cálculo. Abrirla no ejecuta procesos ni modifica su contenido.'));
+if(project?.sourceName)s.append(node('p','JSON activo: '+project.sourceName));
 s.append(button('Descartar proyecto actual',async()=>{
   if(activeJob){notify('Termina o cancela la operación en curso antes de descartar el proyecto.');return;}
   if(!confirm('¿Descartar el proyecto actual? Se quitarán el JSON, los datos de consulta, armaduras y prospecciones cargados, y la lista de archivos y carpetas del proyecto. Los archivos originales del equipo no se borrarán ni se desharán cambios ya guardados en ellos.'))return;
   project=null;result=null;dirty=false;projectFiles.clear();await show('project');notify('Proyecto descartado. Los archivos originales permanecen en el equipo.');
 }));
-projectFiles.render();
+projectFiles.render(undefined,false,{beforeOpen:acceptReplacement,beforeRefresh:()=>!activeJob,
+  onOpen:()=>{project={data:{},identification:{ot:'',revision:'',structure_name:''}};result=null;dirty=false;s.querySelectorAll('p').forEach((p,i)=>{if(i>0)p.remove();});},onJson:loadProjectJson});
 }else if(['docs','live','convert','rename','location','prospect','stratigraphy','dwgprops','revisions','revision-editor'].includes(page)){
 if(['prospect','stratigraphy'].includes(page)&&!project)project={data:{},identification:{ot:'',revision:'',structure_name:''}};
 await renderTools(page,toolContext(page));

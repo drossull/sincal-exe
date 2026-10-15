@@ -90,6 +90,11 @@ class Store:
         if isinstance(payload.get('stratigraphy'), dict) and payload['stratigraphy'].get('report'):
             from sincal.stratigraphy import StratigraphyReport
             StratigraphyReport.from_dict(payload['stratigraphy']['report'])
+            library = payload['stratigraphy'].get('library', [])
+            if not isinstance(library, list) or len(library) > 9:
+                raise ValueError('La sesión admite hasta 10 informes de estratigrafía.')
+            for report in library:
+                StratigraphyReport.from_dict(report)
         if "rebar" in payload:
             if not isinstance(payload["rebar"], dict) or set(payload["rebar"]) - {"entrada", "salida"}:
                 raise ValueError("Estado de estribos no válido.")
@@ -273,6 +278,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, self.server.services.files.choose(payload.get('kind')))
             if self.path == '/api/files/list':
                 return self.send(200, self.server.services.files.list_folder(payload.get('folder')))
+            if self.path == '/api/files/project':
+                return self.send(200, self.server.services.files.project_catalog(payload.get('folder')))
+            if self.path == '/api/files/json':
+                return self.send(200, self.server.services.files.read_json(payload.get('file')))
             if self.path == '/api/rename/plan':
                 return self.send(200, self.server.services.plan_rename(payload))
             if self.path == '/api/jobs':

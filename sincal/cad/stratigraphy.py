@@ -29,14 +29,16 @@ def stratigraphy_scene(hole, include_table=False):
         scene.append(dict(kind='line', points=[a, b], color=color))
     def text(x, y, label, anchor='center'):
         scene.append(dict(kind='text', point=[x, y], text=drawing_label(label), anchor=anchor, color=3, height=2.5))
-    drilled_depth = max(number(r.end) for r in hole.intervals)
+    strata, recovery_rows = hole.strata, hole.recovery_rows
+    soil_depth = max(number(r.end) for r in strata)
+    drilled_depth = max(soil_depth, max((number(r.end) for r in recovery_rows), default=0))
     depth = max(drilled_depth, max((number(b.end) for b in hole.vs_bands), default=0))
     height = max(150, depth*8)
     top, gx, width = 27, 38, 80
     def y(d):
         return top+number(d)*height/depth
     text(0, 0, f'Sondaje {hole.name}', 'left')
-    text(0, 7, 'Estratigrafía según operador', 'left')
+    text(0, 7, 'Horizontes del informe' if hole.horizons else 'Estratigrafía según operador', 'left')
     text(0, 20, 'Prof. (m)', 'left')
     text(gx+width/2, 7, 'NSPT (golpes/pie)')
     text(gx+width/2, 18, 'Recuperación (%) · azul')
@@ -56,9 +58,10 @@ def stratigraphy_scene(hole, include_table=False):
         if d <= drilled_depth:
             line([gx, yy], [gx+width, yy])
         line([9, yy], [12, yy], 1)
-        text(7, yy, f'{d:g}', 'right')
+        if d == depth or depth-d >= step*.45:
+            text(7, yy, f'{d:g}', 'right')
     previous = None
-    for row in hole.intervals:
+    for row in strata:
         a, b = number(row.start), number(row.end)
         if b <= a:
             continue  # Zero-length refused tests are NOT soil layers or zero-% segments.
@@ -66,6 +69,10 @@ def stratigraphy_scene(hole, include_table=False):
             scene.append(dict(kind='hatch', bounds=[12, y(a), 26, y(b)], material=name, color=8))
         for u, v in [([12,y(a)],[26,y(a)]),([12,y(b)],[26,y(b)]),([12,y(a)],[12,y(b)]),([26,y(a)],[26,y(b)])]:
             line(u, v, 1)
+    for row in recovery_rows:
+        a, b = number(row.start), number(row.end)
+        if b <= a:
+            continue
         x = gx + width*number(row.recovery)/100
         if previous and abs(a-previous[1]) < .011:
             line([previous[0], y(a)], [x, y(a)], 5)
@@ -100,14 +107,18 @@ def stratigraphy_scene(hole, include_table=False):
             text(185, y(bound), bound+' m', 'left')
     legend_x = 215 if hole.vs_bands else 137
     legend_y = 32
-    for name in dict.fromkeys(name for r in hole.intervals if number(r.end)>number(r.start) for name in [r.material,*r.inclusions]):
+    for name in dict.fromkeys(name for r in strata if number(r.end)>number(r.start) for name in [r.material,*r.inclusions]):
         scene.append(dict(kind='hatch', bounds=[legend_x, legend_y, legend_x+14, legend_y+5], material=name, color=8))
         text(legend_x+18, legend_y+2.5, HATCHES[name]['label'], 'left')
         legend_y += 9
     text(legend_x, legend_y+4, 'R = rechazo (no equivale a 50)', 'left')
     text(legend_x, legend_y+10, 'NSPT a profundidad DESDE', 'left')
+    if hole.water_depth:
+        text(legend_x, legend_y+19, f'Napa: {hole.water_depth} m (pág. {hole.water_page})', 'left')
+    if hole.horizons and soil_depth < drilled_depth:
+        text(legend_x, legend_y+27, f'Horizontes hasta {soil_depth:g} m; sin extrapolar.', 'left')
     bottom = top+height
-    text(0, bottom+7, 'Fuente: tablas del informe, págs. '+', '.join(map(str, sorted({r.page for r in [*hole.intervals,*hole.tests]}))), 'left')
+    text(0, bottom+7, 'Fuente: tablas del informe, págs. '+', '.join(map(str, sorted({r.page for r in [*strata,*recovery_rows,*hole.tests]}))), 'left')
     text(0, bottom+13, 'Cifras oficiales sin recalcular. Revisar avisos de discrepancia.', 'left')
     if hole.vs_bands:
         band = hole.vs_bands[0]
@@ -125,13 +136,25 @@ def stratigraphy_scene(hole, include_table=False):
                 line([x,cursor],[x,cursor+row_height])
             cursor += row_height
             line([0,cursor],[215,cursor])
-        table_row(['Desde m','Hasta m','Perf. m','Rec. m','Rec. %','Descripción / página'])
-        for row in hole.intervals:
-            lines = textwrap.wrap(row.description+f' (p. {row.page})', 75)
-            table_row([row.start,row.end,row.drilled,row.recovered,row.recovery,'\n'.join(lines)], max(6,4*len(lines)+2))
+        if hole.horizons:
+            columns = [0, 15, 31, 48, 65, 215]
+            table_row(['N.º','Desde m','Hasta m','Espesor m','Horizonte / página'])
+            for row in hole.horizons:
+                lines = textwrap.wrap(row.description+f' (p. {row.page})', 75)
+                table_row([row.index,row.start,row.end,row.thickness,'\n'.join(lines)], max(6,4*len(lines)+2))
+            cursor += 10
+            columns = [0, 15, 31, 48, 80, 105, 130, 215]
+            table_row(['Muestra','Desde m','Hasta m','Método','Rec. cm','Rec. %','Página'])
+            for row in hole.samples:
+                table_row([row.index,row.start,row.end,row.method,row.recovered,row.recovery,row.page])
+        else:
+            table_row(['Desde m','Hasta m','Perf. m','Rec. m','Rec. %','Descripción / página'])
+            for row in hole.intervals:
+                lines = textwrap.wrap(row.description+f' (p. {row.page})', 75)
+                table_row([row.start,row.end,row.drilled,row.recovered,row.recovery,'\n'.join(lines)], max(6,4*len(lines)+2))
         cursor += 10
         columns = [0, 15, 31, 48, 65, 82, 99, 117, 139, 155, 215]
-        table_row(['N.º','Desde m','Hasta m','Hinc. m','Rec. m','N1','N2','N3','NSPT','Página'])
+        table_row(['N.º','Desde m','Hasta m','Hinc. m','Rec. cm' if hole.samples else 'Rec. m','N1','N2','N3','NSPT','Página'])
         for row in hole.tests:
             table_row([row.index,row.start,row.end,row.driven,row.recovered,row.n1,row.n2,row.n3,row.nspt,row.page])
         bottom = cursor
