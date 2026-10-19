@@ -268,7 +268,9 @@ function Invoke-SincalCadScriptCore {
         $controlledExit = $false
         $cadError = $false
         while ($stdout -or $stderr -or -not $process.HasExited) {
+            $drainedOutput = $false
             if ($stdout -and $stdout.IsCompleted) {
+                $drainedOutput = $true
                 $line = $stdout.GetAwaiter().GetResult()
                 $stdout = $null
                 if ($null -ne $line) {
@@ -278,6 +280,7 @@ function Invoke-SincalCadScriptCore {
                 }
             }
             if ($stderr -and $stderr.IsCompleted) {
+                $drainedOutput = $true
                 $line = $stderr.GetAwaiter().GetResult()
                 $stderr = $null
                 if ($null -ne $line) {
@@ -304,7 +307,11 @@ function Invoke-SincalCadScriptCore {
                 Write-Host '[CAD] Fin confirmado; cierre controlado del trabajador que no respondio a QUIT.'
             }
             if ([DateTime]::UtcNow -ge $deadline) { break }
-            if (($stdout -and -not $stdout.IsCompleted) -or ($stderr -and -not $stderr.IsCompleted)) {
+            # A quiet stderr must not throttle a busy stdout (or vice versa).
+            # Drain ready lines without delay, but still check timeout/marker on
+            # every iteration. Sleep only when neither pipe made progress; this
+            # also avoids spinning when both pipes close before CAD exits.
+            if (-not $drainedOutput) {
                 Start-Sleep -Milliseconds 10
             }
         }

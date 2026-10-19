@@ -143,6 +143,20 @@ los dobles de prueba no sustituyen esa revisión geométrica. También debe
 ensayarse el OCR completo con su runtime empaquetado.
 
 Los scripts masivos CMD conservan su funcionamiento y sus registros anteriores.
+
+El lector de salida CAD drena ambos canales sin introducir pausas por cada
+linea cuando el otro canal queda en silencio. Mantiene los limites de tiempo,
+la deteccion de errores y la confirmacion de guardado. El procesamiento sigue
+siendo secuencial y conserva el aislamiento de cada DWG.
+
+PUBLISH-A1 verifica el total de layouts publicados. Para una sola entrada PDF
+conserva sus bytes originales; para varias entradas ensambla sus paginas. Antes
+de reemplazar el destino valida cabecera, cierre, cantidad de paginas y una
+renderizacion temporal en memoria. El PDF entregado no se rasteriza. Un fallo
+de validacion conserva el destino anterior y se comunica al registro del lote.
+Esta comprobacion no garantiza compatibilidad con todos los visores ni valida
+la correccion grafica del plano. La aplicacion y los scripts de publicacion
+deben actualizarse juntos para usar la confirmacion de validacion.
 No se ha reescrito ni certificado cada script de ploteo durante esta migración.
 Las armaduras de muros, alas y otros componentes que estaban en espera continúan
 sin definición nueva; no se consideran implementadas por tener un apartado UI.

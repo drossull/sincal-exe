@@ -7,10 +7,13 @@ import sys
 def main():
     if len(sys.argv) == 3 and sys.argv[1] == '--merge-pdfs':
         from sincal.cad.pdf_merge import merge_request
+        result_path = Path(sys.argv[2]).with_suffix('.result.json')
         try:
             merge_request(sys.argv[2])
-        except Exception:
+        except Exception as error:
+            result_path.write_text(json.dumps({'ok': False, 'error': str(error)}, ensure_ascii=False), encoding='utf-8')
             raise SystemExit(1)
+        result_path.write_text(json.dumps({'ok': True}), encoding='utf-8')
     elif len(sys.argv) == 3 and sys.argv[1] == '--shell-request':
         from sincal.web.desktop import main as desktop
         from sincal.cad.batch import read_shell_request
