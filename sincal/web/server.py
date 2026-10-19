@@ -232,6 +232,7 @@ class Handler(BaseHTTPRequestHandler):
                   "/app.js": (STATIC / "app.js", "text/javascript; charset=utf-8"),
                   "/rebar.js": (STATIC / "rebar.js", "text/javascript; charset=utf-8"),
                   "/tools.js": (STATIC / "tools.js", "text/javascript; charset=utf-8"),
+                  "/study_info.js": (STATIC / "study_info.js", "text/javascript; charset=utf-8"),
                   "/navigation.js": (STATIC / "navigation.js", "text/javascript; charset=utf-8"),
                   "/project_files.js": (STATIC / "project_files.js", "text/javascript; charset=utf-8"),
                   "/stratigraphy.js": (STATIC / "stratigraphy.js", "text/javascript; charset=utf-8"),

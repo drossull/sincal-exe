@@ -1,4 +1,5 @@
 import json
+import re
 import threading
 import urllib.error
 import urllib.request
@@ -51,6 +52,19 @@ def test_http_auth_origin_assets_and_roundtrip(tmp_path):
         assert request("/../../README.md")[0] == 404
         assert request("/roboto-400.ttf")[0] == 200
         assert request("/")[2]["Content-Security-Policy"]
+        # Check actual HTTP routes, not a filesystem mock: a missing imported
+        # module prevents app.js from initializing the entire desktop UI.
+        pending, visited = ['/app.js'], set()
+        while pending:
+            asset = pending.pop()
+            if asset in visited:
+                continue
+            visited.add(asset)
+            status, body, headers = request(asset)
+            assert status == 200, asset
+            assert 'javascript' in headers['Content-Type'], asset
+            pending.extend(re.findall(r'''from\s+['"](/[^'"]+\.js)['"]''', body.decode()))
+        assert '/study_info.js' in visited
         assert request("/api/project/preview", payload(), auth)[0] == 200
         code, raw, _ = request("/api/rebar/defaults", headers=auth)
         assert code == 200
