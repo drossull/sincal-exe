@@ -475,10 +475,10 @@ class Services:
         return self.cad(job, payload.get('expected'), f'(progn (load "{path}") (c:SINCAL-ESTRATIGRAFIA))\n', True, completion='stratigraphy-v1')
 
     @staticmethod
-    def describe_report(report):
+    def describe_report(report, annotation_scale=10.0):
         from sincal.cad.prospecciones import profile_scene
         return {'report': report.to_dict(), 'checks': [dict(key=p.key, errors=p.errors(), warnings=p.warnings(),
-            scene=profile_scene(p, False) if not p.errors() else []) for p in report.profiles]}
+            scene=profile_scene(p, False, annotation_scale) if not p.errors() else []) for p in report.profiles]}
 
     def command(self, job, payload):
         from sincal.cad.commands import normalizar_comando_cad_autonomo
@@ -584,5 +584,9 @@ class Services:
         profile = next((p for p in report.profiles if p.key == payload.get('key')), None)
         if not profile or profile.errors() or (profile.method == 'ocr' and not profile.reviewed):
             raise ValueError('Coteja el OCR y resuelve los errores antes de insertar.')
-        path = self.lisp(job, build_profile_lisp(profile, payload.get('table') is not False))
-        return self.cad(job, payload.get('expected'), f'(progn (load "{path}") (c:SINCAL-PROSPECCIONES))\n', True)
+        expected = payload.get('expected') or {}
+        scale = expected.get('active', {}).get('annotation_scale') or {}
+        if not scale.get('name') or scale.get('value') is None:
+            raise ValueError('Comprueba la escala anotativa activa de CAD antes de insertar.')
+        path = self.lisp(job, build_profile_lisp(profile, payload.get('table') is not False, scale['value'], scale['name']))
+        return self.cad(job, expected, f'(progn (load "{path}") (c:SINCAL-PROSPECCIONES))\n', True, completion='profile-v1')

@@ -42,6 +42,8 @@ def contexts(pages):
 
 
 def identify(profile, context):
+    if profile.source_format == 'geoiberica-remi-v1':
+        return  # Native table carries its own explicit profile and orientation.
     structure, section, arrangement = context
     profile.context = ' · '.join(x for x in (structure, f'Perfil {section}' if section else '') if x)
     if arrangement:
@@ -171,6 +173,12 @@ def extract_images(reader, pages, report, pdf_bytes, *, exhaustive=False, progre
     try:
         for page_number, (page, text) in enumerate(zip(reader.pages, pages), 1):
             check_cancel()
+            if (not exhaustive and 'geoiberica' in normalized(text) and 'remi' in normalized(text)
+                and (re.search(r'\bFigura\s+\d+',text,re.I) or
+                     any(p.page==page_number and p.source_format=='geoiberica-remi-v1' for p in report.profiles))):
+                # Recognized ReMi pages contain native tables or spectra/plots, not
+                # the Inicio/Final image tables supported by this OCR adapter.
+                continue
             if not exhaustive and has_vs_context and len(text.strip()) < 100:
                 # A mixed IMS contains many scanned borehole/photos annexes. The
                 # exhaustive option inspects these too, without guessing relevance.

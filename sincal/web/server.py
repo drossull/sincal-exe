@@ -267,7 +267,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, from_project(payload))
             if self.path == '/api/prospect/preview':
                 from sincal.prospecciones import VsReport
-                return self.send(200, self.server.services.describe_report(VsReport.from_dict(payload)))
+                return self.send(200, self.server.services.describe_report(VsReport.from_dict(payload), payload.get('annotation_scale',10.0)))
             if self.path == '/api/stratigraphy/preview':
                 from sincal.stratigraphy import StratigraphyReport
                 report = StratigraphyReport.from_dict(payload.get('report'))

@@ -3,6 +3,7 @@ import {renderDwgProps} from '/dwgprops.js';
 import {renderRevisions} from '/revisions.js';
 import {renderRevisionEditor} from '/revision_editor.js';
 import {renderStratigraphy} from '/stratigraphy.js';
+import {studyInformation} from '/study_info.js';
 export async function renderTools(page, ctx){
   if(page==='dwgprops')return renderDwgProps(ctx);
   if(page==='revisions')return renderRevisions(ctx);
@@ -112,13 +113,28 @@ export async function renderTools(page, ctx){
     const s=section('informe','Perfiles geofísicos');if(!project){s.append(node('p','Carga un proyecto en Consulta primero.'));return;}
     s.append(node('p','Extracción local PDF/TXT, con OCR cuando sea necesario. Se conserva el valor oficial publicado; el cálculo es solo un control.'));
     const exhaustive=field(s,'OCR en todas las páginas (más lento)','checkbox');const output=section('arreglos','Arreglos, tabla y evidencia');
+    let annotationScale={name:'1:100 (m) · referencia de vista previa',value:10};
+    const activeScale=expected=>{const scale=expected.active?.annotation_scale;
+      if(expected.status!=='ready'||expected.active?.insunits!==6||!scale?.name||!Number.isFinite(scale.value)||scale.value<=0)throw Error('Comprueba la conexión CAD y su escala anotativa en un dibujo en metros.');return scale;};
+    async function scalePreview(expected){const state=project.prospecciones;annotationScale=activeScale(expected);
+      const checked=await api('prospect/preview',{...state.report,annotation_scale:annotationScale.value});
+      if(!current()||state!==project.prospecciones)return false;state.checks=checked.checks;draw();return true;}
+    s.append(button('Tomar escala anotativa de CAD',async()=>{if(!project.prospecciones?.report)throw Error('Carga primero un informe.');await scalePreview(await api('cad/status'));}));
     if(project.prospecciones?.report){const checked=await api('prospect/preview',project.prospecciones.report);project.prospecciones.checks=checked.checks;if(!current())return;}
     function draw(){output.replaceChildren(node('h2','Arreglos, tabla y evidencia'));const report=project.prospecciones?.report;if(!report)return;
+      output.append(node('p',`Escala de vista previa: ${annotationScale.name}. Profundidades reales; texto de 2,5 mm en papel.`,'badge'));
       (report.notices||[]).forEach(t=>output.append(node('p',t,'badge')));
       for(const profile of report.profiles){const part=node('details');const summary=node('summary',`${profile.name} · página ${profile.page} · ${profile.method.toUpperCase()}`);part.append(summary);table(part,['Estrato','Desde · m','Hasta · m','Vs · m/s'],profile.layers.map(r=>[r.index,r.start,r.end,r.vs]));part.append(node('p',`Vs,30 oficial: ${profile.official_vs30||'No publicado'}`));
+        part.append(studyInformation(profile,node));
+        if(profile.source_format==='geoiberica-remi-v1')part.append(node('p','Formato identificado: GEOIBERICA · ReMi. Los límites de profundidad publicados gobiernan el dibujo.','badge'));
+        if(profile.documentary_rows?.length){const extra=node('details');extra.append(node('summary','Espesores y parámetros publicados · solo consulta'));
+          table(extra,['Desde · m','Hasta · m','Espesor · m','Densidad · kg/m³','Poisson','G · MPa','K · MN/m³ (unidad del informe)','E · MPa'],profile.documentary_rows.map(r=>[r.start,r.end,r.thickness,r.density,r.poisson,r.shear,r.bulk,r.young]));part.append(extra);}
         const checks=project.prospecciones.checks?.find(c=>c.key===profile.key);for(const warning of checks?.warnings||profile.extraction_warnings||[])part.append(node('p',warning,'badge'));
-        if(checks?.scene?.length){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','-24 -12 140 205');svg.setAttribute('class','profile-preview');svg.setAttribute('role','img');svg.setAttribute('aria-label','Perfil Vs de '+profile.name);
+        if(checks?.scene?.length){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');const bottom=Math.max(...checks.scene.flatMap(i=>i.points?.map(p=>p[1])||[i.point?.[1]||0]));svg.setAttribute('viewBox',`-24 -12 140 ${bottom+24}`);svg.setAttribute('class','profile-preview');svg.setAttribute('role','img');svg.setAttribute('aria-label','Perfil Vs de '+profile.name);
           for(const item of checks.scene){const shape=document.createElementNS(svg.namespaceURI,item.kind==='polyline'?'polyline':item.kind);shape.setAttribute('class','vs-'+item.kind);
+            const color={8:'#808080',3:'#00ff00',5:'#4f83ff',1:'#ff5959'}[item.color];
+            if(item.kind==='text'){shape.style.fill=color;shape.style.fontSize='2.5px';}
+            else {shape.style.stroke=color;shape.style.fill='none';shape.style.strokeWidth='.25';}
             if(item.kind==='line'){for(const [attribute,value] of Object.entries({x1:item.points[0][0],y1:item.points[0][1],x2:item.points[1][0],y2:item.points[1][1]}))shape.setAttribute(attribute,value);}
             else if(item.kind==='polyline')shape.setAttribute('points',item.points.map(p=>p.join(',')).join(' '));
             else if(item.kind==='circle'){shape.setAttribute('cx',item.point[0]);shape.setAttribute('cy',item.point[1]);shape.setAttribute('r',item.radius);}
@@ -127,9 +143,11 @@ export async function renderTools(page, ctx){
         const evidence=node('details');evidence.append(node('summary','Texto / imagen original'),node('pre',profile.source_text));if(profile.evidence?.image_png){const img=node('img');img.alt='Evidencia OCR original';img.src='data:image/png;base64,'+profile.evidence.image_png;img.className='evidence';evidence.append(img);}if(profile.evidence?.cells?.length)table(evidence,['Texto OCR','Confianza'],profile.evidence.cells.map(c=>[c.text,(c.confidence*100).toFixed(1)+' %']));part.append(evidence);
         if(profile.method==='ocr'){const reviewed=field(part,'He cotejado las cifras OCR con la imagen original','checkbox');reviewed.checked=profile.reviewed;reviewed.addEventListener('change',()=>{profile.reviewed=reviewed.checked;changed();});}
         const include=field(part,'Incluir tabla en CAD','checkbox');include.checked=true;
-        part.append(button('Insertar perfil en CAD',async()=>{const expected=await target();if(expected)await job('cad-profile',{report,key:profile.key,table:include.checked,expected});}));output.append(part);
+        part.append(button('Insertar perfil en CAD',async()=>{const withTable=include.checked,expected=await api('cad/status');
+          if(!await scalePreview(expected)||report!==project.prospecciones?.report)return;
+          if(confirm(`¿Insertar ${profile.name} solo en ${expected.active.name}?\nEscala: ${annotationScale.name}. Profundidades reales y texto de 2,5 mm.\nEl cuadro de empresa y estudio NO se enviará a CAD.\nNo se guardará el dibujo.`))await job('cad-profile',{report,key:profile.key,table:withTable,expected});}));output.append(part);
       }}
     s.append(node('p','Selecciona un informe PDF/TXT incorporado en Proyecto. No necesitas cargar un JSON. El informe se conserva solo mientras la aplicación esté abierta.'));
-    s.append(button('Usar informe de Proyecto',async()=>{if(project.prospecciones?.report&&!confirm('¿Reemplazar el informe de prospecciones actual? El informe actual será descartado.'))return;const file=(await choose('report'))[0];if(!file)return;const result=await job('prospect',{file:file.id,exhaustive:exhaustive.checked});project.prospecciones=result;changed();if(current())draw();},true));draw();
+    s.append(button('Usar informe de Proyecto',async()=>{if(project.prospecciones?.report&&!confirm('¿Reemplazar el informe de prospecciones actual? El informe actual será descartado.'))return;const file=(await choose('report'))[0];if(!file)return;const result=await job('prospect',{file:file.id,exhaustive:exhaustive.checked});project.prospecciones=result;annotationScale={name:'1:100 (m) · referencia de vista previa',value:10};changed();if(current())draw();},true));draw();
   }
 }

@@ -54,10 +54,11 @@ def command_with_completion(request):
             '(T (write-line "ok" SINCAL_LIVE_OUT) '
             '(write-line "CAD devolvio el control; revisa el resultado en el dibujo." SINCAL_LIVE_OUT))) '
             '(close SINCAL_LIVE_OUT))) (princ))\n')
-    if request.get('completion') == 'stratigraphy-v1':
+    if request.get('completion') in ('stratigraphy-v1','profile-v1'):
         if not command.startswith('(') or not command.endswith(')'):
             raise ValueError('La confirmación de estratigrafía requiere una expresión LISP.')
-        return f'(progn (setq *SINCAL_ESTRAT_COMPLETION* (list {marker} {token})) {command})\n'
+        symbol = '*SINCAL_PROFILE_COMPLETION*' if request['completion']=='profile-v1' else '*SINCAL_ESTRAT_COMPLETION*'
+        return f'(progn (setq {symbol} (list {marker} {token})) {command})\n'
     suffix = f'(progn (setq f (open {marker} "w")) (if f (progn (write-line {token} f) (close f))) (princ))'
     if command.startswith('(') and command.endswith(')'):
         return f'(progn {command} {suffix})\n'
@@ -71,7 +72,7 @@ def read_completion(request):
     lines = marker.read_text(encoding='utf-8', errors='replace').splitlines()
     if not lines or lines[0] != request['token']:
         return None
-    if request.get('completion') in ('stratigraphy-v1', 'live-v1'):
+    if request.get('completion') in ('stratigraphy-v1', 'profile-v1', 'live-v1'):
         if len(lines) < 3:
             return None  # Writer may not have closed the marker yet.
         if lines[1] != 'ok':

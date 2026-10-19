@@ -98,6 +98,9 @@ class TabProspecciones(ctk.CTkFrame):
         details = self._panel('tabla', 'TABLA OFICIAL Y AVISOS')
         self.selection_label = ctk.CTkLabel(details, text='', anchor='w', font=FUENTE_NORMAL)
         self.selection_label.pack(fill='x', pady=(0, 6))
+        self.study_label = ctk.CTkLabel(details, text='', anchor='w', justify='left', wraplength=740,
+                                        font=FUENTE_NORMAL_PEQUENA)
+        self.study_label.pack(fill='x', pady=6)
         table_host = ctk.CTkFrame(details, fg_color='transparent')
         table_host.pack(fill='x')
         self.layers_table = ttk.Treeview(table_host, columns=('n', 'start', 'end', 'vs'),
@@ -268,6 +271,12 @@ class TabProspecciones(ctk.CTkFrame):
     def _show_profile(self):
         self.layers_table.delete(*self.layers_table.get_children())
         profile = self.selected_profile()
+        info = profile.study_info if profile else {}
+        self.study_label.configure(text='EMPRESA Y ESTUDIO · SOLO CONSULTA (no se inserta en CAD)\n'+
+            '\n'.join(f'{label}: {info[key]}' for key,label in [('company','Empresa'),('document','Documento'),
+                ('date','Fecha'),('method','Método'),('prepared_by','Elaborado por'),('approved_by','Aprobado por'),
+                ('address','Dirección'),('email','Correo'),('phone','Teléfono'),('website','Sitio web')] if info.get(key))+
+            ('' if info.get('company') else 'Empresa no identificada; consulta el informe original.'))
         self.selection_label.configure(text=(
             f'{profile.name} · Página PDF {profile.page} · Vs,30 oficial: '
             f'{profile.official_vs30 or "No identificado"}' + (' m/s' if profile.official_vs30 else '')

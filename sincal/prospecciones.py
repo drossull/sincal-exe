@@ -61,6 +61,9 @@ class VsProfile:
     extraction_errors: list[str] = field(default_factory=list)
     extraction_warnings: list[str] = field(default_factory=list)
     reviewed: bool = False
+    study_info: dict[str, str] = field(default_factory=dict)
+    documentary_rows: list[dict[str, str]] = field(default_factory=list)
+    source_format: str = ''
 
     def errors(self) -> list[str]:
         errors = list(self.extraction_errors)
@@ -146,6 +149,9 @@ class VsReport:
                 extraction_errors=list(map(str, item.get('extraction_errors', []))),
                 extraction_warnings=list(map(str, item.get('extraction_warnings', []))),
                 reviewed=item.get('reviewed') is True,
+                study_info={str(k): str(v) for k,v in item.get('study_info', {}).items()},
+                documentary_rows=[{str(k):str(v) for k,v in row.items()} for row in item.get('documentary_rows', [])],
+                source_format=str(item.get('source_format', '')),
             )
             if profile.method not in ('text', 'ocr'):
                 raise ValueError('Método de extracción desconocido.')
@@ -178,6 +184,11 @@ def parse_pages(pages: list[str], path="", sha256="", *, allow_empty=False) -> V
     profiles, notices = [], []
     pending = None
     for page_index, text in enumerate(pages, 1):
+        from sincal.prospecciones_geoiberica import parse_table, study_info
+        geo = parse_table(text, page_index)
+        if geo is not None:
+            profiles.append(geo)
+            continue
         plain = normalized(text)
         if 'resumen' in plain and 'resultado' in plain:
             continue
@@ -205,8 +216,10 @@ def parse_pages(pages: list[str], path="", sha256="", *, allow_empty=False) -> V
         name = f"Arreglo {arrangement}" if arrangement else f"Perfil Vs · página {page_index}"
         profiles.append(VsProfile(
             key=f"p{page_index}-{arrangement or 'vs'}", name=name, page=page_index,
-            layers=rows, official_vs30=official[1] if official else '', source_text=text,
+            layers=rows, official_vs30=official[1] if official else '', source_text=text, study_info=study_info(text),
         ))
+    from sincal.prospecciones_geoiberica import compare_model_maxima
+    compare_model_maxima(pages, profiles)
     if not profiles and not allow_empty:
         raise ValueError("No se reconocieron tablas de estratos Vs. Esta versión admite PDF con "
                          "columnas N°, Inicio, Final y Vs. Activa OCR para las tablas en imágenes. "
