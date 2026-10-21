@@ -3,16 +3,29 @@ import {renderRebar,renderCrossbeam} from '/rebar.js';
 import {renderTools} from '/tools.js';
 import {renderNavigation,renderTabs,title,owner,destination} from '/navigation.js';
 import {createProjectFiles} from '/project_files.js';
+import {renderPasarela} from '/optional_modules.js';
 const $ = selector => document.querySelector(selector);
 const token = new URLSearchParams(location.hash.slice(1)).get('token') || sessionStorage.getItem('sincal-local-token') || '';
 sessionStorage.setItem('sincal-local-token', token);
 history.replaceState(null, '', '/');
 let project = null, result = null, dirty = false, page = 'home';
 renderNavigation(node);
+let pasarelaMenuRevision=0;
+function updatePasarelaMenuStatus(status){
+  if(typeof status?.installed!=='boolean')return;
+  pasarelaMenuRevision++;
+  const label=$('#sidebar [data-page="pasarela"] span');
+  if(label)label.textContent=status.installed?'Pasarela BIM':'Pasarela BIM · No instalado';
+}
 const projectFiles=createProjectFiles({api,node,button,section,notify});
 function node(tag, text, className){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(className)e.className=className;return e;}
 function notify(text){$('#notice').textContent=text;}
 async function api(path, payload){const response=await fetch('/api/'+path,{method:payload?'POST':'GET',headers:{'X-Sincal-Token':token,'Content-Type':'application/json'},body:payload?JSON.stringify(payload):undefined});const data=await response.json();if(!response.ok)throw Error(data.error);return data;}
+async function uploadPackage(file){
+  if(!file||!/\.zip$/i.test(file.name)||file.size===0||file.size>150*1024*1024)throw Error('Selecciona un ZIP no vacío de hasta 150 MiB.');
+  const response=await fetch('/api/modules/pasarela/install',{method:'POST',headers:{'X-Sincal-Token':token,'Content-Type':'application/zip','X-File-Name':encodeURIComponent(file.name)},body:file});
+  const data=await response.json();if(!response.ok)throw Error(data.error||'No se pudo instalar el paquete.');return data;
+}
 function button(text, action, primary=false){const b=node('button',text,primary?'primary':'');b.addEventListener('click',async()=>{b.disabled=true;try{await action();}catch(e){notify(e.message);}finally{b.disabled=false;}});return b;}
 function section(id,title){const s=node('section');s.id=id;s.append(node('h2',title));$('#main').append(s);const a=node('a',title);a.href='#'+id;$('#anchors').append(a);return s;}
 function acceptReplacement(){if(activeJob){notify('Termina o cancela la operación en curso antes de cambiar de proyecto.');return false;}return !dirty||confirm('Hay trabajo cargado o modificado. Al continuar se descartará; no se guardan sesiones. ¿Continuar?');}
@@ -66,7 +79,7 @@ async function job(operation,payload={}){
   }finally{activeJob=null;$('#activity').hidden=true;}
 }
 $('#cancel-job').addEventListener('click',()=>{if(activeJob&&activeJob!=='starting')api('jobs/cancel',{id:activeJob}).then(()=>notify('Cancelación solicitada. CAD podría seguir ejecutando la orden.')).catch(e=>notify(e.message));});
-function toolContext(currentPage){return {api:(path,payload)=>path==='files/choose'?projectFiles.choose(payload.kind,payload):api(path,payload),chooseOutput:()=>projectFiles.choose('folder'),node,button,section,notify,job,artifact,project,changed:()=>{dirty=true;},current:()=>page===currentPage};}
+function toolContext(currentPage){return {api:(path,payload)=>path==='files/choose'?projectFiles.choose(payload.kind,payload):api(path,payload),uploadPackage,chooseOutput:()=>projectFiles.choose('folder'),node,button,section,notify,job,artifact,project,changed:()=>{dirty=true;},current:()=>page===currentPage};}
 function download(name,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 async function show(next){page=destination(next);$('#main').replaceChildren();$('#anchors').replaceChildren();$('#breadcrumb').textContent=title(page);document.querySelectorAll('#sidebar [data-page]').forEach(b=>b.setAttribute('aria-current',b.dataset.page===owner(page)?'page':'false'));$('#main').append(node('span','SINCAL SUITE 3.0 / ESCRITORIO','eyebrow'));renderTabs(page,node);window.scrollTo(0,0);
 if(page==='home'){
@@ -107,6 +120,8 @@ const list=node('ul');for(const doc of data.documents)list.append(node('li',doc.
 }catch(error){status.replaceChildren(node('p',error.message));}
 },true),status);
 section('seguridad-cad','Conexión segura').append(node('p','No se inicia CAD automáticamente. Si hay varias instancias, la conexión se bloquea para no elegir un dibujo equivocado. Si COM se cuelga, solo se detiene el proceso de comprobación. Este estado es una instantánea y debe validarse de nuevo antes de cualquier futura operación.'));
+}else if(page==='pasarela'){
+await renderPasarela({...toolContext('pasarela'),onStatus:updatePasarelaMenuStatus});
 }else if(page==='rebar'){
 const intro=section('generador','Generador de armadura');intro.append(node('p','Prepara los antecedentes del puente y trabaja por estructura. El JSON se comparte con Consulta de proyecto; las memorias quedan como antecedentes para un análisis futuro.'));
 projectLoader(intro);if(project?.sourceName)intro.append(node('p','JSON activo: '+project.sourceName));
@@ -130,6 +145,8 @@ function persistPreferences(){api('preferences',{theme:$('#theme').value,palette
 $('#palette').addEventListener('change',()=>{document.documentElement.dataset.palette=$('#palette').value;persistPreferences();});
 for(const id of ['theme','zoom','panels','right-panel'])$('#'+id).addEventListener(id==='theme'||id==='zoom'?'change':'click',persistPreferences);
 async function start(){
+  const menuRevision=pasarelaMenuRevision;
+  api('modules/pasarela/status').then(status=>{if(pasarelaMenuRevision===menuRevision)updatePasarelaMenuStatus(status);}).catch(()=>{});
   const [preferences,palettes]=await Promise.all([api('preferences'),api('palettes')]);
   for(const palette of palettes){const option=node('option',palette.charAt(0).toUpperCase()+palette.slice(1));option.value=palette;$('#palette').append(option);}
   $('#palette').value=preferences.palette||'sincal';document.documentElement.dataset.palette=$('#palette').value;

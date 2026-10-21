@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import secrets
 import sqlite3
+import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
@@ -16,6 +17,7 @@ from .rebar import defaults as rebar_defaults, preview as rebar_preview
 from .cad_connection import connection_status
 from .services import Services, COMMANDS
 from .rebar import from_project
+from sincal.optional_modules import PasarelaModule, MAX_PACKAGE_BYTES
 
 ROOT = Path(__file__).resolve().parents[2]
 STATIC = Path(__file__).with_name("static")
@@ -134,6 +136,7 @@ class Server(ThreadingHTTPServer):
         self.origin = f"http://127.0.0.1:{self.server_port}"
         self.store = Store(data_dir / "sessions.sqlite3")
         self.services = Services(data_dir)
+        self.module_host = PasarelaModule()
         self.recovery_id = uuid.uuid4().hex
 
     def server_close(self):
@@ -178,6 +181,8 @@ class Handler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         if not self.authorized(path.startswith("/api/")):
             return
+        if path == "/api/modules/pasarela/status":
+            return self.send(200, self.server.module_host.status())
         if path == "/api/rebar/defaults":
             return self.send(200, rebar_defaults())
         if path == "/api/cad/status":
@@ -239,6 +244,7 @@ class Handler(BaseHTTPRequestHandler):
                   "/dwgprops.js": (STATIC / "dwgprops.js", "text/javascript; charset=utf-8"),
                   "/revisions.js": (STATIC / "revisions.js", "text/javascript; charset=utf-8"),
                   "/revision_editor.js": (STATIC / "revision_editor.js", "text/javascript; charset=utf-8"),
+                  "/optional_modules.js": (STATIC / "optional_modules.js", "text/javascript; charset=utf-8"),
                   "/app.css": (STATIC / "app.css", "text/css; charset=utf-8"),
                   "/logo.ico": (ROOT / "assets/icons/logo.ico", "image/x-icon")}
         for font in ("roboto-400.ttf", "roboto-700.ttf", "roboto-condensed-700.ttf", "roboto-flex-400.ttf", "roboto-mono-400.ttf"):
@@ -253,6 +259,23 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             size = int(self.headers.get("Content-Length", "0"))
+            if self.path == "/api/modules/pasarela/install":
+                if not 0 < size <= MAX_PACKAGE_BYTES:
+                    return self.send(413, {"error": "El paquete del módulo debe ser un ZIP de hasta 150 MB."})
+                if self.headers.get_content_type() not in ("application/zip", "application/octet-stream"):
+                    return self.send(415, {"error": "Selecciona el paquete ZIP del módulo."})
+                self.connection.settimeout(60)
+                with tempfile.TemporaryDirectory(prefix="sincal-module-upload-") as folder:
+                    package = Path(folder) / "pasarela.zip"
+                    with package.open("wb") as stream:
+                        remaining = size
+                        while remaining:
+                            block = self.rfile.read(min(remaining, 1024 * 1024))
+                            if not block:
+                                raise ValueError("La carga del módulo quedó incompleta.")
+                            stream.write(block)
+                            remaining -= len(block)
+                    return self.send(200, self.server.module_host.install(package))
             if not 0 < size <= MAX_BODY:
                 return self.send(413, {"error": "El límite de la solicitud es 64 MB."})
             if self.headers.get_content_type() != "application/json":
@@ -260,6 +283,18 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(size), parse_constant=lambda _: (_ for _ in ()).throw(ValueError("Número no finito")))
             if not isinstance(payload, dict):
                 raise ValueError("Se requiere un objeto JSON.")
+            if self.path == "/api/modules/pasarela/install-online":
+                return self.send(200, self.server.module_host.install_online())
+            if self.path == "/api/modules/pasarela/release":
+                release_url = self.server.module_host.status()["release_url"]
+                if not release_url.startswith("https://github.com/drossull/sincal-updates/releases/"):
+                    raise ValueError("La publicación del módulo no está disponible.")
+                webbrowser.open(release_url)
+                return self.send(200, {"url": release_url})
+            if self.path == "/api/modules/pasarela/open":
+                return self.send(200, self.server.module_host.launch())
+            if self.path == "/api/modules/pasarela/close":
+                return self.send(200, self.server.module_host.close())
             if self.path == "/api/project/preview":
                 return self.send(200, project_result(payload))
             if self.path == "/api/rebar/preview":
@@ -292,7 +327,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'message': 'Cancelación solicitada; no se deshacen acciones ya terminadas.'})
             self.send(404, {"error": "Ruta no encontrada"})
         except (ValueError, TypeError, RecursionError, AttributeError) as error:
-            self.send(400, {"error": f"Proyecto no válido: {error}"})
+            prefix = "" if self.path.startswith("/api/modules/") else "Proyecto no válido: "
+            self.send(400, {"error": prefix + str(error)})
         except Exception:
             self.send(500, {"error": "No se pudo completar la operación local. Revisa el registro de diagnóstico."})
 

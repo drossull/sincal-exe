@@ -26,6 +26,7 @@ class WorkbenchLayoutTests(unittest.TestCase):
             '"ubicacion", "pin", "Ubicación"',
             '"proyecto", "structure", "Proyecto"',
             '"consulta", "query", "Consulta"',
+            '"pasarela", "structure", "Pasarela BIM"',
             '"estructural", "structure", "Generador de armadura"',
             '"sesiones", "sessions", "Sesiones"',
             '"diagnostico", "diagnostic", "Diagnóstico"',
@@ -36,6 +37,15 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertNotIn("consola_scripts", source)
         self.assertNotIn("Automatización de planos cerrados", source)
         self.assertNotIn("lanzar_script", source)
+
+    def test_optional_pasarela_does_not_import_the_editor_at_startup(self):
+        core = APP.read_text(encoding="utf-8")
+        tab = (ROOT / "sincal" / "ui" / "tabs" / "pasarela.py").read_text(encoding="utf-8")
+        self.assertIn('self.vista_pasarela.refresh()', core)
+        self.assertIn('("pasarela", "Pasarela BIM")', core)
+        self.assertIn('from sincal import optional_modules', tab)
+        self.assertNotIn('import pasarela_bim', core + tab)
+        self.assertNotIn('from pasarela_bim', core + tab)
 
     def test_console_is_dockable_and_dxf_is_a_separate_module(self):
         source = APP.read_text(encoding="utf-8")

@@ -4,7 +4,8 @@ param(
     [string]$CertificateThumbprint = '',
     [string]$InnoSetupPath = '',
     [switch]$SkipSigning,
-    [switch]$DesktopWeb
+    [switch]$DesktopWeb,
+    [switch]$SkipPasarelaModule
 )
 
 Set-StrictMode -Version Latest
@@ -39,7 +40,8 @@ function Assert-VersionConsistency([string]$ProjectRoot, [string]$Version) {
     }
     foreach ($define in @(
         'AppPayloadUrl', 'AppPayloadHash', 'AppPayloadSize',
-        'PluginPayloadUrl', 'PluginPayloadHash', 'PluginPayloadSize'
+        'PluginPayloadUrl', 'PluginPayloadHash', 'PluginPayloadSize',
+        'PasarelaPayloadUrl', 'PasarelaPayloadHash', 'PasarelaPayloadSize'
     )) {
         if ($installer -notmatch ("#error " + [regex]::Escape($define) + " must be supplied by the build script\.")) {
             throw "SINCAL_Installer.iss no está parametrizado para $define."
@@ -304,6 +306,9 @@ function Assert-AppPayloadContents([string]$Path) {
         if ($regionalMaps.Count -gt 0) {
             throw "El paquete de aplicación contiene mapas regionales que deben quedar bajo demanda: $($regionalMaps -join ', ')"
         }
+        if (@($entries | Where-Object { $_ -match '(?i)(^|/)(pasarela_bim|pasarela-bim)(/|$)|SINCAL-Pasarela\.exe$' }).Count -gt 0) {
+            throw 'Pasarela BIM debe distribuirse como módulo independiente, fuera del paquete principal.'
+        }
     }
     finally {
         $archive.Dispose()
@@ -415,7 +420,8 @@ function Write-ReleaseManifest(
     [string]$AppPayload,
     [string]$PluginPayload,
     [string]$AppUrl,
-    [string]$PluginUrl
+    [string]$PluginUrl,
+    [object]$PasarelaModuleInfo
 ) {
     $manifest = [ordered]@{
         schema = 1
@@ -439,6 +445,21 @@ function Write-ReleaseManifest(
                 bytes = (Get-Item $PluginPayload).Length
                 sha256 = (Get-FileHash $PluginPayload -Algorithm SHA256).Hash.ToLowerInvariant()
             }
+        }
+    }
+    if ($null -ne $PasarelaModuleInfo) {
+        $manifest.assets.pasarela_bim = [ordered]@{
+            name = [IO.Path]::GetFileName($PasarelaModuleInfo.zip)
+            url = $PasarelaModuleInfo.url
+            version = $PasarelaModuleInfo.version
+            host_api = $PasarelaModuleInfo.host_api
+            bytes = $PasarelaModuleInfo.bytes
+            sha256 = $PasarelaModuleInfo.sha256
+        }
+        $manifest.assets.pasarela_installer = [ordered]@{
+            name = [IO.Path]::GetFileName($PasarelaModuleInfo.installer)
+            bytes = (Get-Item $PasarelaModuleInfo.installer).Length
+            sha256 = (Get-FileHash $PasarelaModuleInfo.installer -Algorithm SHA256).Hash.ToLowerInvariant()
         }
     }
     $manifest | ConvertTo-Json -Depth 8 | Set-Content -Path $Path -Encoding UTF8
@@ -547,12 +568,42 @@ $releaseBaseUrl = "https://github.com/drossull/sincal-updates/releases/download/
 $appPayloadUrl = "$releaseBaseUrl/$([IO.Path]::GetFileName($appPayload))"
 $pluginPayloadUrl = "$releaseBaseUrl/$([IO.Path]::GetFileName($pluginPayload))"
 
+# Este build tiene su propia spec y su propio payload. Nunca se añade al EXE
+# principal ni obliga a recompilar CAD/OCR cuando se distribuye por separado.
+$pasarelaInfo = $null
+if (-not $SkipPasarelaModule) {
+    Write-Step 'Compilando módulo opcional Pasarela BIM'
+    $moduleBuild = Join-Path $projectRoot 'tools\build_pasarela_module.py'
+    $moduleJson = & python $moduleBuild --output-dir $releaseOutputDir --skip-installer
+    if ($LASTEXITCODE -ne 0) { throw 'Falló la compilación del módulo Pasarela BIM.' }
+    $pasarelaInfo = $moduleJson | ConvertFrom-Json
+    if (-not $SkipSigning) {
+        Sign-File -Path $pasarelaInfo.executable -Certificate $certificate
+    }
+    # Rehacer manifiesto y ZIP DESPUÉS de firmar: el hash cubre el binario final.
+    $moduleJson = & python $moduleBuild --output-dir $releaseOutputDir --skip-build --iscc (Resolve-InnoSetupPath -Provided $InnoSetupPath) --smoke-test
+    if ($LASTEXITCODE -ne 0) { throw 'Falló el empaquetado/verificación del módulo Pasarela BIM.' }
+    $pasarelaInfo = $moduleJson | ConvertFrom-Json
+    if (-not $SkipSigning) {
+        Sign-File -Path $pasarelaInfo.installer -Certificate $certificate
+    }
+    $pasarelaInfo | Add-Member -NotePropertyName url -NotePropertyValue "$releaseBaseUrl/$([IO.Path]::GetFileName($pasarelaInfo.zip))"
+}
+
 Write-Step "Compilando instalador"
 $iscc = Resolve-InnoSetupPath -Provided $InnoSetupPath
 $normalizedVersion = $version.TrimStart('v', 'V')
 Push-Location $projectRoot
 try {
+    $moduleDefines = @('/DIncludePasarelaModule=0')
+    if ($null -ne $pasarelaInfo) {
+        $moduleDefines = @('/DIncludePasarelaModule=1',
+            "/DPasarelaPayloadUrl=$($pasarelaInfo.url)",
+            "/DPasarelaPayloadHash=$($pasarelaInfo.sha256)",
+            "/DPasarelaPayloadSize=$($pasarelaInfo.installed_bytes)")
+    }
     & $iscc `
+        @moduleDefines `
         "/DDesktopWebSetup=$([int][bool]$DesktopWeb)" `
         "/DAppVersion=$normalizedVersion" `
         "/DAppVersionTag=$version" `
@@ -586,15 +637,20 @@ Write-ReleaseManifest `
     -AppPayload $appPayload `
     -PluginPayload $pluginPayload `
     -AppUrl $appPayloadUrl `
-    -PluginUrl $pluginPayloadUrl | Out-Null
+    -PluginUrl $pluginPayloadUrl `
+    -PasarelaModuleInfo $pasarelaInfo | Out-Null
 
 Write-Step "Generando checksums"
-$checksumFile = Write-Checksums -OutputDirectory $releaseOutputDir -Paths @(
+$releasePaths = @(
     $installerExe,
     $appPayload,
     $pluginPayload,
     $releaseManifest
 )
+if ($null -ne $pasarelaInfo) {
+    $releasePaths += @($pasarelaInfo.zip, $pasarelaInfo.installer)
+}
+$checksumFile = Write-Checksums -OutputDirectory $releaseOutputDir -Paths $releasePaths
 
 Write-Step "Resumen"
 Get-Item $distExe, $pluginDll, $installerExe, $appPayload, $pluginPayload, $releaseManifest, $checksumFile | Select-Object FullName,Length,LastWriteTime | Format-List

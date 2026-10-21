@@ -58,7 +58,7 @@ class WebInstallerConfigurationTests(unittest.TestCase):
 
     def test_installer_downloads_hash_pinned_payloads(self):
         installer = (ROOT / "packaging" / "windows" / "SINCAL_Installer.iss").read_text(encoding="utf-8")
-        self.assertEqual(installer.count("external download extractarchive"), 2)
+        self.assertEqual(installer.count("external download extractarchive"), 3)
         self.assertIn('Hash: "{#AppPayloadHash}"', installer)
         self.assertIn('Hash: "{#PluginPayloadHash}"', installer)
 

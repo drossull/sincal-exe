@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "id": "pasarela-bim",
+  "name": "Pasarela BIM",
+  "version": "0.3.0",
+  "entrypoint": "SINCAL-Pasarela.exe",
+  "host_api": 1,
+  "description": "Editor topológico y generador conceptual de pasarelas de hormigón.",
+  "external_dependencies": ["FreeCAD para generar modelos y planos"]
+}

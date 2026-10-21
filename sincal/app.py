@@ -32,6 +32,7 @@ from customtkinter import filedialog
 from PIL import Image, ImageTk
 
 from sincal.ui.tabs.armaduras import TabArmaduras
+from sincal.ui.tabs.pasarela import TabPasarela
 from sincal.ui.tabs.project import TabProject
 from sincal.ui.tabs.prospecciones import TabProspecciones
 from sincal.ui.tabs.sessions import TabSessions
@@ -247,6 +248,11 @@ class ActualizadorCAD(ctk.CTk):
         self.setup_tab_renombrado()
         self.setup_tab_conversion_dxf()
         self.setup_tab_project()
+        self.vista_pasarela = TabPasarela(
+            self._sections["pasarela"][0], parent_app=self,
+            on_status=self.actualizar_estado_pasarela, fg_color="transparent")
+        self.vista_pasarela.pack(fill="both", expand=True)
+        self.after_idle(self.vista_pasarela.refresh)
         self.setup_tab_armaduras()
         self.vista_prospecciones = TabProspecciones(
             self._sections["prospecciones"][0], parent_app=self, fg_color="transparent")
@@ -325,6 +331,7 @@ class ActualizadorCAD(ctk.CTk):
             ("ubicacion", "pin", "Ubicación", "Ubicación"),
             ("proyecto", "structure", "Proyecto", "Proyecto"),
             ("consulta", "query", "Consulta", "Consulta"),
+            ("pasarela", "structure", "Pasarela BIM", "Pasarela BIM"),
             ("estructural", "structure", "Generador de armadura", "Generador de armadura"),
             ("prospecciones", "query", "Perfiles geofísicos", "Perfiles geofísicos"),
             ("sesiones", "sessions", "Sesiones", "Sesiones"),
@@ -499,6 +506,7 @@ class ActualizadorCAD(ctk.CTk):
             ("procesamiento", "Renombrado"),
             ("ubicacion", "Ubicación"),
             ("consulta", "Consulta"),
+            ("pasarela", "Pasarela BIM"),
             ("estructural", "Generador de armadura"),
             ("prospecciones", "Perfiles geofísicos"),
             ("sesiones", "Sesiones"),
@@ -545,6 +553,8 @@ class ActualizadorCAD(ctk.CTk):
         self.configurar_navegacion_pagina(key)
         if key == "consulta" and hasattr(self, "vista_project"):
             self.vista_project.refresh()
+        elif key == "pasarela" and hasattr(self, "vista_pasarela"):
+            self.vista_pasarela.refresh()
         elif key == "estructural" and hasattr(self, "vista_armaduras"):
             self.after_idle(self.vista_armaduras.actualizar_breadcrumb)
         elif key == "sesiones" and hasattr(self, "vista_sessions"):
@@ -569,6 +579,7 @@ class ActualizadorCAD(ctk.CTk):
                 "procesamiento": (("Archivos", "archivos"), ("Buscar y reemplazar", "reemplazo")),
                 "ubicacion": (("Datos del proyecto", "datos"), ("Ubicación y mapa", "mapa"), ("Generar croquis", "generar")),
                 "consulta": (("Identificación", "identificacion"), ("Fuente JSON", "fuente")),
+                "pasarela": (("Disponibilidad", "estado"), ("Instalar módulo", "instalar")),
                 "estructural": (("Dimensiones", "dimensiones"), ("Revisión y marcas", "revision"), ("Despiece", "despiece")),
                 "sesiones": (("Buscar", "buscar"), ("Biblioteca", "biblioteca")),
                 "prospecciones": (("Arreglos", "arreglos"), ("Tabla y avisos", "tabla"), ("Vista previa e inserción", "vista")),
@@ -611,6 +622,8 @@ class ActualizadorCAD(ctk.CTk):
         self.marcar_navegacion_pagina(anchor)
         if section == "consulta" and hasattr(self, "vista_project"):
             self.vista_project.ir_a_seccion(anchor)
+        elif section == "pasarela" and hasattr(self, "vista_pasarela"):
+            self.vista_pasarela.ir_a_seccion(anchor)
         elif section == "estructural" and hasattr(self, "vista_armaduras"):
             self.vista_armaduras.ir_a_seccion(anchor)
         elif section == "sesiones" and hasattr(self, "vista_sessions"):
@@ -1057,6 +1070,11 @@ class ActualizadorCAD(ctk.CTk):
             master=self.tab_project, parent_app=self,
             context=self.project_context, fg_color="transparent")
         self.vista_project.pack(fill="both", expand=True)
+
+    def actualizar_estado_pasarela(self, status):
+        button = self._nav_buttons.get("pasarela")
+        if button is not None and isinstance(status.get("installed"), bool):
+            button.configure(text="Pasarela BIM" if status["installed"] else "Pasarela BIM · No instalado")
 
     def setup_tab_armaduras(self):
         self.vista_armaduras = TabArmaduras(

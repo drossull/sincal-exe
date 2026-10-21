@@ -25,6 +25,20 @@
 #ifndef ReleaseOutputDir
   #error ReleaseOutputDir must be supplied by the build script.
 #endif
+#ifndef IncludePasarelaModule
+  #define IncludePasarelaModule "0"
+#endif
+#if IncludePasarelaModule == "1"
+  #ifndef PasarelaPayloadUrl
+    #error PasarelaPayloadUrl must be supplied by the build script.
+  #endif
+  #ifndef PasarelaPayloadHash
+    #error PasarelaPayloadHash must be supplied by the build script.
+  #endif
+  #ifndef PasarelaPayloadSize
+    #error PasarelaPayloadSize must be supplied by the build script.
+  #endif
+#endif
 
 [Setup]
 AppName=SINCAL Suite
@@ -47,6 +61,9 @@ PrivilegesRequired=admin
 CloseApplications=yes
 RestartApplications=no
 ChangesEnvironment=yes
+#if IncludePasarelaModule == "1"
+UsePreviousSetupType=no
+#endif
 
 ; Classic Explorer integration; the DLL only forwards the selected DWG list.
 #if defined(DesktopWebSetup) && DesktopWebSetup == "1"
@@ -87,12 +104,25 @@ Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F03001
 Root: HKLM; Subkey: "Software\Classes\CLSID\{{8549E221-34D5-4E21-937C-22D8F0300105}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Apartment"
 
 #endif
+#if IncludePasarelaModule == "1"
+[Types]
+Name: "standard"; Description: "Instalación habitual"
+Name: "custom"; Description: "Instalación personalizada"; Flags: iscustom
+
+[Components]
+Name: "core"; Description: "SINCAL Suite y herramientas AutoCAD"; Types: standard custom; Flags: fixed
+; Ningún tipo preselecciona el módulo. Se instala únicamente al marcarlo.
+Name: "pasarela"; Description: "Pasarela BIM (opcional; usa FreeCAD externo para generar)"
+#endif
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 Source: "{#AppPayloadUrl}"; DestDir: "{app}"; DestName: "SINCAL_App_{#AppVersionTag}.zip"; ExternalSize: {#AppPayloadSize}; Hash: "{#AppPayloadHash}"; Flags: external download extractarchive recursesubdirs createallsubdirs ignoreversion
 Source: "{#PluginPayloadUrl}"; DestDir: "{commonpf}\Autodesk\ApplicationPlugins\SINCAL.bundle"; DestName: "SINCAL_AutoCAD_{#AppVersionTag}.zip"; ExternalSize: {#PluginPayloadSize}; Hash: "{#PluginPayloadHash}"; Flags: external download extractarchive recursesubdirs createallsubdirs ignoreversion
+#if IncludePasarelaModule == "1"
+Source: "{#PasarelaPayloadUrl}"; DestDir: "{app}\modules\pasarela-bim"; DestName: "SINCAL_Pasarela.zip"; ExternalSize: {#PasarelaPayloadSize}; Hash: "{#PasarelaPayloadHash}"; Components: pasarela; Flags: external download extractarchive recursesubdirs createallsubdirs ignoreversion
+#endif
 
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\ocr_runtime"

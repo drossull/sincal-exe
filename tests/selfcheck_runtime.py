@@ -58,7 +58,8 @@ def main() -> int:
 
     with open(ruta_recurso("packaging", "windows", "SINCAL_Installer.iss"), encoding="utf-8") as archivo:
         instalador = archivo.read()
-    assert instalador.count("external download extractarchive") == 2, "Faltan paquetes del instalador web"
+    assert instalador.count("external download extractarchive") == 3, "Faltan paquetes del instalador web"
+    assert 'Components: pasarela' in instalador, "El paquete Pasarela debe ser opcional"
     assert 'Hash: "{#AppPayloadHash}"' in instalador, "Falta validar el paquete de aplicación"
     assert 'Hash: "{#PluginPayloadHash}"' in instalador, "Falta validar el paquete del plugin"
 

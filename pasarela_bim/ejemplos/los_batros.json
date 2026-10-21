@@ -1,0 +1,1117 @@
+{
+  "version": 1,
+  "proyecto": {
+    "id": "los-batros-conceptual-v1",
+    "nombre": "Pasarela Los Batros",
+    "estado": "conceptual",
+    "unidades": "mm",
+    "referencia": "G101-PT-PD-PLA-3001 a 3021, revision B",
+    "sistema_coordenadas": "Local: X cruce, Y accesos, Z elevacion. Sin transformacion georreferenciada.",
+    "descripcion": "Caso de ensayo topologico; conexiones documentadas y geometria simplificada. No reproduce moldajes de ejecucion."
+  },
+  "nodos": [
+    {
+      "id": "E1",
+      "tipo": "estribo",
+      "x": -3000,
+      "y": 10650,
+      "z": 8328,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "C1",
+      "tipo": "columna",
+      "x": -3000,
+      "y": 21250,
+      "z": 9048,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "C2",
+      "tipo": "columna",
+      "x": -3000,
+      "y": 42250,
+      "z": 10488,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "C3",
+      "tipo": "columna",
+      "x": -3000,
+      "y": 52950,
+      "z": 11218,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "C4",
+      "tipo": "columna",
+      "x": 0,
+      "y": 52950,
+      "z": 11218,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "C5",
+      "tipo": "columna",
+      "x": 0,
+      "y": 42250,
+      "z": 11928,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "C6",
+      "tipo": "columna",
+      "x": 0,
+      "y": 21250,
+      "z": 13368,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "C7",
+      "tipo": "columna",
+      "x": 0,
+      "y": 0,
+      "z": 14818,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "C8",
+      "tipo": "columna",
+      "x": 32500,
+      "y": 0,
+      "z": 14808,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "C9",
+      "tipo": "columna",
+      "x": 32500,
+      "y": 21250,
+      "z": 13358,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "C10",
+      "tipo": "columna",
+      "x": 32500,
+      "y": 42250,
+      "z": 11918,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "C11",
+      "tipo": "columna",
+      "x": 32500,
+      "y": 52950,
+      "z": 11213,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "C12",
+      "tipo": "columna",
+      "x": 35500,
+      "y": 52950,
+      "z": 11208,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "C13",
+      "tipo": "columna",
+      "x": 35500,
+      "y": 42250,
+      "z": 10478,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "C14",
+      "tipo": "columna",
+      "x": 35500,
+      "y": 21250,
+      "z": 9038,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    },
+    {
+      "id": "E2",
+      "tipo": "estribo",
+      "x": 35500,
+      "y": 10650,
+      "z": 8328,
+      "fuente": "3001-3004",
+      "estado_dato": "reconstruccion_local_de_referencia"
+    }
+  ],
+  "tramos": [
+    {
+      "id": "V1",
+      "desde": "E1",
+      "hasta": "C1",
+      "tipo": "viga",
+      "familia": "corto_extremo",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 285.0,
+      "retranqueo_fin_mm": 285.0,
+      "rasante": [
+        {
+          "t": 0,
+          "f": 0
+        },
+        {
+          "t": 0.075,
+          "f": 0
+        },
+        {
+          "t": 0.925,
+          "f": 1
+        },
+        {
+          "t": 1,
+          "f": 1
+        }
+      ],
+      "fuente": "3015",
+      "estado": "perfil_y_retranqueos_de_ensayo"
+    },
+    {
+      "id": "V2",
+      "desde": "C1",
+      "hasta": "C2",
+      "tipo": "viga",
+      "familia": "largo_rampa",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 350.0,
+      "retranqueo_fin_mm": 350.0,
+      "rasante": [
+        {
+          "t": 0,
+          "f": 0
+        },
+        {
+          "t": 0.04,
+          "f": 0
+        },
+        {
+          "t": 0.464,
+          "f": 0.5
+        },
+        {
+          "t": 0.536,
+          "f": 0.5
+        },
+        {
+          "t": 0.96,
+          "f": 1
+        },
+        {
+          "t": 1,
+          "f": 1
+        }
+      ],
+      "fuente": "3016",
+      "estado": "perfil_y_retranqueos_de_ensayo"
+    },
+    {
+      "id": "V3",
+      "desde": "C2",
+      "hasta": "C3",
+      "tipo": "viga",
+      "familia": "corto_retorno",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 484.0,
+      "retranqueo_fin_mm": 484.0,
+      "rasante": [
+        {
+          "t": 0,
+          "f": 0
+        },
+        {
+          "t": 0.075,
+          "f": 0
+        },
+        {
+          "t": 0.925,
+          "f": 1
+        },
+        {
+          "t": 1,
+          "f": 1
+        }
+      ],
+      "fuente": "3017",
+      "estado": "perfil_y_retranqueos_de_ensayo"
+    },
+    {
+      "id": "V4",
+      "desde": "C4",
+      "hasta": "C5",
+      "tipo": "viga",
+      "familia": "corto_retorno",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 484.0,
+      "retranqueo_fin_mm": 484.0,
+      "rasante": [
+        {
+          "t": 0,
+          "f": 0
+        },
+        {
+          "t": 0.075,
+          "f": 0
+        },
+        {
+          "t": 0.925,
+          "f": 1
+        },
+        {
+          "t": 1,
+          "f": 1
+        }
+      ],
+      "fuente": "3017",
+      "estado": "perfil_y_retranqueos_de_ensayo"
+    },
+    {
+      "id": "V5",
+      "desde": "C5",
+      "hasta": "C6",
+      "tipo": "viga",
+      "familia": "largo_rampa",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 350.0,
+      "retranqueo_fin_mm": 350.0,
+      "rasante": [
+        {
+          "t": 0,
+          "f": 0
+        },
+        {
+          "t": 0.04,
+          "f": 0
+        },
+        {
+          "t": 0.464,
+          "f": 0.5
+        },
+        {
+          "t": 0.536,
+          "f": 0.5
+        },
+        {
+          "t": 0.96,
+          "f": 1
+        },
+        {
+          "t": 1,
+          "f": 1
+        }
+      ],
+      "fuente": "3016",
+      "estado": "perfil_y_retranqueos_de_ensayo"
+    },
+    {
+      "id": "V6",
+      "desde": "C6",
+      "hasta": "C7",
+      "tipo": "viga",
+      "familia": "largo_rampa",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 475.0,
+      "retranqueo_fin_mm": 475.0,
+      "rasante": [
+        {
+          "t": 0,
+          "f": 0
+        },
+        {
+          "t": 0.04,
+          "f": 0
+        },
+        {
+          "t": 0.464,
+          "f": 0.5
+        },
+        {
+          "t": 0.536,
+          "f": 0.5
+        },
+        {
+          "t": 0.96,
+          "f": 1
+        },
+        {
+          "t": 1,
+          "f": 1
+        }
+      ],
+      "fuente": "3016",
+      "estado": "perfil_y_retranqueos_de_ensayo"
+    },
+    {
+      "id": "V7",
+      "desde": "C7",
+      "hasta": "C8",
+      "tipo": "viga",
+      "familia": "atravieso",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 650.0,
+      "retranqueo_fin_mm": 650.0,
+      "rasante": [
+        {
+          "t": 0,
+          "f": 0
+        },
+        {
+          "t": 1,
+          "f": 1
+        }
+      ],
+      "fuente": "3018",
+      "estado": "perfil_y_retranqueos_de_ensayo"
+    },
+    {
+      "id": "V8",
+      "desde": "C8",
+      "hasta": "C9",
+      "tipo": "viga",
+      "familia": "largo_rampa",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 475.0,
+      "retranqueo_fin_mm": 475.0,
+      "rasante": [
+        {
+          "t": 0,
+          "f": 0
+        },
+        {
+          "t": 0.04,
+          "f": 0
+        },
+        {
+          "t": 0.464,
+          "f": 0.5
+        },
+        {
+          "t": 0.536,
+          "f": 0.5
+        },
+        {
+          "t": 0.96,
+          "f": 1
+        },
+        {
+          "t": 1,
+          "f": 1
+        }
+      ],
+      "fuente": "3016",
+      "estado": "perfil_y_retranqueos_de_ensayo"
+    },
+    {
+      "id": "V9",
+      "desde": "C9",
+      "hasta": "C10",
+      "tipo": "viga",
+      "familia": "largo_rampa",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 350.0,
+      "retranqueo_fin_mm": 350.0,
+      "rasante": [
+        {
+          "t": 0,
+          "f": 0
+        },
+        {
+          "t": 0.04,
+          "f": 0
+        },
+        {
+          "t": 0.464,
+          "f": 0.5
+        },
+        {
+          "t": 0.536,
+          "f": 0.5
+        },
+        {
+          "t": 0.96,
+          "f": 1
+        },
+        {
+          "t": 1,
+          "f": 1
+        }
+      ],
+      "fuente": "3016",
+      "estado": "perfil_y_retranqueos_de_ensayo"
+    },
+    {
+      "id": "V10",
+      "desde": "C10",
+      "hasta": "C11",
+      "tipo": "viga",
+      "familia": "corto_retorno",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 484.0,
+      "retranqueo_fin_mm": 484.0,
+      "rasante": [
+        {
+          "t": 0,
+          "f": 0
+        },
+        {
+          "t": 0.075,
+          "f": 0
+        },
+        {
+          "t": 0.925,
+          "f": 1
+        },
+        {
+          "t": 1,
+          "f": 1
+        }
+      ],
+      "fuente": "3017",
+      "estado": "perfil_y_retranqueos_de_ensayo"
+    },
+    {
+      "id": "V11",
+      "desde": "C12",
+      "hasta": "C13",
+      "tipo": "viga",
+      "familia": "corto_retorno",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 484.0,
+      "retranqueo_fin_mm": 484.0,
+      "rasante": [
+        {
+          "t": 0,
+          "f": 0
+        },
+        {
+          "t": 0.075,
+          "f": 0
+        },
+        {
+          "t": 0.925,
+          "f": 1
+        },
+        {
+          "t": 1,
+          "f": 1
+        }
+      ],
+      "fuente": "3017",
+      "estado": "perfil_y_retranqueos_de_ensayo"
+    },
+    {
+      "id": "V12",
+      "desde": "C13",
+      "hasta": "C14",
+      "tipo": "viga",
+      "familia": "largo_rampa",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 350.0,
+      "retranqueo_fin_mm": 350.0,
+      "rasante": [
+        {
+          "t": 0,
+          "f": 0
+        },
+        {
+          "t": 0.04,
+          "f": 0
+        },
+        {
+          "t": 0.464,
+          "f": 0.5
+        },
+        {
+          "t": 0.536,
+          "f": 0.5
+        },
+        {
+          "t": 0.96,
+          "f": 1
+        },
+        {
+          "t": 1,
+          "f": 1
+        }
+      ],
+      "fuente": "3016",
+      "estado": "perfil_y_retranqueos_de_ensayo"
+    },
+    {
+      "id": "V13",
+      "desde": "C14",
+      "hasta": "E2",
+      "tipo": "viga",
+      "familia": "corto_extremo",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 285.0,
+      "retranqueo_fin_mm": 285.0,
+      "rasante": [
+        {
+          "t": 0,
+          "f": 0
+        },
+        {
+          "t": 0.075,
+          "f": 0
+        },
+        {
+          "t": 0.925,
+          "f": 1
+        },
+        {
+          "t": 1,
+          "f": 1
+        }
+      ],
+      "fuente": "3015",
+      "estado": "perfil_y_retranqueos_de_ensayo"
+    },
+    {
+      "id": "RETORNO_E1",
+      "desde": "C3",
+      "hasta": "C4",
+      "tipo": "retorno",
+      "familia": "descanso",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 0,
+      "retranqueo_fin_mm": 0,
+      "fuente": "3019",
+      "estado": "losa_de_conexion_simplificada"
+    },
+    {
+      "id": "RETORNO_E2",
+      "desde": "C11",
+      "hasta": "C12",
+      "tipo": "retorno",
+      "familia": "descanso",
+      "ancho_mm": 2000,
+      "retranqueo_inicio_mm": 0,
+      "retranqueo_fin_mm": 0,
+      "fuente": "3019",
+      "estado": "losa_de_conexion_simplificada"
+    }
+  ],
+  "familias": {
+    "corto_extremo": {
+      "tipo": "cajon",
+      "ancho_inferior_mm": 1000,
+      "ancho_alma_superior_mm": 1260,
+      "ala_mm": 370,
+      "losa_superior_mm": 150,
+      "losa_inferior_mm": 140,
+      "alma_mm": 140,
+      "macizado_mm": 500,
+      "estado": "simplificada",
+      "canto_mm": 550,
+      "fuente": "3015"
+    },
+    "largo_rampa": {
+      "tipo": "cajon",
+      "ancho_inferior_mm": 1000,
+      "ancho_alma_superior_mm": 1260,
+      "ala_mm": 370,
+      "losa_superior_mm": 150,
+      "losa_inferior_mm": 140,
+      "alma_mm": 140,
+      "macizado_mm": 500,
+      "estado": "simplificada",
+      "canto_mm": 600,
+      "fuente": "3016",
+      "canto_fin_mm": 720,
+      "perfil_canto": [
+        {
+          "t": 0,
+          "canto_mm": 600
+        },
+        {
+          "t": 0.463,
+          "canto_mm": 600
+        },
+        {
+          "t": 0.537,
+          "canto_mm": 720
+        },
+        {
+          "t": 1,
+          "canto_mm": 720
+        }
+      ]
+    },
+    "corto_retorno": {
+      "tipo": "cajon",
+      "ancho_inferior_mm": 1000,
+      "ancho_alma_superior_mm": 1260,
+      "ala_mm": 370,
+      "losa_superior_mm": 150,
+      "losa_inferior_mm": 140,
+      "alma_mm": 140,
+      "macizado_mm": 500,
+      "estado": "simplificada",
+      "canto_mm": 550,
+      "fuente": "3017"
+    },
+    "atravieso": {
+      "tipo": "cajon",
+      "ancho_inferior_mm": 1000,
+      "ancho_alma_superior_mm": 1260,
+      "ala_mm": 370,
+      "losa_superior_mm": 150,
+      "losa_inferior_mm": 240,
+      "alma_mm": 140,
+      "macizado_mm": 500,
+      "estado": "simplificada",
+      "canto_mm": 1450,
+      "fuente": "3018"
+    },
+    "descanso": {
+      "tipo": "maciza",
+      "canto_mm": 550,
+      "fuente": "3019",
+      "estado": "simplificada"
+    }
+  },
+  "fundaciones": [
+    {
+      "id": "DADO_C1_C6",
+      "nodos": [
+        "C1",
+        "C6"
+      ],
+      "largo_mm": 6500,
+      "ancho_mm": 2000,
+      "alto_mm": 2000,
+      "cota_superior_mm": 2968.0,
+      "fuente": "3007",
+      "pilotes": [
+        {
+          "id": "P_C1_C6_1",
+          "dx_mm": -2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        },
+        {
+          "id": "P_C1_C6_2",
+          "dx_mm": 2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        }
+      ]
+    },
+    {
+      "id": "DADO_C2_C5",
+      "nodos": [
+        "C2",
+        "C5"
+      ],
+      "largo_mm": 6500,
+      "ancho_mm": 2000,
+      "alto_mm": 2000,
+      "cota_superior_mm": 3037.0,
+      "fuente": "3008",
+      "pilotes": [
+        {
+          "id": "P_C2_C5_1",
+          "dx_mm": -2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        },
+        {
+          "id": "P_C2_C5_2",
+          "dx_mm": 2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        }
+      ]
+    },
+    {
+      "id": "DADO_C3_C4",
+      "nodos": [
+        "C3",
+        "C4"
+      ],
+      "largo_mm": 6500,
+      "ancho_mm": 2000,
+      "alto_mm": 2000,
+      "cota_superior_mm": 2928.0,
+      "fuente": "3009",
+      "pilotes": [
+        {
+          "id": "P_C3_C4_1",
+          "dx_mm": -2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        },
+        {
+          "id": "P_C3_C4_2",
+          "dx_mm": 2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        }
+      ]
+    },
+    {
+      "id": "DADO_C9_C14",
+      "nodos": [
+        "C9",
+        "C14"
+      ],
+      "largo_mm": 6500,
+      "ancho_mm": 2000,
+      "alto_mm": 2000,
+      "cota_superior_mm": 4128.0,
+      "fuente": "3012",
+      "pilotes": [
+        {
+          "id": "P_C9_C14_1",
+          "dx_mm": -2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        },
+        {
+          "id": "P_C9_C14_2",
+          "dx_mm": 2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        }
+      ]
+    },
+    {
+      "id": "DADO_C10_C13",
+      "nodos": [
+        "C10",
+        "C13"
+      ],
+      "largo_mm": 6500,
+      "ancho_mm": 2000,
+      "alto_mm": 2000,
+      "cota_superior_mm": 3588.0,
+      "fuente": "3013",
+      "pilotes": [
+        {
+          "id": "P_C10_C13_1",
+          "dx_mm": -2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        },
+        {
+          "id": "P_C10_C13_2",
+          "dx_mm": 2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        }
+      ]
+    },
+    {
+      "id": "DADO_C11_C12",
+      "nodos": [
+        "C11",
+        "C12"
+      ],
+      "largo_mm": 6500,
+      "ancho_mm": 2000,
+      "alto_mm": 2000,
+      "cota_superior_mm": 3218.0,
+      "fuente": "3014",
+      "pilotes": [
+        {
+          "id": "P_C11_C12_1",
+          "dx_mm": -2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        },
+        {
+          "id": "P_C11_C12_2",
+          "dx_mm": 2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        }
+      ]
+    },
+    {
+      "id": "DADO_C7",
+      "nodos": [
+        "C7"
+      ],
+      "largo_mm": 2000,
+      "ancho_mm": 2000,
+      "alto_mm": 2000,
+      "cota_superior_mm": 2228.0,
+      "fuente": "3010",
+      "pilotes": [
+        {
+          "id": "P_C7_1",
+          "dx_mm": 0,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        }
+      ],
+      "angulo_deg": 0
+    },
+    {
+      "id": "DADO_C8",
+      "nodos": [
+        "C8"
+      ],
+      "largo_mm": 2000,
+      "ancho_mm": 2000,
+      "alto_mm": 2000,
+      "cota_superior_mm": 4658.0,
+      "fuente": "3011",
+      "pilotes": [
+        {
+          "id": "P_C8_1",
+          "dx_mm": 0,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        }
+      ],
+      "angulo_deg": 0
+    },
+    {
+      "id": "DADO_E1",
+      "nodos": [
+        "E1"
+      ],
+      "largo_mm": 7000,
+      "ancho_mm": 2200,
+      "alto_mm": 1500,
+      "cota_superior_mm": 3080.0,
+      "fuente": "3005",
+      "pilotes": [
+        {
+          "id": "P_E1_1",
+          "dx_mm": -2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        },
+        {
+          "id": "P_E1_2",
+          "dx_mm": 2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        }
+      ],
+      "angulo_deg": 90
+    },
+    {
+      "id": "DADO_E2",
+      "nodos": [
+        "E2"
+      ],
+      "largo_mm": 7000,
+      "ancho_mm": 2200,
+      "alto_mm": 1500,
+      "cota_superior_mm": 5508.0,
+      "fuente": "3006",
+      "pilotes": [
+        {
+          "id": "P_E2_1",
+          "dx_mm": -2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        },
+        {
+          "id": "P_E2_2",
+          "dx_mm": 2250,
+          "dy_mm": 0,
+          "diametro_mm": 1500,
+          "longitud_mm": 23000
+        }
+      ],
+      "angulo_deg": 90
+    }
+  ],
+  "soportes": [
+    {
+      "id": "C1",
+      "nodo": "C1",
+      "fundacion": "DADO_C1_C6",
+      "fuente": "3007",
+      "diametro_mm": 800,
+      "cota_superior_mm": 7798.0
+    },
+    {
+      "id": "C6",
+      "nodo": "C6",
+      "fundacion": "DADO_C1_C6",
+      "fuente": "3007",
+      "diametro_mm": 800,
+      "cota_superior_mm": 12118.0
+    },
+    {
+      "id": "C2",
+      "nodo": "C2",
+      "fundacion": "DADO_C2_C5",
+      "fuente": "3008",
+      "diametro_mm": 800,
+      "cota_superior_mm": 9217.0
+    },
+    {
+      "id": "C5",
+      "nodo": "C5",
+      "fundacion": "DADO_C2_C5",
+      "fuente": "3008",
+      "diametro_mm": 800,
+      "cota_superior_mm": 10677.0
+    },
+    {
+      "id": "C3",
+      "nodo": "C3",
+      "fundacion": "DADO_C3_C4",
+      "fuente": "3009",
+      "diametro_mm": 1000,
+      "cota_superior_mm": 10158.0
+    },
+    {
+      "id": "C4",
+      "nodo": "C4",
+      "fundacion": "DADO_C3_C4",
+      "fuente": "3009",
+      "diametro_mm": 1000,
+      "cota_superior_mm": 10138.0
+    },
+    {
+      "id": "C9",
+      "nodo": "C9",
+      "fundacion": "DADO_C9_C14",
+      "fuente": "3012",
+      "diametro_mm": 800,
+      "cota_superior_mm": 12108.0
+    },
+    {
+      "id": "C14",
+      "nodo": "C14",
+      "fundacion": "DADO_C9_C14",
+      "fuente": "3012",
+      "diametro_mm": 800,
+      "cota_superior_mm": 7788.0
+    },
+    {
+      "id": "C10",
+      "nodo": "C10",
+      "fundacion": "DADO_C10_C13",
+      "fuente": "3013",
+      "diametro_mm": 800,
+      "cota_superior_mm": 10668.0
+    },
+    {
+      "id": "C13",
+      "nodo": "C13",
+      "fundacion": "DADO_C10_C13",
+      "fuente": "3013",
+      "diametro_mm": 800,
+      "cota_superior_mm": 9208.0
+    },
+    {
+      "id": "C11",
+      "nodo": "C11",
+      "fundacion": "DADO_C11_C12",
+      "fuente": "3014",
+      "diametro_mm": 1000,
+      "cota_superior_mm": 10118.0
+    },
+    {
+      "id": "C12",
+      "nodo": "C12",
+      "fundacion": "DADO_C11_C12",
+      "fuente": "3014",
+      "diametro_mm": 1000,
+      "cota_superior_mm": 10148.0
+    },
+    {
+      "id": "C7",
+      "nodo": "C7",
+      "fundacion": "DADO_C7",
+      "fuente": "3010",
+      "diametro_mm": 1000,
+      "cota_superior_mm": 12868.0
+    },
+    {
+      "id": "C8",
+      "nodo": "C8",
+      "fundacion": "DADO_C8",
+      "fuente": "3011",
+      "diametro_mm": 1000,
+      "cota_superior_mm": 12858.0
+    },
+    {
+      "id": "E1",
+      "nodo": "E1",
+      "fundacion": "DADO_E1",
+      "fuente": "3005",
+      "ancho_mm": 2000,
+      "largo_mm": 6500,
+      "cota_superior_mm": 7528,
+      "estado": "envolvente_maciza_simplificada"
+    },
+    {
+      "id": "E2",
+      "nodo": "E2",
+      "fundacion": "DADO_E2",
+      "fuente": "3006",
+      "ancho_mm": 2000,
+      "largo_mm": 6500,
+      "cota_superior_mm": 7528,
+      "estado": "envolvente_maciza_simplificada"
+    }
+  ],
+  "pendientes_documentales": [
+    "INC-01: Longitud de cables. Confirmar longitud válida; no elegir automáticamente.",
+    "INC-02: Cadena transversal del esquema de cables. Conciliar disposición del pretensado con sección geométrica.",
+    "INC-03: Dos definiciones INS-01. Confirmar si son variantes o reemplazos; conservar ambas evidencias.",
+    "INC-04: Pernos unión baranda. Confirmar variante y longitud.",
+    "INC-05: Especificaciones de materiales y recubrimientos. Registrar por elemento y lámina; no normalizar sin criterio del proyecto.",
+    "INC-06: Unidades y referencias de ancho. Separar ancho estructural, ancho útil y distancia entre referencias; confirmar unidades por detalle.",
+    "INC-07: Altura rotulada y cotas de C4. Conciliar 10 mm de diferencia sin corregir tácitamente.",
+    "INC-08: Identidad de secciones. Asignar identificadores inequívocos para vistas del generador.",
+    "INC-09: Coordenadas y sistema de referencia. Confirmar sistema y transformación; no mezclar sondeos con coordenadas estructurales.",
+    "INC-10: Cantidad de insertos de baranda. Confirmar alcance por borde o conjunto antes de cubicación.",
+    "INC-11: Cuña de apoyo. Conservar precisión y referencia antes de fijar dimensión."
+  ],
+  "vistas": [],
+  "simplificaciones": [
+    "Coordenadas locales reconstruidas de ejes; no son coordenadas de replanteo.",
+    "Perfiles de rasante y retranqueos simetricos de ensayo: no resuelven por si solos la pendiente de proyecto.",
+    "Secciones de rampas aproximadas; cantos y longitudes nominales conservados.",
+    "Capiteles, estribos y cierres son envolventes simplificadas; no reproducen rebajes ni etapas.",
+    "No incluye armaduras, pretensado geometrico, barandas, aparatos de apoyo ni bombeo transversal.",
+    "Las cantidades corresponden solamente a los solidos simplificados generados."
+  ]
+}

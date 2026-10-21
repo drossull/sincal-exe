@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict');
+const {faces}=require('../../pasarela_bim/web/volumen.js');
+const model={nodos:[{id:'A',x:0,y:0,z:0},{id:'B',x:10000,y:0,z:800}],familias:{losa:{tipo:'maciza',canto_mm:250},escalera:{tipo:'escalera',canto_mm:200,numero_peldanos:10}}};
+const edge={desde:'A',hasta:'B',familia:'losa',ancho_mm:2000,retranqueo_inicio_mm:500,retranqueo_fin_mm:500};
+const shape=faces(model,edge),points=shape.flat();
+assert.equal(Math.min(...points.map(p=>p[0])),500);assert.equal(Math.max(...points.map(p=>p[0])),9500);
+assert.equal(Math.max(...points.map(p=>p[1])),1000);assert.equal(Math.min(...points.map(p=>p[2])),-210);
+const stairs=faces(model,{...edge,familia:'escalera',retranqueo_inicio_mm:0,retranqueo_fin_mm:0});
+assert.equal(stairs.filter(poly=>poly.length===4&&poly.every(p=>p[2]===poly[0][2])).length,10);
+assert.deepEqual(faces(model,{...edge,hasta:'MISSING'}),[]);
+console.log('Volume preview: dimensions, trimmed grade, stair treads passed.');

@@ -1,12 +1,16 @@
 # SINCAL Suite — Ingeniería y estándares CAD
 
-**SINCAL Suite** es un workbench para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 2.0 y la secuencia técnica continúa en `v29.0.23` para conservar una actualización ordenada desde las instalaciones v28.
+**SINCAL Suite** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 3.0. Esta guía corresponde a la release `v3.0.25`, con interfaz de escritorio web y Pasarela BIM como módulo opcional.
 
-## Vista previa de escritorio con interfaz web
+La disponibilidad de los instaladores se confirma en las
+[publicaciones oficiales](https://github.com/drossull/sincal-updates/releases).
+La actualización de esta guía no implica por sí sola que una release ya esté publicada.
 
-La aplicación seguirá siendo de escritorio, no un portal público. La interfaz
+## Aplicación de escritorio con interfaz web
+
+La aplicación funciona localmente en Windows. La interfaz
 HTML/CSS se muestra dentro de una ventana propia mediante Microsoft Edge WebView2.
-Para ejecutar esta vista previa desde el repositorio en Windows:
+Para ejecutarla desde el repositorio durante el desarrollo:
 
 ```powershell
 python -m pip install -r requirements-desktop-web.txt
@@ -14,17 +18,15 @@ python -m sincal.web.desktop
 ```
 
 Requiere Microsoft Edge WebView2 Runtime instalado. Después de instalar las
-dependencias, la interfaz y sus operaciones locales funcionan sin Internet.
-No abre el navegador externo ni modifica el arranque de la versión Tk instalada.
+dependencias, la interfaz y sus operaciones locales funcionan sin Internet;
+las descargas de recursos, actualizaciones y módulos requieren conexión.
 Al cerrar la ventana se pide confirmación y se apaga el servidor interno. Sus
-sesiones usan el mismo almacén del piloto, privado al perfil de Windows.
-El empaquetado firmado y reemplazo del instalador de producción siguen pendientes.
+sesiones se mantienen en el almacén privado del perfil de Windows.
 
-## Funciones de la nueva interfaz de escritorio
+## Funciones de la interfaz de escritorio
 
-La vista previa incorpora todos los módulos del menú. Reutiliza los cálculos,
-recursos y generadores Python/LISP existentes; no convierte SINCAL en un sitio
-público ni modifica el repositorio Cadence.
+La interfaz reúne los módulos del menú y reutiliza los cálculos, recursos y
+generadores Python/LISP existentes. Pasarela BIM se instala y ejecuta por separado.
 
 - **Home:** presentación, comprobación/aplicación de recursos, preparación CAD
   e historial de operaciones con descarga del registro.
@@ -40,6 +42,8 @@ público ni modifica el repositorio Cadence.
   calibración existente. No interpreta coordenadas PTL como geográficas.
 - **Consulta:** JSON de solo lectura, OT/revisión/estructura y exportación TXT;
   dimensiones compatibles del JSON se convierten de mm a cm para las armaduras.
+- **Pasarela BIM:** módulo opcional con estado de instalación, descarga del paquete
+  compatible y acceso al editor topológico de pasarelas de hormigón.
 - **Armaduras:** entrada/salida independientes, marcas editables, diámetros,
   separación, ganchos, origen, cantidades, áreas, pesos, tabla ampliada y detalle
   SVG por marca. Dibujo de vistas FR/AA/BB/CC/EE y despiece de zapata.
@@ -77,23 +81,27 @@ Para pruebas de frontend también existe `python -m sincal.web.server`, que abre
 un navegador **solo para desarrollo**. El arranque normal es la ventana nativa.
 El servidor se limita a loopback: no es apto para publicarlo en Internet.
 
-### Validación y compilación pendiente
+### Validación y compilación
 
-El inventario, las pruebas y limitaciones se mantienen en
-[Estado de la migración](docs/MIGRACION_WEB.md).
-La versión instalada sigue sin reemplazarse. No se ha ejecutado compilación,
-firma, publicación ni instalación de esta migración.
+El arranque de escritorio usa `desktop_main.py` y
+`packaging/windows/SINCAL_Web.spec`. La release `v3.0.25` se construye con
+`tools/build_release.ps1 -DesktopWeb`; sin esa opción, el pipeline conserva el
+arranque Tk para compatibilidad. La versión instalada sólo cambia al ejecutar
+su instalador.
 
-Se prepararon `desktop_main.py`, el trabajador CAD empaquetable y
-`packaging/windows/SINCAL_Web.spec`. Tras autorizar la compilación, instalar las
-dependencias de escritorio, asignar una versión nueva y validar WebView2, el
-pipeline permite elegir esta interfaz con `tools/build_release.ps1 -DesktopWeb`.
-Sin esa opción conserva el arranque Tk anterior. No publicar sin probar el
-ejecutable y las operaciones CAD sobre dibujos de ensayo.
+Cada publicación debe identificar sus pruebas y limitaciones. Antes de publicarla
+se comprueban el ejecutable empaquetado, WebView2, los paquetes firmados y las
+operaciones modificadas sobre archivos de ensayo. El documento
+[Estado de la migración](docs/MIGRACION_WEB.md) conserva antecedentes técnicos;
+sus pendientes históricos no sustituyen el resultado de verificación de cada release.
 
 ## Instalación web y distribución
 
-SINCAL Suite se distribuye mediante un instalador web firmado. El archivo `Setup_SINCAL_v29.0.23.exe` contiene únicamente el motor de instalación; durante la ejecución descarga desde la release pública los paquetes exactos de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y recién entonces los instala.
+SINCAL Suite se distribuye mediante un instalador web firmado. El archivo
+`Setup_SINCAL_v3.0.25.exe` descarga desde su release pública los paquetes exactos
+de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y después los instala.
+El componente **Pasarela BIM** aparece **desmarcado por defecto**: su paquete
+independiente sólo se descarga si se selecciona. También puede instalarse más adelante.
 
 El programa base no incorpora los 125 MB de mapas regionales. El paquete web sí contiene una copia inicial del master DWG, LISPs, startup, scripts, plumilla, calibración y ayuda estructural para que el primer arranque sea funcional. GitHub mantiene esos recursos al día mediante actualizaciones menores. Cada mapa regional se descarga solamente cuando se selecciona por primera vez en el módulo Ubicación.
 
@@ -101,12 +109,15 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
 
 ## Primer inicio
 
-1. Ejecuta el instalador oficial de la release `v29.0.23`.
+1. Descarga y ejecuta el instalador de `v3.0.25` desde su publicación oficial, con SINCAL y CAD cerrados.
 2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
 3. Abre **Diagnóstico**, verifica el motor CAD sugerido y cámbialo si necesitas otra versión.
 4. Pulsa **Preparar integración CAD**.
 5. Reinicia AutoCAD/ZWCAD una vez para activar el cargador y las rutas de confianza.
 6. Abre **Documentación** para consultar el manual buscable de comandos y módulos.
+7. Si necesitas Pasarela BIM y figura **No instalado**, abre su página y pulsa
+   **Instalar Pasarela BIM**. Se descargará el módulo correspondiente a esta
+   versión de SINCAL; al terminar podrás usar **Abrir editor**.
 
 La copia base de los recursos esenciales queda junto a la aplicación. Las revisiones descargadas, estados, diagnósticos y registros se almacenan en `%LOCALAPPDATA%\SINCAL`: son datos internos de SINCAL que no necesitan acompañar el perfil móvil del usuario. La integración CAD activa se materializa en `%APPDATA%\Estandar SINCAL`: AutoCAD/ZWCAD deben poder encontrar allí LISPs, startup y scripts desde el perfil del usuario. No son dos copias equivalentes: **Local** es almacén y estado de la aplicación; **Roaming** es la copia operativa expuesta al CAD.
 
@@ -232,6 +243,41 @@ La cuadrícula ocupa 100 × 150 mm de papel y el texto 2,5 mm a la escala actual
 la tabla es opcional. El dibujo no se guarda automáticamente. La vista previa usa
 una fuente de pantalla; la rotulación final en CAD usa RomanD.
 
+### Pasarela BIM (módulo opcional)
+
+El menú muestra **Pasarela BIM** inmediatamente antes de **Generador de armadura**,
+tanto en la interfaz clásica como en la interfaz de escritorio web. Cuando falta
+el módulo, el menú indica **No instalado** y su página ofrece
+**Instalar Pasarela BIM**. Ese botón descarga e instala el paquete oficial
+correspondiente a la versión de SINCAL instalada; su disponibilidad se comprueba
+al solicitar la instalación. Después aparece **Abrir editor**.
+El editor topológico de pasarelas de hormigón funciona en un proceso
+independiente y abre el navegador del equipo; no carga su motor durante el
+arranque de SINCAL.
+
+El instalador general ofrece el componente **desmarcado por defecto**. También
+puede añadirse después mediante el botón de instalación en línea. Si ya tienes
+el paquete, despliega **Instalar o actualizar desde un ZIP local** y selecciona
+`SINCAL_Pasarela_v0.3.0.zip`, o ejecuta el complemento independiente
+`Setup_SINCAL_Pasarela_v0.3.0.exe` de la misma publicación oficial.
+No hace falta reinstalar el programa general.
+FreeCAD se instala por separado y sólo es necesario para generar el modelo.
+La consulta del módulo indica si está disponible.
+
+La instalación posterior se guarda en `%LOCALAPPDATA%\SINCAL\modules\pasarela-bim`;
+el componente del instalador general, en `{app}\modules\pasarela-bim`.
+La instalación por usuario tiene prioridad. Los resultados se guardan aparte,
+en `%LOCALAPPDATA%\SINCAL\pasarela-bim\generados`; los proyectos se intercambian
+mediante JSON en metros. Antes de actualizar, guarda ese JSON y pulsa
+**Cerrar módulo** en SINCAL. Cerrar sólo la pestaña no detiene el servidor del editor.
+
+La descarga comprueba el tamaño y SHA-256 publicados para el ZIP. Antes de
+instalarlo también se validan identidad, versión de contrato, rutas y SHA-256
+de cada archivo. La sustitución conserva la instalación anterior si falla.
+El módulo tiene su propia versión, `0.3.0`, y no incluye FreeCAD ni OCR.
+Las instrucciones de compilación independiente y distribución están en
+[`packaging/windows/pasarela-bim/README.md`](packaging/windows/pasarela-bim/README.md).
+
 ### Generador de armadura
 
 Prepara vistas, despieces y cubicación de fierro mediante comandos temporales enviados al CAD abierto:
@@ -317,14 +363,24 @@ El tab **Documentación** presenta el manual en el área central y usa el índic
 
 Los cambios en Python, interfaz, plugin .NET o instalador requieren una release completa. Los recursos menores no reemplazan ejecutables.
 
-## Compilar una release web
+## Compilar una release de escritorio web
 
 ```powershell
 python -m pip install -r requirements-build.txt
-pwsh -NoProfile -File tools/build_release.ps1
+python -m pip install -r requirements-desktop-web.txt
+pwsh -NoProfile -File tools/build_release.ps1 -DesktopWeb
 ```
 
-El proceso valida código y pruebas, compila y firma el plugin y la aplicación, crea los paquetes remotos, calcula hashes, compila el instalador web y genera el manifiesto y `SHA256SUMS.txt`. Cada compilación queda aislada en `installer_output/vXX.X.X/`; las versiones anteriores no se mezclan ni se eliminan. Para una compilación local no publicable se puede usar `-SkipSigning`.
+El proceso valida código y pruebas, compila y firma el plugin y la aplicación,
+y construye Pasarela BIM como ejecutable y paquete independientes. Firma el
+ejecutable del módulo antes de calcular sus hashes, compila y firma ambos
+instaladores y genera el manifiesto de release y `SHA256SUMS.txt`.
+Los artefactos de `v3.0.25` quedan en `installer_output/v3.0.25/`.
+Reserva una versión nueva y prepara un checkout de compilación aislado antes
+de ejecutar el pipeline: volver a compilar la misma versión sustituye sus
+artefactos locales. Para una compilación local no publicable puede usarse
+`-SkipSigning`. `-SkipPasarelaModule` omite el paquete y la opción del módulo;
+no debe usarse para esta release que incorpora Pasarela BIM.
 
 La compilación utiliza CPython 3.12 x64 de python.org. `tools/build_ocr_runtime.py`
 prepara un runtime aislado en `ocr_runtime/`, con dependencias fijadas en
@@ -336,13 +392,18 @@ ejecuta `python -m pytest tests/test_prospecciones_ocr.py -q` después de prepar
 
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v29.0.23.exe`
-- `SINCAL_App_v29.0.23.zip`
-- `SINCAL_AutoCAD_v29.0.23.zip`
-- `release-manifest_v29.0.23.json`
+- `Setup_SINCAL_v3.0.25.exe`
+- `SINCAL_App_v3.0.25.zip`
+- `SINCAL_AutoCAD_v3.0.25.zip`
+- `SINCAL_Pasarela_v0.3.0.zip`
+- `Setup_SINCAL_Pasarela_v0.3.0.exe`
+- `release-manifest_v3.0.25.json`
 - `SHA256SUMS.txt`
 
-No renombres los paquetes después de compilar: el instalador usa URLs versionadas y hashes fijados en el momento del build.
+No renombres ni vuelvas a firmar los paquetes después de calcular sus hashes:
+el instalador y la instalación posterior del módulo usan las URLs y hashes de
+esa release. Publica únicamente los siete artefactos anteriores; las carpetas
+de preparación, registros y `pasarela-module-build.json` son salidas internas.
 
 ## Seguridad y diagnóstico
 

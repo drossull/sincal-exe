@@ -11,7 +11,7 @@ web_data = collect_data_files('webview') + [
 a = Analysis([os.path.join(project_root, 'desktop_main.py')], pathex=[project_root],
              binaries=[], datas=web_data,
              hiddenimports=collect_submodules('webview') + ['clr', 'pythoncom', 'win32com.client'],
-             hookspath=[], runtime_hooks=[], excludes=[], noarchive=False)
+             hookspath=[], runtime_hooks=[], excludes=['pasarela_bim'], noarchive=False)
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, a.binaries, a.datas, [], name='SINCAL', debug=False,
           strip=False, upx=True, console=False,
