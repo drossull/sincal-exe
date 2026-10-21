@@ -103,7 +103,8 @@
   if (typeof document === "undefined") return;
   window.PasarelaEditing = editing;
   const $ = (id) => document.getElementById(id);
-  const state = { model: null, selected: null, view: "plan", elevationAxis: null, revision: 0, history: [], validation: null, validationRevision: -1, validateSerial: 0, freecad: false, job: null, files: [], filesRevision: -1, generationWarnings: [], viewport: null, drag: null, userMoved: false };
+  const state = { model: null, selected: null, view: "plan", elevationAxis: null, revision: 0, history: [], validation: null, validationRevision: -1, validateSerial: 0, freecad: false, job: null, startingGeneration: false, files: [], filesRevision: -1, generationWarnings: [], viewport: null, drag: null, userMoved: false };
+  const integration = window.PasarelaIntegration;
   const NS = "http://www.w3.org/2000/svg";
   let validationTimer, toastTimer, sectionController;
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -127,15 +128,16 @@
     return payload;
   }
   function saveHistory() { if (state.model) {state.history.push(clone(state.model));if (state.history.length > 40) state.history.shift();} }
-  function changed({fit = false, inspector = false, projectEdit = true} = {}) {
+  function changed({fit = false, inspector = false, projectEdit = true, dirty = true} = {}) {
     state.revision++;state.validationRevision = -1;state.validation = null;
+    integration?.setDirty(dirty);
     if(state.model&&projectEdit){state.model.proyecto.revision=number(state.model.proyecto.revision)+1;state.model.proyecto.estado="borrador";}
     $("undo").disabled = !state.history.length;$("validation-badge").textContent = "Por comprobar";$("validation-badge").className = "status-badge neutral";$("validation-content").innerHTML='<p class="muted">Configuración modificada. Comprobación pendiente.</p>';
     renderSummary();renderList();renderElevationOptions();renderScene(fit);renderDelivery();renderProjectReference();if (inspector) renderInspector();else sectionController?.refresh();
     clearTimeout(validationTimer);validationTimer = setTimeout(validate, 500);
   }
   function mutate(fn, options = {}) {saveHistory();fn();changed(options);}
-  function acceptModel(model, label) {
+  function acceptModel(model, label, {dirty = true} = {}) {
     model = window.ProjectIO.toInternal(model);
     if (!model || typeof model !== "object" || !Array.isArray(model.nodos) || !Array.isArray(model.tramos)) throw new Error("El JSON debe contener las listas «nodos» y «tramos».");
     for (const key of ["nodos","tramos","fundaciones","soportes","ejes"]) {
@@ -155,14 +157,15 @@
     saveHistory();state.model = clone(model);state.model.familias ||= {};state.model.fundaciones ||= [];state.model.soportes ||= [];state.model.pendientes_documentales ||= [];state.model.fundaciones.forEach(f=>{f.nodos||=[];f.pilotes||=[];});state.selected = null;state.userMoved = false;
     $("project-name").textContent = model.proyecto?.nombre || "Pasarela sin nombre";
     $("project-description").textContent = model.simplificaciones?.length ? "Geometría conceptual simplificada · Perfiles y apoyos aproximados, sin armaduras ni barandas." : "Modelo local orientativo · Edita las relaciones, comprueba la configuración y genera su geometría.";
-    renderNotes();changed({fit:true,inspector:true,projectEdit:false});$("entity-list").scrollTop=0;if (label) toast(label);
+    renderNotes();changed({fit:true,inspector:true,projectEdit:false,dirty});$("entity-list").scrollTop=0;if (label) toast(label);
   }
   function renderSummary() {
+    integration?.setBusy("generation", !!state.job || state.startingGeneration);
     $("summary").innerHTML = `<div><strong>${nodes().length}</strong><span>Nodos</span></div><div><strong>${edges().length}</strong><span>Tramos</span></div>`;
     $("entity-count").textContent = nodes().length + edges().length + foundations().length + axes().length;
     $("canvas-empty").hidden = !!nodes().length;
     ["export-json","validate","add-node","add-edge","add-axis","suggest-axes","project-settings","crossing-setup","cargar-planta"].forEach(id => $(id).disabled = !state.model);
-    $("generate").disabled = !state.model || !state.freecad || !!state.job;
+    $("generate").disabled = !state.model || !state.freecad || !!state.job || state.startingGeneration;
   }
   function renderList() {
     if (!state.model) {$('entity-list').innerHTML='<p class="muted empty-small">Crea un proyecto para dibujar el recorrido.</p>';return;}
@@ -371,16 +374,48 @@
   function renderDelivery(){const stale=state.files.length&&state.filesRevision!==state.revision;if(state.job){$("delivery-status").textContent="GENERANDO";$("delivery-content").innerHTML=`<div class="job-running"><span class="spinner"></span><span>${esc(state.job.message||"Construyendo modelo y vistas…")}</span></div>${state.job.revision!==state.revision?'<p class="stale-message" style="margin-top:8px">Has cambiado el modelo durante la generación. Esta salida corresponderá a la configuración anterior.</p>':""}`;return;}
     if(state.files.length){$("delivery-status").textContent=stale?"VERSIÓN ANTERIOR":state.generationWarnings.length?"CON AVISOS":"DISPONIBLE";$("delivery-content").innerHTML=`<p class="${stale?"stale-message":"muted"}">${stale?"El modelo cambió. Estos archivos pertenecen a una versión anterior; vuelve a generar para obtener la configuración actual.":"Generación completada. Abre el modelo para revisar su geometría y las vistas."}</p><div class="download-list">${state.files.map(f=>{let url;try{url=new URL(f.url,location.origin);if(url.origin!==location.origin)return"";}catch(_){return"";}return`<a class="download-link" href="${esc(url.pathname+url.search)}" download>${esc(f.nombre)} <span aria-hidden="true">↓</span></a>`;}).join("")}</div>${state.generationWarnings.length?`<ul class="issues">${state.generationWarnings.slice(0,3).map(w=>`<li class="warning"><span>${esc(typeof w==="string"?w:w.mensaje||JSON.stringify(w))}</span></li>`).join("")}</ul>${state.generationWarnings.length>3?`<p class="muted">${state.generationWarnings.length-3} avisos adicionales en el informe de generación.</p>`:""}`:""}`;return;}
     $("delivery-status").textContent="SIN GENERAR";$("delivery-content").innerHTML='<p class="muted">Al generar, aquí encontrarás el modelo de FreeCAD y sus archivos de salida.</p>';}
-  async function generate(){if(!state.model||state.job)return;const valid=state.validationRevision===state.revision?state.validation:await validate();if(!(valid?.generable??valid?.valido)){toast("Completa los datos pendientes y corrige los errores antes de generar.",true);return;}if(!state.freecad){toast("FreeCAD no está disponible en este equipo.",true);return;}
-    const revision=state.revision;state.job={revision,message:"Preparando generación…"};renderSummary();renderDelivery();try{const job=await api("/api/generar",clone(state.model));if(!job.trabajo_id)throw new Error("El servidor no identificó el trabajo de generación.");state.job.id=job.trabajo_id;pollJob();}catch(error){state.job=null;renderSummary();renderDelivery();toast(error.message,true);}}
-  async function pollJob(){const job=state.job;if(!job?.id)return;try{const result=await api(`/api/trabajos/${encodeURIComponent(job.id)}`);if(state.job!==job)return;if(result.estado==="completado"){state.files=Array.isArray(result.archivos)?result.archivos:[];state.filesRevision=job.revision;state.generationWarnings=Array.isArray(result.resultado?.avisos)?result.resultado.avisos:Array.isArray(result.avisos)?result.avisos:[];state.job=null;renderSummary();renderDelivery();if(!state.files.length){$("delivery-status").textContent="COMPLETADO";$("delivery-content").innerHTML=`<p class="muted">${esc(result.mensaje||"El proceso terminó sin archivos descargables.")}</p>`;}toast(!state.files.length?"El proceso terminó sin archivos descargables.":job.revision===state.revision?"Modelo generado. Los archivos están disponibles.":"Terminó la generación de la versión anterior.");return;}if(result.estado==="error")throw new Error(result.mensaje||"No se pudo generar el modelo.");job.message=result.mensaje||"Construyendo modelo y vistas…";renderDelivery();setTimeout(pollJob,1600);}catch(error){if(state.job!==job)return;state.job=null;renderSummary();renderDelivery();$("delivery-status").textContent="ERROR";$("delivery-content").insertAdjacentHTML("afterbegin",`<p class="stale-message">${esc(error.message)}</p>`);toast(error.message,true);}}
-  async function loadExample(){const button=$("load-example");button.disabled=true;try{acceptModel(await api("/api/ejemplo"),"Ejemplo Los Batros cargado.");}catch(error){toast(error.message,true);}finally{button.disabled=false;}}
-  function exportJson(){if(!state.model)return;try{const portable=ProjectIO.toPortable(state.model);portable.proyecto.guardado_en=new Date().toISOString();const blob=new Blob([JSON.stringify(portable,null,2)+"\n"],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=(state.model.proyecto?.nombre||"pasarela").replace(/[^a-zA-Z0-9_-]/g,"_")+".json";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast("Proyecto guardado en metros, con familias y borrador incluidos.");}catch(error){toast(error.message,true);}}
-  $("load-example").addEventListener("click",loadExample);$("import-json").addEventListener("click",()=>$("file-input").click());$("file-input").addEventListener("change",async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>20*1024*1024)throw new Error("El archivo JSON supera el tamaño admitido de 20 MB.");acceptModel(JSON.parse(await file.text()),"Configuración importada.");}catch(error){toast(error instanceof SyntaxError?"El archivo no contiene un JSON válido.":error.message,true);}finally{event.target.value="";}});
+  async function generate(){
+    if(!state.model||state.job||state.startingGeneration)return;
+    state.startingGeneration=true;renderSummary();
+    try{
+      const valid=state.validationRevision===state.revision?state.validation:await validate();
+      if(!(valid?.generable??valid?.valido)){toast("Completa los datos pendientes y corrige los errores antes de generar.",true);return;}
+      if(!state.freecad){toast("FreeCAD no está disponible en este equipo.",true);return;}
+      const revision=state.revision;state.job={revision,message:"Preparando generación…"};renderSummary();renderDelivery();
+      const job=await api("/api/generar",clone(state.model));if(!job.trabajo_id)throw new Error("El servidor no identificó el trabajo de generación.");state.job.id=job.trabajo_id;pollJob();
+    }catch(error){state.job=null;renderDelivery();toast(error.message,true);}
+    finally{state.startingGeneration=false;renderSummary();}
+  }
+  async function pollJob(){
+    const job=state.job;if(!job?.id)return;
+    try{
+      const result=await api(`/api/trabajos/${encodeURIComponent(job.id)}`);if(state.job!==job)return;
+      if(result.estado==="completado"){
+        state.files=Array.isArray(result.archivos)?result.archivos:[];state.filesRevision=job.revision;
+        state.generationWarnings=Array.isArray(result.resultado?.avisos)?result.resultado.avisos:Array.isArray(result.avisos)?result.avisos:[];
+        state.job=null;renderSummary();renderDelivery();
+        if(!state.files.length){$("delivery-status").textContent="COMPLETADO";$("delivery-content").innerHTML=`<p class="muted">${esc(result.mensaje||"El proceso terminó sin archivos descargables.")}</p>`;}
+        toast(!state.files.length?"El proceso terminó sin archivos descargables.":job.revision===state.revision?"Modelo generado. Los archivos están disponibles.":"Terminó la generación de la versión anterior.");return;
+      }
+      if(result.estado==="error"){
+        state.job=null;renderSummary();renderDelivery();$("delivery-status").textContent="ERROR";
+        $("delivery-content").insertAdjacentHTML("afterbegin",`<p class="stale-message">${esc(result.mensaje||"No se pudo generar el modelo.")}</p>`);toast(result.mensaje||"No se pudo generar el modelo.",true);return;
+      }
+      job.message=result.mensaje||"Construyendo modelo y vistas…";renderDelivery();setTimeout(pollJob,1600);
+    }catch(error){
+      if(state.job!==job)return;
+      // A failed status request does not mean that the native process stopped.
+      job.message="Sin comunicación con el motor. El trabajo puede seguir en curso; comprobando de nuevo…";
+      renderDelivery();setTimeout(pollJob,3000);
+    }
+  }
+  async function loadExample(){const button=$("load-example");button.disabled=true;integration?.setBusy("example",true);try{acceptModel(await api("/api/ejemplo"),"Ejemplo Los Batros cargado.");}catch(error){toast(error.message,true);}finally{button.disabled=false;integration?.setBusy("example",false);}}
+  function exportJson(){if(!state.model)return;try{const portable=ProjectIO.toPortable(state.model);portable.proyecto.guardado_en=new Date().toISOString();const blob=new Blob([JSON.stringify(portable,null,2)+"\n"],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=(state.model.proyecto?.nombre||"pasarela").replace(/[^a-zA-Z0-9_-]/g,"_")+".json";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast("Descarga del JSON solicitada. Confirma que el archivo se haya guardado.");}catch(error){toast(error.message,true);}}
+  $("load-example").addEventListener("click",loadExample);$("import-json").addEventListener("click",()=>$("file-input").click());$("file-input").addEventListener("change",async event=>{const file=event.target.files[0];if(!file)return;integration?.setBusy("json-import",true);try{if(file.size>20*1024*1024)throw new Error("El archivo JSON supera el tamaño admitido de 20 MB.");acceptModel(JSON.parse(await file.text()),"Configuración importada.",{dirty:false});}catch(error){toast(error instanceof SyntaxError?"El archivo no contiene un JSON válido.":error.message,true);}finally{event.target.value="";integration?.setBusy("json-import",false);}});
   $("export-json").addEventListener("click",exportJson);$("validate").addEventListener("click",validate);$("generate").addEventListener("click",generate);$("add-node").addEventListener("click",addNode);$("add-edge").addEventListener("click",addEdge);$("undo").addEventListener("click",()=>{if(!state.history.length)return;const restored=state.history.pop();state.model=restored;state.selected=null;$("project-name").textContent=restored.proyecto?.nombre||"Pasarela sin nombre";renderNotes();changed({fit:true,inspector:true});toast("Último cambio deshecho.");});$("entity-search").addEventListener("input",renderList);
   $("new-project").addEventListener("click",()=>projectDialog());$("project-settings").addEventListener("click",()=>projectDialog(true));$("crossing-setup").addEventListener("click",crossingDialog);
   $("add-axis").addEventListener("click",()=>axisDialog());$("suggest-axes").addEventListener("click",proposeAxes);$("elevation-axis").addEventListener("change",event=>{state.elevationAxis=event.target.value;renderScene(true);});
-  $("cargar-planta").addEventListener("click",()=>$("planta-input").click());$("planta-input").addEventListener("change",async event=>{const file=event.target.files[0];if(!file||!state.model)return;const model=state.model,button=$("cargar-planta");button.disabled=true;try{if(!window.SitePlan)throw new Error("El lector de plantas no está disponible.");const data=await SitePlan.load(file,model);if(state.model!==model)throw new Error("El proyecto cambió durante la carga. Vuelve a seleccionar la planta.");mutate(()=>{state.model.emplazamiento={...state.model.emplazamiento,planta:data};},{fit:true});toast("Planta de referencia cargada.");}catch(error){toast(error.message,true);}finally{event.target.value="";button.disabled=!state.model;}});
+  $("cargar-planta").addEventListener("click",()=>$("planta-input").click());$("planta-input").addEventListener("change",async event=>{const file=event.target.files[0];if(!file||!state.model)return;const model=state.model,button=$("cargar-planta");button.disabled=true;integration?.setBusy("site-import",true);try{if(!window.SitePlan)throw new Error("El lector de plantas no está disponible.");const data=await SitePlan.load(file,model);if(state.model!==model)throw new Error("El proyecto cambió durante la carga. Vuelve a seleccionar la planta.");mutate(()=>{state.model.emplazamiento={...state.model.emplazamiento,planta:data};},{fit:true});toast("Planta de referencia cargada.");}catch(error){toast(error.message,true);}finally{event.target.value="";button.disabled=!state.model;integration?.setBusy("site-import",false);}});
   $("site-plan-status").addEventListener("change",event=>{const plan=state.model?.emplazamiento?.planta;if(!plan)return;if(event.target.id==="site-visible")mutate(()=>plan.visible=event.target.checked);if(event.target.matches("[data-site-layer]")){const name=event.target.dataset.siteLayer;mutate(()=>{const hidden=new Set(plan.capas_ocultas||[]);if(event.target.checked)hidden.delete(name);else hidden.add(name);plan.capas_ocultas=[...hidden];});}});
   document.addEventListener("click",event=>{const target=event.target.closest("[data-select-type]");if(target)select(target.dataset.selectType,target.dataset.selectId);const action=event.target.closest("[data-action]")?.dataset.action;if(action==="delete")deleteSelection();if(action==="create-support")createSupport();const issue=event.target.closest("[data-issue-id]")?.dataset.issueId;if(issue){const type=nodes().some(n=>n.id===issue)?"node":edges().some(e=>e.id===issue)?"edge":foundations().some(f=>f.id===issue)?"foundation":axes().some(a=>a.id===issue)?"axis":null;if(type)select(type,issue);}});
   document.addEventListener("click",event=>{const add=event.target.closest("[data-node-add]");if(add){connectionDialog(add.dataset.nodeAdd);return;}const action=event.target.closest("[data-action]")?.dataset.action;if(action==="connect")connectionDialog(state.selected?.id);if(action==="direction")directionDialog(edges().find(e=>e.id===state.selected?.id));if(action==="share-foundation")shareFoundation();});
@@ -394,4 +429,5 @@
   window.addEventListener("resize",applyViewport);
   renderSummary();api("/api/estado").then(result=>{state.freecad=!!result.freecad_disponible;$("freecad-status").textContent=state.freecad?"FreeCAD disponible":"FreeCAD no disponible";$("freecad-status").classList.toggle("ready",state.freecad);renderSummary();}).catch(()=>{$("freecad-status").textContent="Motor sin conexión";});
   renderList();renderProjectReference();renderElevationOptions();
+  integration?.ready();
 })();

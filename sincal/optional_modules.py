@@ -23,7 +23,7 @@ import threading
 import time
 from urllib.parse import urlsplit
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen, build_opener, HTTPRedirectHandler, HTTPSHandler
+from urllib.request import Request, urlopen, build_opener, HTTPRedirectHandler, HTTPSHandler, ProxyHandler
 import uuid
 import webbrowser
 import zipfile
@@ -186,6 +186,8 @@ def _read_manifest(raw):
         raise ValueError("Este paquete no corresponde a Pasarela BIM o requiere otra versión de SINCAL.")
     if not isinstance(manifest.get("version"), str) or not re.fullmatch(r"\d+\.\d+\.\d+(?:[-+][\w.-]+)?", manifest["version"]):
         raise ValueError("El paquete no tiene una versión válida.")
+    if "embedding" in manifest and (type(manifest["embedding"]) is not int or manifest["embedding"] < 1):
+        raise ValueError("El paquete no declara una integración válida con SINCAL.")
     files = manifest.get("files")
     if not isinstance(files, dict) or not files or ENTRYPOINT not in files:
         raise ValueError("El paquete no declara todos sus archivos y comprobaciones de integridad.")
@@ -219,11 +221,58 @@ def _remove_owned_directory(path, parent):
     shutil.rmtree(path)
 
 
+def _parent_origin(origin):
+    # An origin is exact: no path, credentials, whitespace, alternate loopback
+    # spelling, query or fragment. Never accept a client-supplied embed target.
+    if not isinstance(origin, str) or not re.fullmatch(r"http://127\.0\.0\.1:[1-9]\d{0,4}", origin) or int(origin.rsplit(":", 1)[1]) > 65535:
+        raise ValueError("La dirección de integración con SINCAL no es válida.")
+    return origin
+
+
 def _local_url(url):
-    parsed = urlsplit(url)
-    if parsed.scheme != "http" or parsed.hostname != "127.0.0.1" or not parsed.port or parsed.username or parsed.password or parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+    try:
+        origin = _parent_origin(url[:-1] if isinstance(url, str) and url.endswith("/") else url)
+    except ValueError:
         raise ValueError("El módulo devolvió una dirección de inicio no válida.")
-    return url.rstrip("/") + "/"
+    return origin + "/"
+
+
+class _NoLocalRedirects(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise ValueError("El módulo devolvió una redirección no autorizada.")
+
+
+def _control_request(info, route, *, payload=None, timeout=5):
+    """Send the private control token only to the validated local endpoint."""
+    token = info.get("control_token")
+    if not isinstance(token, str) or not 20 <= len(token) <= 200:
+        raise ValueError("El módulo no permite gestionar esta sesión. Actualiza su paquete.")
+    headers = {"X-Pasarela-Token": token}
+    data = None
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    request = Request(_local_url(info.get("url")) + route, data=data, headers=headers)
+    # Ignore ambient proxy settings and refuse redirects, including redirects
+    # to another loopback service. The control token must stay in this process.
+    opener = build_opener(ProxyHandler({}), _NoLocalRedirects())
+    with opener.open(request, timeout=timeout) as response:
+        raw = response.read(65537)
+    if len(raw) > 65536:
+        raise ValueError("El módulo devolvió una respuesta no válida.")
+    result = json.loads(raw)
+    if not isinstance(result, dict):
+        raise ValueError("El módulo devolvió una respuesta no válida.")
+    return result
+
+
+def _embedding_supported(manifest):
+    return bool(manifest) and type(manifest.get("embedding")) is int and manifest["embedding"] == 1
+
+
+def _embedding_update_message(running=False):
+    return ("Guarda el JSON y usa «Cerrar módulo» antes de actualizar Pasarela BIM para abrirlo dentro de SINCAL."
+            if running else "Actualiza Pasarela BIM para abrir el editor dentro de SINCAL.")
 
 
 def _wait_windows_process(pid, timeout):
@@ -293,14 +342,13 @@ class PasarelaModule:
             token = info["control_token"]
             if not isinstance(token, str) or not 20 <= len(token) <= 200:
                 return None
-            request = Request(url + "api/host-status", headers={"X-Pasarela-Token": token})
-            with urlopen(request, timeout=.6) as response:
-                current = json.load(response)
+            current = _control_request(info, "api/host-status", timeout=.6)
             if current.get("pid") != info.get("pid") or current.get("version") != info.get("version"):
                 return None
+            info = {**info, "embedding": current.get("embedding"), "url": url}
             self.ready, self.url = info, url
             return info
-        except (OSError, ValueError, KeyError, TypeError):
+        except (OSError, ValueError, KeyError, TypeError, HTTPException):
             return None
 
     def _discover(self):
@@ -320,7 +368,7 @@ class PasarelaModule:
         if self.allow_source and (self.source_dir / "pasarela_bim" / "__main__.py").is_file():
             init = (self.source_dir / "pasarela_bim" / "__init__.py").read_text(encoding="utf-8")
             match = re.search(r'__version__\s*=\s*[\'"]([^\'"]+)', init)
-            return self.source_dir, "development", {"version": match[1] if match else "desarrollo"}
+            return self.source_dir, "development", {"version": match[1] if match else "desarrollo", "embedding": 1}
         return None, None, None
 
     def status(self):
@@ -332,16 +380,20 @@ class PasarelaModule:
                 source, manifest, error = None, None, str(exc)
             installed = manifest is not None
             release = _release_context()
+            running = self._running_info()
+            embedded_supported = _embedding_supported(manifest) and (running is None or _embedding_supported(running))
             return {"id": MODULE_ID, "nombre": "Pasarela BIM", "installed": installed,
                     "source": source, "version": manifest["version"] if installed else None,
+                    "embedded_supported": embedded_supported,
                     "freecad_available": _freecad_available(), "max_package_bytes": MAX_PACKAGE_BYTES,
-                    "running": self._running_info() is not None,
+                    "running": running is not None,
                     "installing": self._online_thread is not None,
                     "online_install_available": release is not None,
                     "release_url": release["release_url"] if release else None,
                     "install_message": (f"Se descargará el módulo oficial correspondiente a SINCAL {release['version']}; su disponibilidad se comprueba al instalar."
                                         if release else "No se pudo identificar un release de SINCAL. Puedes instalar un paquete local compatible."),
-                    "message": error or ("Disponible desde el código de desarrollo." if source == "development" else
+                    "message": error or (_embedding_update_message(running is not None) if installed and not embedded_supported else
+                        "Disponible desde el código de desarrollo." if source == "development" else
                         "Módulo instalado. Puedes abrir el editor." if installed else
                         "Módulo opcional. Instala el paquete Pasarela BIM cuando lo necesites.")}
 
@@ -452,11 +504,33 @@ class PasarelaModule:
                 self._online_thread = None
         return self.status()
 
-    def launch(self, *, open_browser=True, timeout=45):
+    def _bind_parent(self, info, parent_origin):
+        try:
+            result = _control_request(info, "api/host/embed", payload={"parent_origin": parent_origin})
+        except (OSError, ValueError, HTTPException):
+            raise ValueError("No se pudo integrar el editor con SINCAL. Actualiza Pasarela BIM o vuelve a intentarlo.") from None
+        if not _embedding_supported(result) or result.get("parent_origin") != parent_origin:
+            raise ValueError("El módulo no confirmó la integración con esta ventana de SINCAL.")
+        return {"url": _local_url(info["url"]), "embedding": 1, "parent_origin": parent_origin,
+                "message": "Editor abierto dentro de SINCAL. Sus proyectos se guardan mediante JSON."}
+
+    def launch(self, *, open_browser=True, timeout=45, parent_origin=None):
         with self.lock:
+            if parent_origin is not None:
+                parent_origin = _parent_origin(parent_origin)
+                open_browser = False
             if self._online_thread is not None:
                 raise ValueError("Espera a que termine la instalación de Pasarela BIM antes de abrirlo.")
-            if self._running_info() is not None:
+            running = self._running_info()
+            if parent_origin is not None:
+                _, _, manifest = self._discover()
+                if manifest is not None and (not _embedding_supported(manifest) or running is not None and not _embedding_supported(running)):
+                    raise ValueError(_embedding_update_message(running is not None))
+            if running is not None:
+                if parent_origin is not None:
+                    if not _embedding_supported(manifest):
+                        raise ValueError(_embedding_update_message(True))
+                    return self._bind_parent(running, parent_origin)
                 if open_browser:
                     webbrowser.open(self.url)
                 return {"url": self.url, "message": "El editor de Pasarela BIM está abierto."}
@@ -506,10 +580,12 @@ class PasarelaModule:
                                 raise ValueError("El módulo iniciado no corresponde a la versión instalada.")
                             self.url = url.rstrip("/") + "/"
                             self.ready = {**ready, "url": self.url, "version": manifest["version"],
-                                          "launcher_pid": self.process.pid}
+                                          "launcher_pid": self.process.pid, "embedding": manifest.get("embedding")}
                             temporary = self.active_file.with_suffix(".tmp")
                             temporary.write_text(json.dumps(self.ready), encoding="utf-8")
                             temporary.replace(self.active_file)
+                            if parent_origin is not None:
+                                return self._bind_parent(self.ready, parent_origin)
                             if open_browser:
                                 webbrowser.open(self.url)
                             return {"url": self.url, "message": "Editor abierto. Sus proyectos se guardan mediante JSON."}
@@ -540,11 +616,8 @@ class PasarelaModule:
             info = self._running_info()
             if info is None:
                 return {"message": "El módulo ya está cerrado.", "running": False}
-            request = Request(self.url + "api/cerrar", data=b"{}", headers={
-                "X-Pasarela-Token": info["control_token"], "Content-Type": "application/json"})
             try:
-                with urlopen(request, timeout=5) as response:
-                    result = json.load(response)
+                result = _control_request(info, "api/cerrar", payload={})
             except OSError as exc:
                 try:
                     detail = json.loads(exc.read()).get("mensaje", "")
@@ -567,9 +640,7 @@ class PasarelaModule:
                 deadline = time.monotonic() + 8
                 while time.monotonic() < deadline:
                     try:
-                        probe = Request(self.url + "api/host-status", headers={"X-Pasarela-Token": info["control_token"]})
-                        with urlopen(probe, timeout=.5) as response:
-                            json.load(response)
+                        _control_request(info, "api/host-status", timeout=.5)
                     except OSError:
                         break
                     time.sleep(.1)

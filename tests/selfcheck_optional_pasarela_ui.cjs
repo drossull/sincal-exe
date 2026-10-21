@@ -5,12 +5,13 @@ const fs=require('fs'),path=require('path'),assert=require('node:assert/strict')
   const browser=await chromium.launch({channel:'msedge',headless:true});
   try{
     const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[],calls=[];
-    let status={id:'pasarela-bim',nombre:'Pasarela BIM',installed:false,source:null,version:null,freecad_available:false,running:false,message:'Módulo no instalado.',online_install_available:true,release_url:'https://github.com/drossull/sincal-updates/releases/tag/v3.0.25',install_message:'Instala la versión compatible con SINCAL 3.0.25.'};
+    let status={id:'pasarela-bim',nombre:'Pasarela BIM',installed:false,source:null,version:null,embedded_supported:false,freecad_available:false,running:false,message:'Módulo no instalado.',online_install_available:true,release_url:'https://github.com/drossull/sincal-updates/releases/tag/v3.0.25',install_message:'Instala la versión compatible con SINCAL 3.0.25.'};
     let installFailure=false,onlineFailure=false,closeFailure=false,confirmClose=false;
     page.on('pageerror',e=>errors.push(e.message));
     page.on('dialog',d=>confirmClose?d.accept():d.dismiss());
     await page.route('**/*',async route=>{
-      const request=route.request(),p=new URL(request.url()).pathname;
+      const request=route.request(),url=new URL(request.url()),p=url.pathname;
+      if(url.port==='8766'){await route.fulfill({contentType:'text/html',body:`<html><body>Editor de prueba<script>parent.postMessage({type:'pasarela:ready',dirty:false,busy:false},'http://sincal.test')</script></body></html>`});return;}
       if(p.startsWith('/api/')){
         let data={},code=200;
         if(p==='/api/preferences')data={theme:'dark',palette:'sincal',zoom:'100'};
@@ -20,18 +21,18 @@ const fs=require('fs'),path=require('path'),assert=require('node:assert/strict')
         else if(p==='/api/modules/pasarela/install-online'){
           calls.push('online');assert.deepEqual(request.postDataJSON(),{});
           if(onlineFailure){code=502;data={error:'No se pudo descargar el módulo. Comprueba la conexión.'};}
-          else{status={...status,installed:true,source:'user',version:'0.3.0',message:'Módulo instalado.'};data=status;}
-        }else if(p==='/api/modules/pasarela/release'){calls.push('release');data={ok:true};}
+          else{status={...status,installed:true,source:'user',version:'0.3.1',embedded_supported:true,message:'Módulo instalado.'};data=status;}
+        }else if(p==='/api/modules/pasarela/release'){calls.push('release');data={url:status.release_url};}
         else if(p==='/api/modules/pasarela/install'){
           calls.push('install');assert.equal(request.headers()['x-sincal-token'],'test-token');
           assert.equal(request.headers()['content-type'],'application/zip');
           assert.equal(decodeURIComponent(request.headers()['x-file-name']),'Pasarela revisión.zip');
           assert.deepEqual(request.postDataBuffer(),Buffer.from('zip-placeholder'));
           if(installFailure){code=400;data={error:'El manifiesto del paquete no es válido.'};}
-          else{status={...status,installed:true,source:'user',version:'0.3.0',message:'Módulo instalado.'};data=status;}
+          else{status={...status,installed:true,source:'user',version:'0.3.1',embedded_supported:true,message:'Módulo instalado.'};data=status;}
         }else if(p==='/api/modules/pasarela/open'){
           calls.push('open');assert.deepEqual(request.postDataJSON(),{});
-          status={...status,running:true};data={url:'http://127.0.0.1:8766/',message:'Editor abierto en el navegador.'};
+          status={...status,running:true};data={url:'http://127.0.0.1:8766/',embedding:1,parent_origin:'http://sincal.test'};
         }else if(p==='/api/modules/pasarela/close'){
           calls.push('close');
           if(closeFailure){code=409;data={error:'Hay una generación en curso.'};}
@@ -57,8 +58,11 @@ const fs=require('fs'),path=require('path'),assert=require('node:assert/strict')
     if(process.env.SINCAL_UI_SCREENSHOT)await page.screenshot({path:process.env.SINCAL_UI_SCREENSHOT.replace(/\.png$/,'_no_instalado.png'),fullPage:true});
     await page.getByText('Instalar o actualizar desde un ZIP local',{exact:true}).click();
     assert(await open.isDisabled());assert(await page.getByRole('button',{name:'Instalar paquete',exact:true}).isDisabled());
-    const release=page.getByRole('link',{name:'Ver publicación de SINCAL',exact:true});
-    assert.equal(await release.getAttribute('href'),status.release_url);await release.click();assert.equal(calls.filter(v=>v==='release').length,1);
+    const release=page.getByRole('button',{name:'Datos de publicación',exact:true});
+    await release.click();await page.locator('#pasarela-release-info').waitFor();assert.equal(calls.filter(v=>v==='release').length,1);
+    assert.equal(await page.getByLabel('Dirección de publicación',{exact:true}).inputValue(),status.release_url);
+    assert(await page.getByLabel('Dirección de publicación',{exact:true}).getAttribute('readonly')!==null);
+    assert.equal(await page.locator('a[target="_blank"]').count(),0);assert.equal(page.context().pages().length,1);assert.equal(page.url(),'http://sincal.test/');
     await file.setInputFiles({name:'invalido.txt',mimeType:'text/plain',buffer:Buffer.from('x')});
     await page.locator('#pasarela-module-message').getByText('Selecciona un ZIP no vacío de hasta 150 MiB.',{exact:true}).waitFor();
     assert(await page.getByRole('button',{name:'Instalar paquete',exact:true}).isDisabled());
@@ -79,7 +83,7 @@ const fs=require('fs'),path=require('path'),assert=require('node:assert/strict')
     await page.getByRole('button',{name:'Abrir editor',exact:true,disabled:false}).waitFor();assert(await open.isEnabled());
     await page.getByText('No detectado: necesario para generar el modelo BIM',{exact:true}).waitFor();
     assert(await page.getByRole('button',{name:'Actualizar desde paquete',exact:true}).isDisabled());
-    await open.click();await page.locator('#pasarela-module-message').getByText('Editor abierto en el navegador.',{exact:true}).waitFor();
+    await open.click();await page.locator('#pasarela-editor-frame').waitFor();await page.getByRole('button',{name:'Ajustes',exact:true}).click();await page.getByText('Instalar o actualizar desde un ZIP local',{exact:true}).click();
     await file.setInputFiles(packageFile);assert(await page.getByRole('button',{name:'Actualizar desde paquete',exact:true}).isDisabled());
     const close=page.getByRole('button',{name:'Cerrar módulo',exact:true});
     await close.click();assert.equal(calls.filter(v=>v==='close').length,0);
@@ -90,7 +94,7 @@ const fs=require('fs'),path=require('path'),assert=require('node:assert/strict')
     assert(await page.getByRole('button',{name:'Actualizar desde paquete',exact:true}).isEnabled());
     status={...status,source:'development',freecad_available:true,message:'Disponible desde el código de desarrollo.'};
     await page.getByRole('button',{name:'Actualizar estado',exact:true}).click();await page.getByText('Disponible en desarrollo',{exact:true}).waitFor();
-    assert(await open.isEnabled());
+    assert(await page.getByRole('button',{name:'Abrir editor',exact:true}).isEnabled());
     assert.equal(await page.locator('#notice').textContent(),'');
     if(process.env.SINCAL_UI_SCREENSHOT)await page.screenshot({path:process.env.SINCAL_UI_SCREENSHOT,fullPage:true});
     await page.locator('[data-page="rebar"]').click();await page.getByRole('heading',{name:'Generador de armadura',exact:true}).waitFor();

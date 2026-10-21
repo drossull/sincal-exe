@@ -118,10 +118,12 @@ class TestRuntime(unittest.TestCase):
                         respuesta = conn.getresponse();valor = respuesta.read();conn.close()
                         return respuesta.status,valor
                     status,html = solicitar("GET","/");self.assertEqual(status,200)
-                    self.assertIn(ready["control_token"].encode(),html)
+                    self.assertNotIn(ready["control_token"].encode(),html)
+                    self.assertIn(b'name="pasarela-token"',html)
                     self.assertEqual(solicitar("GET","/api/host-status")[0],403)
                     status,estado = solicitar("GET","/api/host-status",ready["control_token"])
                     self.assertEqual(status,200);self.assertEqual(json.loads(estado)["pid"],proceso.pid)
+                    self.assertEqual(json.loads(estado)["embedding"],1)
                     estado = json.loads(solicitar("GET","/api/estado")[1])
                     self.assertNotIn("control_token",estado)
                     self.assertEqual(solicitar("GET","/api/ejemplo")[0],200)

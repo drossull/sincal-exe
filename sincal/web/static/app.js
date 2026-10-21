@@ -3,7 +3,7 @@ import {renderRebar,renderCrossbeam} from '/rebar.js';
 import {renderTools} from '/tools.js';
 import {renderNavigation,renderTabs,title,owner,destination} from '/navigation.js';
 import {createProjectFiles} from '/project_files.js';
-import {renderPasarela} from '/optional_modules.js';
+import {renderPasarela,createPasarelaPanel} from '/optional_modules.js';
 const $ = selector => document.querySelector(selector);
 const token = new URLSearchParams(location.hash.slice(1)).get('token') || sessionStorage.getItem('sincal-local-token') || '';
 sessionStorage.setItem('sincal-local-token', token);
@@ -18,6 +18,7 @@ function updatePasarelaMenuStatus(status){
   if(label)label.textContent=status.installed?'Pasarela BIM':'Pasarela BIM · No instalado';
 }
 const projectFiles=createProjectFiles({api,node,button,section,notify});
+const pasarelaPanel=createPasarelaPanel({api,node,notify,current:()=>page==='pasarela',onStatus:updatePasarelaMenuStatus,onSettings:()=>show('pasarela',{settings:true})});
 function node(tag, text, className){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(className)e.className=className;return e;}
 function notify(text){$('#notice').textContent=text;}
 async function api(path, payload){const response=await fetch('/api/'+path,{method:payload?'POST':'GET',headers:{'X-Sincal-Token':token,'Content-Type':'application/json'},body:payload?JSON.stringify(payload):undefined});const data=await response.json();if(!response.ok)throw Error(data.error);return data;}
@@ -81,7 +82,7 @@ async function job(operation,payload={}){
 $('#cancel-job').addEventListener('click',()=>{if(activeJob&&activeJob!=='starting')api('jobs/cancel',{id:activeJob}).then(()=>notify('Cancelación solicitada. CAD podría seguir ejecutando la orden.')).catch(e=>notify(e.message));});
 function toolContext(currentPage){return {api:(path,payload)=>path==='files/choose'?projectFiles.choose(payload.kind,payload):api(path,payload),uploadPackage,chooseOutput:()=>projectFiles.choose('folder'),node,button,section,notify,job,artifact,project,changed:()=>{dirty=true;},current:()=>page===currentPage};}
 function download(name,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
-async function show(next){page=destination(next);$('#main').replaceChildren();$('#anchors').replaceChildren();$('#breadcrumb').textContent=title(page);document.querySelectorAll('#sidebar [data-page]').forEach(b=>b.setAttribute('aria-current',b.dataset.page===owner(page)?'page':'false'));$('#main').append(node('span','SINCAL SUITE 3.0 / ESCRITORIO','eyebrow'));renderTabs(page,node);window.scrollTo(0,0);
+async function show(next,options={}){page=destination(next);pasarelaPanel.hide();$('#main').replaceChildren();$('#anchors').replaceChildren();$('#breadcrumb').textContent=title(page);document.querySelectorAll('#sidebar [data-page]').forEach(b=>b.setAttribute('aria-current',b.dataset.page===owner(page)?'page':'false'));if(page==='pasarela'&&pasarelaPanel.hasFrame()&&!options.settings){pasarelaPanel.show();return;}$('#main').append(node('span','SINCAL SUITE 3.0 / ESCRITORIO','eyebrow'));renderTabs(page,node);window.scrollTo(0,0);
 if(page==='home'){
 await renderTools('shell-batch',toolContext('home'));if(page!=='home')return;
 await renderTools('sync',toolContext('home'));if(page!=='home')return;
@@ -121,7 +122,7 @@ const list=node('ul');for(const doc of data.documents)list.append(node('li',doc.
 },true),status);
 section('seguridad-cad','Conexión segura').append(node('p','No se inicia CAD automáticamente. Si hay varias instancias, la conexión se bloquea para no elegir un dibujo equivocado. Si COM se cuelga, solo se detiene el proceso de comprobación. Este estado es una instantánea y debe validarse de nuevo antes de cualquier futura operación.'));
 }else if(page==='pasarela'){
-await renderPasarela({...toolContext('pasarela'),onStatus:updatePasarelaMenuStatus});
+await renderPasarela({...toolContext('pasarela'),panel:pasarelaPanel,onStatus:updatePasarelaMenuStatus});
 }else if(page==='rebar'){
 const intro=section('generador','Generador de armadura');intro.append(node('p','Prepara los antecedentes del puente y trabaja por estructura. El JSON se comparte con Consulta de proyecto; las memorias quedan como antecedentes para un análisis futuro.'));
 projectLoader(intro);if(project?.sourceName)intro.append(node('p','JSON activo: '+project.sourceName));
@@ -140,7 +141,7 @@ const system=matchMedia('(prefers-color-scheme: dark)');function theme(){const v
 $('#zoom').addEventListener('change',()=>{document.documentElement.dataset.zoom=$('#zoom').value;localStorage.setItem('sincal-zoom',$('#zoom').value);});$('#zoom').value=localStorage.getItem('sincal-zoom')||'100';document.documentElement.dataset.zoom=$('#zoom').value;
 $('#right-panel').addEventListener('click',()=>{const hidden=document.body.classList.toggle('outline-hidden');$('#right-panel').setAttribute('aria-expanded',String(!hidden));});
 $('#panels').addEventListener('click',()=>{if(matchMedia('(max-width:700px)').matches){const open=document.body.classList.toggle('mobile-open');$('#panels').setAttribute('aria-expanded',String(open));}else{const hidden=document.body.classList.toggle('panels-hidden');$('#panels').setAttribute('aria-expanded',String(!hidden));}});
-window.addEventListener('beforeunload',event=>{if(dirty||activeJob){event.preventDefault();event.returnValue='';}});
+window.addEventListener('beforeunload',event=>{const editor=pasarelaPanel.state();if(dirty||activeJob||editor.dirty||editor.busy||editor.opening||editor.closing){event.preventDefault();event.returnValue='';}});
 function persistPreferences(){api('preferences',{theme:$('#theme').value,palette:$('#palette').value,zoom:$('#zoom').value,sidebar:!document.body.classList.contains('panels-hidden'),outline:!document.body.classList.contains('outline-hidden')}).catch(e=>notify(e.message));}
 $('#palette').addEventListener('change',()=>{document.documentElement.dataset.palette=$('#palette').value;persistPreferences();});
 for(const id of ['theme','zoom','panels','right-panel'])$('#'+id).addEventListener(id==='theme'||id==='zoom'?'change':'click',persistPreferences);

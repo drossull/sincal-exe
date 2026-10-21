@@ -160,7 +160,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+        self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; frame-src http://127.0.0.1:*; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
         self.end_headers()
         self.wfile.write(body)
 
@@ -289,10 +289,9 @@ class Handler(BaseHTTPRequestHandler):
                 release_url = self.server.module_host.status()["release_url"]
                 if not release_url.startswith("https://github.com/drossull/sincal-updates/releases/"):
                     raise ValueError("La publicación del módulo no está disponible.")
-                webbrowser.open(release_url)
                 return self.send(200, {"url": release_url})
             if self.path == "/api/modules/pasarela/open":
-                return self.send(200, self.server.module_host.launch())
+                return self.send(200, self.server.module_host.launch(open_browser=False, parent_origin=self.server.origin))
             if self.path == "/api/modules/pasarela/close":
                 return self.send(200, self.server.module_host.close())
             if self.path == "/api/project/preview":

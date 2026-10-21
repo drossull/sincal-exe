@@ -70,3 +70,15 @@ fieldset{border:1px solid var(--line);padding:20px;margin:24px 0}legend{padding:
 .revision-table input{display:block;width:100%;min-width:0;box-sizing:border-box}
 .revision-table small{display:block;overflow-wrap:anywhere;line-height:1.4;margin-top:7px;color:var(--muted)}
 @media(max-width:700px){.revision-file-row{flex-wrap:wrap}.revision-file-row label{flex-basis:100%}}
+/* The editor stays mounted outside the replaceable tool content. */
+.layout[hidden],#pasarela-editor[hidden]{display:none!important}
+body.pasarela-embedded-active{overflow:hidden}
+.pasarela-embedded-active #workspace{height:100dvh;display:flex;flex-direction:column;min-width:0}
+.pasarela-embedded-active #workspace>header{flex:none}
+.pasarela-embedded-active #outline{display:none!important}
+#pasarela-editor{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column}
+.pasarela-editor-toolbar{display:flex;align-items:center;gap:12px;padding:9px 16px;border-bottom:1px solid var(--line);flex:none}
+.pasarela-editor-toolbar strong{white-space:nowrap}.pasarela-editor-toolbar span{flex:1;color:var(--muted);font-size:12px}
+.pasarela-editor-toolbar button{box-shadow:none;padding:5px 10px;font-size:12px}
+#pasarela-editor-frame{display:block;width:100%;flex:1;min-height:0;border:0;background:var(--bg)}
+@media(max-width:700px){.pasarela-editor-toolbar{gap:8px;padding:7px 10px}.pasarela-editor-toolbar strong{display:none}.pasarela-editor-toolbar span{font-size:11px}}

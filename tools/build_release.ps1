@@ -453,6 +453,7 @@ function Write-ReleaseManifest(
             url = $PasarelaModuleInfo.url
             version = $PasarelaModuleInfo.version
             host_api = $PasarelaModuleInfo.host_api
+            embedding = $PasarelaModuleInfo.embedding
             bytes = $PasarelaModuleInfo.bytes
             sha256 = $PasarelaModuleInfo.sha256
         }

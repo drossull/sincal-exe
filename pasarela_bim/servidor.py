@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from html import escape
 import json
 import mimetypes
 import os
 from pathlib import Path
 import secrets
+import re
 import sys
 import tempfile
 import threading
@@ -25,12 +27,24 @@ from .runtime import raiz_recursos, carpeta_generados
 MAX_BODY = 20 * 1024 * 1024
 
 
+def _origen_padre(valor):
+    """Un origen loopback exacto; nunca una URL con ruta o credenciales."""
+    if not isinstance(valor, str):
+        raise ValueError("El origen de SINCAL debe ser http://127.0.0.1:puerto.")
+    match = re.fullmatch(r"http://127\.0\.0\.1:([1-9][0-9]{0,4})", valor)
+    if not match or not 1 <= int(match.group(1)) <= 65535:
+        raise ValueError("El origen de SINCAL debe ser http://127.0.0.1:puerto, sin ruta ni otros datos.")
+    return valor
+
+
 class Aplicacion(ThreadingHTTPServer):
     daemon_threads = True
 
     def __init__(self, direccion):
         super().__init__(direccion, Manejador)
         self.token = secrets.token_urlsafe(32)
+        self.control_token = secrets.token_urlsafe(32)
+        self.parent_origin = None
         self.trabajos = {}
         self.lock = threading.Lock()
         self.cerrando = False
@@ -65,14 +79,15 @@ class Manejador(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
-    def enviar(self, datos, status=200, tipo="application/json; charset=utf-8"):
+    def enviar(self, datos, status=200, tipo="application/json; charset=utf-8", parent_origin=None):
         contenido = json.dumps(datos, ensure_ascii=True).encode("ascii") if not isinstance(datos, bytes) else datos
         self.send_response(status)
         self.send_header("Content-Type", tipo)
         self.send_header("Content-Length", str(len(contenido)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; frame-ancestors 'none'")
+        ancestor = (self.server.parent_origin if parent_origin is None else parent_origin) or "'none'"
+        self.send_header("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; frame-ancestors " + ancestor)
         self.end_headers()
         self.wfile.write(contenido)
 
@@ -97,9 +112,9 @@ class Manejador(BaseHTTPRequestHandler):
         if ruta == "/api/host-status":
             if not self.server.host_control:
                 return self.enviar({"mensaje":"No encontrado"},404)
-            if not secrets.compare_digest(self.headers.get("X-Pasarela-Token", "").encode("utf-8"),self.server.token.encode("ascii")):
+            if not secrets.compare_digest(self.headers.get("X-Pasarela-Token", "").encode("utf-8"),self.server.control_token.encode("ascii")):
                 return self.enviar({"mensaje":"Control del anfitrión no autorizado"},403)
-            return self.enviar({"version":__version__,"pid":os.getpid()})
+            return self.enviar({"version":__version__,"pid":os.getpid(),"embedding":1})
         if ruta.startswith("/api/trabajos/"):
             id_trabajo = ruta.split("/")[-1]
             with self.server.lock:
@@ -125,22 +140,46 @@ class Manejador(BaseHTTPRequestHandler):
             return self.enviar(contenido, tipo=mimetypes.guess_type(nombre)[0] or "application/octet-stream")
         recursos = {"/": "index.html", "/index.html": "index.html", "/app.js": "app.js", "/style.css": "style.css",
                     "/proyecto.js": "proyecto.js", "/emplazamiento.js": "emplazamiento.js", "/secciones.js": "secciones.js",
-                    "/volumen.js": "volumen.js", "/ejes.js": "ejes.js"}
+                    "/volumen.js": "volumen.js", "/ejes.js": "ejes.js", "/integracion.js": "integracion.js"}
         if ruta not in recursos:
             return self.enviar({"mensaje": "No encontrado"}, 404)
         archivo = raiz_recursos() / "web" / recursos[ruta]
         datos = archivo.read_bytes()
+        parent_origin = self.server.parent_origin or ""
         if archivo.suffix == ".html":
             datos = datos.replace(b"__PASARELA_TOKEN__", self.server.token.encode("ascii"))
+            datos = datos.replace(b"__PASARELA_PARENT_ORIGIN__", escape(parent_origin, quote=True).encode("ascii"))
         self.enviar(datos, tipo={".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
-                                ".css": "text/css; charset=utf-8"}[archivo.suffix])
+                                ".css": "text/css; charset=utf-8"}[archivo.suffix], parent_origin=parent_origin)
 
     def do_POST(self):
         if not self.permitido():
             return
-        if not secrets.compare_digest(self.headers.get("X-Pasarela-Token", "").encode("utf-8"), self.server.token.encode("ascii")):
-            return self.enviar({"mensaje": "Sesión no válida; recarga la aplicación."}, 403)
         ruta = urlsplit(self.path).path
+        if ruta == "/api/host/embed" and not self.server.host_control:
+            return self.enviar({"mensaje":"No encontrado"},404)
+        host_action = self.server.host_control and ruta in ("/api/host/embed", "/api/cerrar")
+        token = self.server.control_token if host_action else self.server.token
+        if not secrets.compare_digest(self.headers.get("X-Pasarela-Token", "").encode("utf-8"), token.encode("ascii")):
+            return self.enviar({"mensaje": "Sesión no válida; recarga la aplicación."}, 403)
+        if ruta == "/api/host/embed":
+            if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
+                return self.enviar({"mensaje":"Se requiere JSON"},415)
+            try:
+                longitud = int(self.headers.get("Content-Length", "0"))
+                if not 0 < longitud <= 4096:
+                    return self.enviar({"mensaje":"Configuración de integración demasiado grande o vacía"},400)
+                datos = json.loads(self.rfile.read(longitud))
+                if not isinstance(datos,dict) or set(datos) != {"parent_origin"}:
+                    raise ValueError("Se requiere únicamente parent_origin.")
+                origen = _origen_padre(datos["parent_origin"])
+            except (ValueError,TypeError,RecursionError) as exc:
+                return self.enviar({"mensaje":str(exc)},400)
+            with self.server.lock:
+                if self.server.cerrando:
+                    return self.enviar({"mensaje":"El módulo se está cerrando."},409)
+                self.server.parent_origin = origen
+            return self.enviar({"embedding":1,"parent_origin":origen})
         if ruta == "/api/cerrar":
             with self.server.lock:
                 if self.server.importaciones or any(t["estado"] == "ejecutando" for t in self.server.trabajos.values()):
@@ -236,7 +275,7 @@ def servir(port=8766, abrir_navegador=True, launch_info=None):
         anuncio = None
         try:
             if launch_info:
-                anuncio = _publicar_inicio(launch_info,servidor.origen,servidor.token)
+                anuncio = _publicar_inicio(launch_info,servidor.origen,servidor.control_token)
             if sys.stdout is not None:
                 print(f"Pasarela BIM disponible en {servidor.origen}", flush=True)
             if abrir_navegador:

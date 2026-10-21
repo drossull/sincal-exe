@@ -40,6 +40,8 @@ def descriptor(root=ROOT):
         raise ValueError("Contrato de módulo no compatible")
     if data.get("entrypoint") != "SINCAL-Pasarela.exe":
         raise ValueError("Punto de entrada del módulo no compatible")
+    if type(data.get("embedding")) is not int or data["embedding"] != 1:
+        raise ValueError("El módulo debe admitir el editor integrado")
     return data
 
 
@@ -74,7 +76,7 @@ def crear_paquete(executable, output, manifest):
     if archive.stat().st_size > MAX_ZIP_BYTES:
         archive.unlink()
         raise ValueError("El ZIP del módulo excede 150 MiB")
-    return {"schema":1,"id":module["id"],"version":module["version"],"host_api":module["host_api"],
+    return {"schema":1,"id":module["id"],"version":module["version"],"host_api":module["host_api"],"embedding":module["embedding"],
             "zip":str(archive),"sha256":sha256(archive),"bytes":archive.stat().st_size,
             "installed_bytes":installed_bytes,"executable":str(executable),"stage":str(stage)}
 

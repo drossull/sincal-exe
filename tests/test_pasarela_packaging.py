@@ -24,6 +24,8 @@ class PasarelaPackagingTests(unittest.TestCase):
                 self.assertEqual(manifest["schema"],1)
                 self.assertEqual(manifest["id"],"pasarela-bim")
                 self.assertEqual(manifest["host_api"],1)
+                self.assertEqual(manifest["embedding"],1)
+                self.assertEqual(result["embedding"],1)
                 self.assertEqual(set(manifest["files"]),set(archive.namelist())-{"module.json"})
                 for path,digest in manifest["files"].items():
                     self.assertEqual(hashlib.sha256(archive.read(path)).hexdigest(),digest)
@@ -62,9 +64,12 @@ class PasarelaPackagingTests(unittest.TestCase):
         addon = (ROOT/"packaging/windows/SINCAL_Pasarela_Installer.iss").read_text(encoding="utf-8")
         self.assertIn("PrivilegesRequired=lowest",addon)
         self.assertIn("DefaultDirName={localappdata}\\SINCAL\\modules\\pasarela-bim",addon)
-        self.assertEqual(addon.count('Parameters: "--port 0"'),2)
+        self.assertNotIn('Parameters: "--port 0"',addon)
+        self.assertNotIn('[Run]',addon)
+        self.assertIn('Abre SINCAL Suite y selecciona Pasarela BIM',addon)
         self.assertNotIn("[UninstallDelete]",addon)
-        self.assertNotIn("[InstallDelete]",addon)
+        cleanup = addon.split('[InstallDelete]',1)[1].split('[Messages]',1)[0].strip()
+        self.assertEqual(cleanup, 'Type: files; Name: "{userprograms}\\SINCAL Suite\\Pasarela BIM.lnk"')
 
 
 if __name__ == "__main__":
