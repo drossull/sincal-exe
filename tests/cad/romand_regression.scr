@@ -1,0 +1,5 @@
+(load (strcat (getenv "SINCAL_TEST_ROOT") "/lisps/ROMAND.lsp"))
+(load (strcat (getenv "SINCAL_TEST_ROOT") "/tests/cad/romand_regression.lsp"))
+_QUIT
+_Yes
+
