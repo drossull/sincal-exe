@@ -23,6 +23,8 @@ DRAWING_FORMATS = {
                          'description': 'Estratos por intervalo, recuperación porcentual y NSPT puntual.'},
     'octay-intervals-v1': {'label': 'Puerto Octay · ensayos por intervalo',
                           'description': 'NSPT azul por intervalo, descripciones de muestras y recuperación en un panel separado. Sin correcciones calculadas.'},
+    'cdi-spt-v1': {'label': 'CDI · registro SPT y horizontes',
+                   'description': 'Horizontes publicados, NSPT por tramo y recuperación independiente. R es rechazo; no se extrapolan horizontes ni se rellenan ensayos faltantes.'},
 }
 SAMPLE_DESCRIPTION_WARNING = 'Hay muestras sin descripción recuperada. Vuelve a cargar el PDF original si abriste un reconocimiento antiguo; no se inventan descripciones.'
 
@@ -72,6 +74,10 @@ class Spt:
     nspt: str
     page: int
     recovered_unit: str = 'm'
+    sample_number: str = ''
+    sample_length: str = ''  # Published LONG. (cm); not labelled recovery in CDI.
+    tool: str = ''
+    mechanism: str = ''
 
     @property
     def refusal(self):
@@ -124,6 +130,18 @@ class Sample:
 
 
 @dataclass
+class DrillingRecord:
+    """CDI recovery rows are independent of soil horizons and SPT samples."""
+    start: str
+    end: str
+    drilled: str
+    recovered: str
+    recovery: str
+    pressure: str
+    page: int
+
+
+@dataclass
 class Borehole:
     key: str
     name: str
@@ -139,10 +157,14 @@ class Borehole:
     water_depth: str = ''
     water_page: int = 0
     reviewed_format: str = ''
+    drilling_records: list[DrillingRecord] = field(default_factory=list)
+    study_info: dict = field(default_factory=dict)
 
     @property
     def drawing_format(self):
         # Recognized data structure, never the filename or a client-supplied label.
+        if self.drilling_records:
+            return 'cdi-spt-v1' if self.horizons and not (self.intervals or self.samples) else ''
         if self.horizons and self.samples and not self.intervals:
             return 'octay-intervals-v1'
         if self.intervals and not (self.horizons or self.samples):
@@ -160,10 +182,13 @@ class Borehole:
 
     @property
     def recovery_rows(self):
-        return self.samples or self.intervals
+        return self.drilling_records or self.samples or self.intervals
 
     def errors(self):
         result = list(self.extraction_errors)
+        cdi = bool(self.drilling_records)
+        if cdi and (self.intervals or self.samples):
+            result.append('No se pueden mezclar registros CDI con intervalos VISAN o muestras Puerto Octay.')
         if self.intervals and (self.horizons or self.samples):
             result.append('No se pueden mezclar intervalos VISAN y registros de informes individuales en un mismo sondaje.')
         if not self.intervals and not self.horizons:
@@ -188,7 +213,7 @@ class Borehole:
             for i, row in enumerate(self.horizons, 1):
                 try:
                     a, b = number(row.start), number(row.end)
-                    if row.index != i or not 0 <= a < b <= 1000 or abs(a-previous) > .011 or number(row.thickness) <= 0:
+                    if row.index != i or not 0 <= a < b <= 1000 or abs(a-previous) > .011 or (not (cdi and row.thickness == '') and number(row.thickness) <= 0):
                         raise ValueError()
                     previous = b
                     if row.material not in MATERIALS[:-1]:
@@ -206,9 +231,21 @@ class Borehole:
                 sample_depth = b
             except (ValueError, TypeError):
                 result.append(f'Muestra {i}: magnitudes no válidas o discontinuas.')
-        if self.horizons and not self.samples:
+        if self.horizons and not (self.samples or self.drilling_records):
             result.append('No se reconoció el registro de recuperación de los partes diarios.')
         previous = max(previous, sample_depth)
+        drill_end = 0.0
+        for i, row in enumerate(self.drilling_records, 1):
+            try:
+                a, b, drilled, recovered, recovery = map(number, (row.start, row.end, row.drilled, row.recovered, row.recovery))
+                if not 0 <= a <= b <= 1000 or a < drill_end-.001 or drilled < 0 or recovered < 0 or not 0 <= recovery <= 100:
+                    raise ValueError()
+                if row.pressure not in ('', '-') and number(row.pressure) < 0:
+                    raise ValueError()
+                drill_end = b
+            except (ValueError, TypeError):
+                result.append(f'Perforación CDI, fila {i}: magnitudes no válidas o solapadas.')
+        previous = max(previous, drill_end)
         if self.water_depth:
             try:
                 if not 0 <= number(self.water_depth) <= previous or not 1 <= self.water_page <= 2000:
@@ -225,6 +262,7 @@ class Borehole:
             except (ValueError, TypeError):
                 result.append('Tramos Vs no válidos, discontinuos o solapados.')
         seen = set()
+        cdi_test_end, cdi_test_ranges = 0.0, set()
         for row in self.tests:
             try:
                 if type(row.index) is not int or row.index < 1 or row.index in seen or not 0 <= number(row.start) <= number(row.end) <= previous + .011:
@@ -235,8 +273,20 @@ class Borehole:
                         raise ValueError()
                 elif not 0 <= number(row.nspt) <= 1000:
                     raise ValueError()
-                if row.recovered_unit != ('cm' if self.samples else 'm'):
+                if row.recovered_unit != ('cm' if self.samples or cdi else 'm'):
                     raise ValueError()
+                if cdi:
+                    if not re.fullmatch(r'\d+', row.sample_number) or number(row.sample_length) < 0:
+                        raise ValueError()
+                    if row.recovered or row.driven:
+                        raise ValueError()  # No recovery/drive length was published in this SPT table.
+                    if not all(re.fullmatch(rf'(?:{NUM}R?|R|[-])', v, re.I) for v in (row.n1, row.n2, row.n3)):
+                        raise ValueError()
+                    pair = (number(row.start), number(row.end))
+                    if pair in cdi_test_ranges or pair[0] < cdi_test_end-.001:
+                        raise ValueError()
+                    cdi_test_ranges.add(pair)
+                    cdi_test_end = pair[1]
             except (ValueError, TypeError):
                 result.append(f'SPT {row.index}: profundidad, rechazo o NSPT no válido.')
         return list(dict.fromkeys(result))
@@ -247,7 +297,7 @@ class Borehole:
         if self.samples and any(not row.description.strip() for row in self.samples):
             warnings.append(SAMPLE_DESCRIPTION_WARNING)
         for row in self.horizons:
-            if abs(number(row.end)-number(row.start)-number(row.thickness)) > .011:
+            if row.thickness and abs(number(row.end)-number(row.start)-number(row.thickness)) > .011:
                 warnings.append(f'Horizonte {row.index}, pág. {row.page}: espesor publicado y cotas no coinciden. No se corrigió.')
         if self.horizons and self.samples:
             end, sample_end = self.horizons[-1].end, self.samples[-1].end
@@ -260,6 +310,22 @@ class Borehole:
         for test in self.tests:
             if not test.refusal and all(re.fullmatch(NUM, v) for v in (test.n2,test.n3,test.nspt)) and abs(number(test.n2)+number(test.n3)-number(test.nspt)) > .01:
                 warnings.append(f'SPT {test.index}, pág. {test.page}: NF publicado no coincide con N2+N3. No se corrigió.')
+        if self.drilling_records:
+            end = max(number(r.end) for r in self.drilling_records)
+            if self.horizons and abs(number(self.horizons[-1].end)-end) > .011:
+                warnings.append(f'Los horizontes terminan a {self.horizons[-1].end} m y la perforación a {end:g} m. Se conservan ambas fuentes; no se extrapola el hatch.')
+            previous, gaps = 0.0, []
+            for row in self.drilling_records:
+                a, b, drilled, recovered, pct = map(number, (row.start,row.end,row.drilled,row.recovered,row.recovery))
+                if a > previous+.001:
+                    gaps.append(f'{previous:g}–{a:g} m (p. {row.page})')
+                previous = b
+                if abs(b-a-drilled) > .011:
+                    warnings.append(f'Pág. {row.page}, {row.start}–{row.end} m: cotas y perforado no coinciden. No se corrigió.')
+                if drilled > 0 and abs(100*recovered/drilled-pct) > 1.01:
+                    warnings.append(f'Pág. {row.page}, {row.start}–{row.end} m: recuperación publicada {row.recovery}% difiere del cociente. No se corrigió.')
+            if gaps:
+                warnings.append('Tramos sin recuperación tabulada: '+', '.join(gaps)+'. No se rellena ni se une a través de estos huecos.')
         for row in self.intervals:
             a, b, drilled, recovered, pct = map(number, (row.start, row.end, row.drilled, row.recovered, row.recovery))
             if abs(b-a-drilled) > .011:
@@ -325,6 +391,16 @@ class StratigraphyReport:
                     if not isinstance(rows, list) or len(rows) > 2000:
                         raise ValueError('Demasiadas filas o formato no válido.')
                     setattr(hole, key, [cls_(**row) for row in rows])
+                rows = item.get('drilling_records', [])
+                if not isinstance(rows, list) or len(rows) > 2000:
+                    raise ValueError('Registros de perforación CDI no válidos.')
+                hole.drilling_records = [DrillingRecord(**row) for row in rows]
+                hole.study_info = item.get('study_info', {})
+                if not isinstance(hole.study_info, dict) or len(hole.study_info) > 20 or any(
+                    not isinstance(k, str) or len(k) > 100 or not isinstance(v, str) or len(v) > 5000
+                    for k, v in hole.study_info.items()
+                ):
+                    raise ValueError('Información del estudio no válida.')
                 hole.water_depth = item.get('water_depth', '')
                 hole.water_page = item.get('water_page', 0)
                 hole.reviewed_format = item.get('reviewed_format', '')
@@ -338,7 +414,7 @@ class StratigraphyReport:
                         raise ValueError('Valores Vs no válidos.')
                     if any(type(p) is not int or not 1 <= p <= 2000 for p in (band.page, band.table_page)):
                         raise ValueError('Páginas Vs no válidas.')
-                for row in [*hole.intervals, *hole.tests, *hole.horizons, *hole.samples]:
+                for row in [*hole.intervals, *hole.tests, *hole.horizons, *hole.samples, *hole.drilling_records]:
                     if type(row.page) is not int or not 1 <= row.page <= 2000:
                         raise ValueError('Página no válida.')
                     for attr, field_value in vars(row).items():
@@ -346,7 +422,7 @@ class StratigraphyReport:
                             raise ValueError('Los valores publicados deben conservarse como texto.')
                     for attr in ('start', 'end'):
                         number(getattr(row, attr))
-                    if hasattr(row, 'recovered'):
+                    if hasattr(row, 'recovered') and not (isinstance(row, Spt) and hole.drilling_records and row.recovered == ''):
                         number(row.recovered)
                 if any(type(row.index) is not int or row.index < 1 for row in [*hole.tests, *hole.horizons, *hole.samples]):
                     raise ValueError('Número de ensayo no válido.')
@@ -470,7 +546,10 @@ def read_report(path, *, progress=None, cancel=None):
         from sincal.stratigraphy_octay import parse_individual_report
         report = parse_individual_report(pages, path.name, hashlib.sha256(data).hexdigest())
     if not report.boreholes:
-        raise ValueError('No se reconocieron tablas de los formatos VISAN o informe individual Puerto Octay. No se estiman valores desde dibujos. Los escaneos sin texto y otros formatos requieren un adaptador de extracción.')
+        from sincal.stratigraphy_cdi import parse_cdi_report
+        report = parse_cdi_report(pages, path.name, hashlib.sha256(data).hexdigest())
+    if not report.boreholes:
+        raise ValueError('No se reconocieron tablas de estratigrafía VISAN, Puerto Octay o CDI. Si el informe contiene velocidades Vs, usa Perfiles geofísicos. No se estiman valores desde dibujos; otros formatos y escaneos sin texto requieren un adaptador.')
     check()
     if path.suffix.lower() == '.pdf':
         import pypdfium2 as pdfium

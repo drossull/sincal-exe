@@ -58,6 +58,23 @@ class TestProyecto(unittest.TestCase):
         with self.assertRaises(ValueError):
             convertir_a_interno(m)
 
+    def test_terreno_por_apoyo_convierte_sin_completar_ausentes_desde_legado(self):
+        portable = proyecto_simple()
+        portable["proyecto"].update(cota_terreno_m=-9, cota_carretera_m=-8)
+        portable["soportes"] = [
+            {"id": "A", "nodo": "A", "fundacion": "D1", "cota_terreno_proyectado_m": -6.25},
+            {"id": "B", "nodo": "B", "fundacion": "D1", "cota_terreno_proyectado_m": -5.9},
+            {"id": "C", "nodo": "C", "fundacion": "D2"}]
+        original = deepcopy(portable)
+        interno = convertir_a_interno(portable)
+        self.assertEqual(interno["soportes"][0]["cota_terreno_proyectado_mm"], -6250)
+        self.assertEqual(interno["soportes"][1]["cota_terreno_proyectado_mm"], -5900)
+        self.assertNotIn("cota_terreno_proyectado_mm", interno["soportes"][2])
+        self.assertEqual(interno["proyecto"]["cota_terreno_m"], -9)
+        vuelta = convertir_a_portable(interno)
+        self.assertEqual(vuelta["soportes"], portable["soportes"])
+        self.assertEqual(portable, original)
+
     def test_encuentros_libres_generan_sin_inventar_soportes(self):
         informe = validar(proyecto_simple())
         self.assertTrue(informe["valido"],informe["errores"])
@@ -136,7 +153,7 @@ class TestProyecto(unittest.TestCase):
         m["proyecto"]["georreferencia"]["norte_desde_x_horario_deg"] = 360
         self.assertIn("georreferencia_invalida",{e["codigo"] for e in validar(m)["errores"]})
 
-    def test_galibo_local_mide_intrados_y_objetivo_sin_certificar_norma(self):
+    def test_galibo_pendiente_no_infiere_calzada_de_cota_global_legacy(self):
         m = proyecto_simple()
         for n in m["nodos"]:
             n["z"] = 6
@@ -144,8 +161,10 @@ class TestProyecto(unittest.TestCase):
         m["proyecto"].update(cota_carretera_m=1,galibo_m=5)
         r = validar(m)
         self.assertTrue(r["valido"])
-        self.assertAlmostEqual(r["comprobaciones"][0]["galibo_minimo_m"],4.8)
-        self.assertEqual(r["comprobaciones"][0]["estado"],"insuficiente")
+        self.assertTrue(r["generable"])
+        self.assertEqual(r["comprobaciones"][0]["estado"],"pendiente")
+        self.assertEqual(r["comprobaciones"][0]["objetivo_m"],5)
+        self.assertNotIn("galibo_minimo_m",r["comprobaciones"][0])
         m["proyecto"].pop("cota_carretera_m")
         self.assertEqual(validar(m)["comprobaciones"][0]["estado"],"pendiente")
 

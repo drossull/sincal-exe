@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "pasarela-bim",
   "name": "Pasarela BIM",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "entrypoint": "SINCAL-Pasarela.exe",
   "host_api": 1,
   "description": "Editor topológico y generador conceptual de pasarelas de hormigón.",

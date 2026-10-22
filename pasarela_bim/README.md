@@ -200,9 +200,10 @@ nominales proceden de la referencia; rasantes, retranqueos y algunas secciones
 son aproximaciones explícitas para probar el motor.
 
 Los capiteles, estribos y cierres son envolventes simplificadas. No se incluyen
-armaduras, geometría de pretensado, aparatos de apoyo, barandas, bombeo ni la
+armaduras, geometría de pretensado, aparatos de apoyo, barandas ni la
 resolución de los once pendientes documentales. Las cantidades describen sólo
-los sólidos generados. No hay comprobación resistente ni normativa.
+los sólidos generados. Las vigas y retornos incorporan pendiente transversal
+del 1 % a dos aguas. No hay comprobación resistente ni normativa.
 
 Las vistas generadas son una base para planos. Esta versión no produce el juego
 ejecutivo de 21 láminas, cotas constructivas, detalles de armadura ni IFC. El

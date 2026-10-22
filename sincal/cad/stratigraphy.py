@@ -38,6 +38,9 @@ def stratigraphy_scene(hole, include_table=False, annotation_scale=10.0):
     errors = hole.errors()
     if errors:
         raise ValueError('\n'.join(errors))
+    if hole.drawing_format == 'cdi-spt-v1':
+        from sincal.cad.stratigraphy_cdi import cdi_scene
+        return cdi_scene(hole, include_table, annotation_scale)
     if hole.drawing_format == 'octay-intervals-v1':
         from sincal.cad.stratigraphy_octay import interval_scene
         return interval_scene(hole, include_table, annotation_scale)

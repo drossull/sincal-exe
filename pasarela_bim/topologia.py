@@ -7,6 +7,8 @@ proyecto. Las discrepancias documentales se conservan como avisos.
 
 from __future__ import annotations
 
+from .seccion import familia_del_tramo
+
 from collections import Counter, defaultdict, deque
 from copy import deepcopy
 import math
@@ -68,57 +70,21 @@ def interpolar_rasante(rasante, t):
 
 
 def _comprobar_galibos(modelo, nodos, familias):
-    """Altura geométrica frente a una cota viaria local constante declarada.
+    """Conserva el requisito de gálibo sin inferir una superficie de calzada.
 
-    Se revisa el intradós en todos los quiebres de rasante/canto y en los
-    extremos útiles. No sustituye un perfil de carretera ni normativa.
+    Una cota proyectada en el centro de un apoyo no describe el pavimento bajo
+    el atravieso. Tampoco las cotas globales de archivos antiguos autorizan una
+    comprobación: se conservan para intercambio, sin tratarlas como un plano.
     """
-    salida = []
     proyecto = modelo.get("proyecto", {})
     if not isinstance(proyecto, dict):
-        return salida
-    carretera, objetivo = proyecto.get("cota_carretera_m"), proyecto.get("galibo_m")
-    for tramo in modelo.get("tramos", []):
-        if not isinstance(tramo, dict) or tramo.get("funcion") != "cruce":
-            continue
-        comprobacion = {"tipo":"galibo_geometrico", "tramo":tramo.get("id"),
-                       "objetivo_m":objetivo, "cota_carretera_m":carretera,
-                       "alcance":"Previsualización con cota puntual de carretera tratada constante; no comprueba un perfil viario ni normativa"}
-        if not _numero(carretera):
-            comprobacion.update(estado="pendiente", mensaje="Falta la cota local de carretera para comprobar gálibo")
-            salida.append(comprobacion)
-            continue
-        a = nodos.get(tramo.get("desde")) if _texto(tramo.get("desde")) else None
-        b = nodos.get(tramo.get("hasta")) if _texto(tramo.get("hasta")) else None
-        familia = familias.get(tramo.get("familia")) if _texto(tramo.get("familia")) else None
-        if not a or not b or not isinstance(familia, dict) or not all(_numero(n.get(e)) for n in (a,b) for e in "xyz"):
-            continue
-        largo = math.hypot(b["x"]-a["x"],b["y"]-a["y"])
-        retiros = [tramo.get("retranqueo_inicio_mm",0),tramo.get("retranqueo_fin_mm",0)]
-        if not _numero(largo) or largo <= 0 or not all(_numero(v) and v >= 0 for v in retiros) or sum(retiros) >= largo:
-            continue
-        rasante = _perfil(tramo)
-        cantos = familia.get("perfil_canto") or [
-            {"t":0,"canto_mm":familia.get("canto_mm")},
-            {"t":1,"canto_mm":familia.get("canto_fin_mm",familia.get("canto_mm"))}]
-        if not all(isinstance(p,list) and len(p)>=2 for p in (rasante,cantos)):
-            continue
-        if not all(isinstance(p,dict) and _numero(p.get("t")) and _numero(p.get(clave))
-                   for perfil,clave in ((rasante,"f"),(cantos,"canto_mm")) for p in perfil):
-            continue
-        if any(q["t"]<=p["t"] for perfil in (rasante,cantos) for p,q in zip(perfil,perfil[1:])):
-            continue
-        inicio,fin = retiros[0]/largo,1-retiros[1]/largo
-        estaciones = {inicio,fin} | {p["t"] for p in rasante+cantos if inicio<p["t"]<fin}
-        perfil_canto = [{"t":p["t"],"f":p["canto_mm"]} for p in cantos]
-        alturas = [(a["z"]+(b["z"]-a["z"])*interpolar_rasante(rasante,t)
-                    -interpolar_rasante(perfil_canto,t))/1000-carretera for t in estaciones]
-        minimo = min(alturas)
-        estado = "sin_objetivo" if not _numero(objetivo) else "suficiente" if minimo >= objetivo-1e-9 else "insuficiente"
-        comprobacion.update(estado=estado,galibo_minimo_m=minimo,
-                            mensaje=f"Altura libre geométrica mínima: {minimo:.3f} m")
-        salida.append(comprobacion)
-    return salida
+        return []
+    return [{"tipo": "galibo_geometrico", "tramo": tramo.get("id"),
+             "objetivo_m": proyecto.get("galibo_m"), "estado": "pendiente",
+             "alcance": "Las cotas de terreno proyectado pertenecen al centro de cada apoyo; no definen el pavimento bajo el atravieso",
+             "mensaje": "Gálibo pendiente de comprobación: las cotas de terreno en los apoyos no definen la superficie de circulación"}
+            for tramo in modelo.get("tramos", [])
+            if isinstance(tramo, dict) and tramo.get("funcion") == "cruce"]
 
 
 def validar(modelo, borrador=False):
@@ -316,6 +282,13 @@ def validar(modelo, borrador=False):
                     error("retranqueos_excesivos", elemento, "Los retranqueos deben dejar una longitud útil positiva")
 
         perfil = _perfil(tramo)
+        if "descanso_central_mm" in tramo:
+            if tramo["descanso_central_mm"] != 1500 or longitud is None or longitud <= 1500:
+                error("descanso_central", elemento, "El descanso central debe medir 1,50 m y caber entre dos sectores inclinados")
+            else:
+                esperado = [(0,0), ((longitud-1500)/2/longitud,.5), ((longitud+1500)/2/longitud,.5), (1,1)]
+                if not isinstance(perfil,list) or len(perfil)!=4 or any(not isinstance(p,dict) or not _numero(p.get(k)) or abs(p[k]-v)>1e-8 for p,(t,f) in zip(perfil,esperado) for k,v in (("t",t),("f",f))):
+                    error("descanso_central", elemento, "La rasante debe conservar el descanso de 1,50 m centrado en la longitud de la viga")
         perfil_valido = isinstance(perfil, list) and len(perfil) >= 2
         if perfil_valido:
             perfil_valido = all(isinstance(p, dict) and _numero(p.get("t")) and _numero(p.get("f"))
@@ -360,6 +333,7 @@ def validar(modelo, borrador=False):
                 error("canto_escalera", elemento, "La losa de escalera requiere canto constante")
             if all(extremos) and all(_numero(n.get("z")) for n in extremos) and abs(extremos[1]["z"]-extremos[0]["z"]) < 1e-6:
                 error("escalera_sin_desnivel", elemento, "La escalera necesita un desnivel positivo entre extremos")
+        familia = familia_del_tramo(familia, tramo, nodos_id)
         canto = dimension(familia, "canto_mm", elemento)
         if tipo_seccion == "maciza" and "ancho_inferior_mm" in familia:
             dimension(familia,"ancho_inferior_mm",elemento)
@@ -386,11 +360,24 @@ def validar(modelo, borrador=False):
                     error("extremos_perfil_canto", elemento, "perfil_canto debe abarcar t=0 hasta t=1")
                 if any(b["t"] <= a["t"] for a, b in zip(perfil_canto, perfil_canto[1:])):
                     error("orden_perfil_canto", elemento, "Los valores t de perfil_canto deben crecer estrictamente")
+        pendiente = familia.get("pendiente_transversal_pct", 0 if tipo_seccion == "escalera" else 1)
+        if not _numero(pendiente) or pendiente < 0:
+            error("pendiente_transversal", elemento, "La pendiente transversal debe ser finita y no negativa")
+        elif tipo_seccion == "escalera" and pendiente != 0:
+            error("pendiente_transversal", elemento, "La pendiente transversal no está disponible para escaleras")
+        elif tipo_seccion != "escalera" and pendiente != 1:
+            error("pendiente_transversal", elemento, "La pendiente transversal debe ser 1 % a dos aguas")
+        elif ancho is not None and cantos:
+            espesor = familia.get("losa_superior_mm") if tipo_seccion == "cajon" else min(cantos)
+            if _numero(espesor) and pendiente*ancho/200 >= espesor:
+                error("pendiente_transversal", elemento, "La pendiente transversal agota el espesor en los bordes")
         if tipo_seccion == "cajon":
             medidas = {k: dimension(familia, k, elemento) for k in (
                 "ancho_inferior_mm", "ancho_alma_superior_mm", "losa_superior_mm", "losa_inferior_mm", "alma_mm")}
             dimension(familia, "ala_mm", elemento, cero=True, defecto=0)
-            macizado = dimension(familia, "macizado_mm", elemento, cero=True, defecto=0)
+            macizado = dimension(familia, "macizado_mm", elemento, cero=True, defecto=500)
+            if macizado is not None and macizado != 500:
+                error("macizado_fijo", elemento, "El macizado debe ser 0,50 m en cada extremo")
             if canto is not None and all(v is not None for v in medidas.values()):
                 if medidas["losa_superior_mm"] + medidas["losa_inferior_mm"] >= min(cantos):
                     error("cajon_sin_hueco", elemento, "Las losas superior e inferior consumen el canto del cajón")
@@ -472,6 +459,12 @@ def validar(modelo, borrador=False):
             error("id_duplicado", elemento, "Se repite el identificador de soporte")
         else:
             ids_soportes.add(identificador)
+        if "cota_terreno_proyectado_mm" not in soporte:
+            aviso("terreno_proyectado_pendiente", elemento,
+                  "Falta definir la cota de terreno proyectado en el centro de este apoyo")
+        elif not _numero(soporte["cota_terreno_proyectado_mm"]):
+            error("cota_terreno_proyectado_invalida", elemento,
+                  "La cota de terreno proyectado en el centro del apoyo debe ser un número finito; omita el campo si está pendiente")
         referencia = soporte.get("nodo")
         nodo = nodos_id.get(referencia) if _texto(referencia) else None
         if nodo is None:

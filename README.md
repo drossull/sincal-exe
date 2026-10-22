@@ -1,6 +1,6 @@
 # SINCAL Suite — Ingeniería y estándares CAD
 
-**SINCAL Suite** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 3.0. Esta guía corresponde a la release `v3.0.26`, con interfaz de escritorio web y Pasarela BIM como módulo opcional.
+**SINCAL Suite** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 3.0. Esta guía corresponde a la release `v3.0.27`, con interfaz de escritorio web y Pasarela BIM como módulo opcional.
 
 La disponibilidad de los instaladores se confirma en las
 [publicaciones oficiales](https://github.com/drossull/sincal-updates/releases).
@@ -85,7 +85,7 @@ El servidor se limita a loopback: no es apto para publicarlo en Internet.
 ### Validación y compilación
 
 El arranque de escritorio usa `desktop_main.py` y
-`packaging/windows/SINCAL_Web.spec`. La release `v3.0.26` se construye con
+`packaging/windows/SINCAL_Web.spec`. La release `v3.0.27` se construye con
 `tools/build_release.ps1 -DesktopWeb`; sin esa opción, el pipeline conserva el
 arranque Tk para compatibilidad. La versión instalada sólo cambia al ejecutar
 su instalador.
@@ -99,7 +99,7 @@ sus pendientes históricos no sustituyen el resultado de verificación de cada r
 ## Instalación web y distribución
 
 SINCAL Suite se distribuye mediante un instalador web firmado. El archivo
-`Setup_SINCAL_v3.0.26.exe` descarga desde su release pública los paquetes exactos
+`Setup_SINCAL_v3.0.27.exe` descarga desde su release pública los paquetes exactos
 de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y después los instala.
 El componente **Pasarela BIM** aparece **desmarcado por defecto**: su paquete
 independiente sólo se descarga si se selecciona. También puede instalarse más adelante.
@@ -110,7 +110,7 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
 
 ## Primer inicio
 
-1. Descarga y ejecuta el instalador de `v3.0.26` desde su publicación oficial, con SINCAL y CAD cerrados.
+1. Descarga y ejecuta el instalador de `v3.0.27` desde su publicación oficial, con SINCAL y CAD cerrados.
 2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
 3. Abre **Diagnóstico**, verifica el motor CAD sugerido y cámbialo si necesitas otra versión.
 4. Pulsa **Preparar integración CAD**.
@@ -200,6 +200,21 @@ El módulo **Proyecto** agrupa **Consulta**, **Generador de armadura** y **Sesio
 
 SINCAL recuerda la última ruta y solicita confirmación para reabrirla al iniciar. Si una sesión contiene cambios, cargar o limpiar otro proyecto exige guardarlos o descartarlos primero. El contexto activo alimenta automáticamente al Generador de armadura y también queda registrado dentro de las sesiones.
 
+### Estratigrafía: informes CDI
+
+El módulo reconoce los informes independientes de sondajes CDI, incluidos los
+formatos S-1 y S-2 de Enlace Ruta 29. Se extraen por separado los horizontes, las
+pasadas de perforación/recuperación (m y %), la presión (PSI) y los ensayos NSPT.
+La longitud de muestra en cm no se confunde con la recuperación; los rechazos R
+y la numeración original se conservan. Las discrepancias generan avisos sin
+recalcular ni sustituir cifras oficiales. No se extrapolan estratos ni se estiman
+valores desde las figuras. La empresa aparece solo como información de consulta
+en pantalla, nunca como parte del dibujo CAD.
+
+La vista previa y la inserción mantienen profundidades reales, textos RomanD
+anotativos de 2,5 mm y la escala anotativa activa. Antes de insertar se debe
+cotejar la extracción y la asignación de hatch con el informe original.
+
 ### Prospecciones
 
 **Proyecto → Prospecciones** carga localmente un informe PDF con texto o imágenes, o un TXT
@@ -262,8 +277,8 @@ independiente conservan su apertura en navegador.
 El instalador general ofrece el componente **desmarcado por defecto**. También
 puede añadirse después mediante el botón de instalación en línea. Si ya tienes
 el paquete, despliega **Instalar o actualizar desde un ZIP local** y selecciona
-`SINCAL_Pasarela_v0.3.1.zip`, o ejecuta el complemento independiente
-`Setup_SINCAL_Pasarela_v0.3.1.exe` de la misma publicación oficial.
+`SINCAL_Pasarela_v0.3.2.zip`, o ejecuta el complemento independiente
+`Setup_SINCAL_Pasarela_v0.3.2.exe` de la misma publicación oficial.
 No hace falta reinstalar el programa general.
 FreeCAD se instala por separado y sólo es necesario para generar el modelo.
 La consulta del módulo indica si está disponible.
@@ -278,7 +293,7 @@ mediante JSON en metros. Antes de actualizar, guarda ese JSON y pulsa
 La descarga comprueba el tamaño y SHA-256 publicados para el ZIP. Antes de
 instalarlo también se validan identidad, versión de contrato, rutas y SHA-256
 de cada archivo. La sustitución conserva la instalación anterior si falla.
-El módulo tiene su propia versión, `0.3.1`, y no incluye FreeCAD ni OCR.
+El módulo tiene su propia versión, `0.3.2`, y no incluye FreeCAD ni OCR.
 Las instrucciones de compilación independiente y distribución están en
 [`packaging/windows/pasarela-bim/README.md`](packaging/windows/pasarela-bim/README.md).
 
@@ -379,7 +394,7 @@ El proceso valida código y pruebas, compila y firma el plugin y la aplicación,
 y construye Pasarela BIM como ejecutable y paquete independientes. Firma el
 ejecutable del módulo antes de calcular sus hashes, compila y firma ambos
 instaladores y genera el manifiesto de release y `SHA256SUMS.txt`.
-Los artefactos de `v3.0.26` quedan en `installer_output/v3.0.26/`.
+Los artefactos de `v3.0.27` quedan en `installer_output/v3.0.27/`.
 Reserva una versión nueva y prepara un checkout de compilación aislado antes
 de ejecutar el pipeline: volver a compilar la misma versión sustituye sus
 artefactos locales. Para una compilación local no publicable puede usarse
@@ -396,12 +411,12 @@ ejecuta `python -m pytest tests/test_prospecciones_ocr.py -q` después de prepar
 
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v3.0.26.exe`
-- `SINCAL_App_v3.0.26.zip`
-- `SINCAL_AutoCAD_v3.0.26.zip`
-- `SINCAL_Pasarela_v0.3.1.zip`
-- `Setup_SINCAL_Pasarela_v0.3.1.exe`
-- `release-manifest_v3.0.26.json`
+- `Setup_SINCAL_v3.0.27.exe`
+- `SINCAL_App_v3.0.27.zip`
+- `SINCAL_AutoCAD_v3.0.27.zip`
+- `SINCAL_Pasarela_v0.3.2.zip`
+- `Setup_SINCAL_Pasarela_v0.3.2.exe`
+- `release-manifest_v3.0.27.json`
 - `SHA256SUMS.txt`
 
 No renombres ni vuelvas a firmar los paquetes después de calcular sus hashes:

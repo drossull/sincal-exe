@@ -140,7 +140,7 @@ class Manejador(BaseHTTPRequestHandler):
             return self.enviar(contenido, tipo=mimetypes.guess_type(nombre)[0] or "application/octet-stream")
         recursos = {"/": "index.html", "/index.html": "index.html", "/app.js": "app.js", "/style.css": "style.css",
                     "/proyecto.js": "proyecto.js", "/emplazamiento.js": "emplazamiento.js", "/secciones.js": "secciones.js",
-                    "/volumen.js": "volumen.js", "/ejes.js": "ejes.js", "/integracion.js": "integracion.js"}
+                    "/volumen.js": "volumen.js", "/ejes.js": "ejes.js", "/integracion.js": "integracion.js", "/ayudas.js": "ayudas.js"}
         if ruta not in recursos:
             return self.enviar({"mensaje": "No encontrado"}, 404)
         archivo = raiz_recursos() / "web" / recursos[ruta]

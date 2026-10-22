@@ -39,7 +39,7 @@ with zipfile.ZipFile(sys.argv[1]) as z:
  try{
   await page.goto('http://127.0.0.1:8767/');await page.locator('#new-project').click();
   await page.locator('[name="nombre"]').fill('Ensayo de pasarela desde cero');
-  for(const [key,value] of Object.entries({este_m:350000,norte_m:6000000,cota_m:120,norte_desde_x_horario_deg:270}))await page.locator(`[name="${key}"]`).fill(String(value));
+  for(const [key,value] of Object.entries({este_m:350000,norte_m:6000000,cota_m:120,norte_desde_y_horario_deg:0}))await page.locator(`[name="${key}"]`).fill(String(value));
   await page.getByRole('button',{name:'Crear proyecto',exact:true}).click();
   await page.locator('[name="vanos"]').selectOption('2');
   await page.screenshot({path:path.join(output,'01_atravieso.png')});

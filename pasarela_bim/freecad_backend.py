@@ -7,6 +7,8 @@ Las vistas TechDraw sí conservan sus vínculos con los sólidos del documento.
 
 from __future__ import annotations
 
+from .seccion import familia_del_tramo
+
 import json
 import hashlib
 import math
@@ -75,6 +77,7 @@ def _loft(Part, wires, etiqueta):
 
 
 def _tramo_shape(Part, App, tramo, familia, nodos):
+    familia = familia_del_tramo(familia, tramo, nodos)
     if familia.get("tipo") == "escalera":
         return _escalera_shape(Part, App, tramo, familia)
     largo = tramo["longitud_planta_mm"]
@@ -90,6 +93,10 @@ def _tramo_shape(Part, App, tramo, familia, nodos):
     alma = float(familia.get("alma_mm", 0))
     if ancho < sup or min(sup, inf, esp_sup, esp_inf) <= 0:
         raise ValueError(f"{tramo['id']}: dimensiones de sección incompatibles")
+    pendiente = familia.get("pendiente_transversal_pct", 1)
+    if isinstance(pendiente, bool) or not isinstance(pendiente, (int, float)) or not math.isfinite(pendiente) or pendiente != 1:
+        raise ValueError("La pendiente transversal debe ser 1 % a dos aguas")
+    descenso = pendiente*ancho/200
     nodo = nodos[tramo["desde"]]
 
     def secciones(s0, s1, interior=False):
@@ -98,6 +105,8 @@ def _tramo_shape(Part, App, tramo, familia, nodos):
             h = _canto(familia, t)
             if not maciza and h <= esp_sup+esp_inf:
                 raise ValueError(f"{tramo['id']}: canto insuficiente para las losas")
+            if descenso >= (h if maciza else esp_sup):
+                raise ValueError("La pendiente transversal agota el espesor en los bordes")
             if interior:
                 # Espesor de alma horizontal en esta aproximación conceptual.
                 bt = sup-2*alma
@@ -115,6 +124,8 @@ def _tramo_shape(Part, App, tramo, familia, nodos):
                           (-sup/2, -esp_sup), (-ancho/2, -esp_sup)]
                 # Evitar aristas nulas cuando no hay ala lateral.
                 perfil = [p for i, p in enumerate(perfil) if p != perfil[i-1]]
+            if not interior and descenso > 0:
+                perfil[:2] = [(-ancho/2, -descenso), (0, 0), (ancho/2, -descenso)]
             centro = (nodo["x"]+tramo["ux"]*largo*t,
                       nodo["y"]+tramo["uy"]*largo*t, _z(tramo, nodos, t))
             salida.append(_wire(Part, App, centro, tramo["ux"], tramo["uy"], perfil))
@@ -122,7 +133,9 @@ def _tramo_shape(Part, App, tramo, familia, nodos):
 
     shape = _loft(Part, secciones(inicio, fin), tramo["id"])
     if tipo_familia == "cajon":
-        macizado = float(familia.get("macizado_mm", 0))
+        macizado = float(familia.get("macizado_mm", 500))
+        if macizado != 500:
+            raise ValueError("El macizado debe ser 0,50 m en cada extremo")
         if fin-inicio > 2*macizado+1e-4:
             hueco = _loft(Part, secciones(inicio+macizado, fin-macizado, True),
                          tramo["id"]+"_hueco")
@@ -171,7 +184,7 @@ def _capitel_shape(Part, App, soporte, nodo, conectados, familias, nodos):
     base = float(soporte["cota_superior_mm"])
     diametro = float(soporte.get("diametro_mm", 1000))
     for tramo in conectados:
-        familia = familias[tramo["familia"]]
+        familia = familia_del_tramo(familias[tramo["familia"]], tramo, nodos)
         en_inicio = tramo["desde"] == nodo["id"]
         signo = 1 if en_inicio else -1
         largo = tramo["longitud_planta_mm"]
@@ -480,6 +493,8 @@ def _svg_elevacion(eje, familias, proyecto, revision):
     niveles += [p["z"] for p in estaciones]
     niveles += [f[k] for p in estaciones for f in p.get("fundaciones", [])
                 for k in ("cota_superior_mm", "cota_inferior_mm")]
+    niveles += [s["cota_terreno_proyectado_mm"] for p in estaciones for s in p.get("soportes", [])
+                if "cota_terreno_proyectado_mm" in s]
     zmin,zmax = min(niveles),max(niveles)
     alto_real = max(zmax-zmin,1000)
     longitud = eje["longitud_mm"]
@@ -568,6 +583,16 @@ def _svg_elevacion(eje, familias, proyecto, revision):
         for soporte in p.get("soportes", []):
             yy = y(soporte["cota_superior_mm"])
             linea(xx-7,yy,xx+7,yy,extra='stroke="#10728a" stroke-width="2"')
+            if "cota_terreno_proyectado_mm" in soporte:
+                zt = soporte["cota_terreno_proyectado_mm"]
+                yt = y(zt)
+                sid = escape(str(soporte["id"]), {'"': '&quot;'})
+                nid = escape(str(p["nodo"]), {'"': '&quot;'})
+                lineas.append(f'<g class="projected-terrain-level" data-support-id="{sid}" data-node-id="{nid}" data-z-mm="{zt}">')
+                linea(xx-11,yt,xx+11,yt,extra='stroke="#637847" stroke-width="1.5"')
+                lineas.append(f'<circle cx="{xx:.3f}" cy="{yt:.3f}" r="3" fill="white" stroke="#637847"/>')
+                texto(xx,yt-10,f"Terreno proyectado {metros(zt)} m","small","middle",'style="fill:#52643e;paint-order:stroke;stroke:white;stroke-width:3px;stroke-linejoin:round"')
+                lineas.append('</g>')
         for dado in p.get("fundaciones", []):
             for k in ("cota_superior_mm", "cota_inferior_mm"):
                 yy = y(dado[k])
@@ -586,7 +611,7 @@ def _svg_elevacion(eje, familias, proyecto, revision):
         linea(xx,560,xx,579)
     texto((x(0)+x(longitud))/2,567,f"Longitud en planta: {metros(longitud)} m","small","middle")
     texto(35,608,"Los números remiten a la tabla. Δ indica la distancia entre estaciones; incluye los intervalos cortos.","muted")
-    texto(35,627,"Apoyos: ejes y cotas declaradas, sin proyección de fustes, capiteles, dados o pilotes. No representa terreno.","muted")
+    texto(35,627,"Apoyos: ejes y cotas declaradas. Terreno proyectado: niveles puntuales al centro de cada apoyo; no define una superficie.","muted")
     columnas = (43,83,265,470,590,735,895,1080)
     titulos = ("N°","Nodo / tipo","Eje de apoyo","Estación [m]","Δ anterior [m]","Paso [m]","Cima apoyo [m]","Dado sup. / inf. [m]")
     lineas.append('<rect x="28" y="651" width="1244" height="31" fill="#eaf1f4"/>')
@@ -650,7 +675,7 @@ def generar(modelo, carpeta_salida, con_vistas=True):
     nodos = datos["nodos_por_id"]
     familias = datos["familias"]
     avisos = ["Geometría conceptual regenerada desde parámetros; no dimensiona la estructura.",
-              "Capiteles y estribos simplificados; sin apoyos elastoméricos, armaduras ni bombeo.",
+              "Capiteles y estribos simplificados; sin apoyos elastoméricos ni armaduras.",
               "El espesor de alma del cajón se representa en dirección horizontal."]
     avisos.extend(a["mensaje"] for a in datos["validacion"].get("avisos",[]))
     doc = App.newDocument("Pasarela_"+_nombre(proyecto["id"]))
@@ -712,7 +737,7 @@ def generar(modelo, carpeta_salida, con_vistas=True):
             obj_p = materializar("pilote", pilote["id"], shape, pilote, fundacion["nodos"])
             _prop(obj_p, "App::PropertyLink", "FundacionVinculada", obj_dado)
     for tramo in datos["tramos"]:
-        familia = familias[tramo["familia"]]
+        familia = familia_del_tramo(familias[tramo["familia"]], tramo, nodos)
         ala_efectiva = (tramo["ancho_mm"]-familia.get("ancho_alma_superior_mm",tramo["ancho_mm"]))/2
         if abs(ala_efectiva-familia.get("ala_mm", ala_efectiva)) > 0.01:
             avisos.append(f"{tramo['id']}: ala efectiva {ala_efectiva:g} mm según ancho total del tramo.")
@@ -771,6 +796,14 @@ def generar(modelo, carpeta_salida, con_vistas=True):
             parametros_soporte["uuid"] = nodo["uuid"]
         obj_s = materializar("soporte",soporte["id"],shape,parametros_soporte,[nodo["id"]])
         _prop(obj_s,"App::PropertyLink","FundacionVinculada",por_id[("dado",soporte["fundacion"])])
+        if "cota_terreno_proyectado_mm" in soporte:
+            cota_terreno = soporte["cota_terreno_proyectado_mm"]
+            _prop(obj_s,"App::PropertyDistance","CotaTerrenoProyectado",cota_terreno,"Terreno proyectado")
+            _prop(obj_s,"App::PropertyVector","CentroTerrenoProyectado",
+                  App.Vector(nodo["x"],nodo["y"],cota_terreno),"Terreno proyectado")
+            _prop(obj_s,"App::PropertyString","ReferenciaTerrenoProyectado",
+                  "Cota local proyectada en el centro del apoyo; no define una superficie ni modifica la fundación.",
+                  "Terreno proyectado")
         conectados = [t for t in datos["tramos"] if nodo["id"] in (t["desde"],t["hasta"])]
         shape_cap = _capitel_shape(Part,App,soporte,nodo,conectados,familias,nodos)
         if shape_cap is not None:

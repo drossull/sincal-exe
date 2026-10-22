@@ -8,14 +8,14 @@
   const m = x => finite(x) ? Number((x / 1000).toFixed(4)) : "";
   const fmt = x => finite(x) ? (x / 1000).toLocaleString("es-CL", {maximumFractionDigits:3}) : "—";
   const defs = {
-    cajon: [{key:"canto_mm",label:"Canto"},{key:"ancho_alma_superior_mm",label:"Ancho exterior superior del cajón"},{key:"ancho_inferior_mm",label:"Ancho exterior inferior"},{key:"losa_superior_mm",label:"Espesor losa superior"},{key:"losa_inferior_mm",label:"Espesor losa inferior"},{key:"alma_mm",label:"Espesor horizontal de alma"},{key:"macizado_mm",label:"Macizado en cada extremo",zero:true}],
+    cajon: [{key:"canto_mm",label:"Alto viga"},{key:"ancho_alma_superior_mm",label:"Ancho superior del cajón sin alas"},{key:"ancho_inferior_mm",label:"Ancho exterior inferior"},{key:"losa_superior_mm",label:"Espesor losa superior en el centro"},{key:"losa_inferior_mm",label:"Espesor losa inferior"},{key:"alma_mm",label:"Espesor horizontal de alma"},{key:"macizado_mm",label:"Macizado en cada extremo",zero:true}],
     maciza: [{key:"canto_mm",label:"Canto / espesor"},{key:"ancho_inferior_mm",label:"Ancho inferior"}],
     escalera: [{key:"canto_mm",label:"Espesor de losa inclinada"},{key:"numero_peldanos",label:"Número de peldaños",integer:true}]
   };
   function defaults(type, width=2000) {
     if (type === "escalera") return {tipo:type,canto_mm:180,numero_peldanos:18};
-    if (type === "maciza") return {tipo:type,canto_mm:250,ancho_inferior_mm:width};
-    return {tipo:"cajon",canto_mm:600,ancho_alma_superior_mm:Math.min(1260,width),ancho_inferior_mm:Math.min(1000,width),losa_superior_mm:150,losa_inferior_mm:140,alma_mm:140,macizado_mm:500};
+    if (type === "maciza") return {tipo:type,pendiente_transversal_pct:1,canto_mm:250,ancho_inferior_mm:width};
+    return {tipo:"cajon",pendiente_transversal_pct:1,canto_mm:600,ancho_alma_superior_mm:Math.min(1260,width),ancho_inferior_mm:Math.min(1000,width),losa_superior_mm:150,losa_inferior_mm:140,alma_mm:140,macizado_mm:500};
   }
   function profile(f) {
     return Array.isArray(f.perfil_canto) && f.perfil_canto.length ? f.perfil_canto : [{t:0,canto_mm:f.canto_mm},{t:1,canto_mm:f.canto_fin_mm ?? f.canto_mm}];
@@ -30,12 +30,21 @@
     if(!defs[type])return ["Tipo de sección desconocido."];
     if(!finite(width)||width<=0)errors.push("El ancho estructural debe ser positivo.");
     for(const d of defs[type]){
-      const v=f[d.key] ?? (d.key==="ancho_inferior_mm"?width:d.key==="macizado_mm"?0:undefined);
+      const v=f[d.key] ?? (d.key==="ancho_inferior_mm"?width:d.key==="macizado_mm"?500:undefined);
       if(!finite(v)||(d.zero?v<0:v<=0)||(d.integer&&!Number.isInteger(v)))errors.push(`${d.label}: introduce ${d.integer?"un entero positivo":"una dimensión válida"}.`);
     }
+    const slope=f.pendiente_transversal_pct??(type==="escalera"?0:1);
+    if(!finite(slope)||slope<0)errors.push("La pendiente transversal debe ser un porcentaje finito mayor o igual a cero.");
+    if(type==="escalera"&&slope!==0)errors.push("La pendiente transversal no está disponible para escaleras.");
+    if(type!=="escalera"&&slope!==1)errors.push("La pendiente transversal debe ser 1 % a dos aguas (regla del proyecto).");
     const ps=profile(f);
+    if(type!=="escalera"&&finite(slope)){
+      const thickness=type==="cajon"?f.losa_superior_mm:Math.min(...ps.map(p=>p.canto_mm));
+      if(slope*width/200>=thickness)errors.push("La pendiente transversal agota el espesor en los bordes. Reduce la pendiente o aumenta el espesor.");
+    }
     if(ps.length<2||ps[0].t!==0||ps.at(-1).t!==1||ps.some((p,i)=>!finite(p.t)||!finite(p.canto_mm)||p.canto_mm<=0||p.t<0||p.t>1||(i&&p.t<=ps[i-1].t)))errors.push("Las estaciones de canto deben aumentar de 0 a 1 y tener cantos positivos.");
     if(type==="cajon"){
+      if((f.macizado_mm??500)!==500)errors.push("El macizado debe ser 0,50 m en cada extremo.");
       const sup=f.ancho_alma_superior_mm,inf=f.ancho_inferior_mm,es=f.losa_superior_mm,ei=f.losa_inferior_mm,a=f.alma_mm;
       if(sup>width)errors.push("El cajón supera el ancho estructural del tramo.");
       for(const h of ps.map(p=>p.canto_mm)){
@@ -51,12 +60,16 @@
     }
     return [...new Set(errors)];
   }
+  function wingWidth(f,width) {return (width-f.ancho_alma_superior_mm)/2;}
+  function withWingWidth(f,width,wing) {return {...f,ancho_alma_superior_mm:width-2*wing,ala_mm:wing};}
   function geometry(f,width,t=0) {
     const h=depthAt(f,t),inf=f.ancho_inferior_mm??width;
-    if(f.tipo!=="cajon")return {outer:[[-width/2,0],[width/2,0],[inf/2,h],[-inf/2,h]],inner:[],depth:h};
+    const drop=(f.pendiente_transversal_pct??1)*width/200;
+    const top=drop>0?[[-width/2,drop],[0,0],[width/2,drop]]:[[-width/2,0],[width/2,0]];
+    if(f.tipo!=="cajon")return {outer:[...top,[inf/2,h],[-inf/2,h]],inner:[],depth:h};
     const sup=f.ancho_alma_superior_mm,es=f.losa_superior_mm,ei=f.losa_inferior_mm,a=f.alma_mm;
     const bt=sup-2*a,bb=inf+(sup-inf)*ei/(h-es)-2*a;
-    return {outer:[[-width/2,0],[width/2,0],[width/2,es],[sup/2,es],[inf/2,h],[-inf/2,h],[-sup/2,es],[-width/2,es]],inner:[[-bt/2,es],[bt/2,es],[bb/2,h-ei],[-bb/2,h-ei]],depth:h};
+    return {outer:[...top,[width/2,es],[sup/2,es],[inf/2,h],[-inf/2,h],[-sup/2,es],[-width/2,es]],inner:[[-bt/2,es],[bt/2,es],[bb/2,h-ei],[-bb/2,h-ei]],depth:h};
   }
   function render(f,width,options={}) {
     const errors=validate(f,width,options);
@@ -79,12 +92,18 @@
       body+=text(w/2,20,`${n} peldaños · huella ${fmt(run/n)} m · contrahuella ${fmt(rise/n)} m`);
       caption=real?"Alzado esquemático del tramo seleccionado; las cotas proceden de sus extremos.":"Ejemplo de alzado: el desarrollo real depende del tramo asignado.";
     }else{
+      caption+=` · Pendiente a dos aguas 1 % · descenso al borde ${fmt(width/200)} m`;
       const g=geometry(f,width,t),maxWidth=Math.max(width,f.ancho_inferior_mm||width),scale=Math.min((w-margin*2)/maxWidth,(h-110)/g.depth);
       const x=w/2,y=55;const path=pts=>pts.map((p,i)=>`${i?'L':'M'}${x+p[0]*scale},${y+p[1]*scale}`).join(' ')+' Z';
       body=`<path d="${path(g.outer)} ${g.inner.length?path(g.inner):''}" fill="#d8e7ef" fill-rule="evenodd" stroke="#2a6385" stroke-width="1.8"/>`;
       body+=dim(x-width/2*scale,y-22,x+width/2*scale,y-22,`${fmt(width)} m`);
       body+=dim(x-maxWidth/2*scale-23,y,x-maxWidth/2*scale-23,y+g.depth*scale,`${fmt(g.depth)} m`);
       body+=dim(x-(f.ancho_inferior_mm??width)/2*scale,y+g.depth*scale+26,x+(f.ancho_inferior_mm??width)/2*scale,y+g.depth*scale+26,`${fmt(f.ancho_inferior_mm??width)} m`);
+      if(f.tipo==="cajon"&&wingWidth(f,width)>0){
+        const wing=wingWidth(f,width),outer=width/2*scale,inner=f.ancho_alma_superior_mm/2*scale;
+        body+=dim(x-outer,y+f.losa_superior_mm*scale+18,x-inner,y+f.losa_superior_mm*scale+18,`${fmt(wing)} m`);
+        body+=dim(x+inner,y+f.losa_superior_mm*scale+18,x+outer,y+f.losa_superior_mm*scale+18,`${fmt(wing)} m`);
+      }
       if(f.tipo==="cajon")body+=text(w/2,h-8,`Losa superior ${fmt(f.losa_superior_mm)} · inferior ${fmt(f.losa_inferior_mm)} · alma ${fmt(f.alma_mm)} m`);
     }
     return `<svg class="sections-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(caption)}" xmlns="http://www.w3.org/2000/svg">${body}</svg><p class="sections-caption">${esc(caption)}</p>`;
@@ -106,32 +125,33 @@
     styles();let familyId,draft,station=0,disposable=false,isNew=false;
     const model=()=>options.getModel();const edge=()=>options.getSelectedEdge?.();
     const message=(text,error=false)=>options.onMessage?.(text,error);
-    function choose(id,newFamily=false){familyId=id;isNew=newFamily;draft=newFamily?defaults("cajon",edge()?.ancho_mm||2000):clone(model().familias[id]);draft.tipo ||= edge()?.tipo==="retorno"?"maciza":"cajon";draft.ancho_inferior_mm??=edge()?.ancho_mm||2000;draw();}
+    function choose(id,newFamily=false){familyId=id;isNew=newFamily;draft=newFamily?defaults("cajon",edge()?.ancho_mm||2000):clone(model().familias[id]);draft.tipo ||= edge()?.tipo==="retorno"?"maciza":"cajon";draft.ancho_inferior_mm??=edge()?.ancho_mm||2000;if(draft.tipo!=="escalera")draft.pendiente_transversal_pct=1;if(draft.tipo==="cajon")draft.macizado_mm=500;draw();}
     function draw(){
       if(disposable)return;
       const e=edge(),f=model()?.familias||{};
       if(!e){container.innerHTML='<div class="sections-panel"><p class="sections-info">Selecciona un tramo para editar su sección.</p></div>';return;}
-      const ds=defs[draft.tipo]||defs.maciza,variable=Array.isArray(draft.perfil_canto)&&draft.perfil_canto.length;
-      const input=(d)=>`<label class="sections-field"><span>${esc(d.label)}${d.integer?'':' (m)'}</span><input type="number" step="${d.integer?'1':'.001'}" data-section-field="${d.key}" value="${d.integer?esc(draft[d.key]):m(draft[d.key])}"></label>`;
-      container.innerHTML=`<section class="sections-panel"><h3>Sección de la familia</h3><label class="sections-field"><span>Familia del tramo</span><select data-section-action="choose">${Object.keys(f).map(id=>`<option value="${esc(id)}" ${id===familyId?'selected':''}>${esc(id)}</option>`).join('')}${isNew?`<option selected value="${esc(familyId)}">${esc(familyId)} (nueva)</option>`:''}</select></label><label class="sections-field"><span>Identificador ${isNew?'de la nueva familia':''}</span><input data-section-id value="${esc(familyId)}" ${isNew?'':'readonly'}></label><label class="sections-field"><span>Forma</span><select data-section-action="type">${[['cajon','Cajón con alas'],['maciza','Maciza / losa'],['escalera','Escalera recta']].map(([v,l])=>`<option value="${v}" ${draft.tipo===v?'selected':''}>${l}</option>`).join('')}</select></label><p class="sections-info">Ancho estructural del tramo: <strong>${fmt(e.ancho_mm)} m</strong>. Se edita en las propiedades del tramo.</p><div class="sections-grid">${ds.filter(d=>!variable||d.key!=='canto_mm').map(input).join('')}</div>${draft.tipo!=='escalera'?`<label class="sections-check"><input type="checkbox" data-section-action="variable" ${variable?'checked':''}> Canto variable a lo largo del tramo</label>`:''}${variable?`<p class="sections-info">Posición normalizada (0–1) · canto (m)</p><div>${draft.perfil_canto.map((p,i)=>`<div class="sections-profile-row"><input type="number" min="0" max="1" step=".001" data-profile-index="${i}" data-profile-key="t" value="${esc(p.t)}" aria-label="Posición estación ${i+1}"><input type="number" step=".001" data-profile-index="${i}" data-profile-key="canto_mm" value="${m(p.canto_mm)}" aria-label="Canto estación ${i+1}">${i>0&&i<draft.perfil_canto.length-1?`<button type="button" data-remove-station="${i}" aria-label="Quitar estación">×</button>`:''}</div>`).join('')}</div><div class="sections-actions"><button type="button" data-section-action="add-station">Añadir estación</button></div><label class="sections-field"><span>Vista en posición <b data-station-value>${station.toFixed(2)}</b></span><input type="range" min="0" max="1" step=".01" value="${station}" data-section-action="station"></label>`:''}<div data-section-preview></div><div class="sections-errors" data-section-errors></div><p class="sections-info" data-section-impact></p><div class="sections-actions"><button type="button" class="primary" data-section-action="apply">${isNew?'Crear y asignar':'Aplicar a esta familia'}</button><button type="button" data-section-action="duplicate">Duplicar para este tramo</button><button type="button" data-section-action="new">Nueva familia</button></div></section>`;
+      const automatic=root.VolumePreview?.sectionFamily(model(),e,draft)?.canto_por_descanso,ds=defs[draft.tipo]||defs.maciza,variable=!automatic&&(Array.isArray(draft.perfil_canto)&&draft.perfil_canto.length||draft.canto_fin_mm!==undefined&&draft.canto_fin_mm!==draft.canto_mm);
+      const input=(d)=>`<label class="sections-field"><span>${esc(automatic&&d.key==='canto_mm'?'Alto viga en la porción alta':d.label)}${d.integer?'':' (m)'}</span><input type="number" step="${d.integer?'1':'.001'}" data-section-field="${d.key}" ${d.key==='macizado_mm'?'readonly':''} value="${d.integer?esc(draft[d.key]):m(draft[d.key])}"></label>`;
+      container.innerHTML=`<section class="sections-panel"><h3>Sección de la familia</h3><label class="sections-field"><span>Familia del tramo</span><select data-section-action="choose">${Object.keys(f).map(id=>`<option value="${esc(id)}" ${id===familyId?'selected':''}>${esc(id)}</option>`).join('')}${isNew?`<option selected value="${esc(familyId)}">${esc(familyId)} (nueva)</option>`:''}</select></label><label class="sections-field"><span>Identificador ${isNew?'de la nueva familia':''}</span><input data-section-id value="${esc(familyId)}" ${isNew?'':'readonly'}></label><label class="sections-field"><span>Forma</span><select data-section-action="type">${[['cajon','Cajón con alas'],['maciza','Maciza / losa'],['escalera','Escalera recta']].map(([v,l])=>`<option value="${v}" ${draft.tipo===v?'selected':''}>${l}</option>`).join('')}</select></label><p class="sections-info">${e.funcion === "cruce" ? "Ancho sección atravieso (viga)" : "Ancho estructural del tramo"}: <strong>${fmt(e.ancho_mm)} m</strong>. Se edita en las propiedades del tramo.</p>${draft.tipo==='cajon'?`<p class="sections-info">El ancho total incluye las dos alas. Cada ala sobresale del cajón bajo la losa superior.</p><label class="sections-field"><span>Vuelo del ala a cada lado (m)</span><input type="number" min="0" step=".001" data-section-wing value="${m(wingWidth(draft,e.ancho_mm))}"></label>`:''}${draft.tipo!=='escalera'?`<label class="sections-field"><span>Pendiente transversal a dos aguas (%)</span><input type="number" readonly data-section-slope value="1"></label><p class="sections-info">Valor fijo por regla del proyecto. El eje es el punto alto. La superficie desciende hacia ambos bordes, con cara inferior horizontal. El espesor superior se mide en el centro. Es independiente de la pendiente longitudinal.</p>`:''}<div class="sections-grid">${ds.filter(d=>!variable||d.key!=='canto_mm').map(input).join('')}</div>${variable?`<p class="sections-info">Este archivo contiene un perfil de canto importado. Se conserva para no alterar la geometría existente. Al insertar un descanso, el canto se calcula automáticamente.</p><div class="sections-info">${profile(draft).map(p=>`Posición ${esc(p.t)} · alto ${fmt(p.canto_mm)} m`).join('<br>')}</div><label class="sections-field"><span>Vista en posición <b data-station-value>${station.toFixed(2)}</b></span><input type="range" min="0" max="1" step=".01" value="${station}" data-section-action="station"></label>`:''}${automatic?`<p class="sections-info">Canto automático por descanso. Cara inferior recta al 8 %; el alto aumenta hacia la porción baja.<span data-automatic-depth></span></p><label class="sections-field"><span>Vista en posición <b data-station-value>${station.toFixed(2)}</b></span><input type="range" min="0" max="1" step=".01" value="${station}" data-section-action="station"></label>`:''}<div data-section-preview></div><div class="sections-errors" data-section-errors></div><p class="sections-info" data-section-impact></p><div class="sections-actions"><button type="button" class="primary" data-section-action="apply">${isNew?'Crear y asignar':'Aplicar a esta familia'}</button><button type="button" data-section-action="duplicate">Duplicar para este tramo</button><button type="button" data-section-action="new">Nueva familia</button></div></section>`;
       preview();
     }
     function preview(){
       const e=edge();if(!e||!draft)return;
-      const context=edgeContext(model(),e),errors=validate(draft,e.ancho_mm,context),used=model().tramos.filter(t=>t.familia===familyId||t===e);
-      for(const other of used.filter(t=>t.id!==e.id))for(const err of validate(draft,other.ancho_mm,edgeContext(model(),other)))errors.push(`${other.id}: ${err}`);
-      container.querySelector('[data-section-preview]').innerHTML=render(draft,e.ancho_mm,{...context,t:station});
+      const context=edgeContext(model(),e),effective=root.VolumePreview?.sectionFamily(model(),e,draft)||draft,errors=validate(effective,e.ancho_mm,context),used=model().tramos.filter(t=>t.familia===familyId||t===e);
+      for(const other of used.filter(t=>t.id!==e.id))for(const err of validate(root.VolumePreview?.sectionFamily(model(),other,draft)||draft,other.ancho_mm,edgeContext(model(),other)))errors.push(`${other.id}: ${err}`);
+      container.querySelector('[data-section-preview]').innerHTML=render(effective,e.ancho_mm,{...context,t:station});
+      const automaticDepth=container.querySelector('[data-automatic-depth]');if(automaticDepth){const values=profile(effective).map(p=>p.canto_mm);automaticDepth.textContent=` Porción alta: ${fmt(Math.min(...values))} m · porción baja: ${fmt(Math.max(...values))} m.`;}
       container.querySelector('[data-section-errors]').textContent=[...new Set(errors)].slice(0,5).join(' ');
       container.querySelector('[data-section-impact]').textContent=isNew?`La nueva familia se asignará únicamente a ${e.id}.`:`Al aplicar se ${used.length===1?"actualizará":"actualizarán"} ${used.length} tramo${used.length===1?'':'s'}: ${used.map(t=>t.id).join(', ')}. Duplica la familia para cambiar sólo ${e.id}.`;
       container.querySelector('[data-section-action="apply"]').disabled=!!errors.length;
-      container.querySelector('[data-section-action="duplicate"]').disabled=!!validate(draft,e.ancho_mm,context).length;
+      container.querySelector('[data-section-action="duplicate"]').disabled=!!validate(effective,e.ancho_mm,context).length;
     }
     function apply(duplicate=false){
       const e=edge(),data=model();if(!e)return;
       const id=duplicate?uniqueId(data,familyId+"_"+e.id):isNew?container.querySelector('[data-section-id]').value.trim():familyId;
       if(!id||isNew&&data.familias[id]){message("Usa un identificador nuevo para la familia.",true);return;}
       const affected=duplicate||isNew?[e]:data.tramos.filter(t=>t.familia===familyId||t===e);
-      const errors=affected.flatMap(t=>validate(draft,t.ancho_mm,edgeContext(data,t)));
+      const errors=affected.flatMap(t=>validate(root.VolumePreview?.sectionFamily(data,t,draft)||draft,t.ancho_mm,edgeContext(data,t)));
       if(errors.length){message(errors[0],true);return;}
       options.onBeforeChange?.();data.familias ||= {};data.familias[id]={...clone(draft),...((duplicate||isNew)?{uuid:uid()}:{})};
       e.familia=id;
@@ -141,12 +161,20 @@
     }
     function change(event){
       const input=event.target,key=input.dataset.sectionField,action=input.dataset.sectionAction;
-      if(key){draft[key]=finite(input.valueAsNumber)?(key==="numero_peldanos"?input.valueAsNumber:Math.round(input.valueAsNumber*1000)):NaN;if(key==="canto_mm")delete draft.canto_fin_mm;preview();}
-      else if(input.dataset.profileIndex!==undefined){const p=draft.perfil_canto[Number(input.dataset.profileIndex)],pk=input.dataset.profileKey;p[pk]=pk==="t"?input.valueAsNumber:input.valueAsNumber*1000;draft.canto_mm=draft.perfil_canto[0].canto_mm;draft.canto_fin_mm=draft.perfil_canto.at(-1).canto_mm;preview();}
+      if(input.hasAttribute('data-section-slope')){input.value='1';draft.pendiente_transversal_pct=1;preview();}
+      else if(input.hasAttribute('data-section-wing')){
+        draft=withWingWidth(draft,edge().ancho_mm,input.valueAsNumber*1000);
+        container.querySelector('[data-section-field="ancho_alma_superior_mm"]').value=m(draft.ancho_alma_superior_mm);preview();
+      }
+      else if(key){if(key==="macizado_mm"){draft.macizado_mm=500;input.value="0.5";preview();return;}draft[key]=finite(input.valueAsNumber)?(key==="numero_peldanos"?input.valueAsNumber:Math.round(input.valueAsNumber*1000)):NaN;if(key==="canto_mm")delete draft.canto_fin_mm;
+        if(key==="ancho_alma_superior_mm"&&draft.tipo==="cajon"){
+          draft.ala_mm=wingWidth(draft,edge().ancho_mm);
+          container.querySelector('[data-section-wing]').value=m(draft.ala_mm);
+        }preview();}
       else if(action==="station"){station=input.valueAsNumber;container.querySelector('[data-station-value]').textContent=station.toFixed(2);preview();}
     }
-    function changed(event){const input=event.target,action=input.dataset.sectionAction;if(action==="choose")choose(input.value);else if(action==="type"){draft=defaults(input.value,edge()?.ancho_mm||2000);draw();}else if(action==="variable"){if(input.checked)draft.perfil_canto=[{t:0,canto_mm:draft.canto_mm},{t:1,canto_mm:draft.canto_fin_mm??draft.canto_mm}];else{draft.canto_mm=depthAt(draft,0);delete draft.perfil_canto;delete draft.canto_fin_mm;}draw();}}
-    function click(event){const button=event.target.closest('button');if(!button)return;const action=button.dataset.sectionAction;if(action==="apply")apply();else if(action==="duplicate")apply(true);else if(action==="new")choose(uniqueId(model(),"seccion"),true);else if(action==="add-station"){const p=draft.perfil_canto;let ix=0;for(let i=1;i<p.length-1;i++)if(p[i+1].t-p[i].t>p[ix+1].t-p[ix].t)ix=i;const a=p[ix],b=p[ix+1];p.splice(ix+1,0,{t:(a.t+b.t)/2,canto_mm:(a.canto_mm+b.canto_mm)/2});draw();}else if(button.dataset.removeStation!==undefined){draft.perfil_canto.splice(Number(button.dataset.removeStation),1);draw();}}
+    function changed(event){const input=event.target,action=input.dataset.sectionAction;if(action==="choose")choose(input.value);else if(action==="type"){draft=defaults(input.value,edge()?.ancho_mm||2000);draw();}}
+    function click(event){const button=event.target.closest('button');if(!button)return;const action=button.dataset.sectionAction;if(action==="apply")apply();else if(action==="duplicate")apply(true);else if(action==="new")choose(uniqueId(model(),"seccion"),true);}
     container.addEventListener('input',change);container.addEventListener('change',changed);container.addEventListener('click',click);
     function refresh(){if(disposable)return;const e=edge();if(e&&model()?.familias?.[e.familia])choose(e.familia);else{draft=defaults('cajon',e?.ancho_mm||2000);familyId=uniqueId(model()||{},'seccion');isNew=true;draw();}}
     refresh();return {refresh,destroy(){disposable=true;container.removeEventListener('input',change);container.removeEventListener('change',changed);container.removeEventListener('click',click);container.replaceChildren();}};
@@ -174,6 +202,6 @@
     dialog.addEventListener('click',event=>{if(event.target.closest('[data-foundation-close]'))close();if(event.target.closest('[data-foundation-apply]')){if(errors().length)return;const ids=allIds();let id=destination;if(id==='__new'){let i=1;id='F_COMPARTIDA';const occupied=new Set([...(model.nodos||[]),...(model.tramos||[]),...(model.soportes||[]),...existing,...existing.flatMap(f=>f.pilotes||[])].map(x=>x.id));while(occupied.has(id))id='F_COMPARTIDA_'+i++;draft.uuid=uid();}options.onBeforeChange?.();model.fundaciones=existing.filter(f=>f.id!==destination).map(f=>({...f,nodos:f.nodos.filter(n=>!ids.includes(n))})).filter(f=>f.nodos.length);model.fundaciones.push({...clone(draft),id,nodos:ids});model.soportes.forEach(s=>{if(ids.includes(s.nodo))s.fundacion=id;});options.onChange?.({foundationId:id,nodeIds:ids});options.onMessage?.(`Fundación ${id} asociada a ${ids.join(', ')}.`);close();}});
     dialog.addEventListener('cancel',()=>dialog.remove());document.body.append(dialog);dialog.showModal();preview();return {close};
   }
-  const api={mount,render,validate,geometry,defaults,fields:type=>clone(defs[type]||[]),depthAt,foundationLayout,openFoundationEditor};
+  const api={mount,render,validate,geometry,wingWidth,withWingWidth,defaults,fields:type=>clone(defs[type]||[]),depthAt,foundationLayout,openFoundationEditor};
   root.Sections=api;if(typeof module!=="undefined"&&module.exports)module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:window);

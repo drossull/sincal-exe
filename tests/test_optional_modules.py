@@ -37,7 +37,8 @@ def test_absent_module_and_explicit_development_source(tmp_path):
     assert not absent["installed"] and absent["source"] is None
     current = host(tmp_path, True).status()
     assert current["installed"] and current["source"] == "development"
-    assert current["version"] == "0.3.1"
+    from pasarela_bim import __version__
+    assert current["version"] == __version__
     assert current["embedded_supported"]
     with patch.object(sys, "frozen", True, create=True):
         assert not PasarelaModule(user_dir=tmp_path, application_dir=tmp_path).status()["installed"]

@@ -25,7 +25,7 @@ def ejemplo():
         ],
         "familias": {
             "cajon": {"canto_mm": 800, "ancho_inferior_mm": 900, "ancho_alma_superior_mm": 1200,
-                      "ala_mm": 400, "losa_superior_mm": 150, "losa_inferior_mm": 100, "alma_mm": 100, "macizado_mm": 300},
+                      "ala_mm": 400, "losa_superior_mm": 150, "losa_inferior_mm": 100, "alma_mm": 100, "macizado_mm": 500},
             "macizo": {"canto_mm": 600},
         },
         "fundaciones": [
@@ -181,6 +181,44 @@ class TestTopologia(unittest.TestCase):
         modelo = ejemplo()
         modelo["soportes"][1]["cota_superior_mm"] = 4800
         self.assert_error(modelo, "soporte_atraviesa_intrados")
+
+    def test_terreno_proyectado_opcional_y_ausente_es_aviso_no_bloqueo(self):
+        modelo = ejemplo()
+        informe = validar(modelo)
+        self.assertTrue(informe["generable"])
+        avisos = [a for a in informe["avisos"] if a["codigo"] == "terreno_proyectado_pendiente"]
+        self.assertEqual({a["elemento"] for a in avisos}, {s["id"] for s in modelo["soportes"]})
+        for valor in (None, False, "0", math.nan, math.inf, -math.inf, {}, 10**500):
+            with self.subTest(valor=str(valor)[:30]):
+                modificado = deepcopy(modelo)
+                modificado["soportes"][0]["cota_terreno_proyectado_mm"] = valor
+                self.assert_error(modificado, "cota_terreno_proyectado_invalida")
+        for valor in (0, -6500, 125.5):
+            modelo["soportes"][0]["cota_terreno_proyectado_mm"] = valor
+            self.assertTrue(validar(modelo)["generable"])
+
+    def test_terreno_independiente_por_apoyo_de_dado_compartido(self):
+        modelo = ejemplo()
+        original = resolver_modelo(modelo)
+        modelo["soportes"][1]["cota_terreno_proyectado_mm"] = -250
+        modelo["soportes"][2]["cota_terreno_proyectado_mm"] = 400
+        resuelto = resolver_modelo(modelo)
+        self.assertEqual(resuelto["fundaciones"], original["fundaciones"])
+        self.assertEqual(resuelto["nodos"], original["nodos"])
+        for indice in (1, 2):
+            soporte = resuelto["soportes"][indice]
+            esperado = deepcopy(original["soportes"][indice])
+            esperado["cota_terreno_proyectado_mm"] = modelo["soportes"][indice]["cota_terreno_proyectado_mm"]
+            self.assertEqual(soporte, esperado)
+            nodo = resuelto["nodos_por_id"][soporte["nodo"]]
+            self.assertEqual(soporte["centro"][:2], [nodo["x"], nodo["y"]])
+            self.assertNotEqual(soporte["centro"][:2], resuelto["fundaciones"][1]["centro"][:2])
+        self.assertNotIn("cota_terreno_proyectado_mm", resuelto["soportes"][0])
+        modelo["proyecto"].update(cota_carretera_m=-50, cota_terreno_m=-50, galibo_m=5.5)
+        modelo["tramos"][1]["funcion"] = "cruce"
+        comprobacion = validar(modelo)["comprobaciones"][0]
+        self.assertEqual(comprobacion["estado"], "pendiente")
+        self.assertNotIn("galibo_minimo_m", comprobacion)
 
     def test_huellas_en_dado_compartido_corto_o_rotado(self):
         modelo = ejemplo()

@@ -34,6 +34,34 @@ def modelo_ejes():
 
 
 class TestElevaciones(unittest.TestCase):
+    def test_terreno_proyectado_por_apoyo_compartiendo_fundacion(self):
+        modelo = modelo_ejes()
+        modelo["soportes"][0]["cota_terreno_proyectado_m"] = -0.3
+        modelo["soportes"][1]["cota_terreno_proyectado_m"] = -0.7
+        modelo["soportes"][1]["fundacion"] = "D1"
+        modelo["fundaciones"][0].update(nodos=["E1","C1"],largo_m=13)
+        modelo["fundaciones"] = [f for f in modelo["fundaciones"] if f["id"] != "D2"]
+        before = deepcopy(modelo)
+        datos = resolver_modelo(modelo)
+        eje = next(e for e in datos["ejes_resueltos"] if e["tipo"] == "recorrido")
+        self.assertEqual([p["soportes"][0].get("cota_terreno_proyectado_mm") for p in eje["estaciones"]],[-300,-700,None,None])
+        xml = ET.fromstring(_svg_elevacion(eje,datos["familias"],modelo["proyecto"],"terreno"))
+        marcas = [g for g in xml.iter("{http://www.w3.org/2000/svg}g") if g.attrib.get("class") == "projected-terrain-level"]
+        self.assertEqual(len(marcas),2)
+        self.assertEqual([g.attrib["data-node-id"] for g in marcas],["E1","C1"])
+        self.assertEqual([float(g.attrib["data-z-mm"]) for g in marcas],[-300,-700])
+        # Each datum is centred on its support station, not on the shared footing.
+        for marca in marcas:
+            circle = marca.find("{*}circle")
+            line = marca.find("{*}line")
+            self.assertAlmostEqual(float(circle.attrib["cx"]),(float(line.attrib["x1"])+float(line.attrib["x2"]))/2,places=3)
+            self.assertAlmostEqual(float(line.attrib["x2"])-float(line.attrib["x1"]),22,places=3)
+            parent = next(p for p in xml.iter() if marca in list(p))
+            self.assertAlmostEqual(float(circle.attrib["cx"]),float(parent.find("{*}line").attrib["x1"]),places=3)
+            self.assertIn("Terreno proyectado",marca.find("{*}text").text)
+            self.assertFalse(marca.findall("{*}polyline"))
+        self.assertEqual(modelo,before)
+
     def test_eje_recto_tiene_rotulo_longitudinal(self):
         modelo = modelo_ejes()
         modelo.pop("ejes")

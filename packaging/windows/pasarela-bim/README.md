@@ -11,11 +11,11 @@ Desde la raíz del repositorio, con Python, PyInstaller e Inno Setup disponibles
 python tools/build_pasarela_module.py --smoke-test
 ```
 
-El comando genera en `installer_output/pasarela-bim/v0.3.1/`:
+El comando genera en `installer_output/pasarela-bim/v0.3.2/`:
 
-- `SINCAL_Pasarela_v0.3.1.zip`: ejecutable y `module.json`, con hashes SHA-256 de
+- `SINCAL_Pasarela_v0.3.2.zip`: ejecutable y `module.json`, con hashes SHA-256 de
   todos los archivos del paquete excepto el propio manifiesto.
-- `Setup_SINCAL_Pasarela_v0.3.1.exe`: complemento instalable posteriormente,
+- `Setup_SINCAL_Pasarela_v0.3.2.exe`: complemento instalable posteriormente,
   por usuario y sin privilegios de administrador.
 - `pasarela-module-build.json`: rutas, tamaños y hash del ZIP para preparar la distribución.
 - `smoke-test.json`: resultado de la comprobación de la interfaz del ejecutable real.
@@ -47,7 +47,7 @@ FreeCAD. Los recursos web y el motor Python propio se incluyen en el ejecutable;
 FreeCAD importa este motor desde la extracción privada de PyInstaller.
 
 El contrato del manifiesto es `schema: 1`, `id: "pasarela-bim"`, `host_api: 1`,
-`version: "0.3.1"`, `embedding: 1` y `entrypoint: "SINCAL-Pasarela.exe"`. La versión es independiente
+`version: "0.3.2"`, `embedding: 1` y `entrypoint: "SINCAL-Pasarela.exe"`. La versión es independiente
 de la aplicación principal. El paquete se limita a 150 MiB comprimidos y 512 MiB
 instalados.
 

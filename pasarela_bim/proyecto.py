@@ -3,6 +3,8 @@
 El motor conserva v1/mm. Sólo las cinco colecciones geométricas cambian de
 unidad; proyecto, emplazamiento, terreno, georreferencia y sus metadatos son
 opacos para la conversión y conservan sus magnitudes expresadas en metros.
+La cota opcional ``soportes[].cota_terreno_proyectado_mm`` pertenece a cada
+apoyo y se intercambia en metros; no se completa desde cotas globales legadas.
 """
 
 from copy import deepcopy

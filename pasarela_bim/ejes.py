@@ -7,6 +7,7 @@ directrices y perfiles se derivan sin modificar nodos, tramos ni cimentaciones.
 from collections import defaultdict
 from copy import deepcopy
 import math
+from .seccion import familia_del_tramo
 import uuid
 
 from .proyecto import convertir_a_interno
@@ -306,7 +307,7 @@ def resolver_ejes(modelo):
         fundaciones = [dados[i] for i in dict.fromkeys(s["fundacion"] for s in ss)]
         return {"nodo":ref,"tipo_nodo":nodo["tipo"],"estacion_mm":distancia,
                 **{k:nodo[k] for k in "xyz"},"ejes_apoyo":deepcopy(marcadores[ref]),
-                "soportes":[{k:s[k] for k in ("id","fundacion","cota_superior_mm","diametro_mm","ancho_mm","largo_mm") if k in s} for s in ss],
+                "soportes":[{k:s[k] for k in ("id","fundacion","cota_superior_mm","cota_terreno_proyectado_mm","diametro_mm","ancho_mm","largo_mm") if k in s} for s in ss],
                 "fundaciones":[{"id":f["id"],"cota_superior_mm":f["cota_superior_mm"],
                                 "cota_inferior_mm":f["cota_superior_mm"]-f["alto_mm"]} for f in fundaciones]}
 
@@ -328,7 +329,7 @@ def resolver_ejes(modelo):
             largo = math.hypot(b["x"]-a["x"],b["y"]-a["y"])
             invertido = cadena[indice] != tramo["desde"]
             rasante = tramo.get("rasante",[{"t":0,"f":0},{"t":1,"f":1}])
-            familia = datos["familias"][tramo["familia"]]
+            familia = familia_del_tramo(datos["familias"][tramo["familia"]], tramo, nodos)
             cantos = familia.get("perfil_canto") or [{"t":0,"canto_mm":familia["canto_mm"]},
                       {"t":1,"canto_mm":familia.get("canto_fin_mm",familia["canto_mm"])}]
             ini,fin = tramo.get("retranqueo_inicio_mm",0)/largo,1-tramo.get("retranqueo_fin_mm",0)/largo

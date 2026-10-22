@@ -24,6 +24,7 @@
     for (const change of plan.nodos) Object.assign(model.nodos.find(n=>n.id===change.id),change.after);
     for (const change of plan.soportes) model.soportes.find(s=>s.id===change.id).cota_superior_mm=change.after;
     for (const change of plan.fundaciones) model.fundaciones.find(f=>f.id===change.id).cota_superior_mm=change.after;
+    syncLandings(model);
   }
   const RAMP_SLOPE = .08, POSITION_TOLERANCE = .001;
   const zFixed = node => node.cota_fija === true || node.posicion_fija === true;
@@ -39,7 +40,7 @@
     if(fn==="descanso"||fn==="retorno") {if(dz>POSITION_TOLERANCE)throw new Error(`${edge.id}: el ${fn} debe permanecer horizontal.`);return null;}
     if(fn!=="rampa"&&fn!=="cruce")return null;
     if(dz<=POSITION_TOLERANCE){if(fn==="rampa")throw new Error(`${edge.id}: una rampa necesita desnivel; usa Descanso para un tramo horizontal.`);return null;}
-    return dz*profileFactor(edge)/RAMP_SLOPE;
+    return edge.descanso_central_mm===1500?dz/RAMP_SLOPE+1500:dz*profileFactor(edge)/RAMP_SLOPE;
   }
   function checkSlopeRules(model, edgeIds) {
     const map=new Map(model.nodos.map(n=>[n.id,n]));
@@ -83,7 +84,7 @@
   function resolveDirection(model,edgeId,vector,length,{scope="branch"}={}) {
     const edge=model.tramos.find(e=>e.id===edgeId),a=model.nodos.find(n=>n.id===edge?.desde),b=model.nodos.find(n=>n.id===edge?.hasta);if(!a||!b||!Number.isFinite(length)||length<=0)throw new Error("Revisa el tramo y su longitud.");
     const ids=scope==="branch"?connectedIds(model,b.id,edgeId):[b.id];if(ids.includes(a.id))throw new Error("La conexión forma un circuito. No se puede trasladar su rama sin modificar también el origen.");
-    let dz=b.z-a.z;if(edge.funcion==="rampa"||(edge.funcion==="cruce"&&Math.abs(dz)>POSITION_TOLERANCE)){if(Math.abs(dz)<=POSITION_TOLERANCE)throw new Error("Define primero un desnivel para esta rampa.");dz=Math.sign(dz)*length*RAMP_SLOPE/profileFactor(edge);}else if(["descanso","retorno"].includes(edge.funcion))dz=0;
+    let dz=b.z-a.z;if(edge.funcion==="rampa"||(edge.funcion==="cruce"&&Math.abs(dz)>POSITION_TOLERANCE)){if(Math.abs(dz)<=POSITION_TOLERANCE)throw new Error("Define primero un desnivel para esta rampa.");if(edge.descanso_central_mm===1500&&length<=1500)throw new Error("La longitud debe superar 1,5 m.");dz=Math.sign(dz)*(edge.descanso_central_mm===1500?length-1500:length/profileFactor(edge))*RAMP_SLOPE;}else if(["descanso","retorno"].includes(edge.funcion))dz=0;
     const delta={x:a.x+vector[0]*length-b.x,y:a.y+vector[1]*length-b.y,z:a.z+dz-b.z},positions=new Map();
     for(const n of model.nodos){if(!ids.includes(n.id))continue;if(xyFixed(n)&&Math.hypot(delta.x,delta.y)>POSITION_TOLERANCE)throw new Error(`${n.id}: su posición fija en planta impide mover esta rama.`);if(zFixed(n)&&Math.abs(delta.z)>POSITION_TOLERANCE)throw new Error(`${n.id}: su cota fija impide conservar el 8 % con esta longitud.`);positions.set(n.id,{x:n.x+delta.x,y:n.y+delta.y,z:n.z+delta.z});}
     const candidate={...model,nodos:model.nodos.map(n=>({...n,...positions.get(n.id)}))},affected=new Set(model.tramos.filter(e=>ids.includes(e.desde)||ids.includes(e.hasta)).map(e=>e.id));checkSlopeRules(candidate,affected);return positionsPlan(model,positions);
@@ -98,12 +99,31 @@
     if(globalThis.AxisManager?.renameReferences)globalThis.AxisManager.renameReferences(model,type,previous,value);
     else for(const axis of model.ejes||[]){if(type==="node"&&axis.nodo===previous)axis.nodo=value;if(type==="edge"&&Array.isArray(axis.tramos))axis.tramos=axis.tramos.map(id=>id===previous?value:id);}
   }
-  const editing = {connectedIds,movementPlan,applyMovement,renameEntity,resolveElevation,resolveDirection,checkSlopeRules,requiredLength};
+  function landingProfile(length){
+    if(!Number.isFinite(length)||length<=1500)throw new Error("La viga debe superar 1,5 m para alojar el descanso y sus dos pendientes.");
+    return [{t:0,f:0},{t:(length-1500)/2/length,f:.5},{t:(length+1500)/2/length,f:.5},{t:1,f:1}];
+  }
+  function syncLandings(model){for(const e of model.tramos||[])if(e.descanso_central_mm===1500){const a=model.nodos.find(n=>n.id===e.desde),b=model.nodos.find(n=>n.id===e.hasta);if(a&&b)e.rasante=landingProfile(Math.hypot(b.x-a.x,b.y-a.y));}}
+  function insertLanding(model,edgeId){
+    const candidate=JSON.parse(JSON.stringify(model)),e=candidate.tramos.find(e=>e.id===edgeId),a=candidate.nodos.find(n=>n.id===e?.desde),b=candidate.nodos.find(n=>n.id===e?.hasta);
+    if(!a||!b||!['rampa','cruce'].includes(e.funcion)||Math.abs(b.z-a.z)<.001)throw new Error("Selecciona una viga inclinada con función rampa o atravieso.");
+    if(candidate.familias?.[e.familia]?.tipo==="escalera")throw new Error("El descanso integrado requiere una sección de viga, no una familia de escalera.");
+    const L=Math.hypot(b.x-a.x,b.y-a.y),profile=landingProfile(L),branch=connectedIds(candidate,b.id,e.id);
+    if(branch.includes(a.id))throw new Error("El tramo pertenece a un circuito. Resuelve sus cotas antes de insertar el descanso.");
+    if((e.retranqueo_inicio_mm||0)>=L*profile[1].t||(e.retranqueo_fin_mm||0)>=L*(1-profile[2].t))throw new Error("Los retranqueos invaden el descanso central.");
+    const dz=a.z+Math.sign(b.z-a.z)*(L-1500)*.08-b.z;
+    for(const n of candidate.nodos)if(branch.includes(n.id)){if(zFixed(n)&&Math.abs(dz)>.001)throw new Error(`${n.id}: su cota está fijada.`);n.z+=dz;}
+    for(const support of candidate.soportes||[])if(branch.includes(support.nodo))support.cota_superior_mm+=dz;
+    e.descanso_central_mm=1500;e.rasante=profile;
+    checkSlopeRules(candidate,new Set([e.id]));
+    return {model:candidate,deltaZ:dz,nodes:branch,length:L};
+  }
+  const editing = {landingProfile,insertLanding,connectedIds,movementPlan,applyMovement,renameEntity,resolveElevation,resolveDirection,checkSlopeRules,requiredLength};
   if (typeof module !== "undefined" && module.exports) module.exports = editing;
   if (typeof document === "undefined") return;
   window.PasarelaEditing = editing;
   const $ = (id) => document.getElementById(id);
-  const state = { model: null, selected: null, view: "plan", elevationAxis: null, revision: 0, history: [], validation: null, validationRevision: -1, validateSerial: 0, freecad: false, job: null, startingGeneration: false, files: [], filesRevision: -1, generationWarnings: [], viewport: null, drag: null, userMoved: false };
+  const state = { model: null, selected: null, view: "plan", orbitAngle: 0, elevationAxis: null, revision: 0, history: [], validation: null, validationRevision: -1, validateSerial: 0, freecad: false, job: null, startingGeneration: false, files: [], filesRevision: -1, generationWarnings: [], viewport: null, drag: null, userMoved: false };
   const integration = window.PasarelaIntegration;
   const NS = "http://www.w3.org/2000/svg";
   let validationTimer, toastTimer, sectionController;
@@ -129,6 +149,8 @@
   }
   function saveHistory() { if (state.model) {state.history.push(clone(state.model));if (state.history.length > 40) state.history.shift();} }
   function changed({fit = false, inspector = false, projectEdit = true, dirty = true} = {}) {
+    if(state.model)syncLandings(state.model);
+    if(state.model?.proyecto?.referencia_vertical==="tope_atravieso"&&state.model.tramos.some(e=>e.funcion==="cruce"))state.model=ProjectIO.rebaseToCrossing(state.model).model;
     state.revision++;state.validationRevision = -1;state.validation = null;
     integration?.setDirty(dirty);
     if(state.model&&projectEdit){state.model.proyecto.revision=number(state.model.proyecto.revision)+1;state.model.proyecto.estado="borrador";}
@@ -173,17 +195,32 @@
     const groups = [["Ejes",axes(),"axis"],["Nodos",nodes(),"node"],["Tramos",edges(),"edge"],["Fundaciones",foundations(),"foundation"]];
     $("entity-list").innerHTML = groups.map(([title,items,type]) => {
       const filtered = items.filter(x => `${x.id} ${x.nombre||""} ${x.desde||""} ${x.hasta||""}`.toLowerCase().includes(search));
-      return !filtered.length ? "" : `<div class="entity-group">${title.toUpperCase()}</div>${filtered.map(x => `<button class="entity-button ${state.selected?.type === type && state.selected.id === x.id ? "active":""}" data-select-type="${type}" data-select-id="${esc(x.id)}"><span class="entity-dot ${type === "edge" ? "edge "+(x.tipo === "retorno"?"return":"") : type === "foundation"?"foundation":type === "axis"?"axis":""}"></span><b>${esc(x.id)}</b><small>${esc(type === "axis" ? (x.tipo==="apoyo"?`Apoyo ${x.nodo}`:x.nombre||x.tipo) : type === "edge" ? `${x.desde} → ${x.hasta}` : type === "foundation" ? (x.nodos||[]).join(" + ") : x.tipo === "estribo"?"Estribo":x.tipo === "encuentro"?"Encuentro":"Columna")}</small></button>`).join("")}`;
+      return !filtered.length ? "" : `<div class="entity-group">${title.toUpperCase()}</div>${filtered.map(x => `<button class="entity-button ${state.selected?.type === type && state.selected.id === x.id ? "active":""}" data-select-type="${type}" data-select-id="${esc(x.id)}"><span class="entity-dot ${type === "edge" ? "edge "+(x.tipo === "retorno"?"return":"") : type === "foundation"?"foundation":type === "axis"?"axis":""}"></span><b>${esc(x.id)}</b><small>${esc(type === "axis" ? (x.tipo==="apoyo"?`Apoyo ${x.nodo}`:x.nombre||x.tipo) : type === "edge" ? `${x.desde} → ${x.hasta}` : type === "foundation" ? `${x.pilotes?.length?"Dado":"Fundación"} · ${(x.nodos||[]).join(" + ")}` : x.tipo === "estribo"?"Estribo":x.tipo === "encuentro"?"Encuentro":"Columna")}</small></button>`).join("")}`;
     }).join("") || '<p class="muted empty-small">No hay coincidencias.</p>';
   }
   function select(type,id) {state.selected = {type,id};if(type==="axis"&&axes().find(a=>a.id===id)?.tipo!=="apoyo"){state.elevationAxis=id;renderElevationOptions();}renderList();renderInspector();renderScene();}
   function svg(tag, attributes, text) {const element = document.createElementNS(NS,tag);Object.entries(attributes || {}).forEach(([k,v]) => element.setAttribute(k,v));if (text !== undefined) element.textContent = text;return element;}
-  function project(x,y,z = 0) {x = number(x)/1000;y = number(y)/1000;z = number(z)/1000;return state.view === "plan" ? [x*14,-y*14] : [(x-y)*9.9,(x+y)*4.95-z*12];}
+  function project(x,y,z = 0) {
+    x=number(x)/1000;y=number(y)/1000;z=number(z)/1000;
+    if(state.view==="plan")return [x*14,-y*14];
+    const c=Math.cos(state.orbitAngle),s=Math.sin(state.orbitAngle),rx=x*c-y*s,ry=x*s+y*c;
+    return [(rx-ry)*9.9,(rx+ry)*4.95-z*12];
+  }
+  function orbitCentre(){const ns=nodes();return ns.length?[ns.reduce((s,n)=>s+number(n.x),0)/ns.length,ns.reduce((s,n)=>s+number(n.y),0)/ns.length,ns.reduce((s,n)=>s+number(n.z),0)/ns.length]:[0,0,0];}
+  function setOrbit(angle){
+    const centre=orbitCentre(),before=project(...centre);
+    state.orbitAngle=((angle%(2*Math.PI))+2*Math.PI)%(2*Math.PI);
+    const after=project(...centre);
+    if(state.viewport){state.viewport.x+=after[0]-before[0];state.viewport.y+=after[1]-before[1];}
+    renderScene();
+  }
   function foundationCentre(f) {const related = (f.nodos||[]).map(findNode).filter(Boolean);if(!related.length)return null;return [related.reduce((a,n)=>a+number(n.x),0)/related.length,related.reduce((a,n)=>a+number(n.y),0)/related.length];}
   function foundationAngle(f){if(Number.isFinite(f.angulo_deg))return f.angulo_deg*Math.PI/180;const a=findNode(f.nodos?.[0]),b=findNode(f.nodos?.at(-1));return a&&b?Math.atan2(b.y-a.y,b.x-a.x):0;}
   function renderScene(fit = false) {
     const scene = $("scene");scene.replaceChildren();if (!state.model) return;
     $("north-symbol").hidden=state.view==="elevation";
+    $("reset-orbit").hidden=state.view!=="iso";
+    document.querySelector('.canvas-caption').textContent=state.view==="iso"?"Arrastra el fondo para orbitar sobre Z · Mayús + arrastrar o botón central para desplazar · Rueda para zoom":"Selecciona para editar · Arrastra el fondo para desplazar · Rueda para zoom";
     if(state.view==="elevation"){
       if(!state.elevationAxis||!window.AxisManager){scene.append(svg("text",{x:0,y:0,"font-size":12},"Crea o propone un eje longitudinal para ver su elevación."));state.viewport={x:-40,y:-60,w:480,h:180};applyViewport();return;}
       try{const elevation=AxisManager.elevation(state.model,state.elevationAxis);scene.append(elevation.group);if(fit||!state.viewport){const points=elevation.bounds||[[0,0],[200,100]],xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);state.viewport={x:Math.min(...xs)-35,y:Math.min(...ys)-35,w:Math.max(Math.max(...xs)-Math.min(...xs)+70,200),h:Math.max(Math.max(...ys)-Math.min(...ys)+70,150)};}applyViewport();}catch(error){scene.append(svg("text",{x:0,y:0,"font-size":11},error.message));state.viewport={x:-35,y:-40,w:600,h:150};applyViewport();}return;
@@ -197,33 +234,80 @@
     foundations().forEach(f => {
       const centre = foundationCentre(f);if(!centre)return;const z = number(f.cota_superior_mm), a = foundationAngle(f);
       const corners = [[-1,-1],[1,-1],[1,1],[-1,1]].map(([sx,sy])=>{const dx=sx*number(f.largo_mm,2500)/2,dy=sy*number(f.ancho_mm,2500)/2;return project(centre[0]+dx*Math.cos(a)-dy*Math.sin(a),centre[1]+dx*Math.sin(a)+dy*Math.cos(a),z);});points.push(...corners);
+      for(const pile of f.pilotes||[]){const px=centre[0]+pile.dx_mm*Math.cos(a)-pile.dy_mm*Math.sin(a),py=centre[1]+pile.dx_mm*Math.sin(a)+pile.dy_mm*Math.cos(a),pz=z-f.alto_mm,pt=project(px,py,pz),bottom=project(px,py,pz-pile.longitud_mm);points.push(pt,bottom);const pg=svg("g",{class:"pile-preview","pointer-events":"none"});pg.append(svg("title",{},`Pilote ${pile.id}`));if(state.view==="iso")pg.append(svg("line",{x1:pt[0],y1:pt[1],x2:bottom[0],y2:bottom[1],stroke:"#889daa","stroke-width":pile.diametro_mm/1000*9}));else pg.append(svg("circle",{cx:pt[0],cy:pt[1],r:pile.diametro_mm/2000*14,fill:"#bccbd4",stroke:"#607987"}));scene.append(pg);}
       const g=svg("g");mark(g,"foundation",f.id);g.append(svg("polygon",{points:corners.map(p=>p.join(",")).join(" "),fill:selected("foundation",f.id)?"#dcebf280":"#e2e9ed48",stroke:selected("foundation",f.id)?"#246993":"#94a7b3","stroke-width":1.1,"stroke-dasharray":"5 4","vector-effect":"non-scaling-stroke"}));
       const c=project(...centre,z);if((f.nodos||[]).length>1)g.append(svg("text",{x:c[0],y:c[1]+18,"font-size":9,"text-anchor":"middle"},f.id));scene.append(g);
     });
     if(state.view === "iso")supports().forEach(s=>{const n=findNode(s.nodo),f=foundations().find(f=>f.id===s.fundacion);if(!n||!f)return;const base=project(n.x,n.y,f.cota_superior_mm),top=project(n.x,n.y,s.cota_superior_mm);points.push(base,top);scene.append(svg("line",{x1:base[0],y1:base[1],x2:top[0],y2:top[1],stroke:"#9bb0bd","stroke-width":Math.max(3,metres(s.diametro_mm||s.ancho_mm||800)*6),"stroke-linecap":"butt"}));});
+    if(state.view === "iso" && window.VolumePreview?.capital) supports().forEach(s=>{scene.append(VolumePreview.capital(state.model,s,project));for(const part of VolumePreview.capitals(state.model,s))for(const face of part.faces)points.push(...face.map(p=>project(...p)));});
     edges().forEach(e => {const a=findNode(e.desde),b=findNode(e.hasta);if(!a||!b)return;const p=project(a.x,a.y,a.z),q=project(b.x,b.y,b.z);points.push(p,q);const g=svg("g");mark(g,"edge",e.id);const color=e.tipo==="retorno"?"#38978f":"#3c7a9f", active=selected("edge",e.id);
-      if(window.VolumePreview)g.append(VolumePreview.edge(state.model,e,project,state.view,active));
+      if(window.VolumePreview)g.append(VolumePreview.edge(state.model,e,project,state.view,active,state.orbitAngle));
       g.append(svg("line",{x1:p[0],y1:p[1],x2:q[0],y2:q[1],stroke:active?"#b5d9ec":"#d7e3ea","stroke-width":active?13:8,"stroke-linecap":"round","vector-effect":"non-scaling-stroke"}));
       g.append(svg("line",{x1:p[0],y1:p[1],x2:q[0],y2:q[1],stroke:color,"stroke-width":active?3:2,"vector-effect":"non-scaling-stroke"}));
+      if(state.view==="plan"&&e.descanso_central_mm===1500){const L=Math.hypot(b.x-a.x,b.y-a.y),ux=(b.x-a.x)/L,uy=(b.y-a.y)/L,cx=(a.x+b.x)/2,cy=(a.y+b.y)/2,w=e.ancho_mm/2;const ps=[[-750,-w],[750,-w],[750,w],[-750,w]].map(([t,v])=>project(cx+ux*t-uy*v,cy+uy*t+ux*v));g.append(svg("polygon",{class:"landing-preview",points:ps.map(p=>p.join(',')).join(' '),fill:"#dae8c3",stroke:"#6b8753","stroke-width":1}));g.append(svg("title",{},"Descanso integrado central: 1,50 m"));}
       g.append(svg("line",{x1:p[0],y1:p[1],x2:q[0],y2:q[1],stroke:"transparent","stroke-width":20,"vector-effect":"non-scaling-stroke"}));
       const dx=q[0]-p[0],dy=q[1]-p[1],len=Math.hypot(dx,dy)||1;let nx=-dy/len,ny=dx/len;if(nx<0||(Math.abs(nx)<.001&&ny>0)){nx=-nx;ny=-ny;}const label=e.tipo==="retorno"?`R${edges().filter(item=>item.tipo==="retorno").indexOf(e)+1}`:e.id;g.append(svg("title",{},e.id));g.append(svg("text",{x:(p[0]+q[0])/2+nx*13,y:(p[1]+q[1])/2+ny*13,"data-x":(p[0]+q[0])/2,"data-y":(p[1]+q[1])/2,"data-nx":nx,"data-ny":ny,"font-size":10,"text-anchor":"middle","dominant-baseline":"middle",class:"beam-label"},label));scene.append(g);
     });
     nodes().forEach(n=>{const p=project(n.x,n.y,n.z);points.push(p);const g=svg("g");mark(g,"node",n.id);if(selected("node",n.id))g.append(svg("circle",{cx:p[0],cy:p[1],r:12,fill:"#4f9dcc24",class:"node-halo"}));g.append(svg(n.tipo==="estribo"?"rect":"circle",n.tipo==="estribo"?{x:p[0]-5,y:p[1]-5,width:10,height:10,rx:1,fill:"#fff",stroke:"#315f7c","stroke-width":2,"vector-effect":"non-scaling-stroke",class:"node-marker","data-x":p[0],"data-y":p[1]}:{cx:p[0],cy:p[1],r:5,fill:"#fff",stroke:"#315f7c","stroke-width":2,"vector-effect":"non-scaling-stroke",class:"node-marker"}));g.append(svg("circle",{cx:p[0],cy:p[1],r:14,fill:"transparent",class:"node-hit"}));const neighbour=nodes().filter(other=>other.id!==n.id&&Math.abs(number(other.y)-number(n.y))<1000&&Math.abs(number(other.x)-number(n.x))<8000).sort((a,b)=>Math.abs(a.x-n.x)-Math.abs(b.x-n.x))[0];const side=neighbour&&number(n.x)<number(neighbour.x)?-1:1;g.append(svg("text",{x:p[0]+side*10,y:p[1]-10,"data-x":p[0],"data-y":p[1],"data-side":side,"font-size":10,"text-anchor":side<0?"end":"start",class:"node-label"},n.id));scene.append(g);});
     nodes().forEach(n=>{const p=project(n.x,n.y,n.z),g=svg("g",{class:"node-add","data-node-add":n.id,"data-x":p[0],"data-y":p[1],role:"button",tabindex:"0","aria-label":`Añadir conexión desde ${n.id}`});g.append(svg("circle",{r:9,fill:"#fff",stroke:"#95b7cb","stroke-width":1}));g.append(svg("text",{"text-anchor":"middle","dominant-baseline":"central","font-size":14},"+"));scene.append(g);});
     if(window.AxisManager){try{scene.append(AxisManager.renderPlan(state.model,project,state.selected?.type==="axis"?state.selected.id:null));}catch(error){toast(`Revisa los ejes: ${error.message}`,true);}}
-    if(fit||!state.viewport){const xs=points.length?points.map(p=>p[0]):[0,1],ys=points.length?points.map(p=>p[1]):[0,1];const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),margin=axes().length?65:45;state.viewport={x:minX-margin,y:minY-margin,w:Math.max(maxX-minX+2*margin,200),h:Math.max(maxY-minY+2*margin,200)};}
+    if(fit||!state.viewport){const xs=points.length?points.map(p=>p[0]):[0,1],ys=points.length?points.map(p=>p[1]):[0,1];const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),margin=state.view==="plan"?100:axes().length?65:45;state.viewport={x:minX-margin,y:minY-margin,w:Math.max(maxX-minX+2*margin,200),h:Math.max(maxY-minY+2*margin,200)};}
     applyViewport();
   }
-  function applyViewport(){if(!state.viewport)return;const v=state.viewport,canvas=$("model-canvas");canvas.setAttribute("viewBox",`${v.x} ${v.y} ${v.w} ${v.h}`);const scale=Math.max(v.w/(canvas.clientWidth||800),v.h/(canvas.clientHeight||480));canvas.querySelectorAll(".node-label").forEach(t=>{t.setAttribute("font-size",11*scale);t.setAttribute("x",Number(t.dataset.x)+Number(t.dataset.side)*9*scale);t.setAttribute("y",Number(t.dataset.y)-9*scale);t.style.strokeWidth=3*scale;});canvas.querySelectorAll(".beam-label").forEach(t=>{t.setAttribute("font-size",10*scale);t.setAttribute("x",Number(t.dataset.x)+Number(t.dataset.nx)*12*scale);t.setAttribute("y",Number(t.dataset.y)+Number(t.dataset.ny)*12*scale);t.style.strokeWidth=3*scale;});canvas.querySelectorAll("circle.node-marker").forEach(c=>c.setAttribute("r",4.5*scale));canvas.querySelectorAll("rect.node-marker").forEach(c=>{c.setAttribute("width",8*scale);c.setAttribute("height",8*scale);c.setAttribute("x",Number(c.dataset.x)-4*scale);c.setAttribute("y",Number(c.dataset.y)-4*scale);});canvas.querySelectorAll(".node-hit").forEach(c=>c.setAttribute("r",11*scale));canvas.querySelectorAll(".node-halo").forEach(c=>c.setAttribute("r",11*scale));canvas.querySelectorAll(".node-add").forEach(g=>g.setAttribute("transform",`translate(${Number(g.dataset.x)+16*scale} ${Number(g.dataset.y)+16*scale}) scale(${scale})`));}
+  // Dimensions measure the topological node spacing projected onto the XY plane.
+  function renderPlanDimensions(scale){
+    $("scene").querySelector('.plan-dimensions')?.remove();
+    if(state.view!=="plan"||!state.model||!$("show-plan-dimensions").checked)return;
+    const layer=svg("g",{class:"plan-dimensions","pointer-events":"none","aria-label":"Distancias en planta entre nodos, en metros"});
+    const locations=nodes().map(n=>project(n.x,n.y));
+    const centre=locations.length?[locations.reduce((s,p)=>s+p[0],0)/locations.length,locations.reduce((s,p)=>s+p[1],0)/locations.length]:[0,0];
+    for(const e of edges()){
+      const a=findNode(e.desde),b=findNode(e.hasta);if(!a||!b)continue;
+      const p=project(a.x,a.y),q=project(b.x,b.y),dx=q[0]-p[0],dy=q[1]-p[1],L=Math.hypot(dx,dy);
+      if(!Number.isFinite(L)||L<1e-6)continue;
+      const ux=dx/L,uy=dy/L;let nx=-uy,ny=ux;
+      // Prefer the outside of each cluster of parallel access segments.
+      const parallel=edges().filter(other=>{
+        const c=findNode(other.desde),d=findNode(other.hasta);if(!c||!d)return false;
+        const C=project(c.x,c.y),D=project(d.x,d.y),vx=D[0]-C[0],vy=D[1]-C[1],len=Math.hypot(vx,vy);
+        return len>0&&Math.abs(ux*vy-uy*vx)/len<.01&&Math.abs(((C[0]+D[0]-p[0]-q[0])/2)*nx+((C[1]+D[1]-p[1]-q[1])/2)*ny)<Math.max(80,number(e.ancho_mm)/1000*28);
+      }).map(other=>{const c=findNode(other.desde),d=findNode(other.hasta);const C=project(c.x,c.y),D=project(d.x,d.y);return [(C[0]+D[0])/2,(C[1]+D[1])/2];});
+      const reference=parallel.length>1?[parallel.reduce((s,p)=>s+p[0],0)/parallel.length,parallel.reduce((s,p)=>s+p[1],0)/parallel.length]:centre;
+      let outward=((p[0]+q[0])/2-reference[0])*nx+((p[1]+q[1])/2-reference[1])*ny;
+      if(Math.abs(outward)<.01)outward=((p[0]+q[0])/2-centre[0])*nx+((p[1]+q[1])/2-centre[1])*ny;
+      if(outward<0){nx=-nx;ny=-ny;}
+      const offset=Math.max(0,number(e.ancho_mm))/2000*14+27*scale;
+      const A=[p[0]+nx*offset,p[1]+ny*offset],B=[q[0]+nx*offset,q[1]+ny*offset];
+      const g=svg("g",{"data-dimension-edge":e.id});
+      const line=(a,b)=>g.append(svg("line",{x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:"#607b8c","stroke-width":1,"vector-effect":"non-scaling-stroke"}));
+      line(A,B);
+      for(const [origin,end] of [[p,A],[q,B]]){
+        line([origin[0]+nx*6*scale,origin[1]+ny*6*scale],[end[0]+nx*5*scale,end[1]+ny*5*scale]);
+        line([end[0]-(ux+nx)*3*scale,end[1]-(uy+ny)*3*scale],[end[0]+(ux+nx)*3*scale,end[1]+(uy+ny)*3*scale]);
+      }
+      let angle=Math.atan2(dy,dx)*180/Math.PI;if(angle>90)angle-=180;if(angle< -90)angle+=180;
+      const x=(A[0]+B[0])/2,y=(A[1]+B[1])/2;
+      const distance=Math.hypot(b.x-a.x,b.y-a.y)/1000;
+      g.append(svg("title",{},`${e.id}: ${e.desde} – ${e.hasta}. Distancia en planta entre nodos; no incluye retranqueos.`));
+      g.append(svg("text",{x,y,"font-size":11*scale,"text-anchor":"middle","dominant-baseline":"central",transform:`rotate(${angle} ${x} ${y})`,fill:"#31566c",stroke:"#fff","stroke-width":5*scale,"stroke-linejoin":"round","paint-order":"stroke"},`${fmt(distance,3)} m`));
+      layer.append(g);
+    }
+    $("scene").append(layer);
+  }
+  function applyViewport(){if(!state.viewport)return;const v=state.viewport,canvas=$("model-canvas");canvas.setAttribute("viewBox",`${v.x} ${v.y} ${v.w} ${v.h}`);const scale=Math.max(v.w/(canvas.clientWidth||800),v.h/(canvas.clientHeight||480));renderPlanDimensions(scale);canvas.querySelectorAll(".node-label").forEach(t=>{t.setAttribute("font-size",11*scale);t.setAttribute("x",Number(t.dataset.x)+Number(t.dataset.side)*9*scale);t.setAttribute("y",Number(t.dataset.y)-9*scale);t.style.strokeWidth=3*scale;});canvas.querySelectorAll(".beam-label").forEach(t=>{t.setAttribute("font-size",10*scale);t.setAttribute("x",Number(t.dataset.x)+Number(t.dataset.nx)*12*scale);t.setAttribute("y",Number(t.dataset.y)+Number(t.dataset.ny)*12*scale);t.style.strokeWidth=3*scale;});canvas.querySelectorAll("circle.node-marker").forEach(c=>c.setAttribute("r",4.5*scale));canvas.querySelectorAll("rect.node-marker").forEach(c=>{c.setAttribute("width",8*scale);c.setAttribute("height",8*scale);c.setAttribute("x",Number(c.dataset.x)-4*scale);c.setAttribute("y",Number(c.dataset.y)-4*scale);});canvas.querySelectorAll(".node-hit").forEach(c=>c.setAttribute("r",11*scale));canvas.querySelectorAll(".node-halo").forEach(c=>c.setAttribute("r",11*scale));canvas.querySelectorAll(".node-add").forEach(g=>g.setAttribute("transform",`translate(${Number(g.dataset.x)+16*scale} ${Number(g.dataset.y)+16*scale}) scale(${scale})`));}
   function zoom(factor,centre){if(!state.viewport)return;const v=state.viewport;if(v.w*factor<35||v.w*factor>50000)return;const c=centre||[v.x+v.w/2,v.y+v.h/2];v.x=c[0]-(c[0]-v.x)*factor;v.y=c[1]-(c[1]-v.y)*factor;v.w*=factor;v.h*=factor;applyViewport();}
   function svgPoint(event){const matrix=$("model-canvas").getScreenCTM();if(!matrix)return[0,0];const point=new DOMPoint(event.clientX,event.clientY).matrixTransform(matrix.inverse());return[point.x,point.y];}
-  const field = (label,key,value,options={}) => `<label class="field"><span>${esc(label)}${options.unit?`<small>${options.unit}</small>`:""}</span><input data-field="${key}" type="${options.text?"text":"number"}" ${options.text?"":"step=\"0.001\""} value="${esc(value)}" ${options.readonly?"readonly":""}></label>`;
+  const field = (label,key,value,options={}) => `<label class="field"><span>${esc(label)}${options.unit?`<small>${options.unit}</small>`:""}</span><input data-field="${key}" type="${options.text?"text":"number"}" ${options.text?"":"step=\"0.001\""} value="${esc(value)}" ${options.readonly?"readonly":""} ${options.placeholder?`placeholder="${esc(options.placeholder)}"`:""}></label>`;
+  function supportTerrainField(s,index){
+    const defined=Number.isFinite(s.cota_terreno_proyectado_mm),origin=state.model.proyecto?.georreferencia?.cota_m;
+    return `${field("Cota de terreno proyectado",`support:${index}:cota_terreno_proyectado_mm`,defined?metres(s.cota_terreno_proyectado_mm):"",{unit:"m",placeholder:"Por definir"})}<p class="helper" data-terrain-reference>En el centro del apoyo · cota local respecto de Z = 0.${defined&&Number.isFinite(origin)?` Cota geográfica: ${esc(fmt(origin+s.cota_terreno_proyectado_mm/1000,3))} m.`:""} La cota de la fundación se define por separado.</p>`;
+  }
   const choice = (label,key,value,items) => `<label class="field"><span>${esc(label)}</span><select data-field="${key}">${items.map(([v,t])=>`<option value="${esc(v)}" ${String(v)===String(value)?"selected":""}>${esc(t)}</option>`).join("")}</select></label>`;
   function renderInspector(){
     sectionController?.destroy();sectionController=null;
     const sel=state.selected;if(!sel){$("selection-kind").textContent="SIN SELECCIÓN";$("inspector").innerHTML='<div class="inspector-empty"><span aria-hidden="true">⌖</span><h3>Selecciona un elemento</h3><p>Las relaciones definen la estructura. Las dimensiones dan forma a cada pieza.</p></div>';return;}
     const entity=entities(sel.type).find(x=>x.id===sel.id);if(!entity){state.selected=null;renderInspector();return;}
-    $("selection-kind").textContent=sel.type==="node"?"NODO":sel.type==="edge"?"TRAMO":sel.type==="axis"?"EJE":"FUNDACIÓN";
+    $("selection-kind").textContent=sel.type==="node"?"NODO":sel.type==="edge"?"TRAMO":sel.type==="axis"?"EJE":entity.pilotes?.length?"DADO":"FUNDACIÓN";
     let html=`<div class="entity-title"><strong>${esc(entity.id)}</strong><small>${sel.type==="node"?"Coordenadas locales":sel.type==="edge"?"Conexión estructural":sel.type==="axis"?"Derivado de la topología":"Asociada a sus nodos"}</small></div>${field("Identificador","id",entity.id,{text:true})}`;
     if(sel.type==="axis"){
       html+=field("Nombre","nombre",entity.nombre||entity.id,{text:true});
@@ -233,18 +317,19 @@
     }else if(sel.type==="node"){
       html+=choice("Tipo de nodo","tipo",entity.tipo,[["encuentro","Encuentro · sin soporte"],["columna","Columna"],["estribo","Estribo"]]);html+=`<div class="field-grid three">${field("X local","x",metres(entity.x),{unit:"m"})}${field("Y local","y",metres(entity.y),{unit:"m"})}${field("Cota local","z",metres(entity.z),{unit:"m"})}</div><label class="check-field"><input type="checkbox" data-field="cota_fija" ${entity.cota_fija?"checked":""}> Mantener fija esta cota</label><label class="check-field"><input type="checkbox" data-field="xy_fijo" ${entity.xy_fijo?"checked":""}> Fijar posición en planta</label><button class="button small full" data-action="connect">+ Extender desde este nodo</button>`;
       const connections=edges().filter(e=>e.desde===entity.id||e.hasta===entity.id);html+=`<div class="dimension-readout"><span>Conexiones</span><b>${connections.map(e=>esc(e.id)).join(", ")||"Sin conectar"}</b></div>`;
-      const ss=supports().filter(s=>s.nodo===entity.id);ss.forEach((s,i)=>{const f=foundations().find(f=>f.id===s.fundacion);html+=`<div class="inspector-section"><h3>Soporte ${esc(s.id)}</h3><p class="helper">${esc(s.fundacion||"Sin fundación")} · Su cota superior es independiente de la cota del nodo.</p>${field("Cota superior",`support:${i}:cota_superior_mm`,metres(s.cota_superior_mm),{unit:"m"})}${f?field("Altura sobre fundación",`support:${i}:height`,metres(number(s.cota_superior_mm)-number(f.cota_superior_mm)),{unit:"m"}):""}${s.diametro_mm!==undefined?field("Diámetro",`support:${i}:diametro_mm`,metres(s.diametro_mm),{unit:"m"}):`<div class="field-grid">${field("Ancho",`support:${i}:ancho_mm`,metres(s.ancho_mm),{unit:"m"})}${field("Largo",`support:${i}:largo_mm`,metres(s.largo_mm),{unit:"m"})}</div>`}</div>`;});
+      const ss=supports().filter(s=>s.nodo===entity.id);ss.forEach((s,i)=>{const f=foundations().find(f=>f.id===s.fundacion);html+=`<div class="inspector-section"><h3>Soporte ${esc(s.id)}</h3><p class="helper">${esc(s.fundacion||"Sin fundación")} · Su cota superior es independiente de la cota del nodo.</p>${supportTerrainField(s,i)}${field("Cota superior",`support:${i}:cota_superior_mm`,metres(s.cota_superior_mm),{unit:"m"})}${f?field("Altura sobre fundación",`support:${i}:height`,metres(number(s.cota_superior_mm)-number(f.cota_superior_mm)),{unit:"m"}):""}${s.diametro_mm!==undefined?field("Diámetro",`support:${i}:diametro_mm`,metres(s.diametro_mm),{unit:"m"}):`<div class="field-grid">${field("Ancho",`support:${i}:ancho_mm`,metres(s.ancho_mm),{unit:"m"})}${field("Largo",`support:${i}:largo_mm`,metres(s.largo_mm),{unit:"m"})}</div>`}</div>`;});
       if(!ss.length)html+='<div class="inspector-section"><h3>Apoyo físico</h3><p class="helper">Un encuentro puede permanecer sin apoyo. Crea una columna o un estribo cuando el recorrido lo necesite.</p><button class="button small full" data-action="create-support">+ Crear soporte y fundación</button></div>';
       html+='<div class="inspector-section"><button class="button small full" data-action="share-foundation">Asociar / compartir fundación</button></div>';
     }else if(sel.type==="edge"){
       const opts=nodes().map(n=>[n.id,n.id]);html+=`<div class="field-grid">${choice("Desde","desde",entity.desde,opts)}${choice("Hasta","hasta",entity.hasta,opts)}</div>`;
-      html+=choice("Tipo","tipo",entity.tipo,[["viga","Viga"],["retorno","Retorno"]])+choice("Función","funcion",entity.funcion||"",[["","Por definir · revisar legado"],["cruce","Atravieso"],["rampa","Rampa"],["descanso","Descanso"],["retorno","Retorno"],["escalera","Escalera"]]);const families=Object.keys(state.model.familias);if(entity.familia&&!families.includes(entity.familia))families.unshift(entity.familia);html+=choice("Familia","familia",entity.familia,families.map(id=>[id,id]));html+=field("Ancho estructural","ancho_mm",metres(entity.ancho_mm),{unit:"m"});html+=`<div class="field-grid">${field("Retranqueo inicial","retranqueo_inicio_mm",metres(entity.retranqueo_inicio_mm),{unit:"m"})}${field("Retranqueo final","retranqueo_fin_mm",metres(entity.retranqueo_fin_mm),{unit:"m"})}</div><button class="button small full" data-action="direction">Cambiar dirección y longitud…</button><div id="section-editor"></div>`;
+      html+=choice("Tipo","tipo",entity.tipo,[["viga","Viga"],["retorno","Retorno"]])+choice("Función","funcion",entity.funcion||"",[["","Por definir · revisar legado"],["cruce","Atravieso"],["rampa","Rampa"],["descanso","Descanso"],["retorno","Retorno"],["escalera","Escalera"]]);const families=Object.keys(state.model.familias);if(entity.familia&&!families.includes(entity.familia))families.unshift(entity.familia);html+=choice("Familia","familia",entity.familia,families.map(id=>[id,id]));html+=field(entity.funcion === "cruce" ? "Ancho sección atravieso" : "Ancho estructural","ancho_mm",metres(entity.ancho_mm),{unit:"m"});html+=`<div class="field-grid">${field("Retranqueo inicial","retranqueo_inicio_mm",metres(entity.retranqueo_inicio_mm),{unit:"m"})}${field("Retranqueo final","retranqueo_fin_mm",metres(entity.retranqueo_fin_mm),{unit:"m"})}</div><button class="button small full" data-action="direction">Cambiar dirección y longitud…</button><button class="button small full" data-action="insert-landing">Insertar descanso central de 1,5 m…</button><div id="section-editor"></div>`;
       const a=findNode(entity.desde),b=findNode(entity.hasta);if(a&&b){const length=Math.hypot(b.x-a.x,b.y-a.y)/1000;html+=`<div class="dimension-readout"><span>Distancia en planta</span><b>${fmt(length)} m</b></div><div class="dimension-readout"><span>Desnivel entre nodos</span><b>${fmt((b.z-a.z)/1000)} m</b></div>`;}
       if(entity.funcion==="rampa")html+='<div class="dimension-readout"><span>Pendiente de rampa</span><b>8 % · fija</b></div>';if(!entity.funcion)html+='<p class="helper">Tramo legado sin clasificación. Define su función para comprobar la pendiente; no se ha ajustado su geometría.</p>';
-      if(entity.rasante?.length)html+=`<div class="inspector-section"><h3>Rasante del tramo</h3><p class="helper">La rasante guarda sus estaciones y fracciones de desnivel. El dibujo muestra la conexión entre nodos; los cambios de pendiente se conservan en el JSON.</p><div class="metrics">${entity.rasante.map(r=>`<span>t ${fmt(r.t,2)} · f ${fmt(r.f,2)}</span>`).join("")}</div></div>`;
+      if(entity.rasante?.length)html+=`<div class="inspector-section"><h3>Rasante del tramo</h3><p class="helper">La rasante guarda sus estaciones y fracciones de desnivel. La viga sigue siendo continua; los cambios de pendiente se muestran en el modelo y se conservan en el JSON.</p><div class="metrics">${entity.rasante.map(r=>`<span>t ${fmt(r.t,2)} · f ${fmt(r.f,2)}</span>`).join("")}</div></div>`;
     }else{
       html+=`<p class="helper muted">Nodos: ${(entity.nodos||[]).map(esc).join(" + ")}. Su posición sigue el centro de estos nodos.</p><button class="button small full" data-action="share-foundation">Cambiar nodos asociados…</button><div class="inspector-section"><div class="field-grid">${field("Largo","largo_mm",metres(entity.largo_mm),{unit:"m"})}${field("Ancho","ancho_mm",metres(entity.ancho_mm),{unit:"m"})}</div>${field("Espesor del dado","alto_mm",metres(entity.alto_mm),{unit:"m"})}${field("Cota superior","cota_superior_mm",metres(entity.cota_superior_mm),{unit:"m"})}${field("Giro en planta","angulo_deg",foundationAngle(entity)*180/Math.PI,{unit:"°"})}</div><div class="dimension-readout"><span>Pilotes</span><b>${(entity.pilotes||[]).length}</b></div><p class="helper muted" style="margin-top:12px">Las posiciones de los pilotes son locales a esta fundación. Se conservan al mover sus nodos.</p>`;
     }
+    if(sel.type==="foundation")html+=`<h3>${entity.pilotes?.length?'Dado sobre pilotes':'Fundación sin pilotes'}</h3><button class="button small full" data-action="add-pile">+ Añadir pilote bajo la fundación…</button>${(entity.pilotes||[]).map((p,i)=>`<div class="inspector-section"><b>${esc(p.id)}</b><p class="helper">Ø ${fmt(p.diametro_mm/1000)} m · largo ${fmt(p.longitud_mm/1000)} m</p><button class="button small" data-action="edit-pile" data-pile-index="${i}">Editar pilote</button><button class="button small" data-action="remove-pile" data-pile-index="${i}">Quitar pilote</button></div>`).join('')}`;
     if(sel.type!=="foundation")html+=`<button class="button danger small full delete-button" data-action="delete">Eliminar ${sel.type==="node"?"nodo y conexiones":sel.type==="axis"?"eje":"conexión"}</button>`;
     $("inspector").innerHTML=html;
     if(sel.type==="edge"&&window.Sections)sectionController=Sections.mount($("section-editor"),{getModel:()=>state.model,getSelectedEdge:()=>edges().find(e=>e.id===state.selected?.id),onBeforeChange:saveHistory,onChange:()=>{window.AxisManager?.reconcile(state.model);changed();},onMessage:toast});
@@ -255,6 +340,11 @@
       value=value.trim();try{const check=clone(state.model);renameEntity(check,sel.type,entity.id,value);mutate(()=>{const old=entity.id;renameEntity(state.model,sel.type,old,value);if(sel.type==="axis"&&state.elevationAxis===old)state.elevationAxis=value;state.selected.id=value;},{inspector:true});}catch(error){toast(error.message,true);renderInspector();}return;
     }
     if(["cota_fija","xy_fijo"].includes(key)){mutate(()=>entity[key]=value,{inspector:true});return;}
+    if(sel.type==="node"&&/^support:\d+:cota_terreno_proyectado_mm$/.test(key)){
+      const s=supports().filter(s=>s.nodo===entity.id)[Number(key.split(":")[1])];if(!s)return;
+      if(input.validity.badInput||(input.value!==""&&!Number.isFinite(value))){toast("Introduce una cota válida o deja el terreno por definir.",true);renderInspector();return;}
+      mutate(()=>{if(input.value==="")delete s.cota_terreno_proyectado_mm;else s.cota_terreno_proyectado_mm=Math.round(value*1000);},{fit:state.view==="elevation",inspector:true});return;
+    }
     if(!isText&&!Number.isFinite(value)){toast("Introduce un número válido.",true);renderInspector();return;}
     if(sel.type==="node"&&key==="z"){renderInspector();if(entity.z!==Math.round(value*1000))elevationDialog(entity,Math.round(value*1000));return;}
     if(sel.type==="edge"&&key==="funcion"&&entity.funcion!==value){renderInspector();functionDialog(entity,value);return;}
@@ -267,7 +357,7 @@
   }
   function nextId(prefix,items){let n=1;const ids=new Set(items.map(x=>x.id));while(ids.has(`${prefix}${n}`))n++;return `${prefix}${n}`;}
   const allIds = () => [...nodes(),...edges(),...axes(),...foundations(),...foundations().flatMap(f=>f.pilotes||[])];
-  const inputField = (label,name,value,opts={}) => `<label class="field"><span>${esc(label)}${opts.unit?`<small>${esc(opts.unit)}</small>`:""}</span><input name="${name}" type="${opts.text?"text":"number"}" value="${esc(value)}" ${opts.text?"":"step=\"any\""} ${opts.min!==undefined?`min="${opts.min}"`:""} required></label>`;
+  const inputField = (label,name,value,opts={}) => `<label class="field"><span>${esc(label)}${opts.unit?`<small>${esc(opts.unit)}</small>`:""}</span><input name="${name}" type="${opts.text?"text":"number"}" value="${esc(value)}" ${opts.text?"":"step=\"any\""} ${opts.min!==undefined?`min="${opts.min}"`:""} ${opts.optional?'placeholder="Por definir"':"required"}></label>`;
   const selectField = (label,name,value,items) => `<label class="field"><span>${esc(label)}</span><select name="${name}">${items.map(([id,title])=>`<option value="${esc(id)}" ${id===value?"selected":""}>${esc(title)}</option>`).join("")}</select></label>`;
   function dialog(title,content,submitLabel,onSubmit,{onInput,wide=false}={}) {
     const element=document.createElement("dialog");element.className=`editor-dialog ${wide?"wide":""}`;
@@ -281,30 +371,31 @@
   }
   function renderProjectReference(){
     const p=state.model?.proyecto,g=p?.georreferencia;
-    $("project-reference").textContent=g?`E ${fmt(g.este_m,3)} · N ${fmt(g.norte_m,3)} · Origen Z ${fmt(g.cota_m,3)} m · Norte ${fmt(g.norte_desde_x_horario_deg,1)}°`:"Coordenadas locales · emplazamiento por definir";
+    $("project-reference").textContent=g?`E ${fmt(g.este_m,3)} · N ${fmt(g.norte_m,3)} · Origen Z ${fmt(g.cota_m,3)} m · Norte desde Y ↻ ${fmt(ProjectIO.northAngleFromY(g),1)}°`:"Coordenadas locales · emplazamiento por definir";
     $("crossing-setup").textContent=nodes().length?"Añadir atravieso":"Instalar atravieso";
     const area=$("site-plan-status"),plan=state.model?.emplazamiento?.planta;area.hidden=!plan;
     if(plan)area.innerHTML=`<label><input type="checkbox" id="site-visible" ${plan.visible!==false?"checked":""}> Mostrar planta de referencia</label><span>${esc(window.SitePlan?.status(state.model)||"Planta cargada")}</span><details><summary>Capas visibles</summary><div class="site-layers">${(plan.capas||[]).map(layer=>{const name=typeof layer==="string"?layer:layer.nombre;return `<label><input type="checkbox" data-site-layer="${esc(name)}" ${(plan.capas_ocultas||[]).includes(name)?"":"checked"}> ${esc(name)}</label>`;}).join("")}</div></details>${Array.isArray(plan.avisos)&&plan.avisos.length?`<ul class="site-plan-warnings">${plan.avisos.map(item=>`<li>${esc(item)}</li>`).join("")}</ul>`:""}`;
   }
   function projectDialog(existing=false){
     const p=existing?state.model?.proyecto:null,g=p?.georreferencia||{};
-    dialog(existing?"Emplazamiento del proyecto":"Nuevo proyecto",`${inputField("Nombre del proyecto","nombre",p?.nombre||"Nueva pasarela",{text:true})}<p class="helper">El origen local coincide con el punto medio del atravieso, a nivel del terreno. X sigue el atravieso; Z apunta hacia arriba.</p><div class="field-grid three">${inputField("Este del origen","este_m",g.este_m||0,{unit:"m"})}${inputField("Norte del origen","norte_m",g.norte_m||0,{unit:"m"})}${inputField("Cota del terreno / origen","cota_m",g.cota_m||0,{unit:"m"})}</div><div class="field-grid">${inputField("Norte: giro horario desde X","norte_desde_x_horario_deg",g.norte_desde_x_horario_deg??270,{unit:"°"})}${inputField("Sistema de referencia","crs",g.crs||"Por definir",{text:true})}</div><div class="field-grid">${inputField("Gálibo de proyecto","galibo",p?.galibo_m??5.5,{unit:"m",min:0})}${inputField("Cota de carretera local","carretera",p?.cota_carretera_m??0,{unit:"m"})}</div><p class="helper">El gálibo se mide hasta la cara inferior del tablero. Las cotas locales parten del terreno definido en el origen.</p>`,existing?"Guardar emplazamiento":"Crear proyecto",data=>{
-      const params={nombre:data.nombre.trim(),este_m:Number(data.este_m),norte_m:Number(data.norte_m),cota_m:Number(data.cota_m),norte_desde_x_horario_deg:Number(data.norte_desde_x_horario_deg),crs:data.crs.trim(),galibo_mm:Number(data.galibo)*1000,cota_carretera_mm:Number(data.carretera)*1000};
+    dialog(existing?"Emplazamiento del proyecto":"Nuevo proyecto",`${inputField("Nombre del proyecto","nombre",p?.nombre||"Nueva pasarela",{text:true})}<p class="helper">${!existing||p?.referencia_vertical==="tope_atravieso"?"El origen local coincide con la cara superior de la viga en el punto medio del atravieso. Z = 0 sobre el eje; Z apunta hacia arriba.":"Este proyecto conserva su referencia vertical anterior. Usa «Origen en tope de viga» para convertirlo sin mover la estructura."}</p><div class="field-grid three">${inputField("Este del origen","este_m",g.este_m||0,{unit:"m"})}${inputField("Norte del origen","norte_m",g.norte_m||0,{unit:"m"})}${inputField(!existing||p?.referencia_vertical==="tope_atravieso"?"Cota del tope de viga / origen":"Cota del origen actual","cota_m",g.cota_m||0,{unit:"m"})}</div><div class="field-grid">${inputField("Norte: giro horario desde Y","norte_desde_y_horario_deg",ProjectIO.northAngleFromY(g),{unit:"°",min:0})}${inputField("Sistema de referencia","crs",g.crs||"Por definir",{text:true})}</div><div class="field-grid">${inputField("Gálibo de proyecto","galibo",p?.galibo_m??5.5,{unit:"m",min:0})}</div><p class="helper">La cota de terreno proyectado se define individualmente en el centro de cada apoyo. El gálibo queda registrado como requisito; estas cotas puntuales no permiten comprobar la altura libre sobre las pistas.</p>`,existing?"Guardar emplazamiento":"Crear proyecto",data=>{
+      const params={nombre:data.nombre.trim(),este_m:Number(data.este_m),norte_m:Number(data.norte_m),cota_m:Number(data.cota_m),norte_desde_y_horario_deg:Number(data.norte_desde_y_horario_deg),crs:data.crs.trim(),galibo_mm:Number(data.galibo)*1000};
       if(!params.nombre||Object.values(params).some(v=>typeof v==="number"&&!Number.isFinite(v)))throw new Error("Completa el nombre y las coordenadas numéricas.");
-      if(existing){mutate(()=>{const fresh=ProjectIO.newProject(params).proyecto;Object.assign(state.model.proyecto,{nombre:fresh.nombre,georreferencia:fresh.georreferencia,galibo_m:fresh.galibo_m,cota_carretera_m:fresh.cota_carretera_m});$("project-name").textContent=fresh.nombre;});toast("Emplazamiento guardado. Las cotas de los nodos conservan sus valores locales.");}
+      if(existing){mutate(()=>{const fresh=ProjectIO.newProject(params).proyecto;Object.assign(state.model.proyecto,{nombre:fresh.nombre,georreferencia:fresh.georreferencia,galibo_m:fresh.galibo_m});$("project-name").textContent=fresh.nombre;});toast("Emplazamiento guardado. Las cotas de los nodos conservan sus valores locales.");}
       else{acceptModel(ProjectIO.newProject(params),"Proyecto creado. Define el atravieso inicial.");setTimeout(crossingDialog,0);}
     },{wide:true});
   }
   function crossingDialog(){if(!state.model)return;
     const p=state.model.proyecto;
-    dialog("Instalar el atravieso",`<p class="helper">Vista preliminar. Los extremos se sitúan a ambos lados del origen, sobre el eje X. Cada apoyo queda pendiente de dimensionar.</p><div class="field-grid three">${inputField("Longitud total","longitud",30,{unit:"m",min:.1})}${inputField("Ancho estructural","ancho",2,{unit:"m",min:.1})}${inputField("Canto","canto",1,{unit:"m",min:.05})}</div>${selectField("Disposición","vanos","1",[["1","Un vano · dos extremos"],["2","Dos vanos · apoyo central"]])}<div id="crossing-preview" class="preview-box"></div>`,"Instalar atravieso",data=>{
-      const L=Number(data.longitud)*1000,W=Number(data.ancho)*1000,H=Number(data.canto)*1000;if(![L,W,H].every(v=>Number.isFinite(v)&&v>0))throw new Error("Longitud, ancho y canto deben ser positivos.");
-      const Z=(number(p.cota_carretera_m)+number(p.galibo_m,5.5))*1000+H, count=Number(data.vanos), inserted=[];
+    let Z=0;if(p.referencia_vertical!=="tope_atravieso"&&edges().some(e=>e.funcion==="cruce")){try{Z=ProjectIO.rebaseToCrossing(state.model).shiftMm;}catch(error){toast(error.message,true);return;}}
+    dialog("Instalar el atravieso",`<p class="helper">Vista preliminar. Los extremos se sitúan a ambos lados del origen, sobre el eje X. Cada apoyo queda pendiente de dimensionar. El ancho sección atravieso corresponde al ancho de la viga del atravieso.</p><div class="field-grid three">${inputField("Longitud total","longitud",30,{unit:"m",min:.1})}${inputField("Ancho sección atravieso","ancho",2,{unit:"m",min:.1})}${inputField("Alto viga","canto",1,{unit:"m",min:.05})}</div>${selectField("Disposición","vanos","1",[["1","Un vano · dos extremos"],["2","Dos vanos · apoyo central"]])}<div id="crossing-preview" class="preview-box"></div>`,"Instalar atravieso",data=>{
+      const L=Number(data.longitud)*1000,W=Number(data.ancho)*1000,H=Number(data.canto)*1000;if(![L,W,H].every(v=>Number.isFinite(v)&&v>0))throw new Error("La longitud, el ancho y el alto de la viga deben ser positivos.");
+      const count=Number(data.vanos), inserted=[];
       mutate(()=>{const family=uniqueFamily("atravieso");state.model.familias[family]={tipo:"maciza",canto_mm:H,estado:"dimensiones_iniciales_editables"};
         for(let i=0;i<=count;i++){const id=nextId("C",allIds());nodes().push({id,uuid:ProjectIO.uid(),tipo:"columna",x:-L/2+L*i/count,y:0,z:Z});inserted.push(id);}
         for(let i=0;i<count;i++)edges().push({id:nextId("V",allIds()),uuid:ProjectIO.uid(),desde:inserted[i],hasta:inserted[i+1],tipo:"viga",funcion:"cruce",familia:family,ancho_mm:W,retranqueo_inicio_mm:0,retranqueo_fin_mm:0,rasante:[{t:0,f:0},{t:1,f:1}]});state.selected={type:"node",id:inserted[0]};assignSuggestedAxes();
       },{fit:true,inspector:true});toast("Atravieso instalado. Usa + en sus nodos para extender el recorrido.");
-    },{wide:true,onInput:(data,el)=>{const L=Number(data.longitud),W=Number(data.ancho),H=Number(data.canto),Z=number(p.cota_carretera_m)+number(p.galibo_m,5.5)+H;el.querySelector("#crossing-preview").innerHTML=`<svg viewBox="0 0 500 130" aria-label="Vista preliminar del atravieso"><line x1="45" y1="100" x2="455" y2="100" stroke="#a7b5bf" stroke-dasharray="5 4"/><rect x="60" y="32" width="380" height="16" rx="2" fill="#8db5cd"/><line x1="60" y1="48" x2="60" y2="100" stroke="#718b9c" stroke-width="5"/><line x1="440" y1="48" x2="440" y2="100" stroke="#718b9c" stroke-width="5"/>${data.vanos==="2"?'<line x1="250" y1="48" x2="250" y2="100" stroke="#718b9c" stroke-width="5"/>':""}<text x="250" y="20" text-anchor="middle">${esc(fmt(L))} m · ancho ${esc(fmt(W))} m</text><text x="250" y="77" text-anchor="middle">Gálibo ${esc(fmt(number(p.galibo_m,5.5)))} m</text><text x="250" y="122" text-anchor="middle">Terreno local Z = 0 · carretera Z = ${esc(fmt(number(p.cota_carretera_m)))} m</text></svg><p>Cota de paso = carretera + gálibo + canto = <strong>${esc(fmt(Z,3))} m</strong></p><p class="helper">La sección inicial es maciza. Puedes cambiar su familia y perfil antes de generar.</p>`;}});
+    },{wide:true,onInput:(data,el)=>{const L=Number(data.longitud),W=Number(data.ancho);el.querySelector("#crossing-preview").innerHTML=`<svg viewBox="0 0 500 120" aria-label="Vista preliminar del atravieso, apoyos por definir"><rect x="60" y="32" width="380" height="16" rx="2" fill="#8db5cd"/><line x1="60" y1="48" x2="60" y2="85" stroke="#718b9c" stroke-dasharray="4 3"/><line x1="440" y1="48" x2="440" y2="85" stroke="#718b9c" stroke-dasharray="4 3"/>${data.vanos==="2"?'<line x1="250" y1="48" x2="250" y2="85" stroke="#718b9c" stroke-dasharray="4 3"/>':""}<text x="250" y="20" text-anchor="middle">${esc(fmt(L))} m · ancho ${esc(fmt(W))} m</text><text x="250" y="110" text-anchor="middle">Terreno proyectado: por definir en cada apoyo</text></svg><p>Cota local del tope de viga = <strong>${esc(fmt(Z/1000,3))} m</strong></p><p>Gálibo requerido: ${esc(fmt(number(p.galibo_m,5.5)))} m · comprobación pendiente.</p><p class="helper">La sección inicial es maciza. Puedes cambiar su familia y perfil antes de generar.</p>`;}});
   }
   function uniqueFamily(prefix){let id=prefix,i=2;while(Object.hasOwn(state.model.familias,id))id=`${prefix}_${i++}`;return id;}
   function assignSuggestedAxes(){if(window.AxisManager){state.model.ejes=AxisManager.suggest(state.model);AxisManager.syncSupports(state.model);}}
@@ -357,8 +448,27 @@
   function addNode(){if(!state.model)return;dialog("Añadir nodo de encuentro",`<div class="field-grid three">${inputField("X local","x",0,{unit:"m"})}${inputField("Y local","y",0,{unit:"m"})}${inputField("Cota local","z",0,{unit:"m"})}</div><p class="helper">Puedes dibujar y guardar el recorrido antes de definir sus apoyos.</p>`,"Crear nodo",data=>{const position={x:Number(data.x)*1000,y:Number(data.y)*1000,z:Number(data.z)*1000};if(!Object.values(position).every(Number.isFinite))throw new Error("Introduce coordenadas finitas.");const id=nextId("N",allIds());mutate(()=>{nodes().push({id,uuid:ProjectIO.uid(),tipo:"encuentro",...position});state.selected={type:"node",id};},{fit:true,inspector:true});});}
   function addEdge(){connectionDialog();}
   function removeSupport(id){state.model.soportes=supports().filter(s=>s.nodo!==id);state.model.fundaciones=foundations().map(f=>({...f,nodos:f.nodos.filter(n=>n!==id)})).filter(f=>f.nodos.length);}
+  function landingDialog(){
+    try{const result=insertLanding(state.model,state.selected?.id),e=edges().find(e=>e.id===state.selected.id);
+      dialog("Descanso integrado en la viga",`<p>Viga continua ${esc(e.id)}: descanso central de 1,50 m, ancho ${fmt(e.ancho_mm/1000)} m. Longitud en planta conservada: ${fmt(result.length/1000,3)} m.</p><p>La viga ajustará automáticamente su canto: la porción baja tendrá 0,12 m más que la alta, manteniendo recta la cara inferior.</p><p>Se conserva la cota de ${esc(e.desde)}. La cota de ${esc(e.hasta)} y su rama cambia ${fmt(result.deltaZ/1000,3)} m para mantener el 8 % en ambos sectores inclinados.</p><p>Nodos afectados: ${result.nodes.map(esc).join(', ')}. Los soportes asociados ajustan su cota superior; las fundaciones conservan su cota.</p>`,"Insertar descanso",()=>mutate(()=>{state.model=result.model;},{fit:true,inspector:true}));
+    }catch(error){toast(error.message,true);}
+  }
+  function pileDialog(index){
+    const f=foundations().find(f=>f.id===state.selected?.id);if(!f)return;
+    const old=Number.isInteger(index)?f.pilotes?.[index]:null;
+    dialog(old?"Editar pilote":"Añadir pilote bajo la fundación",`<p>El pilote nace en la cara inferior del dado y baja verticalmente. Posición respecto del centro de la fundación.</p>${inputField("Diámetro","diametro",old?old.diametro_mm/1000:1)}${inputField("Longitud","longitud",old?old.longitud_mm/1000:10)}${inputField("Desplazamiento X","dx",old?old.dx_mm/1000:0)}${inputField("Desplazamiento Y","dy",old?old.dy_mm/1000:0)}`,"Guardar pilote",data=>{
+      const d=Number(data.diametro)*1000,L=Number(data.longitud)*1000,x=Number(data.dx)*1000,y=Number(data.dy)*1000;
+      if(![d,L,x,y].every(Number.isFinite)||d<=0||L<=0)throw new Error("Introduce diámetro y longitud positivos y coordenadas válidas.");
+      if(Math.abs(x)+d/2>f.largo_mm/2||Math.abs(y)+d/2>f.ancho_mm/2)throw new Error("El pilote debe quedar contenido en el dado.");
+      mutate(()=>{const pile={...(old||{id:nextId('P',allIds()),uuid:ProjectIO.uid()}),diametro_mm:d,longitud_mm:L,dx_mm:x,dy_mm:y};f.pilotes||=[];if(old)f.pilotes[index]=pile;else f.pilotes.push(pile);f.tipo='dado';},{fit:true,inspector:true});
+    });
+  }
   function createSupport(){const n=findNode(state.selected?.id);if(!n||supports().some(s=>s.nodo===n.id))return;
-    dialog(`Apoyo físico en ${n.id}`,`${selectField("Tipo de apoyo","tipo",n.tipo==="estribo"?"estribo":"columna",[["columna","Columna"],["estribo","Estribo"]])}<p class="helper">Se crea una fundación individual con medidas iniciales editables. Después puedes compartirla con otros apoyos.</p>`,"Crear apoyo",data=>mutate(()=>{const f=nextId("F",allIds());n.tipo=data.tipo;const depths=edges().filter(e=>e.desde===n.id||e.hasta===n.id).map(e=>number(state.model.familias[e.familia]?.canto_mm,1000));const top=number(n.z)-Math.max(1000,...depths)-300;foundations().push({id:f,uuid:ProjectIO.uid(),nodos:[n.id],largo_mm:3000,ancho_mm:3000,alto_mm:1000,cota_superior_mm:Math.min(0,top-1000),angulo_deg:0,pilotes:[]});supports().push({id:n.id,uuid:ProjectIO.uid(),nodo:n.id,fundacion:f,cota_superior_mm:top,...(n.tipo==="estribo"?{ancho_mm:1000,largo_mm:2000}:{diametro_mm:1000})});window.AxisManager?.syncSupports(state.model);},{inspector:true}));
+    dialog(`Apoyo físico en ${n.id}`,`${selectField("Tipo de apoyo","tipo",n.tipo==="estribo"?"estribo":"columna",[["columna","Columna"],["estribo","Estribo"]])}${inputField("Cota de terreno proyectado","terreno_proyectado","",{unit:"m",optional:true})}<p class="helper">Cota local en el centro del apoyo, respecto de Z = 0. Puedes dejarla por definir y completarla después.</p><p class="helper">Se crea una fundación individual con medidas iniciales editables. Si defines el terreno, se toma como referencia para proponer su cota inicial. Después puedes ajustar la fundación por separado o compartirla con otros apoyos.</p>`,"Crear apoyo",data=>{
+      const terrain=data.terreno_proyectado.trim()===""?undefined:Number(data.terreno_proyectado)*1000;
+      if(terrain!==undefined&&!Number.isFinite(terrain))throw new Error("Introduce una cota de terreno válida o déjala por definir.");
+      mutate(()=>{const f=nextId("F",allIds());n.tipo=data.tipo;const depths=edges().filter(e=>e.desde===n.id||e.hasta===n.id).map(e=>number(state.model.familias[e.familia]?.canto_mm,1000));const top=number(n.z)-Math.max(1000,...depths)-300;foundations().push({id:f,uuid:ProjectIO.uid(),nodos:[n.id],largo_mm:3000,ancho_mm:3000,alto_mm:1000,cota_superior_mm:terrain===undefined?top-1000:Math.min(terrain,top-1000),angulo_deg:0,pilotes:[]});supports().push({id:n.id,uuid:ProjectIO.uid(),nodo:n.id,fundacion:f,cota_superior_mm:top,...(terrain===undefined?{}:{cota_terreno_proyectado_mm:Math.round(terrain)}),...(n.tipo==="estribo"?{ancho_mm:1000,largo_mm:2000}:{diametro_mm:1000})});window.AxisManager?.syncSupports(state.model);},{fit:state.view==="elevation",inspector:true});
+    });
   }
   function shareFoundation(){if(!window.Sections?.openFoundationEditor){toast("El editor de fundaciones no está disponible.",true);return;}const sel=state.selected,ids=sel?.type==="node"?[sel.id]:foundations().find(f=>f.id===sel?.id)?.nodos||[];Sections.openFoundationEditor({getModel:()=>state.model,selectedNodeIds:ids,onBeforeChange:saveHistory,onChange:()=>changed({inspector:true}),onMessage:toast});}
   function deleteSelection(){const sel=state.selected;if(!sel)return;mutate(()=>{if(sel.type==="axis")state.model.ejes=axes().filter(a=>a.id!==sel.id);else{if(sel.type==="edge")state.model.tramos=edges().filter(e=>e.id!==sel.id);else if(sel.type==="node"){state.model.nodos=nodes().filter(n=>n.id!==sel.id);state.model.tramos=edges().filter(e=>e.desde!==sel.id&&e.hasta!==sel.id);state.model.soportes=supports().filter(s=>s.nodo!==sel.id);state.model.fundaciones=foundations().map(f=>({...f,nodos:(f.nodos||[]).filter(id=>id!==sel.id)})).filter(f=>f.nodos.length);}window.AxisManager?.reconcile(state.model);}state.selected=null;},{inspector:true});toast(sel.type==="axis"?"Eje eliminado. Sus nodos y tramos se conservan.":"Elemento eliminado. Puedes recuperar el cambio con Deshacer.");}
@@ -417,7 +527,7 @@
   $("add-axis").addEventListener("click",()=>axisDialog());$("suggest-axes").addEventListener("click",proposeAxes);$("elevation-axis").addEventListener("change",event=>{state.elevationAxis=event.target.value;renderScene(true);});
   $("cargar-planta").addEventListener("click",()=>$("planta-input").click());$("planta-input").addEventListener("change",async event=>{const file=event.target.files[0];if(!file||!state.model)return;const model=state.model,button=$("cargar-planta");button.disabled=true;integration?.setBusy("site-import",true);try{if(!window.SitePlan)throw new Error("El lector de plantas no está disponible.");const data=await SitePlan.load(file,model);if(state.model!==model)throw new Error("El proyecto cambió durante la carga. Vuelve a seleccionar la planta.");mutate(()=>{state.model.emplazamiento={...state.model.emplazamiento,planta:data};},{fit:true});toast("Planta de referencia cargada.");}catch(error){toast(error.message,true);}finally{event.target.value="";button.disabled=!state.model;integration?.setBusy("site-import",false);}});
   $("site-plan-status").addEventListener("change",event=>{const plan=state.model?.emplazamiento?.planta;if(!plan)return;if(event.target.id==="site-visible")mutate(()=>plan.visible=event.target.checked);if(event.target.matches("[data-site-layer]")){const name=event.target.dataset.siteLayer;mutate(()=>{const hidden=new Set(plan.capas_ocultas||[]);if(event.target.checked)hidden.delete(name);else hidden.add(name);plan.capas_ocultas=[...hidden];});}});
-  document.addEventListener("click",event=>{const target=event.target.closest("[data-select-type]");if(target)select(target.dataset.selectType,target.dataset.selectId);const action=event.target.closest("[data-action]")?.dataset.action;if(action==="delete")deleteSelection();if(action==="create-support")createSupport();const issue=event.target.closest("[data-issue-id]")?.dataset.issueId;if(issue){const type=nodes().some(n=>n.id===issue)?"node":edges().some(e=>e.id===issue)?"edge":foundations().some(f=>f.id===issue)?"foundation":axes().some(a=>a.id===issue)?"axis":null;if(type)select(type,issue);}});
+  document.addEventListener("click",event=>{const target=event.target.closest("[data-select-type]");if(target)select(target.dataset.selectType,target.dataset.selectId);const action=event.target.closest("[data-action]")?.dataset.action;if(action==="insert-landing")landingDialog();if(action==="add-pile")pileDialog();if(action==="edit-pile")pileDialog(Number(event.target.closest('[data-pile-index]').dataset.pileIndex));if(action==="remove-pile"){const f=foundations().find(f=>f.id===state.selected?.id),i=Number(event.target.closest('[data-pile-index]').dataset.pileIndex);if(f)mutate(()=>{f.pilotes.splice(i,1);if(!f.pilotes.length)f.tipo='zapata';},{fit:true,inspector:true});}if(action==="delete")deleteSelection();if(action==="create-support")createSupport();const issue=event.target.closest("[data-issue-id]")?.dataset.issueId;if(issue){const type=nodes().some(n=>n.id===issue)?"node":edges().some(e=>e.id===issue)?"edge":foundations().some(f=>f.id===issue)?"foundation":axes().some(a=>a.id===issue)?"axis":null;if(type)select(type,issue);}});
   document.addEventListener("click",event=>{const add=event.target.closest("[data-node-add]");if(add){connectionDialog(add.dataset.nodeAdd);return;}const action=event.target.closest("[data-action]")?.dataset.action;if(action==="connect")connectionDialog(state.selected?.id);if(action==="direction")directionDialog(edges().find(e=>e.id===state.selected?.id));if(action==="share-foundation")shareFoundation();});
   document.addEventListener("click",event=>{const action=event.target.closest("[data-action]")?.dataset.action,axis=axes().find(a=>a.id===state.selected?.id);if(action==="edit-axis")axisDialog(axis);if(action==="move-axis")moveAxisDialog(axis);if(action==="axis-elevation"&&axis){state.elevationAxis=axis.id;setView("elevation");}});
   $("model-canvas").addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){const target=event.target.closest("[data-select-type]");if(target){event.preventDefault();select(target.dataset.selectType,target.dataset.selectId);}}});
@@ -425,7 +535,31 @@
   $("inspector").addEventListener("change",event=>{if(event.target.matches("[data-field]"))editField(event.target);});
   ["plan","iso","elevation"].forEach(view=>$("view-"+view).addEventListener("click",()=>setView(view)));
   $("fit").addEventListener("click",()=>renderScene(true));$("zoom-in").addEventListener("click",()=>zoom(.8));$("zoom-out").addEventListener("click",()=>zoom(1.25));
-  const canvas=$("model-canvas");canvas.addEventListener("wheel",event=>{event.preventDefault();zoom(event.deltaY>0?1.12:.89,svgPoint(event));},{passive:false});canvas.addEventListener("pointerdown",event=>{if(event.button!==0||event.target.closest("[data-select-type], [data-node-add]")||!state.viewport)return;state.drag={point:svgPoint(event),x:state.viewport.x,y:state.viewport.y};canvas.setPointerCapture(event.pointerId);canvas.classList.add("dragging");});canvas.addEventListener("pointermove",event=>{if(!state.drag)return;const p=svgPoint(event),v=state.viewport;v.x-=p[0]-state.drag.point[0];v.y-=p[1]-state.drag.point[1];applyViewport();});["pointerup","pointercancel","lostpointercapture"].forEach(name=>canvas.addEventListener(name,()=>{state.drag=null;canvas.classList.remove("dragging");}));
+  const canvas=$("model-canvas");
+  canvas.addEventListener("wheel",event=>{event.preventDefault();zoom(event.deltaY>0?1.12:.89,svgPoint(event));},{passive:false});
+  canvas.addEventListener("pointerdown",event=>{
+    if(![0,1].includes(event.button)||!state.viewport)return;
+    if(event.button===0&&event.target.closest("[data-select-type], [data-node-add]"))return;
+    event.preventDefault();
+    state.drag={mode:state.view==="iso"&&event.button===0&&!event.shiftKey?"orbit":"pan",point:svgPoint(event),clientX:event.clientX,angle:state.orbitAngle,pointerId:event.pointerId};
+    canvas.setPointerCapture(event.pointerId);canvas.classList.add("dragging");
+  });
+  canvas.addEventListener("pointermove",event=>{
+    if(!state.drag||state.drag.pointerId!==event.pointerId)return;
+    if(state.drag.mode==="orbit"){setOrbit(state.drag.angle+(event.clientX-state.drag.clientX)*Math.PI/360);return;}
+    const p=svgPoint(event),v=state.viewport;v.x-=p[0]-state.drag.point[0];v.y-=p[1]-state.drag.point[1];applyViewport();
+  });
+  ["pointerup","pointercancel","lostpointercapture"].forEach(name=>canvas.addEventListener(name,event=>{
+    if(state.drag?.pointerId!==event.pointerId)return;
+    state.drag=null;canvas.classList.remove("dragging");
+    if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId);
+  }));
+  $("reset-orbit").addEventListener("click",()=>{setOrbit(0);renderScene(true);});
+  $("origin-top").addEventListener("click",()=>{
+    if(!state.model){toast("Abre o crea un proyecto con atravieso.",true);return;}
+    try{const plan=ProjectIO.rebaseToCrossing(state.model);dialog("Origen en el tope del atravieso",`<p>El punto medio del atravieso, sobre la cara superior de la viga, pasará a Z = 0.</p><p>Se restarán ${fmt(plan.shiftMm/1000,3)} m a las cotas locales de nodos, apoyos, fundaciones, terreno y carretera. ${state.model.proyecto?.georreferencia||state.model.georreferencia?'La cota geográfica del origen se ajustará en el mismo valor.':'El archivo no tiene georreferencia; se conserva la geometría relativa.'}</p><p>La estructura conserva sus dimensiones, pendientes y gálibo.</p>`,"Cambiar origen",()=>mutate(()=>{state.model=plan.model;},{fit:true,inspector:true}));}catch(error){toast(error.message,true);}
+  });
+  $("show-plan-dimensions").addEventListener("change",applyViewport);
   window.addEventListener("resize",applyViewport);
   renderSummary();api("/api/estado").then(result=>{state.freecad=!!result.freecad_disponible;$("freecad-status").textContent=state.freecad?"FreeCAD disponible":"FreeCAD no disponible";$("freecad-status").classList.toggle("ready",state.freecad);renderSummary();}).catch(()=>{$("freecad-status").textContent="Motor sin conexión";});
   renderList();renderProjectReference();renderElevationOptions();

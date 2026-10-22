@@ -1,10 +1,11 @@
 // Documentary values are read-only. Material choices are drawing conventions,
 // not changes to the official descriptions, recovery, SPT or depths.
+import {studyInformation} from '/study_info.js';
 export async function renderStratigraphy(ctx){
   const {api,node,button,section,notify,job,project,changed,current}=ctx;
   const input=section('estratigrafia-informe','Estratigrafía');
   input.append(node('p','Carga el informe de mecánica de suelos y selecciona un sondaje. Se identifica el formato por sus tablas antes de insertar; la vista previa y el dibujo CAD usan el mismo formato.'));
-  input.append(node('p','Formatos: tablas resumen VISAN e informes individuales tipo Puerto Octay. Puedes mantener hasta 10 informes en la sesión. No se estiman cifras desde curvas; los escaneos sin texto todavía no son compatibles.','muted'));
+  input.append(node('p','Formatos: tablas resumen VISAN, informes individuales Puerto Octay y registros SPT de CDI. Puedes mantener hasta 10 informes en la sesión. Para informes de velocidades Vs usa Perfiles geofísicos. No se estiman cifras desde curvas; los escaneos sin texto todavía no son compatibles.','muted'));
   const output=section('estratigrafia-revision','Sondajes, vista previa y evidencia');
   let selected=project.stratigraphy?.report?.boreholes?.[0]?.key, includeTable=false, revision=0;
   let annotationScale={name:'1:100 (m) · referencia de vista previa',value:10};
@@ -46,9 +47,17 @@ export async function renderStratigraphy(ctx){
     const hole=report.boreholes.find(h=>h.key===selected);if(!hole)return;
     const checks=state.checks?.find(c=>c.key===hole.key);
     const format=checks?.format;
+    const cdi=format?.id==='cdi-spt-v1';
     output.append(node('p',`Formato identificado: ${format?.label||'No reconocido'}`,'badge'));
     if(format?.description)output.append(node('p',format.description,'muted'));
-    for(const warning of checks?.warnings||[])output.append(node('p',warning,'badge'));
+    if(hole.study_info&&Object.keys(hole.study_info).length)output.append(studyInformation(hole,node));
+    const warnings=checks?.warnings||[];
+    if(cdi&&warnings.length){
+      const audit=node('details');audit.className='documentary-warnings';audit.append(node('summary',`${warnings.length} avisos del informe — revisar antes de insertar`));
+      for(const warning of warnings)audit.append(node('p',warning,'badge'));
+      output.append(audit);
+      for(const warning of warnings.filter(w=>w.includes('no se extrapola')))output.append(node('p',warning,'badge'));
+    }else for(const warning of warnings)output.append(node('p',warning,'badge'));
     for(const error of checks?.errors||[])output.append(node('p',error,'badge'));
     const toggle=node('label','Incluir tablas de valores debajo del gráfico'),inc=node('input');inc.type='checkbox';inc.checked=includeTable;toggle.prepend(inc);output.append(toggle);
     inc.addEventListener('change',async()=>{includeTable=inc.checked;try{await refresh();}catch(e){notify(e.message);}});
@@ -59,9 +68,12 @@ export async function renderStratigraphy(ctx){
     if(checks?.scene){output.append(renderScene(checks.scene, state.hatches));output.append(node('p','Hatch de la simbología PROSPECCIONES del maestro. CAD consulta el DWG instalado; si actualizas sus patrones, la vista previa puede variar. Textos CAD: RomanD anotativo, altura de papel 2,5. Los bolones y bloques descritos se superponen al suelo principal, sin inferir porcentajes.','muted'));}
     const drilling=node('details');drilling.append(node('summary','Intervalos de perforación y asignación de hatch (revisar)'));output.append(drilling);
     if(hole.horizons?.length){
-      table(drilling,['Horizonte','Desde m','Hasta m','Espesor m','Descripción oficial','Pág.'],hole.horizons.map(r=>[r.index,r.start,r.end,r.thickness,r.description,r.page]));
+      table(drilling,['Horizonte','Desde m','Hasta m','Espesor m','Descripción oficial','Pág.'],hole.horizons.map(r=>[r.index,r.start,r.end,r.thickness||'No publicado',r.description,r.page]));
       const samples=node('details');samples.append(node('summary','Pasadas y recuperación — no son los límites de los estratos'));output.append(samples);
-      table(samples,['Muestra','Desde m','Hasta m','Método','Recuperado cm','Recuperación %','Descripción oficial','Pág.'],hole.samples.map(r=>[r.index,r.start,r.end,r.method,r.recovered,r.recovery,r.description||'No recuperada',r.page]));
+      if(cdi){
+        table(samples,['Desde m','Hasta m','Perforado m','Recuperado m','Recuperación %','Presión PSI','Pág.'],hole.drilling_records.map(r=>[r.start,r.end,r.drilled,r.recovered,r.recovery,r.pressure||'No publicado',r.page]));
+        samples.append(node('p','Se conservan las filas de avance cero y los huecos de la tabla. No se convierten las longitudes de muestra SPT en recuperación.','muted'));
+      }else table(samples,['Muestra','Desde m','Hasta m','Método','Recuperado cm','Recuperación %','Descripción oficial','Pág.'],hole.samples.map(r=>[r.index,r.start,r.end,r.method,r.recovered,r.recovery,r.description||'No recuperada',r.page]));
       if(hole.water_depth)output.append(node('p',`Napa publicada: ${hole.water_depth} m · pág. ${hole.water_page}`));
     }else table(drilling,['Desde m','Hasta m','Perforado m','Recuperado m','Recuperación %','Descripción oficial','Pág.'],hole.intervals.map(r=>[r.start,r.end,r.drilled,r.recovered,r.recovery,r.description,r.page]));
     const choices=node('div',undefined,'strata-materials');drilling.append(choices);
@@ -74,7 +86,10 @@ export async function renderStratigraphy(ctx){
       choice.addEventListener('change',async()=>{row.material=choice.value;hole.reviewed=false;changed();try{await refresh();}catch(e){notify(e.message);}});
     });
     const tests=node('details');tests.append(node('summary','Tabla oficial NSPT — no es la recuperación'));output.append(tests);
-    table(tests,['N.º','Desde m','Hasta m','Hincado m','Recuperado (unidad)','N1','N2','N3','NSPT / NF','Pág.'],hole.tests.map(r=>[r.index,r.start,r.end,r.driven||'—',r.recovered+' '+(r.recovered_unit||'m'),r.n1,r.n2,r.n3,r.nspt,r.page]));
+    if(cdi){
+      table(tests,['Muestra publicada','Desde m','Hasta m','Long. muestra cm','N1','N2','N3','NSPT','Herramienta','Sistema','Pág.'],hole.tests.map(r=>[r.sample_number,r.start,r.end,r.sample_length,r.n1,r.n2,r.n3,r.nspt,r.tool,r.mechanism,r.page]));
+      tests.append(node('p','NSPT corresponde a la última columna publicada, sin recalcular. R y 50R/59R se conservan literalmente. La longitud de muestra (cm) no es la recuperación (m) de la tabla superior.','muted'));
+    }else table(tests,['N.º','Desde m','Hasta m','Hincado m','Recuperado (unidad)','N1','N2','N3','NSPT / NF','Pág.'],hole.tests.map(r=>[r.index,r.start,r.end,r.driven||'—',r.recovered+' '+(r.recovered_unit||'m'),r.n1,r.n2,r.n3,r.nspt,r.page]));
     const vs=node('details');vs.append(node('summary','Vs por tramo — valores y rangos de la figura'));output.append(vs);
     if(hole.vs_bands?.length){
       table(vs,['Desde m','Hasta m','Vs m/s (figura)','Pág. figura','Tabla de profundidades'],hole.vs_bands.map(r=>[r.start,r.end,r.low===r.high?r.low:`${r.low} - ${r.high}`,r.page,`${r.profile} · pág. ${r.table_page}`]));
