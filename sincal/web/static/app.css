@@ -82,3 +82,28 @@ body.pasarela-embedded-active{overflow:hidden}
 .pasarela-editor-toolbar button{box-shadow:none;padding:5px 10px;font-size:12px}
 #pasarela-editor-frame{display:block;width:100%;flex:1;min-height:0;border:0;background:var(--bg)}
 @media(max-width:700px){.pasarela-editor-toolbar{gap:8px;padding:7px 10px}.pasarela-editor-toolbar strong{display:none}.pasarela-editor-toolbar span{font-size:11px}}
+
+/* Hybrid reinforcement assistant: project tree at left, selected CAD context at right. */
+.rebar-assistant-summary{font-family:Mono,monospace;color:var(--accent);margin:18px 0}
+.rebar-assistant-shell{display:grid;grid-template-columns:minmax(260px,.9fr) minmax(0,1.5fr);gap:20px;align-items:start}
+.rebar-assistant-tree,.rebar-assistant-inspector{min-width:0;border:1px solid var(--line);padding:18px;background:var(--bg)}
+.rebar-assistant-tree{display:grid;gap:18px}
+.rebar-structure{margin:0;padding:0;border:0}.rebar-structure h3{margin:0 0 8px;color:var(--accent)}
+.rebar-instance{padding:8px 0;border-bottom:0}.rebar-instance summary{font-weight:700;color:var(--text)}
+.rebar-element-list{display:grid;gap:6px;margin-top:8px}
+.rebar-element-button{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;padding:9px 10px;text-align:left;box-shadow:none;background:transparent;border-color:transparent}
+.rebar-element-button:hover,.rebar-element-button[aria-current=true]{border-color:var(--accent);color:var(--text)}
+.rebar-element-button[aria-current=true]{background:var(--field)}
+.rebar-element-button small{color:var(--muted)}
+.rebar-state{display:inline-block;white-space:nowrap;padding:2px 7px;border:1px solid currentColor;color:var(--muted);font:11px/1.4 Mono,monospace}
+.rebar-state[data-state=ready]{color:#55b981}.rebar-state[data-state=prepared],.rebar-state[data-state=detected]{color:var(--accent)}
+.rebar-state[data-state=needs_input],.rebar-state[data-state=error]{color:#e77b68}
+.rebar-state[data-state=not_applicable]{opacity:.65}
+.rebar-inspector-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:14px}
+.rebar-inspector-title{min-width:0}.rebar-inspector-title h3{margin:3px 0 0;font-size:22px}.rebar-inspector-title small{color:var(--muted)}
+.rebar-assistant-inspector>h3{font-size:15px;margin:22px 0 10px}.rebar-assistant-inspector table{font-size:12px}.rebar-assistant-inspector th,.rebar-assistant-inspector td{padding:8px;white-space:normal}
+.rebar-optional-note{border-left:3px solid var(--accent);padding:7px 10px;background:var(--field)}
+.rebar-recipes{display:flex;flex-wrap:wrap;gap:7px}.rebar-recipe{padding:4px 8px;border:1px solid var(--line);font-size:12px}
+.rebar-detection{border-top:1px solid var(--line);margin-top:22px;padding-top:8px}.rebar-detection .rows{grid-template-columns:minmax(110px,.8fr) 1.4fr}
+.rebar-candidates{font:12px/1.6 Mono,monospace;overflow-wrap:anywhere}
+@media(max-width:900px){.rebar-assistant-shell{grid-template-columns:1fr}.rebar-assistant-tree{max-height:none}.rebar-assistant-inspector{position:static}}

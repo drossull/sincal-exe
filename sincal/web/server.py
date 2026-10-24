@@ -13,7 +13,11 @@ import uuid
 import webbrowser
 
 from sincal.project import ProjectContext, project_sections, project_text, validate_project_data
-from .rebar import defaults as rebar_defaults, preview as rebar_preview
+from .rebar import (
+    assistant_catalog as rebar_assistant_catalog,
+    defaults as rebar_defaults,
+    preview as rebar_preview,
+)
 from .cad_connection import connection_status
 from .services import Services, COMMANDS
 from .rebar import from_project
@@ -236,6 +240,7 @@ class Handler(BaseHTTPRequestHandler):
         assets = {"/": (STATIC / "index.html", "text/html; charset=utf-8"),
                   "/app.js": (STATIC / "app.js", "text/javascript; charset=utf-8"),
                   "/rebar.js": (STATIC / "rebar.js", "text/javascript; charset=utf-8"),
+                  "/rebar_assistant.js": (STATIC / "rebar_assistant.js", "text/javascript; charset=utf-8"),
                   "/tools.js": (STATIC / "tools.js", "text/javascript; charset=utf-8"),
                   "/study_info.js": (STATIC / "study_info.js", "text/javascript; charset=utf-8"),
                   "/navigation.js": (STATIC / "navigation.js", "text/javascript; charset=utf-8"),
@@ -298,6 +303,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, project_result(payload))
             if self.path == "/api/rebar/preview":
                 return self.send(200, rebar_preview(payload))
+            if self.path == '/api/rebar/catalog':
+                return self.send(200, rebar_assistant_catalog(payload))
             if self.path == '/api/rebar/from-project':
                 return self.send(200, from_project(payload))
             if self.path == '/api/prospect/preview':

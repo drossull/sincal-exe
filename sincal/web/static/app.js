@@ -1,5 +1,6 @@
 'use strict';
 import {renderRebar,renderCrossbeam} from '/rebar.js';
+import {renderRebarAssistant} from '/rebar_assistant.js';
 import {renderTools} from '/tools.js';
 import {renderNavigation,renderTabs,title,owner,destination} from '/navigation.js';
 import {createProjectFiles} from '/project_files.js';
@@ -46,7 +47,7 @@ async function loadProjectJson(file){
     project.stratigraphy={report:reports[0],library:reports.slice(1),...checked};dirty=true;
     notify('Reconocimiento incorporado. Disponible en Prospecciones → Estratigrafía.');
   }else{
-    const candidate={data:saved,identification:{...identity()},sourceName:file.name};
+    const candidate={data:saved,identification:{...identity()},sourceName:file.name,rebarAssistant:{elements:{}}};
     const preview=await api('project/preview',candidate);candidate.rebar=await api('rebar/from-project',candidate.data);
     if(project!==previous)throw Error('El proyecto cambió durante la carga.');
     // Loading bridge data does not discard independently loaded borehole reports.
@@ -126,8 +127,9 @@ await renderPasarela({...toolContext('pasarela'),panel:pasarelaPanel,onStatus:up
 }else if(page==='rebar'){
 const intro=section('generador','Generador de armadura');intro.append(node('p','Prepara los antecedentes del puente y trabaja por estructura. El JSON se comparte con Consulta de proyecto; las memorias quedan como antecedentes para un análisis futuro.'));
 projectLoader(intro);if(project?.sourceName)intro.append(node('p','JSON activo: '+project.sourceName));
+await renderRebarAssistant({...toolContext(page),project});if(page!=='rebar')return;
 projectFiles.render(['memory_pdf','memory_excel'],true);
-const guide=section('guia-armadura','Cómo funciona');const steps=node('ol');for(const text of ['Carga el JSON del puente y adjunta las memorias PDF y Excel disponibles.','Selecciona la estructura en el menú: Estribos, Viga, Cepa, Travesaño o Losa.','En las herramientas disponibles, revisa dimensiones, recubrimientos, marcas y despieces antes de generar.','Comprueba la conexión en Diagnóstico y revisa el dibujo de destino antes de enviar a CAD.'])steps.append(node('li',text));guide.append(steps,node('p','El módulo documenta armaduras; no sustituye la revisión del ingeniero. Viga, Cepa y Losa aún no tienen generador. La carga de memorias no realiza análisis automático.'));
+const guide=section('guia-armadura','Cómo funciona');const steps=node('ol');for(const text of ['Carga el JSON del puente y adjunta las memorias PDF y Excel disponibles.','Selecciona una instancia y un elemento en el asistente.','Prepara sus capas y confirma los moldajes mediante una selección breve en CAD.','Genera sólo las recetas disponibles y revisa geometría, marcas y cotas en el dibujo.'])steps.append(node('li',text));guide.append(steps,node('p','El módulo documenta armaduras; no sustituye la revisión del ingeniero. Por ahora sólo la zapata tiene receta de generación; los demás elementos se muestran sin inventar armaduras.'));
 }else if(page==='rebar-abutments'){
 await renderRebar({...toolContext(page),project});
 }else if(page==='rebar-crossbeam'){

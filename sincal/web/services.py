@@ -15,7 +15,13 @@ import uuid
 from .files import Files, rename_plan, apply_rename
 from .jobs import Jobs, Cancelled
 from .cad_connection import connection_status
-from .rebar import domain, defaults, from_project
+from .rebar import (
+    domain,
+    defaults,
+    from_project,
+    resolve_assistant_element,
+    summarize_element_detection,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 COMMANDS = {
@@ -149,6 +155,8 @@ class Services:
                     'location-render': self.location_render, 'prospect': self.prospect,
                     'stratigraphy': self.stratigraphy, 'cad-stratigraphy': self.stratigraphy_insert,
                     'cad-command': self.command, 'cad-detect': self.detect,
+                    'cad-prepare-layers': self.prepare_rebar_layers,
+                    'cad-detect-element': self.detect_rebar_element,
                     'cad-rebar': self.rebar, 'cad-profile': self.profile,
                     'cad-prepare': self.prepare, 'cad-crossbeam': self.crossbeam,
                     'engines': self.engines, 'engine-select': self.engine_select,
@@ -531,23 +539,92 @@ class Services:
         return self.cad(job, payload.get('expected'), order, True)
 
     def detect(self, job, payload):
-        from sincal.ui.tabs.armaduras import TabArmaduras
+        from sincal.cad.armaduras_workflow import build_moldaje_scan_lisp
         from sincal.cad.moldajes import parse_moldaje_detection
+        from sincal.rebar.model import CAPAS_ZAPATA
         folder = self.runtime / job.id
         folder.mkdir(exist_ok=True)
         output = folder / 'moldajes.txt'
-        path = self.lisp(job, TabArmaduras._lisp_detector_moldajes(str(output)))
-        self.cad(job, payload.get('expected'), f'(progn (load "{path}") (c:SINCAL-DETECTAR-ZAPATA))\n', True)
+        path = self.lisp(job, build_moldaje_scan_lisp(str(output), CAPAS_ZAPATA))
+        self.cad(job, payload.get('expected'), f'(progn (load "{path}") (c:SINCAL-ANALIZAR-MOLDAJES))\n', True)
         if not output.exists():
             raise ValueError('El detector no generó un resultado. Revisa CAD.')
         detection = parse_moldaje_detection(output.read_text(encoding='utf-8'))
         key = self.remember(self.detections, (payload['expected'], detection))
         return {'detection': key, **asdict(detection)}
 
+    def prepare_rebar_layers(self, job, payload):
+        from sincal.cad.armaduras_workflow import build_prepare_layers_lisp
+        structure, instance, element = resolve_assistant_element(
+            payload.get('project'), payload.get('structure_key'),
+            payload.get('instance_key'), payload.get('element_key'),
+        )
+        if not element.layers:
+            raise ValueError('Las capas de este elemento todavía no están definidas.')
+        layers = list(element.layer_names)
+        path = self.lisp(job, build_prepare_layers_lisp(layers))
+        result = self.cad(
+            job, payload.get('expected'),
+            f'(progn (load "{path}") (c:SINCAL-PREPARAR-ARMADURAS))\n',
+        )
+        return {
+            'message': result.get('message', 'Capas de moldaje preparadas en el dibujo activo.'),
+            'structure_key': structure.key,
+            'instance_key': instance.key,
+            'element_key': element.key,
+            'layers': layers,
+        }
+
+    def detect_rebar_element(self, job, payload):
+        from sincal.cad.armaduras_workflow import build_moldaje_scan_lisp
+        from sincal.cad.moldajes import MoldajeContext, parse_moldaje_detection
+        if payload.get('interactive') is not True:
+            raise ValueError('Confirma la selección manual de los moldajes del elemento.')
+        structure, instance, element = resolve_assistant_element(
+            payload.get('project'), payload.get('structure_key'),
+            payload.get('instance_key'), payload.get('element_key'),
+        )
+        if not element.layers:
+            raise ValueError('Las capas de este elemento todavía no están definidas.')
+        folder = self.runtime / job.id
+        folder.mkdir(exist_ok=True)
+        output = folder / 'moldajes.txt'
+        context = MoldajeContext(element.key, instance.key)
+        source = build_moldaje_scan_lisp(
+            str(output), element.layer_names, context=context, interactive=True,
+        )
+        path = self.lisp(job, source)
+        self.cad(
+            job, payload.get('expected'),
+            f'(progn (load "{path}") (c:SINCAL-ANALIZAR-MOLDAJES))\n',
+        )
+        if not output.exists():
+            raise ValueError('El detector no generó un resultado. Revisa CAD.')
+        text = output.read_text(encoding='utf-8')
+        selection = 'unknown'
+        for line in text.splitlines():
+            parts = [part.strip() for part in line.split('|')]
+            if len(parts) == 3 and parts[0].upper() == 'META' and parts[1].upper() == 'SELECTION':
+                selection = 'ok' if parts[2].upper() == 'OK' else 'cancelled'
+                break
+        detection = parse_moldaje_detection(
+            text, allowed_layers=element.layer_names, context=context,
+        )
+        key = self.remember(self.detections, (payload['expected'], detection))
+        summary = summarize_element_detection(element, detection, selection=selection)
+        return {
+            'detection': key,
+            'structure_key': structure.key,
+            'instance_key': instance.key,
+            'element_key': element.key,
+            'layers': list(element.layer_names),
+            **summary,
+        }
+
     def rebar(self, job, payload):
         from sincal.cad.zapata_views import build_zapata_lisp
         from sincal.cad.zapata_detail import build_zapata_detail_lisp
-        from sincal.rebar.model import build_zapata_schedule
+        from sincal.rebar.model import VISTAS_ZAPATA, build_zapata_schedule
         from sincal.runtime import ruta_recurso
         geometry, cover, rules = domain(payload['state'])
         schedule = build_zapata_schedule(geometry, cover, rules)
@@ -568,8 +645,12 @@ class Services:
                 raise ValueError('Detecta y confirma moldajes de este dibujo primero.')
             expected, result = detection
             candidate = next((c for c in result.candidates if c.handle == payload.get('handle') and c.is_valid), None)
-            view = payload.get('view')
-            if view not in ('FR', 'AA', 'BB', 'CC', 'DD', 'EE') or not candidate or candidate.layer != view + '_ZAP':
+            requested_view = payload.get('view')
+            view = 'FF' if requested_view == 'EE' else requested_view
+            if (view not in VISTAS_ZAPATA or not candidate
+                    or candidate.layer != view + '_ZAP'
+                    or (candidate.context.element and candidate.context.element != 'abutment.footing')
+                    or (candidate.context.instance and candidate.context.instance != key)):
                 raise ValueError('Selecciona un contorno válido para esa vista.')
             source = build_zapata_lisp(view, candidate, geometry, cover, rules, key, master)
             command = 'SINCAL-ZAPATA-GENERAR'

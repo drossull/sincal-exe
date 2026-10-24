@@ -1,4 +1,4 @@
-# Opt-in only. Do not build without the user's compilation approval.
+# Standard desktop release: local web UI hosted in WebView2.
 import os
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 

@@ -1,2 +1,2 @@
-# Optional desktop shell; the existing Tk build remains unchanged.
+# Desktop shell used by the standard SINCAL release.
 pywebview==6.2.1

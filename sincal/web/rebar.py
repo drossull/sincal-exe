@@ -1,8 +1,10 @@
 """Web adapter; engineering rules remain in the existing domain model."""
 from dataclasses import asdict, replace
 from copy import deepcopy
+from collections.abc import Mapping
 import math
 
+from sincal.rebar.catalog import BRIDGE_REBAR_CATALOG, ContourPolicy
 from sincal.rebar.model import Cover, ZapataGeometry, default_zapata_rules, build_zapata_schedule
 from sincal.rebar.detail import build_detail_groups, polyline_render_points, polyline_developed_length_m
 
@@ -88,3 +90,160 @@ def preview(payload):
             "marks": [{**asdict(mark), "kg": mark.kg_steel, 'area_cm2': mark.area_m2 * 10000,
                        'spacing_cm': next(rule.spacing_cm for rule in rules if rule.key == mark.key)} for mark in schedule.marks],
             "total_kg": schedule.total_kg, "details": details}
+
+
+def assistant_catalog(data):
+    """Serialize the immutable bridge catalog for the web assistant.
+
+    Optional elements are deliberately included even when they are absent from
+    the project.  The UI can therefore explain that they do not apply instead
+    of silently hiding part of the bridge hierarchy.
+    """
+    if not isinstance(data, Mapping):
+        raise ValueError("El proyecto de armaduras debe ser un objeto JSON.")
+    structures = []
+    for structure in BRIDGE_REBAR_CATALOG.structures:
+        instances = []
+        for instance in BRIDGE_REBAR_CATALOG.resolve_instances(structure.key, data):
+            elements = []
+            for element in BRIDGE_REBAR_CATALOG.elements_for(structure.key):
+                elements.append({
+                    "key": element.key,
+                    "label": element.label,
+                    "folder_path": list(element.folder_path),
+                    "optional": element.optional,
+                    "presence": element.presence.kind.value,
+                    "present": element.presence.resolve(data, instance.key),
+                    "definition_pending": element.definition_pending,
+                    "layers": [{
+                        "view": layer.view,
+                        "layer": layer.layer,
+                        "contour": layer.contour.value,
+                        "detail": layer.detail,
+                    } for layer in element.layers],
+                    "recipes": [recipe.value for recipe in element.recipes],
+                })
+            instances.append({
+                "key": instance.key,
+                "label": instance.label,
+                "source_index": instance.source_index,
+                "elements": elements,
+            })
+        structures.append({
+            "key": structure.key,
+            "label": structure.label,
+            "folder": structure.folder,
+            "instances": instances,
+        })
+    return {"structures": structures}
+
+
+def resolve_assistant_element(data, structure_key, instance_key, element_key, *, require_present=True):
+    """Resolve one unambiguous catalog context supplied by the web client."""
+    if not isinstance(data, Mapping):
+        raise ValueError("El proyecto de armaduras debe ser un objeto JSON.")
+    if not all(isinstance(value, str) and value.strip()
+               for value in (structure_key, instance_key, element_key)):
+        raise ValueError("Selecciona una estructura, instancia y elemento válidos.")
+    try:
+        structure = BRIDGE_REBAR_CATALOG.structure(structure_key)
+        element = BRIDGE_REBAR_CATALOG.element(element_key)
+    except KeyError as error:
+        raise ValueError("El elemento estructural no pertenece al catálogo vigente.") from error
+    if element.structure_key != structure.key:
+        raise ValueError("El elemento no pertenece a la estructura seleccionada.")
+    matches = tuple(
+        instance for instance in BRIDGE_REBAR_CATALOG.resolve_instances(structure.key, data)
+        if instance.key == instance_key
+    )
+    if not matches:
+        raise ValueError("La instancia no existe en el JSON del proyecto.")
+    if len(matches) != 1:
+        raise ValueError("La instancia es ambigua en el JSON; usa nombres únicos.")
+    present = element.presence.resolve(data, instance_key)
+    if require_present and not present:
+        raise ValueError("El elemento opcional no está presente en esta instancia.")
+    return structure, matches[0], element
+
+
+def summarize_element_detection(element, detection, *, selection="unknown"):
+    """Return a JSON-ready assessment for one explicitly selected element."""
+    assignments = {}
+    assigned_candidates = {}
+    missing_layers = []
+    ambiguous_layers = []
+    curved_layers = []
+    usable_by_layer = {}
+    for layer_view in element.layers:
+        allow_open = layer_view.contour in (ContourPolicy.OPEN, ContourPolicy.EITHER)
+        allow_closed = layer_view.contour in (ContourPolicy.CLOSED, ContourPolicy.EITHER)
+        candidates = tuple(
+            candidate for candidate in detection.for_layer(layer_view.layer)
+            if not (candidate.closed is True and not allow_closed)
+            and candidate.is_usable(allow_open=allow_open, allow_arcs=True)
+        )
+        usable_by_layer[layer_view.layer] = candidates
+        if not candidates:
+            missing_layers.append(layer_view.layer)
+        elif len(candidates) > 1:
+            ambiguous_layers.append(layer_view.layer)
+        else:
+            assignments[layer_view.layer] = candidates[0].handle
+            assigned_candidates[layer_view.layer] = candidates[0]
+            if candidates[0].has_arcs:
+                curved_layers.append(layer_view.layer)
+
+    candidates = []
+    for candidate in detection.candidates:
+        item = asdict(candidate)
+        item["vertices"] = [list(point) for point in candidate.vertices]
+        item["bulges"] = list(candidate.bulges)
+        item["label"] = candidate.label
+        item["usable"] = candidate in usable_by_layer.get(candidate.layer, ())
+        candidates.append(item)
+
+    trusted_detection = selection == "ok" and detection.uses_metres
+    detection_complete = (
+        trusted_detection
+        and bool(element.layers)
+        and len(assigned_candidates) == len(element.layers)
+    )
+    generation_ready = (
+        detection_complete
+        and element.key == "abutment.footing"
+        and all(candidate.is_valid for candidate in assigned_candidates.values())
+    )
+    if not trusted_detection:
+        assignments = {}
+
+    if selection == "cancelled":
+        message = "Selección cancelada; no se cambió ninguna asignación."
+    elif selection != "ok":
+        message = "No se pudo confirmar la selección de moldajes en CAD."
+    elif not detection.uses_metres:
+        message = "Corrige INSUNITS a 6 (metros) antes de generar armaduras."
+    elif missing_layers or ambiguous_layers:
+        message = "La selección requiere revisión antes de generar armaduras."
+    elif curved_layers:
+        message = "Moldajes completos; revisa las vistas con arcos antes de generar."
+    elif generation_ready:
+        message = "La zapata tiene todos sus moldajes cerrados y está lista para generar."
+    elif element.key == "abutment.footing" and detection_complete:
+        message = "Moldajes completos, pero la zapata requiere contornos cerrados para generar."
+    elif detection_complete:
+        message = "Moldajes completos; la receta de armadura aún está pendiente de aprobación."
+    else:
+        message = f"{len(assignments)} vista(s) asignadas al elemento."
+    return {
+        "message": message,
+        "selection": selection,
+        "uses_metres": detection.uses_metres,
+        "insunits": detection.insunits,
+        "candidates": candidates,
+        "assignments": assignments,
+        "detection_complete": detection_complete,
+        "generation_ready": generation_ready,
+        "missing_layers": missing_layers,
+        "ambiguous_layers": ambiguous_layers,
+        "curved_layers": curved_layers,
+    }

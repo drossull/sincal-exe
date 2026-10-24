@@ -4,12 +4,16 @@ param(
     [string]$CertificateThumbprint = '',
     [string]$InnoSetupPath = '',
     [switch]$SkipSigning,
-    [switch]$DesktopWeb,
+    [switch]$DesktopWeb = $true,
     [switch]$SkipPasarelaModule
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+if (-not $DesktopWeb) {
+    throw 'Las releases de SINCAL usan la interfaz web. No se permite sustituirla por el arranque Tk.'
+}
 
 function Write-Step([string]$Message) {
     Write-Host "`n=== $Message ===" -ForegroundColor Cyan
@@ -535,6 +539,10 @@ finally {
     Pop-Location
 }
 Assert-ArtifactExists $distExe
+
+Write-Step 'Verificando que el ejecutable contiene la interfaz web'
+& python (Join-Path $projectRoot 'tools\verify_desktop_payload.py') $distExe
+if ($LASTEXITCODE -ne 0) { throw 'El ejecutable no corresponde al escritorio web de SINCAL.' }
 
 $certificate = $null
 if (-not $SkipSigning) {

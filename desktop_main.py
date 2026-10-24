@@ -1,4 +1,4 @@
-"""Opt-in embedded UI entry point; the production Tk entry stays unchanged."""
+"""Production entry point for SINCAL's local WebView2 desktop interface."""
 import json
 from pathlib import Path
 import sys

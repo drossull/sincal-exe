@@ -6,7 +6,7 @@ export async function renderRebar(ctx){
   intro.append(node('p',project.identification.structure_name||'Proyecto sin nombre'));
   intro.append(node('p','Las dimensiones disponibles vienen del JSON (mm → cm). Completa las ausentes y revisa el cálculo antes de dibujar. El programa documenta armaduras; no sustituye la revisión del ingeniero.','muted'));
   const defaults=await api('rebar/from-project',project.data);if(!current())return;
-  project.rebar??={};let selected='entrada',revision=0;
+  project.rebar??={};let selected=['entrada','salida'].includes(project.rebarAssistant?.legacyAbutment)?project.rebarAssistant.legacyAbutment:'entrada',revision=0;
   const controls=node('div',undefined,'actions');intro.append(controls);
   const body=node('div');intro.append(body);
   for(const [key,label] of [['entrada','Estribo de entrada'],['salida','Estribo de salida']]){
@@ -57,12 +57,14 @@ export async function renderRebar(ctx){
     },true),output);
     const cad=node('fieldset');cad.append(node('legend','4. Dibujo CAD · ZAPATA'));
     cad.append(node('p','1. Abre Model en metros. 2. Detecta moldajes. 3. Elige el contorno de cada vista. 4. Genera y revisa en CAD. Para el despiece, selecciona allí el punto de inserción.'));
-    const candidates=node('div');let detection=null;const selections={};
-    cad.append(button('Detectar moldajes',async()=>{const expected=await api('cad/status');if(expected.status!=='ready')throw Error(expected.message);if(!confirm(`Leer moldajes de ${expected.active.name}?`))return;detection=await job('cad-detect',{expected});candidates.replaceChildren();
-      for(const view of ['FR','AA','BB','CC','EE']){const label=node('label',view==='FR'?'Frontal':view[0]+'–'+view[1]),select=node('select');const empty=node('option','Selecciona un contorno');empty.value='';select.append(empty);for(const item of detection.candidates.filter(c=>c.layer===view+'_ZAP'&&c.status==='OK')){const option=node('option',`${item.handle} · ${item.vertex_count} vértices · ${item.area_m2.toFixed(2)} m²`);option.value=item.handle;select.append(option);}label.append(select);selections[view]=select;
+    const candidates=node('div'),retained=project.rebarAssistant?.legacyDetection;let detection=retained?.instance_key===selected&&retained.detection?.uses_metres===true?retained.detection:null;const selections={};
+    function showDetection(result){detection=result;candidates.replaceChildren();
+      for(const view of ['FR','AA','BB','CC','FF']){const label=node('label',view==='FR'?'Frontal':view[0]+'–'+view[1]),select=node('select');const empty=node('option','Selecciona un contorno');empty.value='';select.append(empty);for(const item of detection.candidates.filter(c=>c.layer===view+'_ZAP'&&c.status==='OK')){const option=node('option',`${item.handle} · ${item.vertex_count} vértices · ${item.area_m2.toFixed(2)} m²`);option.value=item.handle;select.append(option);}const assigned=detection.assignments?.[view+'_ZAP'];if(assigned&&[...select.options].some(option=>option.value===assigned))select.value=assigned;label.append(select);selections[view]=select;
         label.append(button('Dibujar '+view,async()=>{if(!select.value)throw Error('Selecciona un contorno.');if(!confirm(`¿Generar vista ${view} en el contorno ${select.value}?`))return;await job('cad-rebar',{state,abutment:selected,view,handle:select.value,detection:detection.detection});notify('Orden terminada. Comprueba geometría, marcas y cotas en CAD.');}));candidates.append(label);}
-    }),candidates,button('Generar despiece general',async()=>{const expected=await api('cad/status');if(expected.status!=='ready')throw Error(expected.message);if(confirm(`¿Generar despiece de ${selected} en ${expected.active.name}? Selecciona el punto en CAD.`))await job('cad-rebar',{state,abutment:selected,view:'detail',expected});},true));
-    cad.append(node('p','D–D, muros y alas no tienen generador de zapata. No se inventa armadura para componentes todavía no definidos.','muted'));body.append(cad);
+    }
+    cad.append(button('Detectar moldajes',async()=>{const expected=await api('cad/status');if(expected.status!=='ready')throw Error(expected.message);if(!confirm(`Leer moldajes de ${expected.active.name}?`))return;showDetection(await job('cad-detect',{expected}));}),candidates,button('Generar despiece general',async()=>{const expected=await api('cad/status');if(expected.status!=='ready')throw Error(expected.message);if(confirm(`¿Generar despiece de ${selected} en ${expected.active.name}? Selecciona el punto en CAD.`))await job('cad-rebar',{state,abutment:selected,view:'detail',expected});},true));
+    if(detection)showDetection(detection);
+    cad.append(node('p','Muros y alas no tienen generador de zapata. No se inventa armadura para componentes todavía no definidos.','muted'));body.append(cad);
   }
   function detail(piece,mark){
     if(!piece){notify('No existe geometría para esta marca.');return;}

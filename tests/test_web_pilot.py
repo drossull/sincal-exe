@@ -70,6 +70,11 @@ def test_http_auth_origin_assets_and_roundtrip(tmp_path):
         assert code == 200
         code, preview, _ = request("/api/rebar/preview", json.loads(raw), auth)
         assert code == 200 and json.loads(preview)["valid"]
+        code, catalog, _ = request("/api/rebar/catalog", payload()["data"], auth)
+        assert code == 200
+        assert [item["label"] for item in json.loads(catalog)["structures"]] == [
+            "ESTRIBO", "CEPA", "VIGA", "TRAVESAÑO", "LOSA",
+        ]
         for path in ('/api/sessions', '/api/sessions/example', '/api/sessions/import',
                      '/api/recovery', '/api/recovery/clear', '/api/recovery/consumed'):
             assert request(path, headers=auth)[0] == 404
