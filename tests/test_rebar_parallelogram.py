@@ -144,3 +144,19 @@ def test_three_corner_mode_is_not_allowed_for_a_section():
     with pytest.raises(ValueError, match="corresponde a la planta"):
         reference_candidate(corners(geometry), 1, context, geometry, project,
                             reference_mode="parallelogram")
+
+
+def test_rectangular_rotado_with_zero_skew_accepts_rectangle_reference():
+    geometry, context, project = fixture(0)
+    project["estribos"]["orientacion_dado_estribo_entrada"] = "rectangular_rotado"
+    supplied = corners(geometry)
+    candidate = reference_candidate(supplied, 1, context, geometry, project)
+    assert candidate.vertices == tuple(p[:2] for p in reversed(supplied))
+    assert candidate.is_valid
+
+
+def test_rectangular_rotado_with_nonzero_skew_rejects_before_creating_candidate():
+    geometry, context, project = fixture(12)
+    project["estribos"]["orientacion_dado_estribo_entrada"] = "rectangular_rotado"
+    with pytest.raises(ValueError, match="rectangular girada con esviaje distinto de 0°"):
+        reference_candidate(corners(geometry, delta=0), 1, context, geometry, project)

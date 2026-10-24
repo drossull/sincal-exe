@@ -142,6 +142,15 @@ def assistant_catalog(data):
     return {"structures": structures}
 
 
+def footing_plan_orientation(data, instance_key):
+    """Match Proyecto Puentes: the orientation option belongs to open abutments."""
+    abutments = data.get("estribos", {})
+    kind = abutments.get(f"tipo_estribo_{instance_key}")
+    if kind and kind != "transparente":
+        return "romboide"
+    return abutments.get(f"orientacion_dado_estribo_{instance_key}", "rectangular")
+
+
 def reference_sequence(data, instance_key, view, *, geometry=None):
     """Select two corners for rectangles and three for a skewed footing plan."""
     from sincal.rebar.model import VISTAS_ZAPATA
@@ -152,9 +161,11 @@ def reference_sequence(data, instance_key, view, *, geometry=None):
     elements = BRIDGE_REBAR_CATALOG.elements_for("abutment")
     order = ("abutment.footing", "abutment.pile")
     ordered = sorted(elements, key=lambda item: order.index(item.key) if item.key in order else 2)
-    orientation = data.get("estribos", {}).get(f"orientacion_dado_estribo_{instance_key}", "rectangular")
+    orientation = footing_plan_orientation(data, instance_key)
     skew = (geometry.esviaje_grados if geometry is not None else
             float(data.get("parametros_generales", {}).get("angulo_esviaje_puente", 0)))
+    if view == "FF" and orientation == "rectangular_rotado" and abs(skew) > 1e-9:
+        raise ValueError("La planta rectangular está girada. Esta versión requiere la base horizontal; no se envió una orden a CAD.")
     skewed_plan = view == "FF" and orientation == "romboide" and abs(skew) > 1e-9
     return [{"key": item.key, "label": item.label,
              "reference_mode": "parallelogram" if skewed_plan and item.key == "abutment.footing" else "rectangle"}
@@ -204,8 +215,14 @@ def reference_candidate(vertices, factor, context, geometry, project, *, referen
     if any(len(p) == 3 and abs(p[2] / factor) > 1e-7 for p in raw_points):
         raise ValueError("La referencia de zapata debe estar en el plano XY con Z = 0.")
     points = tuple((p[0] / factor, p[1] / factor) for p in raw_points)
-    orientation = project.get("estribos", {}).get(
-        f"orientacion_dado_estribo_{context.instance}", "rectangular")
+    orientation = footing_plan_orientation(project, context.instance)
+    if context.view == "FF" and orientation == "rectangular_rotado":
+        if abs(geometry.esviaje_grados) > 1e-9:
+            raise ValueError(
+                "El JSON define una zapata rectangular girada con esviaje distinto de 0°. "
+                "Esta orientación no es compatible con la referencia horizontal de esta versión. "
+                "No se insertaron armaduras.")
+        orientation = "rectangular"
     if context.view == "FF" and orientation not in ("rectangular", "romboide"):
         raise ValueError("El JSON debe indicar si la zapata en planta es rectangular o romboide.")
     if reference_mode == "parallelogram":

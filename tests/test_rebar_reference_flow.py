@@ -79,6 +79,16 @@ def test_reference_sequence_uses_three_only_for_the_skewed_footing_plan():
     geometry, _, _ = domain(defaults())
     assert reference_sequence(project, 'entrada', 'EE', geometry=geometry)[0]['reference_mode'] == 'rectangle'
     project['estribos']['orientacion_dado_estribo_entrada'] = 'rectangular'
+    project['estribos']['tipo_estribo_entrada'] = 'transparente'
+    assert reference_sequence(project, 'entrada', 'EE')[0]['reference_mode'] == 'rectangle'
+
+
+def test_solid_abutment_uses_effective_skew_not_inactive_orientation_option():
+    project = _project()
+    project['estribos']['orientacion_dado_estribo_entrada'] = 'rectangular_rotado'
+    project['parametros_generales'] = {'angulo_esviaje_puente': -12}
+    assert reference_sequence(project, 'entrada', 'EE')[0]['reference_mode'] == 'parallelogram'
+    project['parametros_generales']['angulo_esviaje_puente'] = 0
     assert reference_sequence(project, 'entrada', 'EE')[0]['reference_mode'] == 'rectangle'
 
 
@@ -386,8 +396,10 @@ def test_ee_three_corner_flow_validates_and_inserts_skewed_plan(service, factor,
     assert result['references']['reference_modes'] == {'abutment.footing': 'parallelogram'}
 
 
-def test_ee_rectangular_plan_still_uses_two_corners(service):
+@pytest.mark.parametrize('orientation', ['rectangular', 'rectangular_rotado'])
+def test_ee_rectangular_plan_still_uses_two_corners(service, orientation):
     payload = _payload()
+    payload['project']['estribos']['orientacion_dado_estribo_entrada'] = orientation
     payload['view'] = 'EE'
     text = _references_text(['abutment.footing'], footing_height=7.5).replace('META|VIEW|FR', 'META|VIEW|EE')
     job = _job('g')
@@ -397,6 +409,19 @@ def test_ee_rectangular_plan_still_uses_two_corners(service):
         result = service.rebar(job, payload)
     assert len(calls) == 2
     assert result['references']['reference_modes'] == {'abutment.footing': 'rectangle'}
+
+
+def test_ee_rotated_rectangle_blocks_before_any_cad_order(service):
+    payload = _payload()
+    payload['view'] = 'EE'
+    payload['state']['geometry']['esviaje_grados'] = 12
+    payload['project']['estribos']['orientacion_dado_estribo_entrada'] = 'rectangular_rotado'
+    payload['project']['estribos']['tipo_estribo_entrada'] = 'transparente'
+    with patch.object(service, 'cad') as cad, \
+         patch('sincal.runtime.ruta_recurso', return_value='master.dwg'), \
+         pytest.raises(ValueError, match='girada'):
+        service.rebar(_job('i'), payload)
+    cad.assert_not_called()
 
 
 def test_ee_skewed_plan_cannot_accept_stale_rectangle_result(service):

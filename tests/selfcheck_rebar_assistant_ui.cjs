@@ -19,7 +19,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
         else if(p==='/api/modules/pasarela/status')data={installed:false};
         else if(p==='/api/files/choose')data=[{id:'root',name:'Proyecto',path:'C:/Proyecto'}];
         else if(p==='/api/files/project')data={root:{id:'root',path:'C:/Proyecto'},warnings:[],entries:[{name:'puente.json',relative:'puente.json',path:'C:/Proyecto/puente.json',grants:{session:'bridge'}}]};
-        else if(p==='/api/files/json')data={value:{bridge:'test',abutments:[{name:'entrada'}],estribos:{orientacion_dado_estribo_entrada:'romboide',orientacion_dado_estribo_salida:'rectangular'}}};
+        else if(p==='/api/files/json')data={value:{bridge:'test',abutments:[{name:'entrada'}],estribos:{tipo_estribo_entrada:'muro_lleno',orientacion_dado_estribo_entrada:'rectangular_rotado',tipo_estribo_salida:'transparente',orientacion_dado_estribo_salida:'rectangular'}}};
         else if(p==='/api/project/preview')data={warnings:[],sections:[],text:'Proyecto de prueba'};
         else if(p==='/api/rebar/from-project'){
           const state={geometry:{largo_cm:900,ancho_cm:2000,alto_cm:200,esviaje_grados:10},cover:{inferior_cm:7.5,superior_cm:5,lateral_cm:5},rules:[]};
@@ -125,7 +125,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
     assert.equal(calls[0].payload.view,'EE');
     assert.equal(calls[0].payload.selection_mode,'geometry');
     assert.equal(calls[0].payload.drawing_units,'mm');
-    assert.deepEqual(calls[0].payload.project,{bridge:'test',abutments:[{name:'entrada'}],estribos:{orientacion_dado_estribo_entrada:'romboide',orientacion_dado_estribo_salida:'rectangular'}});
+    assert.deepEqual(calls[0].payload.project,{bridge:'test',abutments:[{name:'entrada'}],estribos:{tipo_estribo_entrada:'muro_lleno',orientacion_dado_estribo_entrada:'rectangular_rotado',tipo_estribo_salida:'transparente',orientacion_dado_estribo_salida:'rectangular'}});
     assert.equal('handle' in calls[0].payload,false);
     assert.equal('detection' in calls[0].payload,false);
     assert.equal(calls.some(call=>call.operation.includes('detect')),false);

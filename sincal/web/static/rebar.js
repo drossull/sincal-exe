@@ -78,7 +78,9 @@ export async function renderRebar(ctx){
         const expected=await api('cad/status');
         if(!calculationIsCurrent(ticket))throw Error('El cálculo cambió. Calcula nuevamente antes de insertar.');
         if(expected.status!=='ready')throw Error(expected.message);
-        const skewedPlan=view==='EE'&&project.data?.estribos?.[`orientacion_dado_estribo_${ticket.abutment}`]==='romboide'&&Math.abs(Number(ticket.state.geometry?.esviaje_grados)||0)>1e-9;
+        const abutments=project.data?.estribos||{},kind=abutments[`tipo_estribo_${ticket.abutment}`];
+        const orientation=kind&&kind!=='transparente'?'romboide':abutments[`orientacion_dado_estribo_${ticket.abutment}`];
+        const skewedPlan=view==='EE'&&orientation==='romboide'&&Math.abs(Number(ticket.state.geometry?.esviaje_grados)||0)>1e-9;
         notify(skewedPlan?`En CAD sigue la guía para indicar tres puntos por cada elemento de la planta E–E romboide. SINCAL validará las dimensiones contra el JSON antes de insertar.`:`En CAD indica la esquina superior izquierda e inferior derecha de cada elemento solicitado para la vista ${label}. SINCAL validará las dimensiones contra el JSON antes de insertar.`);
         const result=await job('cad-rebar',{state:ticket.state,project:project.data,abutment:ticket.abutment,view,expected,selection_mode:'geometry',drawing_units:drawingUnits.value});
         if(!calculationIsCurrent(ticket))return;
