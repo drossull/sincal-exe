@@ -41,7 +41,14 @@ class TabPasarela(ctk.CTkFrame):
         self.refresh_button = self._button(actions, "Actualizar estado", self.refresh)
         self.message = self._label(self.container, "", color=COLOR_TEXTO_SUAVE)
         self._label(self.container, "La instalación directa descarga el módulo compatible con tu versión de SINCAL y comprueba sus archivos. FreeCAD se instala por separado.", color=COLOR_TEXTO_SUAVE)
-        self.manual_button = ShadowButton(self.container, text="▸ Instalar o actualizar desde un ZIP local", command=self.toggle_manual, font=FUENTE_NORMAL, corner_radius=RADIO_CONTROL)
+        self.manual_button = ShadowButton(
+            self.container,
+            text="▸ Instalar o actualizar desde un ZIP local",
+            command=self.toggle_manual,
+            font=FUENTE_NORMAL,
+            corner_radius=RADIO_CONTROL,
+            width=360,
+        )
         self.manual_button.pack(anchor="w", padx=12, pady=12)
 
         self.install_panel = ctk.CTkFrame(self.container, fg_color=COLOR_PANEL, corner_radius=RADIO_PANEL)

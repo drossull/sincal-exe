@@ -340,10 +340,10 @@ class ActualizadorCAD(ctk.CTk):
             ("ubicacion", "pin", "Ubicación", "Ubicación"),
             ("proyecto", "structure", "Proyecto", "Proyecto"),
             ("consulta", "query", "Consulta", "Consulta"),
-            ("pasarela", "structure", "Pasarela BIM", "Pasarela BIM"),
             ("estructural", "structure", "Generador de armadura", "Generador de armadura"),
             ("prospecciones", "query", "Perfiles geofísicos", "Perfiles geofísicos"),
             ("sesiones", "sessions", "Sesiones", "Sesiones"),
+            ("pasarela", "structure", "Pasarela BIM", "Pasarela BIM"),
             ("diagnostico", "diagnostic", "Diagnóstico", "Diagnóstico"),
         )
         for key, icon_name, label, title in self.nav_items:

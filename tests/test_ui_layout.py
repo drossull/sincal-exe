@@ -32,9 +32,10 @@ class WorkbenchLayoutTests(unittest.TestCase):
             '"ubicacion", "pin", "Ubicación"',
             '"proyecto", "structure", "Proyecto"',
             '"consulta", "query", "Consulta"',
-            '"pasarela", "structure", "Pasarela BIM"',
             '"estructural", "structure", "Generador de armadura"',
+            '"prospecciones", "query", "Perfiles geofísicos"',
             '"sesiones", "sessions", "Sesiones"',
+            '"pasarela", "structure", "Pasarela BIM"',
             '"diagnostico", "diagnostic", "Diagnóstico"',
         ]
         positions = [source.index(item) for item in expected]
@@ -52,6 +53,7 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('from sincal import optional_modules', tab)
         self.assertNotIn('import pasarela_bim', core + tab)
         self.assertNotIn('from pasarela_bim', core + tab)
+        self.assertIn("width=360", tab)
 
     def test_console_is_dockable_and_dxf_is_a_separate_module(self):
         source = APP.read_text(encoding="utf-8")
