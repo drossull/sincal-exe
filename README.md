@@ -1,6 +1,6 @@
 # SINCAL Suite — Ingeniería y estándares CAD
 
-**SINCAL Suite** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 3.0. Esta guía corresponde a la release `v3.0.30`, con interfaz de escritorio web y Pasarela BIM como módulo opcional.
+**SINCAL Suite** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 3.0. Esta guía corresponde a la release `v3.0.31`, con interfaz de escritorio web y Pasarela BIM como módulo opcional.
 
 La disponibilidad de los instaladores se confirma en las
 [publicaciones oficiales](https://github.com/drossull/sincal-updates/releases).
@@ -85,7 +85,7 @@ El servidor se limita a loopback: no es apto para publicarlo en Internet.
 ### Validación y compilación
 
 El arranque de escritorio usa `desktop_main.py` y
-`packaging/windows/SINCAL_Web.spec`. La release `v3.0.30` se construye con
+`packaging/windows/SINCAL_Web.spec`. La release `v3.0.31` se construye con
 `tools/build_release.ps1`; la interfaz web es la opción predeterminada.
 `-DesktopWeb` se conserva como parámetro compatible. El pipeline rechaza el
 arranque Tk y verifica el contenido real del EXE antes de firmarlo.
@@ -100,7 +100,7 @@ sus pendientes históricos no sustituyen el resultado de verificación de cada r
 ## Instalación web y distribución
 
 SINCAL Suite se distribuye mediante un instalador web firmado. El archivo
-`Setup_SINCAL_v3.0.30.exe` descarga desde su release pública los paquetes exactos
+`Setup_SINCAL_v3.0.31.exe` descarga desde su release pública los paquetes exactos
 de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y después los instala.
 El componente **Pasarela BIM** aparece **desmarcado por defecto**: su paquete
 independiente sólo se descarga si se selecciona. También puede instalarse más adelante.
@@ -111,7 +111,7 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
 
 ## Primer inicio
 
-1. Descarga y ejecuta el instalador de `v3.0.30` desde su publicación oficial, con SINCAL y CAD cerrados.
+1. Descarga y ejecuta el instalador de `v3.0.31` desde su publicación oficial, con SINCAL y CAD cerrados.
 2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
 3. Abre **Diagnóstico**, verifica el motor CAD sugerido y cámbialo si necesitas otra versión.
 4. Pulsa **Preparar integración CAD**.
@@ -302,15 +302,15 @@ Las instrucciones de compilación independiente y distribución están en
 
 Prepara vistas, despieces y cubicación de fierro mediante comandos temporales enviados al CAD abierto:
 
-- Estribos: separa **Estribo de entrada** y **Estribo de salida**, con dimensiones, reglas y marcas propias. Primero se carga el JSON, se revisan los parámetros y se calcula la zapata. Después se usa un botón por vista: frontal, A–A, B–B, C–C o F–F. La zapata conserva las marcas y reglas ya definidas; las otras familias requieren definiciones del usuario.
+- Estribos: separa **Estribo de entrada** y **Estribo de salida**, con dimensiones, reglas y marcas propias. Primero se carga el JSON, se revisan los parámetros y se calcula la zapata. Después se usa un botón por vista: frontal, A–A, B–B, C–C o planta E–E. La zapata conserva las marcas y reglas ya definidas; las otras familias requieren definiciones del usuario.
 - Travesaños: extremos, cuadrantes sobre tope, macizos y viga; geometría y despiece.
 - Proyecto activo: recibe automáticamente desde **Proyecto → Consulta** los parámetros compatibles y los convierte a las unidades de la interfaz.
 
 Las vistas de zapata generan cotas coordinadas con `MARK`, `GSG_COTAS` y `GSG_MLEADER`. El **despiece general de zapata** se inserta en Model, agrupa los empalmes, acota parciales con `GSG_ARM-COTAS` y describe cada pieza con RomanD a 2,5 mm de papel. Cada grupo queda identificado de manera independiente; cuando sus parámetros cambian, AutoCAD/ZWCAD permite actualizarlo, conservarlo, aceptar todos los cambios o cancelar desde la línea de comandos.
 
-El **Asistente** construye desde el JSON el árbol de estribos, cepas, vigas, travesaños y losas. Cada orden de vista pide en CAD una secuencia de rectángulos de referencia: esquina superior izquierda e inferior derecha de la zapata, pilotes si el JSON los activa y los demás elementos presentes en esa vista. Los puntos definen rectángulos; no son ventanas de selección de objetos. No se buscan moldajes por nombre de capa ni se recorre el dibujo para reconocerlos. Sólo la zapata genera armaduras; las demás referencias se conservan en el estado de la sesión como pendientes.
+El **Asistente** construye desde el JSON el árbol de estribos, cepas, vigas, travesaños y losas. Cada orden de vista pide en CAD una secuencia de rectángulos de referencia: esquina superior izquierda e inferior derecha de la zapata, pilotes si el JSON los activa y los demás elementos presentes en esa vista. Las vistas rectangulares usan dos esquinas opuestas. La planta esviada E–E pide tres esquinas consecutivas (superior izquierda, superior derecha e inferior derecha) y reconstruye la cuarta. Los puntos no son ventanas de selección de objetos. No se buscan moldajes por nombre de capa ni se recorre el dibujo para reconocerlos. Sólo la zapata genera armaduras; las demás referencias se conservan en el estado de la sesión como pendientes.
 
-Las coordenadas CAD se interpretan explícitamente en metros, centímetros o milímetros. El modo automático usa la declaración del dibujo, pero el tamaño del rectángulo se contrasta con el cálculo antes de insertar. Si no coincide, se detiene el envío y se informan ambas medidas. Una elección explícita de unidades no modifica `INSUNITS`. Cancelar la secuencia no inserta armaduras.
+Las coordenadas CAD se interpretan explícitamente en metros, centímetros o milímetros. El modo automático usa la declaración del dibujo, pero las dimensiones y el esviaje de la referencia se contrastan con el cálculo antes de insertar. La base superior debe estar horizontal; las plantas giradas se rechazan de forma explícita en esta versión. Si no coincide, se detiene el envío y se informan ambas medidas. Una elección explícita de unidades no modifica `INSUNITS`. Cancelar la secuencia no inserta armaduras.
 
 El flujo web conserva las referencias devueltas por instancia y vista durante la sesión. Cada nueva inserción vuelve a pedir los puntos y verifica el dibujo de destino; no reutiliza handles ni detecciones de otro dibujo.
 
@@ -399,7 +399,7 @@ El proceso valida código y pruebas, compila y firma el plugin y la aplicación,
 y construye Pasarela BIM como ejecutable y paquete independientes. Firma el
 ejecutable del módulo antes de calcular sus hashes, compila y firma ambos
 instaladores y genera el manifiesto de release y `SHA256SUMS.txt`.
-Los artefactos de `v3.0.30` quedan en `installer_output/v3.0.30/`.
+Los artefactos de `v3.0.31` quedan en `installer_output/v3.0.31/`.
 Reserva una versión nueva y prepara un checkout de compilación aislado antes
 de ejecutar el pipeline: volver a compilar la misma versión sustituye sus
 artefactos locales. Para una compilación local no publicable puede usarse
@@ -416,12 +416,12 @@ ejecuta `python -m pytest tests/test_prospecciones_ocr.py -q` después de prepar
 
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v3.0.30.exe`
-- `SINCAL_App_v3.0.30.zip`
-- `SINCAL_AutoCAD_v3.0.30.zip`
+- `Setup_SINCAL_v3.0.31.exe`
+- `SINCAL_App_v3.0.31.zip`
+- `SINCAL_AutoCAD_v3.0.31.zip`
 - `SINCAL_Pasarela_v0.3.2.zip`
 - `Setup_SINCAL_Pasarela_v0.3.2.exe`
-- `release-manifest_v3.0.30.json`
+- `release-manifest_v3.0.31.json`
 - `SHA256SUMS.txt`
 
 No renombres ni vuelvas a firmar los paquetes después de calcular sus hashes:

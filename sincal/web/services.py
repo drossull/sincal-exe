@@ -670,22 +670,27 @@ class Services:
                         asdict(candidate) if candidate else None)
 
     def rebar_from_references(self, job, payload, geometry, cover, rules, key, master):
-        """Collect one view's rectangles, then insert only its defined recipe."""
+        """Collect one view's references, then insert only its defined recipe."""
         from sincal.cad.moldajes import MoldajeContext
         from sincal.cad.selected_moldaje import build_selection_lisp, parse_selected_moldaje
         from sincal.cad.zapata_views import build_zapata_lisp
         project, view = payload.get('project'), payload.get('view')
-        sequence = reference_sequence(project, key, view)
+        view = 'FF' if view == 'EE' else view
+        selection_view = 'EE' if view == 'FF' else view
+        sequence = reference_sequence(project, key, view, geometry=geometry)
         expected = payload.get('expected')
         scale = drawing_units_per_m(expected, payload.get('drawing_units', 'auto'))
-        context = MoldajeContext('abutment', key, view)
+        context = MoldajeContext('abutment', key, selection_view)
         folder = self.runtime / job.id
         folder.mkdir(exist_ok=True)
         output = folder / 'references.txt'
         output.unlink(missing_ok=True)
         source = build_selection_lisp(str(output), context, sequence)
         path = self.lisp(job, source)
-        job.update(f'Vista {view}: indica dos esquinas por elemento en CAD. Sólo la zapata tiene armaduras definidas.')
+        instructions = ('marca tres esquinas consecutivas de la zapata: superior izquierda, superior derecha e inferior derecha'
+                        if sequence[0]['reference_mode'] == 'parallelogram'
+                        else 'indica dos esquinas por elemento en CAD')
+        job.update(f'Vista {selection_view}: {instructions}. Sólo la zapata tiene armaduras definidas.')
         self.cad(job, expected, f'(progn (load "{path}") (c:SINCAL-SELECCIONAR-MOLDAJE))\n',
                  reference_mode=True, focus=True)
         if not output.exists():
@@ -694,21 +699,25 @@ class Services:
         if result.selection == 'cancelled':
             return {'selection': 'cancelled', 'message': 'Selección cancelada. No se insertaron armaduras.'}
         if result.selection != 'ok' or result.error:
-            raise ValueError(result.error or 'No se completaron los rectángulos de referencia.')
+            raise ValueError(result.error or 'No se completaron las referencias.')
         if list(result.rectangles) != [item['key'] for item in sequence]:
             raise ValueError('La secuencia no corresponde a los elementos del JSON. No se insertaron armaduras.')
+        if result.reference_modes != {item['key']: item['reference_mode'] for item in sequence}:
+            raise ValueError('La cantidad de esquinas no corresponde a esta vista. No se insertaron armaduras.')
         if result.insunits != expected.get('active', {}).get('insunits'):
             raise ValueError('Cambió la unidad declarada durante la selección. Vuelve a enviar la vista.')
         candidate = reference_candidate(result.rectangles['abutment.footing'], scale,
-                                        MoldajeContext('abutment.footing', key, view), geometry, project)
+                                        MoldajeContext('abutment.footing', key, view), geometry, project,
+                                        reference_mode=result.reference_modes['abutment.footing'])
         job.check()
         source = build_zapata_lisp(view, candidate, geometry, cover, rules, key, master,
                                   drawing_units_per_m=scale)
         path = self.lisp(job, source)
         inserted = self.cad(job, expected, f'(progn (load "{path}") (c:SINCAL-ZAPATA-GENERAR))\n',
                             reference_mode=True, completion='live-v1')
-        references = {'instance': key, 'view': view, 'drawing': expected,
+        references = {'instance': key, 'view': selection_view, 'drawing': expected,
                       'drawing_units_per_m': scale, 'rectangles': result.rectangles,
+                      'reference_modes': result.reference_modes,
                       'generated': ['abutment.footing'],
                       'pending': [item['key'] for item in sequence if item['key'] != 'abutment.footing']}
         return {**inserted, 'selection': 'ok', 'references': references,

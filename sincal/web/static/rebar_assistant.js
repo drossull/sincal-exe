@@ -20,7 +20,7 @@ const RECIPE_LABELS={
   additional_bars:'Refuerzos adicionales',
 };
 
-const VIEW_LABELS={FR:'Frontal',AA:'A–A',BB:'B–B',CC:'C–C',DD:'D–D',EE:'E–E',FF:'F–F',EL:'Elevación',PLAN:'Planta',SECC:'Sección',DET:'Detalle'};
+const VIEW_LABELS={FR:'Frontal',AA:'A–A',BB:'B–B',CC:'C–C',DD:'D–D',EE:'Planta E–E',FF:'F–F',EL:'Elevación',PLAN:'Planta',SECC:'Sección',DET:'Detalle'};
 
 function array(value){return Array.isArray(value)?value:[];}
 function elementId(structure,instance,element){return `${structure.key}:${instance.key}:${element.key}`;}
@@ -38,7 +38,7 @@ function viewCodes(element){
 export async function renderRebarAssistant(ctx){
   const {project,api,node,section,notify,current}=ctx;
   const dashboard=section('asistente-armaduras','Asistente de armaduras');
-  dashboard.append(node('p','Carga el JSON, selecciona un elemento con cálculo disponible y configura su armadura. Al insertar una vista, indicarás en CAD dos esquinas para cada rectángulo de referencia solicitado.'));
+  dashboard.append(node('p','Carga el JSON, selecciona un elemento con cálculo disponible y configura su armadura. Al insertar, CAD solicitará dos esquinas para las referencias rectangulares y tres puntos guiados sólo cuando la planta E–E sea romboide y tenga esviaje.'));
   if(!project?.data||!Object.keys(project.data).length){
     dashboard.append(node('p','Incorpora el JSON del puente para construir la lista real de estribos, cepas, vigas, travesaños y losas.','badge'));
     return;
@@ -118,7 +118,7 @@ export async function renderRebarAssistant(ctx){
     const viewList=node('div',undefined,'rebar-recipes');
     for(const code of views)viewList.append(node('span',`${VIEW_LABELS[code]||code} · ${code}`,'rebar-recipe'));
     if(!views.length)viewList.append(node('span','Vistas pendientes de definición','muted'));
-    inspector.append(viewList,node('p','Estos códigos identifican vistas gráficas. Al insertar, el JSON define qué elementos pedir y CAD solicita dos esquinas por cada rectángulo de referencia.','muted'));
+    inspector.append(viewList,node('p','El JSON define qué elementos pedir en cada vista. CAD solicita dos esquinas para una referencia rectangular y tres puntos sólo para una planta E–E romboide con esviaje; SINCAL valida esas referencias contra las dimensiones del JSON antes de insertar.','muted'));
 
     if(isFooting(element)){
       const recipes=array(element.recipes);inspector.append(node('h3','Armaduras previstas'));

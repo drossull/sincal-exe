@@ -38,7 +38,7 @@ def test_reference_preserves_location_and_calculated_dimensions(view,width,heigh
     assert result.layer == '' and result.handle == ''
 
 
-def test_ff_reconstructs_json_skew_inside_reference_rectangle():
+def test_skewed_plan_rejects_two_corner_box_instead_of_assuming_json_skew():
     import math
     state = defaults(); state['geometry']['esviaje_grados']=-12
     geometry,_,_ = domain(state)
@@ -46,9 +46,8 @@ def test_ff_reconstructs_json_skew_inside_reference_rectangle():
     width=11.596+abs(delta)
     points=((0,7.5,0),(width,7.5,0),(width,0,0),(0,0,0))
     project={'estribos':{'orientacion_dado_estribo_entrada':'romboide'}}
-    result=reference_candidate(points,1,MoldajeContext('abutment.footing','entrada','FF'),geometry,project)
-    assert result.vertices[2][0]-result.vertices[1][0] == pytest.approx(delta)
-    assert result.area_m2 == pytest.approx(11.596*7.5)
+    with pytest.raises(ValueError, match='tres'):
+        reference_candidate(points,1,MoldajeContext('abutment.footing','entrada','FF'),geometry,project)
 
 
 def test_unknown_units_and_nonzero_plane_require_explicit_correction():
@@ -68,6 +67,19 @@ def test_reference_sequence_is_specific_to_view():
     cc=[e['key'] for e in reference_sequence(project,'entrada','CC')]
     assert 'abutment.left_wing' in bb and 'abutment.right_wing' not in bb
     assert 'abutment.right_wing' in cc and 'abutment.left_wing' not in cc
+
+
+def test_reference_sequence_uses_three_only_for_the_skewed_footing_plan():
+    project = _project()
+    project['estribos']['orientacion_dado_estribo_entrada'] = 'romboide'
+    project['parametros_generales'] = {'angulo_esviaje_puente': -12}
+    assert reference_sequence(project, 'entrada', 'EE') == [
+        {'key': 'abutment.footing', 'label': 'Zapata', 'reference_mode': 'parallelogram'}]
+    assert all(item['reference_mode'] == 'rectangle' for item in reference_sequence(project, 'entrada', 'FR'))
+    geometry, _, _ = domain(defaults())
+    assert reference_sequence(project, 'entrada', 'EE', geometry=geometry)[0]['reference_mode'] == 'rectangle'
+    project['estribos']['orientacion_dado_estribo_entrada'] = 'rectangular'
+    assert reference_sequence(project, 'entrada', 'EE')[0]['reference_mode'] == 'rectangle'
 
 
 @pytest.fixture
@@ -340,3 +352,63 @@ def test_reference_mode_worker_never_reads_modelspace_or_handles(tmp_path):
     assert result == {"message": "ok"}
     assert len(document.sent) == 1
     assert "(princ)" in document.sent[0]
+
+
+@pytest.mark.parametrize('factor,units', [(1, 'm'), (100, 'cm'), (1000, 'mm')])
+@pytest.mark.parametrize('skew', [-12, 12])
+def test_ee_three_corner_flow_validates_and_inserts_skewed_plan(service, factor, units, skew):
+    import math
+    payload = _payload(drawing_units=units)
+    payload['view'] = 'EE'
+    payload['state']['geometry']['esviaje_grados'] = skew
+    payload['project']['estribos']['orientacion_dado_estribo_entrada'] = 'romboide'
+    payload['project']['parametros_generales'] = {'angulo_esviaje_puente': skew}
+    delta = 7.5 * math.tan(math.radians(skew))
+    vertices = [(100 + delta, 207.5), (111.596 + delta, 207.5), (111.596, 200)]
+    encoded = [';'.join(str(value * factor) for value in (*point, 0)) for point in vertices]
+    text = _references_text(['abutment.footing']).split('RECTANGLE|')[0].replace('META|VIEW|FR', 'META|VIEW|EE')
+    text += 'PARALLELOGRAM|abutment.footing|' + '|'.join(encoded) + '\n'
+    job = _job('f')
+    calls, fake_cad = _cad_collector(service, job, text)
+    with patch.object(service, 'cad', side_effect=fake_cad), \
+         patch('sincal.runtime.ruta_recurso', return_value='master.dwg'), \
+         patch('sincal.cad.zapata_views.build_zapata_lisp', wraps=real_build_zapata_lisp) as build:
+        result = service.rebar(job, payload)
+    assert len(calls) == 2
+    assert 'SUPERIOR DERECHA' in calls[0]['source']
+    assert 'ssget' not in calls[0]['source'].lower()
+    assert build.call_args.args[0] == 'FF'  # existing calculation identity
+    candidate = build.call_args.args[1]
+    assert [c for p in candidate.vertices for c in p] == pytest.approx(
+        [100, 200, 111.596, 200, 111.596 + delta, 207.5, 100 + delta, 207.5])
+    assert build.call_args.kwargs['drawing_units_per_m'] == factor
+    assert result['references']['view'] == 'EE'
+    assert result['references']['reference_modes'] == {'abutment.footing': 'parallelogram'}
+
+
+def test_ee_rectangular_plan_still_uses_two_corners(service):
+    payload = _payload()
+    payload['view'] = 'EE'
+    text = _references_text(['abutment.footing'], footing_height=7.5).replace('META|VIEW|FR', 'META|VIEW|EE')
+    job = _job('g')
+    calls, fake_cad = _cad_collector(service, job, text)
+    with patch.object(service, 'cad', side_effect=fake_cad), \
+         patch('sincal.runtime.ruta_recurso', return_value='master.dwg'):
+        result = service.rebar(job, payload)
+    assert len(calls) == 2
+    assert result['references']['reference_modes'] == {'abutment.footing': 'rectangle'}
+
+
+def test_ee_skewed_plan_cannot_accept_stale_rectangle_result(service):
+    payload = _payload()
+    payload['view'] = 'EE'
+    payload['state']['geometry']['esviaje_grados'] = -12
+    payload['project']['estribos']['orientacion_dado_estribo_entrada'] = 'romboide'
+    text = _references_text(['abutment.footing'], footing_height=7.5).replace('META|VIEW|FR', 'META|VIEW|EE')
+    job = _job('h')
+    calls, fake_cad = _cad_collector(service, job, text)
+    with patch.object(service, 'cad', side_effect=fake_cad), \
+         patch('sincal.runtime.ruta_recurso', return_value='master.dwg'), \
+         pytest.raises(ValueError, match='cantidad de esquinas'):
+        service.rebar(job, payload)
+    assert len(calls) == 1

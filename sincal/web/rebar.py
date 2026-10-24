@@ -116,7 +116,9 @@ def assistant_catalog(data):
                     "present": element.presence.resolve(data, instance.key),
                     "definition_pending": element.definition_pending,
                     "calculation_available": element.key == "abutment.footing",
-                    "views": list(dict.fromkeys(item.view for item in element.layers)),
+                    "views": list(dict.fromkeys(
+                        "EE" if element.key == "abutment.footing" and item.view == "FF" else item.view
+                        for item in element.layers)),
                     "layers": [{
                         "view": layer.view,
                         "layer": layer.layer,
@@ -140,16 +142,23 @@ def assistant_catalog(data):
     return {"structures": structures}
 
 
-def reference_sequence(data, instance_key, view):
-    """User-guided rectangles: view names are context, never CAD layer filters."""
+def reference_sequence(data, instance_key, view, *, geometry=None):
+    """Select two corners for rectangles and three for a skewed footing plan."""
     from sincal.rebar.model import VISTAS_ZAPATA
+    view = "FF" if view == "EE" else view
     if view not in VISTAS_ZAPATA:
         raise ValueError("Selecciona una vista de zapata válida.")
     resolve_assistant_element(data, "abutment", instance_key, "abutment.footing")
     elements = BRIDGE_REBAR_CATALOG.elements_for("abutment")
     order = ("abutment.footing", "abutment.pile")
     ordered = sorted(elements, key=lambda item: order.index(item.key) if item.key in order else 2)
-    return [{"key": item.key, "label": item.label} for item in ordered
+    orientation = data.get("estribos", {}).get(f"orientacion_dado_estribo_{instance_key}", "rectangular")
+    skew = (geometry.esviaje_grados if geometry is not None else
+            float(data.get("parametros_generales", {}).get("angulo_esviaje_puente", 0)))
+    skewed_plan = view == "FF" and orientation == "romboide" and abs(skew) > 1e-9
+    return [{"key": item.key, "label": item.label,
+             "reference_mode": "parallelogram" if skewed_plan and item.key == "abutment.footing" else "rectangle"}
+            for item in ordered
             if item.presence.resolve(data, instance_key)
             and any(layer.view == view for layer in item.layers)]
 
@@ -172,14 +181,76 @@ def drawing_units_per_m(expected, choice="auto"):
     return choices[choice]
 
 
-def reference_candidate(vertices, factor, context, geometry, project):
-    """Place the existing recipe without stretching it to a contradictory box."""
+def reference_candidate(vertices, factor, context, geometry, project, *, reference_mode="rectangle"):
+    """Validate a measured reference; never infer a skewed plan from its box.
+
+    Parallelogram vertices are upper-left, upper-right, lower-right, lower-left.
+    The three selected corners determine the fourth before this validation.
+    The current drawing recipe requires the upper edge to remain horizontal.
+    """
     from sincal.cad.moldajes import MoldajeCandidate
-    if any(len(p) > 2 and abs(float(p[2])) > 1e-7 for p in vertices):
+    if reference_mode not in ("rectangle", "parallelogram"):
+        raise ValueError("Tipo de referencia de zapata no válido.")
+    if (isinstance(factor, bool) or not isinstance(factor, (int, float))
+            or not math.isfinite(factor) or factor <= 0):
+        raise ValueError("La unidad de la referencia no es válida.")
+    try:
+        raw_points = tuple(tuple(float(v) for v in p) for p in vertices)
+    except (TypeError, ValueError) as error:
+        raise ValueError("La referencia de zapata no es válida.") from error
+    if (len(raw_points) != 4 or any(len(p) not in (2, 3) for p in raw_points)
+            or not all(math.isfinite(v) for p in raw_points for v in p)):
+        raise ValueError("La referencia de zapata debe contener cuatro vértices válidos.")
+    if any(len(p) == 3 and abs(p[2] / factor) > 1e-7 for p in raw_points):
         raise ValueError("La referencia de zapata debe estar en el plano XY con Z = 0.")
-    points = tuple((float(p[0]) / factor, float(p[1]) / factor) for p in vertices)
-    if len(points) != 4 or not all(math.isfinite(v) for point in points for v in point):
-        raise ValueError("El rectángulo de referencia no es válido.")
+    points = tuple((p[0] / factor, p[1] / factor) for p in raw_points)
+    orientation = project.get("estribos", {}).get(
+        f"orientacion_dado_estribo_{context.instance}", "rectangular")
+    if context.view == "FF" and orientation not in ("rectangular", "romboide"):
+        raise ValueError("El JSON debe indicar si la zapata en planta es rectangular o romboide.")
+    if reference_mode == "parallelogram":
+        if context.view != "FF":
+            raise ValueError("La referencia de tres esquinas corresponde a la planta de zapata.")
+        if orientation != "romboide":
+            raise ValueError("La referencia es romboide, pero el JSON define una zapata rectangular.")
+        p1, p2, p3, p4 = points
+        upper = (p2[0] - p1[0], p2[1] - p1[1])
+        base = math.hypot(*upper)
+        if base <= 1e-7:
+            raise ValueError("Las dos esquinas superiores de la zapata no pueden coincidir.")
+        closing = (p1[0] + p3[0] - p2[0], p1[1] + p3[1] - p2[1])
+        if math.dist(p4, closing) > 1e-7:
+            raise ValueError("Los vértices no forman el paralelogramo definido por las tres esquinas.")
+        unit = (upper[0] / base, upper[1] / base)
+        down = (p3[0] - p2[0], p3[1] - p2[1])
+        depth = down[0] * unit[1] - down[1] * unit[0]
+        if depth <= 1e-7:
+            raise ValueError("Selecciona las esquinas consecutivas: superior izquierda, superior derecha e inferior derecha.")
+        # delta is the upper edge's signed horizontal displacement from the
+        # lower edge. Its sign must agree with the JSON's skew convention.
+        delta = -(down[0] * unit[0] + down[1] * unit[1])
+        measured_skew = math.degrees(math.atan2(delta, depth))
+        wanted_delta = geometry.largo_m * math.tan(math.radians(geometry.esviaje_grados))
+        measurements = ((base, geometry.ancho_m), (depth, geometry.largo_m),
+                        (delta, wanted_delta))
+        if any(abs(actual - wanted) > max(0.01, abs(wanted) * 0.005)
+               for actual, wanted in measurements):
+            raise ValueError(
+                f"La planta seleccionada tiene base {base:.3f} m, profundidad perpendicular "
+                f"{depth:.3f} m y esviaje {measured_skew:.3f}°, pero el cálculo requiere "
+                f"{geometry.ancho_m:.3f} m, {geometry.largo_m:.3f} m y "
+                f"{geometry.esviaje_grados:.3f}°. Revisa los puntos, la unidad o el JSON. "
+                "No se insertaron armaduras.")
+        if upper[0] <= 0 or abs(upper[1]) > 1e-7:
+            raise ValueError(
+                "La planta está girada. Esta versión requiere la base superior horizontal, "
+                "de izquierda a derecha; no se deformaron ni insertaron armaduras.")
+        contour = (p4, p3, p2, p1)
+        return MoldajeCandidate("", "", "OK", 4, base * depth,
+                                contour, True, False, (), context)
+    if (context.view == "FF" and orientation == "romboide"
+            and abs(geometry.esviaje_grados) > 1e-9):
+        raise ValueError("La planta esviada requiere tres esquinas consecutivas; no puede definirse por dos puntos de un rectángulo.")
     minx, maxx = min(p[0] for p in points), max(p[0] for p in points)
     miny, maxy = min(p[1] for p in points), max(p[1] for p in points)
     width, height = maxx - minx, maxy - miny
@@ -189,7 +260,6 @@ def reference_candidate(vertices, factor, context, geometry, project):
     elif context.view in ("AA", "BB", "CC"):
         wanted_width, wanted_height = geometry.largo_m, geometry.alto_m
     elif context.view == "FF":
-        orientation = project.get("estribos", {}).get(f"orientacion_dado_estribo_{context.instance}", "rectangular")
         if orientation == "romboide":
             delta = geometry.largo_m * math.tan(math.radians(geometry.esviaje_grados))
         wanted_width, wanted_height = geometry.ancho_m + abs(delta), geometry.largo_m

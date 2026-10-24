@@ -47,9 +47,9 @@ def test_lisp_guides_two_wcs_corners_per_element_without_scanning_or_com():
     assert "getpoint" in lisp
     assert "getcorner" in lisp
     assert "(trans first 1 0)" in lisp
-    assert "(trans opposite 1 0)" in lisp
-    assert '("abutment.footing" "Zapata")' in lisp
-    assert '("abutment.pile" "Pilote opcional")' in lisp
+    assert "(trans second 1 0)" in lisp
+    assert '("abutment.footing" "Zapata" "RECTANGLE")' in lisp
+    assert '("abutment.pile" "Pilote opcional" "RECTANGLE")' in lisp
     assert "META|EXPECTED|2" in lisp
     assert "META|ELEMENTS|abutment.footing;abutment.pile" in lisp
     assert "ssget" not in lisp.lower()
@@ -58,6 +58,41 @@ def test_lisp_guides_two_wcs_corners_per_element_without_scanning_or_com():
     assert "vlax-" not in lisp.lower()
     assert "(cons 8" not in lisp
     assert "seleccion.txt.part" in lisp
+    assert '"\\n[SINCAL]' in lisp
+    assert '"\n[SINCAL]' not in lisp
+
+
+def test_lisp_requests_three_consecutive_points_for_parallelogram_and_cancels_atomically():
+    lisp = build_selection_lisp(
+        r"C:\tmp\seleccion.txt",
+        CONTEXT,
+        [
+            {"key": "abutment.footing", "label": "Zapata"},
+            {
+                "key": "abutment.front_wall",
+                "label": "Muro frontal",
+                "reference_mode": "parallelogram",
+            },
+        ],
+    )
+
+    assert '("abutment.footing" "Zapata" "RECTANGLE")' in lisp
+    assert '("abutment.front_wall" "Muro frontal" "PARALLELOGRAM")' in lisp
+    assert "SUPERIOR IZQUIERDA" in lisp
+    assert "SUPERIOR DERECHA" in lisp
+    assert "INFERIOR DERECHA" in lisp
+    assert "(sincal:safe-getpoint-from first" in lisp
+    assert "(sincal:safe-getpoint-from second" in lisp
+    assert "(trans first 1 0)" in lisp
+    assert "(trans second 1 0)" in lisp
+    assert "(trans third 1 0)" in lisp
+    assert "(if (not third)" in lisp
+    assert "antes del tercer punto" in lisp
+    assert '"PARALLELOGRAM|"' in lisp
+    assert "ssget" not in lisp.lower()
+    assert "modelspace" not in lisp.lower()
+    assert "vla-" not in lisp.lower()
+    assert "vlax-" not in lisp.lower()
 
 
 def test_lisp_escapes_labels_and_context_and_has_safe_abort_result():
@@ -90,6 +125,7 @@ def test_parse_rectangle_in_metres_builds_four_raw_wcs_vertices_without_assuming
         (0.0, 0.0, 2.0),
     )
     assert result.candidate is None
+    assert result.reference_modes == {"abutment.footing": "rectangle"}
 
 
 @pytest.mark.parametrize(("units", "uses_metres"), [(0, False), (4, False), (6, True)])
@@ -120,6 +156,44 @@ def test_parse_preserves_sequence_for_multiple_elements():
         (8.0, 5.0, 0.0),
         (2.0, 5.0, 0.0),
     )
+    assert result.reference_modes == {
+        "abutment.footing": "rectangle",
+        "abutment.front_wall": "rectangle",
+    }
+
+
+def test_parse_mixed_v1_records_builds_rotated_parallelogram_fourth_vertex():
+    text = _header(expected=2) + "\n" + "\n".join([
+        "RECTANGLE|abutment.footing|0;5;0|10;0;0",
+        "PARALLELOGRAM|abutment.front_wall|2;9;0|8;10;0|9;5;0",
+    ])
+
+    result = parse_selected_moldaje(text, CONTEXT)
+
+    assert result.rectangles["abutment.front_wall"] == (
+        (2.0, 9.0, 0.0),
+        (8.0, 10.0, 0.0),
+        (9.0, 5.0, 0.0),
+        (3.0, 4.0, 0.0),
+    )
+    assert result.reference_modes == {
+        "abutment.footing": "rectangle",
+        "abutment.front_wall": "parallelogram",
+    }
+
+
+def test_parse_parallelogram_supports_rigid_rotation():
+    text = _header() + (
+        "\nPARALLELOGRAM|abutment.footing|0;0;7|"
+        "1.414213562;1.414213562;7|2.828427124;0;7"
+    )
+
+    result = parse_selected_moldaje(text, CONTEXT)
+
+    assert result.rectangles["abutment.footing"][3] == pytest.approx(
+        (1.414213562, -1.414213562, 7.0),
+    )
+    assert result.reference_modes["abutment.footing"] == "parallelogram"
 
 
 @pytest.mark.parametrize(
@@ -140,6 +214,17 @@ def test_cancel_invalid_or_abort_never_returns_geometry(selection, error):
     assert result.error == error
     assert result.rectangles == {}
     assert result.candidate is None
+    assert result.reference_modes == {}
+
+
+def test_cancelled_third_point_result_cannot_publish_completed_prefix():
+    text = _header(
+        selection="CANCELLED",
+        error="Cancelado en abutment.footing antes del tercer punto.",
+    ) + "\nPARALLELOGRAM|abutment.footing|0;5;0|10;5;0|10;0;0"
+
+    with pytest.raises(ValueError, match="parciales"):
+        parse_selected_moldaje(text, CONTEXT)
 
 
 @pytest.mark.parametrize(
@@ -152,6 +237,21 @@ def test_cancel_invalid_or_abort_never_returns_geometry(selection, error):
     ],
 )
 def test_ok_protocol_rejects_degenerate_reversed_or_non_planar_rectangle(record, message):
+    with pytest.raises(ValueError, match=message):
+        parse_selected_moldaje(_header() + "\n" + record, CONTEXT)
+
+
+@pytest.mark.parametrize(
+    ("record", "message"),
+    [
+        ("PARALLELOGRAM|abutment.footing|0;5;0|0;5;0|2;0;0", "coinciden"),
+        ("PARALLELOGRAM|abutment.footing|0;5;0|2;5;0|4;5;0", "colineales"),
+        ("PARALLELOGRAM|abutment.footing|0;5;0|2;5;0|2;8;0", "orden contrario"),
+        ("PARALLELOGRAM|abutment.footing|0;5;0|2;5;1|3;0;0", "plano XY"),
+        ("PARALLELOGRAM|abutment.footing|0;5;0|nan;5;0|3;0;0", "finitos"),
+    ],
+)
+def test_ok_protocol_rejects_invalid_parallelogram(record, message):
     with pytest.raises(ValueError, match=message):
         parse_selected_moldaje(_header() + "\n" + record, CONTEXT)
 
@@ -198,4 +298,10 @@ def test_builder_rejects_empty_duplicate_or_protocol_unsafe_keys():
             "result.txt",
             CONTEXT,
             [{"key": "abutment|footing", "label": "Zapata"}],
+        )
+    with pytest.raises(ValueError, match="Modo de referencia"):
+        build_selection_lisp(
+            "result.txt",
+            CONTEXT,
+            [{"key": "abutment.footing", "label": "Zapata", "reference_mode": "ellipse"}],
         )

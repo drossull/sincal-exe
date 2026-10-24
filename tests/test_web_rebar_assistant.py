@@ -48,6 +48,7 @@ def test_assistant_catalog_serializes_full_hierarchy_and_optional_presence():
     assert entry["abutment.footing"]["layers"][-1] == {
         "view": "FF", "layer": "FF_ZAP", "contour": "either", "detail": False,
     }
+    assert entry["abutment.footing"]["views"] == ['FR', 'AA', 'BB', 'CC', 'EE']
     assert "orthogonal_mesh" in entry["abutment.footing"]["recipes"]
 
 

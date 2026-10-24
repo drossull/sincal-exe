@@ -67,18 +67,19 @@ export async function renderRebar(ctx){
       output.append(button('Ampliar tabla de marcas',()=>{const dialog=node('dialog'),copy=table.cloneNode(true),container=node('div',undefined,'table-wrap');dialog.append(node('h2','Marcas · '+selected));copy.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const mark=response.marks.find(m=>m.mark===b.textContent);detail(response.details.find(d=>d.mark===mark.mark),mark);}));container.append(copy);dialog.append(container,button('Cerrar tabla',()=>dialog.close()));dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();}));
     },true),output);
     const cad=node('fieldset');cad.append(node('legend','4. Insertar en CAD · ZAPATA'));
-    cad.append(node('p','Calcula la armadura, elige una vista y pulsa su botón. En CAD indicarás dos esquinas para definir el rectángulo de referencia de cada elemento solicitado por el JSON; no importa en qué capa esté dibujado. Para el despiece, selecciona allí el punto de inserción.'));
+    cad.append(node('p','Calcula la armadura, elige una vista y pulsa su botón. CAD solicitará dos esquinas para cada referencia rectangular y tres puntos sólo cuando la planta E–E sea romboide y tenga esviaje. Las capas no importan y las dimensiones se validan contra el JSON antes de insertar. Para el despiece, selecciona allí el punto de inserción.'));
     const unitsLabel=node('label','Unidades del dibujo CAD'),drawingUnits=node('select');
     for(const [value,label] of [['auto','Automática'],['m','Metros'],['cm','Centímetros'],['mm','Milímetros']]){const option=node('option',label);option.value=value;drawingUnits.append(option);}
     drawingUnits.value=project.rebarAssistant.drawingUnits;drawingUnits.addEventListener('change',()=>{project.rebarAssistant.drawingUnits=drawingUnits.value;changed();});unitsLabel.append(drawingUnits);
     cad.append(unitsLabel,node('p','Automática usa la unidad declarada por el dibujo y valida el tamaño del rectángulo contra el cálculo. Una unidad explícita prevalece para esta operación sin modificar el DWG.','muted'));
     const viewActions=node('div',undefined,'actions');
-    for(const [view,label] of [['FR','Frontal (FR)'],['AA','A–A'],['BB','B–B'],['CC','C–C'],['FF','F–F']]){
+    for(const [view,label] of [['FR','Frontal (FR)'],['AA','A–A'],['BB','B–B'],['CC','C–C'],['EE','planta (E–E)']]){
       viewActions.append(insertionButton(`Insertar ${label}`,async ticket=>{
         const expected=await api('cad/status');
         if(!calculationIsCurrent(ticket))throw Error('El cálculo cambió. Calcula nuevamente antes de insertar.');
         if(expected.status!=='ready')throw Error(expected.message);
-        notify(`En CAD indica la esquina superior izquierda e inferior derecha de cada elemento solicitado para la vista ${label}. El JSON define la secuencia.`);
+        const skewedPlan=view==='EE'&&project.data?.estribos?.[`orientacion_dado_estribo_${ticket.abutment}`]==='romboide'&&Math.abs(Number(ticket.state.geometry?.esviaje_grados)||0)>1e-9;
+        notify(skewedPlan?`En CAD sigue la guía para indicar tres puntos por cada elemento de la planta E–E romboide. SINCAL validará las dimensiones contra el JSON antes de insertar.`:`En CAD indica la esquina superior izquierda e inferior derecha de cada elemento solicitado para la vista ${label}. SINCAL validará las dimensiones contra el JSON antes de insertar.`);
         const result=await job('cad-rebar',{state:ticket.state,project:project.data,abutment:ticket.abutment,view,expected,selection_mode:'geometry',drawing_units:drawingUnits.value});
         if(!calculationIsCurrent(ticket))return;
         if(result?.selection==='cancelled'){notify(`Selección cancelada para la vista ${label}. No se insertó armadura.`);return;}

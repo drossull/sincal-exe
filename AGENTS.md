@@ -12,7 +12,7 @@ Estas reglas se aplican a todo el repositorio.
 ## Flujo acordado del generador de armaduras
 
 - Cargar el JSON de Proyecto Puentes, calcular las armaduras y elegir el elemento, instancia y vista que se insertará.
-- Enviar una orden por vista a AutoCAD/ZWCAD para que el dibujante indique dos puntos por elemento: esquina superior izquierda e inferior derecha. Los puntos definen un rectángulo de referencia; NO una ventana que capture líneas u objetos. Insertar las armaduras calculadas usando esas referencias.
+- Enviar una orden por vista a AutoCAD/ZWCAD: dos esquinas opuestas (superior izquierda e inferior derecha) para referencias rectangulares; tres esquinas consecutivas (superior izquierda, superior derecha e inferior derecha) para la planta esviada E-E de la zapata. Reconstruir la cuarta esquina del paralelogramo y validar dimensiones y esviaje contra el cálculo/JSON antes de insertar. Los puntos NO son una ventana que capture líneas u objetos, ni autorizan deformar los fierros para encajarlos.
 - Los nombres de las capas NO identifican los moldajes ni son un requisito de entrada. No pedir crear o renombrar capas para usar el generador.
 - Trabajar sobre la selección explícita de la vista; no recorrer el dibujo completo ni consultar AutoCAD en segundo plano para identificar los elementos.
 - Conservar la interfaz web y la organización de módulos; adaptar únicamente los controles necesarios para este flujo solicitado.
