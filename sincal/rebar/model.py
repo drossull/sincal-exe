@@ -1,6 +1,6 @@
 """Modelo paramétrico y auditable de armaduras de zapata.
 
-Cada barra física se calcula una vez; sus apariciones en FR, AA, BB, CC y EE
+Cada barra física se calcula una vez; sus apariciones en FR, AA, BB, CC y FF
 son representaciones y no vuelven a sumar acero. La geometría usa metros y
 los largos de fabricación se entregan en centímetros enteros.
 """
@@ -12,7 +12,7 @@ import re
 from typing import Mapping
 
 DENSIDAD_ACERO_KG_M3 = 7850.0
-VISTAS_ZAPATA = ("FR", "AA", "BB", "CC", "DD", "EE")
+VISTAS_ZAPATA = ("FR", "AA", "BB", "CC", "FF")
 CAPAS_ZAPATA = tuple(f"{vista}_ZAP" for vista in VISTAS_ZAPATA)
 DIAMETROS_DISPONIBLES_MM = (12, 16, 18, 22, 25, 28, 32, 36)
 LARGOS_TRASLAPO_CM = {12: 80, 16: 110, 18: 120, 22: 150, 25: 170, 28: 190, 32: 220, 36: 250}
@@ -188,11 +188,11 @@ def default_zapata_rules():
 
 
 _VIEW_NOTES = {
-    "mesh_x": {"FR": "longitud real", "AA": "bloque transversal", "BB": "bloque transversal", "CC": "bloque transversal", "EE": "longitud real; representa malla superior"},
-    "mesh_y": {"FR": "bloque transversal", "AA": "longitud real", "BB": "longitud real", "CC": "longitud real", "EE": "longitud real; representa malla superior"},
-    "suple": {"FR": "bloque transversal", "AA": "longitud real", "BB": "longitud real", "CC": "longitud real", "EE": "longitud real"},
-    "lateral_x": {"AA": "círculo transversal", "BB": "círculo transversal", "CC": "círculo transversal", "EE": "longitud real"},
-    "lateral_y": {"FR": "círculo transversal", "EE": "longitud real"},
+    "mesh_x": {"FR": "longitud real", "AA": "bloque transversal", "BB": "bloque transversal", "CC": "bloque transversal", "FF": "longitud real; representa malla superior"},
+    "mesh_y": {"FR": "bloque transversal", "AA": "longitud real", "BB": "longitud real", "CC": "longitud real", "FF": "longitud real; representa malla superior"},
+    "suple": {"FR": "bloque transversal", "AA": "longitud real", "BB": "longitud real", "CC": "longitud real", "FF": "longitud real"},
+    "lateral_x": {"AA": "círculo transversal", "BB": "círculo transversal", "CC": "círculo transversal", "FF": "longitud real"},
+    "lateral_y": {"FR": "círculo transversal", "FF": "longitud real"},
 }
 
 

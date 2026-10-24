@@ -18,7 +18,12 @@ from ttkbootstrap.widgets.tableview import Tableview
 from sincal.ui.scroll import SafeScrollableFrame
 from sincal.ui.widgets import ShadowButton
 
-from sincal.cad.moldajes import parse_moldaje_detection
+from sincal.cad.armaduras_workflow import (
+    build_moldaje_scan_lisp,
+    build_prepare_layers_lisp,
+)
+from sincal.cad.moldajes import MoldajeContext, parse_moldaje_detection
+from sincal.rebar.catalog import BRIDGE_REBAR_CATALOG, ContourPolicy
 from sincal.rebar.model import (
     CAPAS_ZAPATA,
     Cover,
@@ -32,6 +37,19 @@ from sincal.cad.zapata_detail import build_zapata_detail_lisp
 from sincal.rebar.detail import build_detail_groups, polyline_render_points
 from sincal.runtime import ruta_recurso, ruta_runtime
 from sincal.sessions import sha256_file
+from sincal.ui.tabs.armaduras_assistant import (
+    ArmaturesAssistantCallbacks,
+    ArmaturesAssistantDashboard,
+    ArmaturesAssistantModel,
+    STATUS_DETECTED,
+    STATUS_ERROR,
+    STATUS_GENERATED,
+    STATUS_NEEDS_INPUT,
+    STATUS_NOT_APPLICABLE,
+    STATUS_PENDING,
+    STATUS_READY,
+    project_bridge_elements,
+)
 from sincal.ui.theme import (
     COLOR_ACENTO,
     COLOR_ACENTO_HOVER,
@@ -57,8 +75,7 @@ SIGLAS_ZAPATA = {
     "AA_ZAP": "Sección longitudinal A-A por el centro del estribo.",
     "BB_ZAP": "Sección B-B observada desde el extremo izquierdo.",
     "CC_ZAP": "Sección C-C observada desde el extremo derecho.",
-    "DD_ZAP": "Sección horizontal D-D por los muros del estribo.",
-    "EE_ZAP": "Sección E-E: planta de la fundación.",
+    "FF_ZAP": "Sección F-F: planta de la fundación.",
 }
 
 
@@ -75,6 +92,8 @@ class TabArmaduras(ctk.CTkFrame):
         self._json_path = ""
         self._json_snapshot = None
         self._json_sha256 = ""
+        self._assistant_assignments = {}
+        self._assistant_scan = None
         self.setup_ui()
         self._blank_workspace = self._capture_workspace()
         self._bind_session_change_tracking()
@@ -146,10 +165,28 @@ class TabArmaduras(ctk.CTkFrame):
         # =========================================================
         self.tab_maestro = ttk.Notebook(self, bootstyle="primary")
         self.tab_maestro.pack(padx=20, pady=5, fill="both", expand=True)
+        tab_assistant = ctk.CTkFrame(
+            self.tab_maestro, fg_color=COLOR_FONDO, corner_radius=0)
         tab_estribos = ctk.CTkFrame(self.tab_maestro, fg_color=COLOR_FONDO, corner_radius=0)
         tab_travesanos = ctk.CTkFrame(self.tab_maestro, fg_color=COLOR_FONDO, corner_radius=0)
+        self.tab_maestro.add(tab_assistant, text="ASISTENTE")
         self.tab_maestro.add(tab_estribos, text="ESTRIBOS")
         self.tab_maestro.add(tab_travesanos, text="TRAVESAÑOS")
+        project_data = (
+            self.project_context.data
+            if self.project_context is not None and self.project_context.active else {}
+        )
+        self.assistant_dashboard = ArmaturesAssistantDashboard(
+            tab_assistant,
+            model=ArmaturesAssistantModel(project_bridge_elements(project_data)),
+            callbacks=ArmaturesAssistantCallbacks(
+                prepare_drawing=self.preparar_dibujo_armaduras,
+                analyze_moldajes=self.analizar_moldajes_asistente,
+                generate_ready=self.generar_listos_asistente,
+                select_element=self._seleccionar_elemento_asistente,
+            ),
+        )
+        self.assistant_dashboard.pack(fill="both", expand=True)
         ttk.Separator(tab_estribos, orient="horizontal", bootstyle="secondary").pack(
             fill="x", padx=8, pady=(8, 4))
         ttk.Separator(tab_travesanos, orient="horizontal", bootstyle="secondary").pack(
@@ -316,7 +353,9 @@ class TabArmaduras(ctk.CTkFrame):
             main_text = self.tab_maestro.tab(self.tab_maestro.select(), "text")
         except Exception:
             return
-        if main_text == "ESTRIBOS":
+        if main_text == "ASISTENTE":
+            segments = ("Proyecto", "Generador de armadura", "Asistente")
+        elif main_text == "ESTRIBOS":
             detail = self.tab_estribo.tab(self.tab_estribo.select(), "text")
             segments = ("Proyecto", "Generador de armadura", "Estribos", detail)
         else:
@@ -342,6 +381,322 @@ class TabArmaduras(ctk.CTkFrame):
         page.update_idletasks()
         total = max(1, page.winfo_reqheight())
         page._parent_canvas.yview_moveto(max(0.0, min(1.0, target.winfo_y() / total)))
+
+    # =========================================================
+    # ASISTENTE HÍBRIDO
+    # =========================================================
+    def _seleccionar_elemento_asistente(self, element):
+        if not element.metadata.get("element_key"):
+            return
+        if self.parent_app._sections.get("estructural", (None,))[0].winfo_manager():
+            self.parent_app.actualizar_ruta_interna(
+                "Proyecto", "Generador de armadura", "Asistente", element.name)
+
+    def _reload_assistant_project(self, data, project_name=""):
+        if self._assistant_scan and hasattr(self.parent_app, "finalizar_actividad"):
+            self.parent_app.finalizar_actividad("moldajes_hibrido")
+        self._assistant_assignments = {}
+        self._assistant_scan = None
+        self.assistant_dashboard.set_elements(project_bridge_elements(data))
+        label = project_name or "ninguno"
+        self.assistant_dashboard.set_summary(
+            project=f"Proyecto: {label}",
+            drawing="Dibujo activo: pendiente de análisis",
+            units="Unidades: sin verificar",
+            session="Sesión: sin guardar",
+        )
+
+    def preparar_dibujo_armaduras(self):
+        """Crea sólo las capas de moldaje faltantes en el dibujo activo."""
+        if not hasattr(self.parent_app, "enviar_comando_cad_activo"):
+            messagebox.showerror(
+                "Asistente de armaduras",
+                "La versión actual no admite órdenes sobre el dibujo CAD activo.",
+            )
+            return
+        try:
+            lisp = build_prepare_layers_lisp(BRIDGE_REBAR_CATALOG.layer_names())
+            token = str(int(time.time() * 1000))
+            path = ruta_runtime(f"SINCAL_PREPARAR_ARMADURAS_{token}.lsp")
+            with open(path, "w", encoding="utf-8") as stream:
+                stream.write(lisp)
+        except (OSError, ValueError) as error:
+            messagebox.showerror(
+                "Asistente de armaduras", f"No se pudo preparar la orden CAD:\n{error}")
+            return
+        cad_path = path.replace("\\", "\\\\")
+        self.parent_app.enviar_comando_cad_activo(
+            f'(progn (load "{cad_path}") (c:SINCAL-PREPARAR-ARMADURAS))\n',
+            "Preparación de capas de armadura",
+        )
+        self.assistant_dashboard.set_summary(
+            drawing="Dibujo activo: preparando capas estándar")
+        self.parent_app.log_r(
+            f"[*] Se solicitó preparar {len(BRIDGE_REBAR_CATALOG.layer_names())} capas de moldaje; "
+            "las existentes se conservarán sin cambios.")
+
+    def analizar_moldajes_asistente(self):
+        """Escanea todo el plano o una selección contextual del elemento activo."""
+        if self._assistant_scan:
+            messagebox.showinfo(
+                "Asistente de armaduras", "Ya hay un análisis CAD en curso.")
+            return
+        selected = self.assistant_dashboard.selected_element()
+        contextual = bool(selected and selected.metadata.get("element_key") and selected.layers)
+        if contextual:
+            layers = selected.layers
+            context = MoldajeContext(
+                selected.metadata.get("element_key", ""),
+                selected.metadata.get("instance_key", ""),
+            )
+            element_id = selected.id
+        else:
+            layers = BRIDGE_REBAR_CATALOG.layer_names()
+            context = MoldajeContext()
+            element_id = None
+        try:
+            token = str(int(time.time() * 1000))
+            output_path = ruta_runtime(f"moldajes_hibrido_{token}.txt")
+            lisp_path = ruta_runtime(f"SINCAL_ANALIZAR_MOLDAJES_{token}.lsp")
+            lisp = build_moldaje_scan_lisp(
+                output_path, layers, context=context, interactive=contextual)
+            with open(lisp_path, "w", encoding="utf-8") as stream:
+                stream.write(lisp)
+            if os.path.exists(output_path):
+                os.remove(output_path)
+        except (OSError, ValueError) as error:
+            messagebox.showerror(
+                "Asistente de armaduras", f"No se pudo preparar el análisis:\n{error}")
+            return
+        self._assistant_scan = {
+            "output": output_path,
+            "layers": tuple(layers),
+            "context": context,
+            "element_id": element_id,
+            "deadline": time.monotonic() + (90 if contextual else 25),
+        }
+        if element_id:
+            self.assistant_dashboard.update_element(
+                element_id, status=STATUS_DETECTED,
+                message="Selecciona por ventana las vistas de este elemento en CAD y presiona Enter.")
+        self.assistant_dashboard.set_summary(
+            drawing=(
+                "Dibujo activo: esperando selección CAD" if contextual
+                else "Dibujo activo: analizando capas conocidas"
+            ))
+        cad_path = lisp_path.replace("\\", "\\\\")
+        self.parent_app.iniciar_actividad(
+            "moldajes_hibrido", "Analizando moldajes del dibujo activo")
+        self.parent_app.enviar_comando_cad_activo(
+            f'(progn (load "{cad_path}") (c:SINCAL-ANALIZAR-MOLDAJES))\n',
+            "Análisis híbrido de moldajes",
+        )
+        self.after(400, self._esperar_moldajes_asistente)
+
+    def _esperar_moldajes_asistente(self):
+        scan = self._assistant_scan
+        if not scan:
+            return
+        path = scan["output"]
+        if os.path.isfile(path):
+            try:
+                with open(path, "r", encoding="utf-8") as stream:
+                    detection = parse_moldaje_detection(
+                        stream.read(), scan["layers"], context=scan["context"])
+                self._aplicar_deteccion_asistente(detection, scan["element_id"])
+            except (OSError, ValueError) as error:
+                messagebox.showerror(
+                    "Asistente de armaduras", f"No se pudo leer el resultado CAD:\n{error}")
+            finally:
+                self._assistant_scan = None
+                self.parent_app.finalizar_actividad("moldajes_hibrido")
+            return
+        if time.monotonic() < scan["deadline"]:
+            self.after(400, self._esperar_moldajes_asistente)
+            return
+        element_id = scan.get("element_id")
+        if element_id and self.assistant_dashboard.tree.exists(element_id):
+            self.assistant_dashboard.update_element(
+                element_id, status=STATUS_ERROR,
+                message="CAD no respondió o la selección se canceló. Vuelve a analizar el elemento.")
+        self._assistant_scan = None
+        self.parent_app.finalizar_actividad("moldajes_hibrido")
+        self.assistant_dashboard.set_summary(
+            drawing="Dibujo activo: sin respuesta del análisis")
+
+    @staticmethod
+    def _usable_candidates(detection, layer_view):
+        allow_open = layer_view.contour in (
+            ContourPolicy.OPEN, ContourPolicy.EITHER)
+        allow_closed = layer_view.contour in (
+            ContourPolicy.CLOSED, ContourPolicy.EITHER)
+        result = []
+        for candidate in detection.for_layer(layer_view.layer):
+            if candidate.closed is True and not allow_closed:
+                continue
+            if candidate.is_usable(allow_open=allow_open, allow_arcs=True):
+                result.append(candidate)
+        return tuple(result)
+
+    def _aplicar_deteccion_asistente(self, detection, element_id=None):
+        model = self.assistant_dashboard.model
+        targets = []
+        for element in model.elements:
+            if not element.metadata.get("element_key"):
+                continue
+            if element.status == STATUS_NOT_APPLICABLE:
+                continue
+            if element_id and element.id != element_id:
+                continue
+            targets.append(element)
+
+        if not detection.uses_metres:
+            for element in targets:
+                self._assistant_assignments.pop(element.id, None)
+                if element.metadata.get("element_key") == "abutment.footing":
+                    side = element.metadata.get("instance_key", "")
+                    state = self._abutments.get(side)
+                    if state:
+                        state["moldajes_use_metres"] = False
+                        state["confirmed_moldajes"] = {}
+                model.update(
+                    element.id, status=STATUS_ERROR,
+                    message="El dibujo no declara metros. Ajusta INSUNITS = 6 y analiza nuevamente.",
+                )
+            self._sync_assistant_group_statuses()
+            self.assistant_dashboard.refresh(preferred_selection=element_id)
+            self.assistant_dashboard.set_summary(
+                drawing=f"Dibujo activo: {len(detection.candidates)} candidato(s) leídos",
+                units="Unidades: corregir INSUNITS a 6 antes de generar",
+            )
+            self.marcar_sesion_modificada()
+            return
+
+        for element in targets:
+            specification = BRIDGE_REBAR_CATALOG.element(
+                element.metadata["element_key"])
+            assignments = {}
+            missing = []
+            ambiguous = []
+            curved = []
+            for layer_view in specification.layers:
+                candidates = self._usable_candidates(detection, layer_view)
+                if not candidates:
+                    missing.append(layer_view.layer)
+                elif len(candidates) > 1:
+                    ambiguous.append(f"{layer_view.layer} ({len(candidates)})")
+                else:
+                    assignments[layer_view.layer] = candidates[0]
+                    if candidates[0].has_arcs:
+                        curved.append(layer_view.layer)
+
+            if not specification.layers:
+                status = STATUS_NEEDS_INPUT
+                message = "Las capas de este elemento todavía no están definidas."
+            elif missing or ambiguous:
+                status = STATUS_NEEDS_INPUT
+                parts = []
+                if missing:
+                    parts.append("faltan " + ", ".join(missing))
+                if ambiguous:
+                    parts.append("hay varios candidatos en " + ", ".join(ambiguous))
+                message = "Requiere revisión: " + "; ".join(parts) + "."
+            elif curved:
+                status = STATUS_NEEDS_INPUT
+                message = (
+                    f"Moldajes completos, pero contienen arcos en {', '.join(curved)}; "
+                    "deben revisarse antes de generar.")
+            elif specification.key == "abutment.footing" and all(
+                    candidate.is_valid for candidate in assignments.values()):
+                status = STATUS_READY
+                message = (
+                    f"{len(assignments)} vistas asignadas. La zapata está lista para revisar y generar.")
+                self._apply_assistant_footing_assignment(element, detection, assignments)
+            else:
+                status = STATUS_DETECTED
+                message = (
+                    f"{len(assignments)} vistas reconocidas. Falta aprobar la receta de armadura "
+                    "para habilitar su generación automática.")
+            self._assistant_assignments[element.id] = assignments
+            model.update(element.id, status=status, message=message)
+
+        self._sync_assistant_group_statuses()
+        self.assistant_dashboard.refresh(preferred_selection=element_id)
+        self.assistant_dashboard.set_summary(
+            drawing=f"Dibujo activo: {len(detection.candidates)} candidato(s) leídos",
+            units="Unidades: metros (INSUNITS = 6)",
+        )
+        self.marcar_sesion_modificada()
+
+    def _apply_assistant_footing_assignment(self, element, detection, assignments):
+        side = element.metadata.get("instance_key", "")
+        state = self._abutments.get(side)
+        if not state:
+            return
+        state["moldajes_use_metres"] = detection.uses_metres
+        state["confirmed_moldajes"] = dict(assignments)
+        state["moldaje_choices"] = {}
+        for layer, (variable, option) in state["moldaje_option_vars"].items():
+            candidate = assignments.get(layer)
+            choices = {"Sin candidato": None}
+            if candidate:
+                choices[candidate.label] = candidate
+                variable.set(candidate.label)
+            else:
+                variable.set("Sin candidato")
+            option.configure(values=list(choices))
+            state["moldaje_choices"][layer] = choices
+        state["moldaje_status"].configure(
+            text=f"{len(assignments)} moldaje(s) confirmados desde el asistente.",
+            text_color=COLOR_ACENTO,
+        )
+
+    def _sync_assistant_group_statuses(self):
+        model = self.assistant_dashboard.model
+        for _ in range(3):
+            for element in reversed(model.elements):
+                if element.metadata.get("element_key"):
+                    continue
+                children = model.children(element.id)
+                if not children:
+                    continue
+                statuses = {child.status for child in children}
+                if statuses == {STATUS_NOT_APPLICABLE}:
+                    status = STATUS_NOT_APPLICABLE
+                elif STATUS_ERROR in statuses or STATUS_NEEDS_INPUT in statuses:
+                    status = STATUS_NEEDS_INPUT
+                elif statuses <= {STATUS_GENERATED, STATUS_NOT_APPLICABLE}:
+                    status = STATUS_GENERATED
+                elif statuses & {STATUS_READY, STATUS_DETECTED, STATUS_GENERATED}:
+                    status = STATUS_DETECTED
+                else:
+                    status = STATUS_PENDING
+                model.update(element.id, status=status)
+
+    def generar_listos_asistente(self):
+        """Lleva los elementos automáticos listos a su revisión final segura."""
+        ready = tuple(
+            element for element in self.assistant_dashboard.model.ready_elements()
+            if element.metadata.get("element_key") == "abutment.footing"
+        )
+        if not ready:
+            messagebox.showinfo(
+                "Asistente de armaduras",
+                "Aún no hay elementos con una receta automática lista. Analiza un elemento o resuelve sus avisos.",
+            )
+            return
+        first = ready[0]
+        side = first.metadata.get("instance_key", "entrada")
+        self.tab_maestro.select(1)
+        self.tab_estribo.select(0 if side == "entrada" else 1)
+        self.after_idle(lambda: self.ir_a_seccion("revision"))
+        messagebox.showinfo(
+            "Revisión antes de generar",
+            f"{len(ready)} zapata(s) tienen sus moldajes confirmados.\n\n"
+            "SINCAL abrió la primera en Revisión y marcas. Verifica diámetros y separaciones; "
+            "después usa los botones de vista o el despiece existente. Las demás recetas del puente "
+            "seguirán habilitándose a medida que se aprueben sus criterios.",
+        )
 
     def _setup_abutment_page(self, parent, key, title):
         """Construye un estribo independiente en un panel redimensionable."""
@@ -457,7 +812,7 @@ class TabArmaduras(ctk.CTkFrame):
         ).grid(row=4, column=0, columnspan=4, sticky="w", pady=(14, 5))
         views = (
             ("Frontal", "FR"), ("A-A", "AA"), ("B-B", "BB"),
-            ("C-C", "CC"), ("D-D", "DD"), ("E-E", "EE"),
+            ("C-C", "CC"), ("F-F", "FF"),
         )
         view_buttons = ttk.Frame(geometry)
         view_buttons.grid(row=5, column=0, columnspan=4, sticky="w")
@@ -1139,6 +1494,12 @@ class TabArmaduras(ctk.CTkFrame):
 
     def generar_vista_cad(self, vista, abutment_key="entrada"):
         state = self._abutments[abutment_key]
+        if not state["moldajes_use_metres"]:
+            messagebox.showwarning(
+                "Workbench",
+                "Vuelve a detectar los moldajes en un dibujo con INSUNITS = 6 antes de generar.",
+            )
+            return
         schedule = self.actualizar_revision_zapata(abutment_key, notificar=False)
         if not schedule or not schedule.is_valid:
             messagebox.showwarning("Workbench", "Corrige las validaciones de la revisión antes de preparar una vista.")
@@ -1188,10 +1549,31 @@ class TabArmaduras(ctk.CTkFrame):
             "sólo se reemplazan entidades SINCAL de esa vista."
         )
         state["generated_views"].add(vista)
+        assistant_id = (
+            f"element:abutment:{abutment_key}:abutment.footing")
+        if self.assistant_dashboard.tree.exists(assistant_id):
+            expected = {layer.split("_", 1)[0] for layer in CAPAS_ZAPATA}
+            generated = set(state["generated_views"])
+            status = STATUS_GENERATED if expected <= generated else STATUS_READY
+            message = (
+                "Todas las vistas de zapata fueron enviadas a CAD."
+                if status == STATUS_GENERATED else
+                f"Vista {vista} enviada a CAD; faltan {len(expected - generated)} vista(s)."
+            )
+            self.assistant_dashboard.update_element(
+                assistant_id, status=status, message=message)
+            self._sync_assistant_group_statuses()
+            self.assistant_dashboard.refresh(preferred_selection=assistant_id)
         self.marcar_sesion_modificada()
 
     def generar_despiece_zapata(self, abutment_key="entrada"):
         state = self._abutments[abutment_key]
+        if not state["moldajes_use_metres"]:
+            messagebox.showwarning(
+                "Workbench",
+                "Vuelve a detectar los moldajes en un dibujo con INSUNITS = 6 antes de generar el despiece.",
+            )
+            return
         schedule = self.actualizar_revision_zapata(abutment_key, notificar=False)
         if not schedule or not schedule.is_valid:
             messagebox.showwarning("Workbench", "Corrige las validaciones antes de revisar el despiece.")
@@ -1338,9 +1720,11 @@ class TabArmaduras(ctk.CTkFrame):
 
         self._json_path = str(ruta or "")
         self._json_snapshot = datos
-        self._json_sha256 = sha256_file(ruta)
+        self._json_sha256 = sha256_file(ruta) if ruta and os.path.isfile(ruta) else ""
         nombre = os.path.basename(ruta) if ruta else "Instantánea de sesión"
         self.lbl_json_status.configure(text=f"Proyecto: {nombre}", text_color=COLOR_ACENTO)
+        if hasattr(self, "assistant_dashboard"):
+            self._reload_assistant_project(datos, nombre)
         if notificar:
             self.parent_app.log_r(f"[*] JSON cargado: {nombre}")
             messagebox.showinfo(
@@ -1365,6 +1749,8 @@ class TabArmaduras(ctk.CTkFrame):
         self._session_dirty = False
         self.lbl_session_status.configure(
             text="Sin sesión activa", text_color=COLOR_TEXTO_SUAVE)
+        if hasattr(self, "assistant_dashboard"):
+            self.assistant_dashboard.set_summary(session="Sesión: sin guardar")
         self.btn_guardar_sesion.configure(state="disabled")
         self.btn_nueva_sesion.configure(state="disabled")
         self.parent_app.session_store.clear_autosave(old_id)
@@ -1386,6 +1772,8 @@ class TabArmaduras(ctk.CTkFrame):
         self._json_sha256 = ""
         self.lbl_json_status.configure(
             text="Proyecto: ninguno", text_color=COLOR_TEXTO_SUAVE)
+        if hasattr(self, "assistant_dashboard"):
+            self._reload_assistant_project({}, "ninguno")
 
     # =========================================================
     # SESIONES DE TRABAJO
@@ -1452,12 +1840,24 @@ class TabArmaduras(ctk.CTkFrame):
         return {
             "skew": self.ent_z_esviaje.get(),
             "abutments": abutments,
+            "assistant": {
+                "elements": {
+                    element.id: {
+                        "status": element.status,
+                        "message": element.message,
+                    }
+                    for element in self.assistant_dashboard.model.elements
+                    if element.metadata.get("element_key")
+                },
+            },
             "crossbeam": {
                 name: getattr(self, name).get() for name in travesano_names
                 if hasattr(self, name)
             },
             "active_tabs": {
                 "main": self.tab_maestro.index("current"),
+                "main_name": self.tab_maestro.tab(
+                    self.tab_maestro.select(), "text"),
                 "abutment": self.tab_estribo.index("current"),
                 "crossbeam": self.tab_sub_travesanos.index("current"),
             },
@@ -1498,15 +1898,59 @@ class TabArmaduras(ctk.CTkFrame):
                 else:
                     state["moldaje_status"].configure(
                         text="Sin lectura CAD.", text_color=COLOR_TEXTO_SUAVE)
-                state["generated_views"] = set(saved.get("generated_views", ()))
-                state["detail_generated"] = bool(saved.get("detail_generated"))
+                # Una sesión recuerda el historial, pero no puede certificar
+                # que esas entidades sigan presentes en el DWG activo.
+                state["moldajes_use_metres"] = False
+                state["generated_views"] = set()
+                state["detail_generated"] = False
                 self.actualizar_revision_zapata(key, notificar=False)
             for name, value in workspace.get("crossbeam", {}).items():
                 if hasattr(self, name):
                     self._set_entry(getattr(self, name), value)
+            for element_id, saved in (
+                    workspace.get("assistant", {}).get("elements", {}).items()):
+                try:
+                    current = self.assistant_dashboard.model.get(element_id)
+                except KeyError:
+                    continue
+                status = saved.get("status", current.status)
+                if status not in {
+                    STATUS_PENDING, STATUS_DETECTED, STATUS_NEEDS_INPUT,
+                    STATUS_READY, STATUS_GENERATED, STATUS_ERROR,
+                    STATUS_NOT_APPLICABLE,
+                }:
+                    status = current.status
+                if status in {STATUS_DETECTED, STATUS_READY, STATUS_GENERATED}:
+                    status = STATUS_PENDING
+                    message = (
+                        "Estado anterior conservado en la sesión. Vuelve a analizar "
+                        "y confirmar este elemento en el dibujo activo."
+                    )
+                else:
+                    message = saved.get("message", current.message)
+                self.assistant_dashboard.model.update(
+                    element_id,
+                    status=status,
+                    message=message,
+                )
+            self._sync_assistant_group_statuses()
+            self.assistant_dashboard.refresh()
             tabs = workspace.get("active_tabs", {})
+            main_name = tabs.get("main_name")
+            try:
+                if main_name:
+                    for index in range(self.tab_maestro.index("end")):
+                        if self.tab_maestro.tab(index, "text") == main_name:
+                            self.tab_maestro.select(index)
+                            break
+                else:
+                    # Las sesiones previas a este asistente tenían Estribos en
+                    # índice 0 y Travesaños en índice 1.
+                    self.tab_maestro.select(int(tabs.get("main", 0)) + 1)
+            except (tk.TclError, ValueError):
+                self.tab_maestro.select(0)
             for notebook, name in (
-                (self.tab_maestro, "main"), (self.tab_estribo, "abutment"),
+                (self.tab_estribo, "abutment"),
                 (self.tab_sub_travesanos, "crossbeam"),
             ):
                 try:
@@ -1610,6 +2054,9 @@ class TabArmaduras(ctk.CTkFrame):
         name = self._session_metadata.get("name", "Sesión sin guardar")
         self.lbl_session_status.configure(
             text=f"{name} · Cambios sin guardar", text_color=COLOR_MOSTAZA)
+        if hasattr(self, "assistant_dashboard"):
+            self.assistant_dashboard.set_summary(
+                session=f"Sesión: {name} · cambios sin guardar")
 
     def abrir_biblioteca_sesiones(self):
         self.parent_app.seleccionar_seccion("sesiones")
@@ -1643,6 +2090,8 @@ class TabArmaduras(ctk.CTkFrame):
         self.parent_app.session_store.clear_autosave(self._session_metadata.get("id"))
         self.lbl_session_status.configure(
             text=f"Sesión: {self._session_metadata['name']}", text_color=COLOR_ACENTO)
+        self.assistant_dashboard.set_summary(
+            session=f"Sesión: {self._session_metadata['name']}")
         self.btn_guardar_sesion.configure(state="disabled")
         self.btn_nueva_sesion.configure(state="normal")
         self.parent_app.log_r(f"[OK] Sesión guardada: {path}")
@@ -1711,9 +2160,6 @@ class TabArmaduras(ctk.CTkFrame):
                     except (OSError, json.JSONDecodeError) as error:
                         messagebox.showerror("Abrir sesión", f"No se pudo leer el JSON actual:\n{error}")
                         return False
-        self._restore_workspace(document.get("workspace") or {})
-        if hasattr(self.parent_app, "vista_prospecciones"):
-            self.parent_app.vista_prospecciones.restore(document.get("prospecciones"))
         snapshot = source.get("snapshot")
         project = document.get("project") or {}
         identification = {
@@ -1725,14 +2171,14 @@ class TabArmaduras(ctk.CTkFrame):
         active_hash = sha256_file(source_path) if current_data is not None else source.get("sha256", "")
         self.parent_app.activate_project_snapshot(
             active_data, source_path, active_hash, identification)
-        if current_data is not None:
-            self._aplicar_json_bim(current_data, source_path, notificar=False)
-        else:
-            self._json_path = source_path
-            self._json_snapshot = snapshot
-            self._json_sha256 = source.get("sha256", "")
-            json_name = os.path.basename(source_path) if source_path else "Instantánea de sesión"
-            self.lbl_json_status.configure(text=f"Proyecto: {json_name}", text_color=COLOR_ACENTO)
+        # Primero reconstruye el árbol real del proyecto y sólo después aplica
+        # los campos guardados. Así una sesión abierta desde cero no pierde sus
+        # instancias y los estados CAD se revalidan contra el dibujo actual.
+        self._aplicar_json_bim(active_data, source_path, notificar=False)
+        self._json_sha256 = active_hash
+        self._restore_workspace(document.get("workspace") or {})
+        if hasattr(self.parent_app, "vista_prospecciones"):
+            self.parent_app.vista_prospecciones.restore(document.get("prospecciones"))
         self._session_metadata = dict(document.get("metadata") or {})
         is_recovery = Path(path).name.startswith("recovery-")
         formal_path = document.get("formal_path") if is_recovery else str(path)
@@ -1745,6 +2191,10 @@ class TabArmaduras(ctk.CTkFrame):
                 else " · JSON recalculado" if current_data is not None else ""),
             text_color=COLOR_MOSTAZA if self._session_dirty else COLOR_ACENTO,
         )
+        self.assistant_dashboard.set_summary(
+            session=f"Sesión: {name}" + (
+                " · recuperada" if is_recovery
+                else " · JSON recalculado" if current_data is not None else ""))
         self.btn_guardar_sesion.configure(state="normal" if self._session_dirty else "disabled")
         self.btn_nueva_sesion.configure(state="normal")
         self.parent_app.log_r(f"[OK] Sesión cargada: {name}. Revalida los moldajes en el DWG activo.")

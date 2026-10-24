@@ -15,6 +15,12 @@ PROJECT = ROOT / "sincal" / "ui" / "tabs" / "project.py"
 
 
 class WorkbenchLayoutTests(unittest.TestCase):
+    def test_windows_root_is_shown_before_customtkinter_mainloop(self):
+        source = APP.read_text(encoding="utf-8")
+        self.assertIn('hasattr(self, "_window_exists")', source)
+        self.assertIn("self._window_exists = True", source)
+        self.assertIn("self.deiconify()", source)
+
     def test_primary_navigation_is_ordered_and_not_tabview_based(self):
         source = APP.read_text(encoding="utf-8")
         expected = [
@@ -266,7 +272,7 @@ class WorkbenchLayoutTests(unittest.TestCase):
         glossary = topics["estribos-glosario"]["contenido"]
         self.assertIn("CTF — Contrafuerte", glossary)
         self.assertNotIn("CON — Contrafuerte", glossary)
-        self.assertIn("EE (planta de fundación)", topics["estribos-vistas-y-capas"]["contenido"])
+        self.assertIn("FF (planta de fundación)", topics["estribos-vistas-y-capas"]["contenido"])
 
     def test_zapata_review_is_backed_by_the_parametric_rebar_model(self):
         source = ARMADURAS.read_text(encoding="utf-8")
@@ -303,8 +309,9 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertNotIn("def generar_despiece_cad", source)
         self.assertIn('"FORMATOS ANOTATIVOS ACAD_2025.dwg"', source)
         self.assertIn("SINCAL-ZAPATA-GENERAR", source)
-        self.assertIn('("D-D", "DD")', source)
-        self.assertIn('("E-E", "EE")', source)
+        self.assertIn('("F-F", "FF")', source)
+        self.assertNotIn('("D-D", "DD")', source)
+        self.assertNotIn('("E-E", "EE")', source)
         self.assertNotIn("self.ent_phi_inf", source)
         self.assertNotIn("self.ent_espac_inf", source)
         self.assertIn('text="ESTRIBOS"', source)
@@ -312,6 +319,23 @@ class WorkbenchLayoutTests(unittest.TestCase):
         self.assertIn('self._labelframe(parent, "ZAPATA")', source)
         self.assertIn('increment=100', source)
         self.assertIn('increment=50', source)
+
+    def test_hybrid_rebar_assistant_is_integrated_without_replacing_legacy_generators(self):
+        source = ARMADURAS.read_text(encoding="utf-8")
+        assistant = (ROOT / "sincal" / "ui" / "tabs" / "armaduras_assistant.py").read_text(
+            encoding="utf-8")
+        workflow = (ROOT / "sincal" / "cad" / "armaduras_workflow.py").read_text(
+            encoding="utf-8")
+        self.assertIn('text="ASISTENTE"', source)
+        self.assertIn("ArmaturesAssistantDashboard(", source)
+        self.assertIn("def preparar_dibujo_armaduras", source)
+        self.assertIn("def analizar_moldajes_asistente", source)
+        self.assertIn("build_moldaje_scan_lisp", source)
+        self.assertIn("project_bridge_elements", assistant)
+        self.assertIn("SINCAL-PREPARAR-ARMADURAS", workflow)
+        self.assertIn("SINCAL-ANALIZAR-MOLDAJES", workflow)
+        self.assertIn("def generar_vista_cad", source)
+        self.assertIn("def generar_travesano_cad", source)
 
     def test_each_structural_subtab_has_only_one_page_scroll(self):
         source = ARMADURAS.read_text(encoding="utf-8")

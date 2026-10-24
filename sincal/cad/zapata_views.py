@@ -13,7 +13,7 @@ from sincal.rebar.model import (
 )
 
 
-EE_LAP_GRAPHIC_OFFSET_M = 0.005
+FF_LAP_GRAPHIC_OFFSET_M = 0.005
 ANNOTATION_OFFSET_M = 0.25
 LEADER_DOGLEG_M = 0.45
 
@@ -155,6 +155,8 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
     """Crea un AutoLISP autocontenido; no modifica el moldaje confirmado."""
     if view == "DD":
         raise ZapataCadError("DD corresponde a muros y alas; no genera armadura de zapata.")
+    if view not in ("FR", "AA", "BB", "CC", "FF"):
+        raise ZapataCadError(f"La vista {view} no corresponde a una capa de zapata vigente.")
     if len(candidate.vertices) < 3:
         raise ZapataCadError("Vuelve a detectar el moldaje para obtener sus vértices topológicos.")
     active = _rule_map(rules)
@@ -329,7 +331,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
         y = (min(p[1] for p in inner) + max(p[1] for p in inner)) / 2.0
         a, b = _axis_intersections(inner, y, True)
         if a is None:
-            raise ZapataCadError("No fue posible ubicar el par 1–2 en EE.")
+            raise ZapataCadError("No fue posible ubicar el par 1–2 en FF.")
         radius_m = bend_radius_cm(rule.diameter_mm) / 100.0
         left = (a[0] + radius_m, y)
         right = (b[0] - radius_m, y)
@@ -347,7 +349,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
         terminal_cm = developed_cm - LARGO_COMERCIAL_CM + lap_cm
         second_straight_m = (terminal_cm - hook_cm - arc_cm) / 100.0
         first_end = (min(right[0], left[0] + first_straight_m), y)
-        short_y = y - EE_LAP_GRAPHIC_OFFSET_M
+        short_y = y - FF_LAP_GRAPHIC_OFFSET_M
         second_start = (max(left[0], right[0] - second_straight_m), short_y)
         second_end = (right[0], short_y)
         commands.append(_path_command((left, first_end), layer, 0, tag))
@@ -421,7 +423,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
         column_blocks(ly, right_hook[0] - lateral_radius,
                       bottom_y + radius_real, top_y - radius_real, "right")
 
-    if view == "EE":
+    if view == "FF":
         ee_mesh_x_pair(mx)
         vertical_chords(my)
         if "suple" in active:

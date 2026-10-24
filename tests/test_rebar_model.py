@@ -40,7 +40,7 @@ class ZapataScheduleTests(unittest.TestCase):
         self.assertEqual(marks["4"].quantity, marks["5"].quantity)
         self.assertNotIn("DD", marks["1"].views)
         self.assertNotIn("FR", marks["4"].views)
-        self.assertEqual(marks["6"].views, ("FR", "EE"))
+        self.assertEqual(marks["6"].views, ("FR", "FF"))
         self.assertGreater(schedule.total_kg, 0)
 
     def test_single_piece_keeps_base_mark_and_two_hooks(self):
@@ -71,7 +71,7 @@ class ZapataScheduleTests(unittest.TestCase):
         )
         schedule = build_zapata_schedule(self.geometry, self.cover, tuple(rules))
         suple = next(mark for mark in schedule.marks if mark.mark == "3-A")
-        self.assertEqual(suple.views, ("FR", "AA", "BB", "CC", "EE"))
+        self.assertEqual(suple.views, ("FR", "AA", "BB", "CC", "FF"))
         self.assertEqual(suple.hook_count, 2)
 
     def test_rejects_cover_that_leaves_no_space(self):

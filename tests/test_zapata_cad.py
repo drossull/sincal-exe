@@ -10,7 +10,7 @@ from sincal.cad.zapata_views import ZapataCadError, build_zapata_lisp, inward_of
 class ZapataCadTests(unittest.TestCase):
     def setUp(self):
         self.candidate = MoldajeCandidate(
-            "EE_ZAP", "ABC", "OK", 5, 86.97,
+            "FF_ZAP", "ABC", "OK", 5, 86.97,
             ((0, 0), (5, 0), (11.596, 0), (11.596, 7.5), (0, 7.5)),
         )
         self.geometry = ZapataGeometry.from_centimetres(750, 1159.6, 150, 7)
@@ -27,7 +27,7 @@ class ZapataCadTests(unittest.TestCase):
             inward_offset(((0, 0), (2, 0), (1, 1), (2, 2), (0, 2)), 0.05)
 
     def test_builds_each_approved_view_and_preserves_tag_scope(self):
-        for view in ("FR", "AA", "BB", "CC", "EE"):
+        for view in ("FR", "AA", "BB", "CC", "FF"):
             candidate = MoldajeCandidate(
                 f"{view}_ZAP", "ABC", "OK", self.candidate.vertex_count,
                 self.candidate.area_m2, self.candidate.vertices,
@@ -120,15 +120,19 @@ class ZapataCadTests(unittest.TestCase):
         self.assertIn('(list 0.061 6.039 0.0)', lisp)
         self.assertIn('(list 11.535 6.039 0.0)', lisp)
 
-    def test_ee_draws_short_lap_bar_five_millimetres_toward_negative_y(self):
+    def test_ff_draws_short_lap_bar_five_millimetres_toward_negative_y(self):
         lisp = build_zapata_lisp(
-            "EE", self.candidate, self.geometry, self.cover, self.rules, "entrada")
+            "FF", self.candidate, self.geometry, self.cover, self.rules, "entrada")
         self.assertIn("3.75", lisp)
         self.assertIn("3.745", lisp)
 
     def test_dd_is_reserved_for_walls(self):
         with self.assertRaisesRegex(ZapataCadError, "muros y alas"):
             build_zapata_lisp("DD", self.candidate, self.geometry, self.cover, self.rules, "entrada")
+
+    def test_ee_is_not_a_current_footing_view(self):
+        with self.assertRaisesRegex(ZapataCadError, "no corresponde"):
+            build_zapata_lisp("EE", self.candidate, self.geometry, self.cover, self.rules, "entrada")
 
 
 if __name__ == "__main__":

@@ -272,6 +272,15 @@ class ActualizadorCAD(ctk.CTk):
         self.iniciar_actividad("historial", "Cargando historial")
         threading.Thread(target=self.cargar_info_github, daemon=True).start()
 
+        # CustomTkinter mantiene la raíz retirada mientras prepara la barra de
+        # título de Windows. Como SINCAL ya tiene callbacks periódicos activos,
+        # su ``update`` interno puede no regresar y la ventana queda oculta si
+        # no aparece antes un diálogo de actualización. Marcamos la raíz como
+        # creada y la mostramos explícitamente antes de entrar a ``mainloop``.
+        if os.name == "nt" and hasattr(self, "_window_exists"):
+            self._window_exists = True
+        self.deiconify()
+
     def iniciar_actividad(self, key, texto="Procesando", progreso=None):
         """Activa el indicador global desde cualquier hilo de la aplicación."""
         if threading.get_ident() != self._main_thread_ident:
