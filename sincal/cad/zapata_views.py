@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+from functools import partial
 
 from sincal.rebar.model import (
     LARGO_COMERCIAL_CM,
@@ -104,8 +105,8 @@ def _fmt(value):
     return f"{value:.9f}".rstrip("0").rstrip(".")
 
 
-def _point(point):
-    return f"(list {_fmt(point[0])} {_fmt(point[1])} 0.0)"
+def _point(point, scale=1.0):
+    return f"(list {_fmt(point[0] * scale)} {_fmt(point[1] * scale)} 0.0)"
 
 
 def _unit(a, b):
@@ -117,32 +118,34 @@ def _at(point, vector, distance):
     return point[0] + vector[0] * distance, point[1] + vector[1] * distance
 
 
-def _path_command(points, layer, radius, tag):
-    args = " ".join(f'"_NON" {_point(point)}' for point in points)
-    fillet = f'(command "_.FILLET" "_R" {_fmt(radius)} "_.FILLET" "_P" e)' if len(points) > 2 and radius > 0 else ""
+def _path_command(points, layer, radius, tag, *, scale=1.0):
+    # COMMAND consumes UCS coordinates. Entity data and ActiveX calls below
+    # consume WCS, so only this path needs a coordinate-system conversion.
+    args = " ".join(f'"_NON" (trans {_point(point, scale)} 0 1)' for point in points)
+    fillet = f'(command "_.FILLET" "_R" {_fmt(radius * scale)} "_.FILLET" "_P" e)' if len(points) > 2 and radius > 0 else ""
     return f'(progn (setvar "CLAYER" "{layer}") (command "_.PLINE" {args} "") (setq e (entlast)) {fillet} (sincal:tag e "{tag}"))'
 
 
-def _circle_command(point, diameter, tag):
+def _circle_command(point, diameter, tag, *, scale=1.0):
     layer = f"fi{int(diameter)}"
     radius_m = diameter / 2000.0
     return (f'(progn (setq e (entmakex (list (cons 0 "CIRCLE") (cons 8 "{layer}") '
-            f'(cons 10 {_point(point)}) (cons 40 {_fmt(radius_m)})))) '
+            f'(cons 10 {_point(point, scale)}) (cons 40 {_fmt(radius_m * scale)})))) '
             f'(sincal:tag e "{tag}"))')
 
 
-def _dimension_command(first, last, text_point, entries, layer, tag):
+def _dimension_command(first, last, text_point, entries, layer, tag, *, scale=1.0):
     override = " + ".join(
         f"({mark}) {description}" for mark, description in entries)
     return (
-        f'(sincal:marked-dim {_point(first)} {_point(last)} {_point(text_point)} '
+        f'(sincal:marked-dim {_point(first, scale)} {_point(last, scale)} {_point(text_point, scale)} '
         f'"{override}" "{layer}" "{tag}")'
     )
 
 
-def _mleader_command(anchor, landing, text, layer, tag):
+def _mleader_command(anchor, landing, text, layer, tag, *, scale=1.0):
     return (
-        f'(sincal:mleader {_point(anchor)} {_point(landing)} '
+        f'(sincal:mleader {_point(anchor, scale)} {_point(landing, scale)} '
         f'"{text}" "{layer}" "{tag}")'
     )
 
@@ -151,14 +154,28 @@ def _rule_map(rules):
     return {rule.key: rule for rule in rules if rule.enabled}
 
 
-def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, master_path=""):
-    """Crea un AutoLISP autocontenido; no modifica el moldaje confirmado."""
+def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, master_path="",
+                      *, drawing_units_per_m=1.0):
+    """Emit CAD geometry in drawing units; all input lengths remain metres.
+
+    Scaling is applied only to newly emitted coordinates and radii. The source
+    moldaje is never selected, transformed, renamed or otherwise changed.
+    """
+    if (isinstance(drawing_units_per_m, bool)
+            or not isinstance(drawing_units_per_m, (int, float))
+            or not math.isfinite(drawing_units_per_m)
+            or drawing_units_per_m not in (1, 100, 1000)):
+        raise ZapataCadError("Selecciona unidades de dibujo en metros, centímetros o milímetros.")
+    path_command = partial(_path_command, scale=drawing_units_per_m)
+    circle_command = partial(_circle_command, scale=drawing_units_per_m)
+    dimension_command = partial(_dimension_command, scale=drawing_units_per_m)
+    mleader_command = partial(_mleader_command, scale=drawing_units_per_m)
     if view == "DD":
         raise ZapataCadError("DD corresponde a muros y alas; no genera armadura de zapata.")
     if view not in ("FR", "AA", "BB", "CC", "FF"):
-        raise ZapataCadError(f"La vista {view} no corresponde a una capa de zapata vigente.")
+        raise ZapataCadError(f"La vista {view} no corresponde a una vista de zapata vigente.")
     if len(candidate.vertices) < 3:
-        raise ZapataCadError("Vuelve a detectar el moldaje para obtener sus vértices topológicos.")
+        raise ZapataCadError("Vuelve a seleccionar la referencia de la zapata para obtener sus vértices.")
     active = _rule_map(rules)
     if "mesh_x" not in active or "mesh_y" not in active:
         raise ZapataCadError("Las mallas 1–2 y 3 deben estar activas.")
@@ -210,7 +227,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
             anchor = _at(midpoint, vector, along)
             landing = _at(anchor, outward, LEADER_DOGLEG_M + lane * 0.18)
             landing = _at(landing, vector, 0.30 if index % 2 == 0 else -0.30)
-            commands.append(_mleader_command(
+            commands.append(mleader_command(
                 anchor, landing, f"({label})", f"fi{int(rule.diameter_mm)}", tag))
 
     def inset(rule):
@@ -237,7 +254,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
             raise ZapataCadError("No fue posible intersectar el moldaje en el nivel de la malla.")
         hook_m = hook_length_m(rule)
         dy = hook_m if upward else -hook_m
-        commands.append(_path_command(((a[0], a[1] + dy), a, b, (b[0], b[1] + dy)),
+        commands.append(path_command(((a[0], a[1] + dy), a, b, (b[0], b[1] + dy)),
                                       f"fi{int(rule.diameter_mm)}", bend_radius_cm(rule.diameter_mm) / 100, tag))
         group_leaders(rule, a, b, annotation_side, lane)
 
@@ -248,7 +265,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
             raise ZapataCadError("No fue posible intersectar el moldaje en el nivel de la malla.")
         hook_m = hook_length_m(rule)
         dx = hook_m if rightward else -hook_m
-        commands.append(_path_command(((a[0] + dx, a[1]), a, b, (b[0] + dx, b[1])),
+        commands.append(path_command(((a[0] + dx, a[1]), a, b, (b[0] + dx, b[1])),
                                       f"fi{int(rule.diameter_mm)}", bend_radius_cm(rule.diameter_mm) / 100, tag))
         group_leaders(rule, a, b, annotation_side, lane)
 
@@ -260,7 +277,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
         for value in positions:
             a, b = _axis_intersections(inner, lo + value / 100, True)
             if a is not None:
-                commands.append(_path_command((a, b), f"fi{int(rule.diameter_mm)}", 0, tag))
+                commands.append(path_command((a, b), f"fi{int(rule.diameter_mm)}", 0, tag))
                 if representative is None or abs(value - positions[len(positions) // 2]) < 1e-9:
                     representative = (a, b)
         if representative:
@@ -276,7 +293,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
             x = min(hi, lo + value / 100 + offset)
             a, b = _axis_intersections(inner, x, False)
             if a is not None:
-                commands.append(_path_command((a, b), f"fi{int(rule.diameter_mm)}", 0, tag))
+                commands.append(path_command((a, b), f"fi{int(rule.diameter_mm)}", 0, tag))
                 if representative is None or value == middle:
                     representative = (a, b)
         if representative:
@@ -285,14 +302,14 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
     def row_blocks(rule, y, start, end, dimension_side, lane=0):
         positions = distribution_positions_cm((end - start) * 100, rule.spacing_cm, rule.origin)
         centres = tuple((start + value / 100, y) for value in positions)
-        commands.extend(_circle_command(point, rule.diameter_mm, tag) for point in centres)
+        commands.extend(circle_command(point, rule.diameter_mm, tag) for point in centres)
         entries = distribution_entries(rule, len(centres))
         layer = f"fi{int(rule.diameter_mm)}"
         if len(centres) >= 2:
             dim_y = (maxy + ANNOTATION_OFFSET_M + lane * 0.20
                      if dimension_side == "top"
                      else miny - ANNOTATION_OFFSET_M - lane * 0.20)
-            commands.append(_dimension_command(
+            commands.append(dimension_command(
                 centres[0], centres[-1], ((centres[0][0] + centres[-1][0]) / 2.0, dim_y),
                 entries, layer, tag,
             ))
@@ -301,20 +318,20 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
             landing = (centres[0][0] + LEADER_DOGLEG_M,
                        centres[0][1] + outward * (ANNOTATION_OFFSET_M + lane * 0.20))
             text = " + ".join(f"({mark}) {description}" for mark, description in entries)
-            commands.append(_mleader_command(centres[0], landing, text, layer, tag))
+            commands.append(mleader_command(centres[0], landing, text, layer, tag))
 
     def column_blocks(rule, x, start_y, end_y, dimension_side, lane=0):
         positions = distribution_positions_cm(
             max(0.0, (end_y - start_y) * 100.0), rule.spacing_cm, rule.origin)
         centres = tuple((x, start_y + value / 100) for value in positions)
-        commands.extend(_circle_command(point, rule.diameter_mm, tag) for point in centres)
+        commands.extend(circle_command(point, rule.diameter_mm, tag) for point in centres)
         entries = distribution_entries(rule, len(centres))
         layer = f"fi{int(rule.diameter_mm)}"
         if len(centres) >= 2:
             dim_x = (minx - ANNOTATION_OFFSET_M - lane * 0.20
                      if dimension_side == "left"
                      else maxx + ANNOTATION_OFFSET_M + lane * 0.20)
-            commands.append(_dimension_command(
+            commands.append(dimension_command(
                 centres[0], centres[-1], (dim_x, (centres[0][1] + centres[-1][1]) / 2.0),
                 entries, layer, tag,
             ))
@@ -323,7 +340,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
             landing = (centres[0][0] + outward * (ANNOTATION_OFFSET_M + lane * 0.20),
                        centres[0][1] + LEADER_DOGLEG_M)
             text = " + ".join(f"({mark}) {description}" for mark, description in entries)
-            commands.append(_mleader_command(centres[0], landing, text, layer, tag))
+            commands.append(mleader_command(centres[0], landing, text, layer, tag))
 
     def ee_mesh_x_pair(rule):
         """Una representación 1–2; la barra corta se desplaza 5 mm hacia Y-."""
@@ -341,7 +358,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
         developed_cm = straight_cm + 2.0 * (hook_cm + arc_cm)
         layer = f"fi{int(rule.diameter_mm)}"
         if developed_cm <= LARGO_COMERCIAL_CM:
-            commands.append(_path_command((left, right), layer, 0, tag))
+            commands.append(path_command((left, right), layer, 0, tag))
             group_leaders(rule, left, right, "bottom")
             return
         first_straight_m = (LARGO_COMERCIAL_CM - hook_cm - arc_cm) / 100.0
@@ -352,8 +369,8 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
         short_y = y - FF_LAP_GRAPHIC_OFFSET_M
         second_start = (max(left[0], right[0] - second_straight_m), short_y)
         second_end = (right[0], short_y)
-        commands.append(_path_command((left, first_end), layer, 0, tag))
-        commands.append(_path_command((second_start, second_end), layer, 0, tag))
+        commands.append(path_command((left, first_end), layer, 0, tag))
+        commands.append(path_command((second_start, second_end), layer, 0, tag))
         labels = mark_labels(rule)
         if labels:
             group_leaders_for_segments = (
@@ -364,7 +381,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
                 vector = _unit(segment_start, segment_end)
                 anchor = _at(segment_start, vector, math.dist(segment_start, segment_end) * 0.55)
                 landing = (anchor[0] + LEADER_DOGLEG_M, anchor[1] - ANNOTATION_OFFSET_M - lane * 0.18)
-                commands.append(_mleader_command(anchor, landing, f"({label})", layer, tag))
+                commands.append(mleader_command(anchor, landing, f"({label})", layer, tag))
 
     top_y = maxy - cover.superior_m - mx.diameter_mm / 2000
     bottom_y = miny + cover.inferior_m + mx.diameter_mm / 2000
@@ -443,7 +460,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
                 prev, nxt = inner[i - 1], inner[(i + 2) % len(inner)]
                 p0 = _at(a, _unit(a, prev), min(hook_m, math.dist(a, prev) * 0.8))
                 p3 = _at(b, _unit(b, nxt), min(hook_m, math.dist(b, nxt) * 0.8))
-                commands.append(_path_command((p0, a, b, p3), f"fi{int(rule.diameter_mm)}",
+                commands.append(path_command((p0, a, b, p3), f"fi{int(rule.diameter_mm)}",
                                               bend_radius_cm(rule.diameter_mm) / 100, tag))
                 side = "top" if (a[1] + b[1]) / 2.0 >= (miny + maxy) / 2.0 else "bottom"
                 group_leaders(rule, a, b, side)
@@ -530,6 +547,7 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
   (vla-put-Layer obj layer)
   (sincal:tag (vlax-vla-object->ename obj) tag))
 (defun c:SINCAL-ZAPATA-GENERAR (/ acad doc ms e b)
+  (setq *SINCAL_LIVE_RESULT* nil)
   (setq acad (vlax-get-acad-object) doc (vla-get-ActiveDocument acad) ms (vla-get-ModelSpace doc))
   (if (sincal:ensure-annotation-styles acad doc "{master_lisp}")
     (progn
@@ -537,8 +555,11 @@ def build_zapata_lisp(view, candidate, geometry, cover, rules, abutment_key, mas
     (sincal:delete-old "{tag}")
     {body}
     (vla-Regen doc 1)
+    (setq *SINCAL_LIVE_RESULT* (list T "Vista {view} de zapata generada. Moldaje preservado."))
     (princ "\\n[SINCAL] Vista {view} generada con cotas y llamadas. Moldaje preservado."))
-    (alert (strcat "SINCAL no pudo importar GSG_COTAS y GSG_MLEADER.\\n"
-                   "Verifique el master DWG y vuelva a generar; no se modifico la vista.")))
+    (progn
+      (setq *SINCAL_LIVE_RESULT* (list nil (strcat "SINCAL no pudo importar GSG_COTAS y GSG_MLEADER. "
+                     "Verifique el master DWG y vuelva a generar; no se modifico la vista.")))
+      (princ (strcat "\\n[SINCAL] " (cadr *SINCAL_LIVE_RESULT*)))))
   (princ))
 '''

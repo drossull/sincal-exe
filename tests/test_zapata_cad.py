@@ -134,6 +134,75 @@ class ZapataCadTests(unittest.TestCase):
         with self.assertRaisesRegex(ZapataCadError, "no corresponde"):
             build_zapata_lisp("EE", self.candidate, self.geometry, self.cover, self.rules, "entrada")
 
+    def test_all_created_geometry_uses_requested_drawing_units(self):
+        # The input rectangle and domain remain in metres. Every emitted point,
+        # including leaders and dimensions, must be converted exactly once.
+        def emitted_points(source):
+            return [tuple(map(float, match)) for match in re.findall(
+                r'\(list (-?[\d.]+) (-?[\d.]+) 0\.0\)', source)]
+
+        for view in ("FR", "AA", "BB", "CC", "FF"):
+            baseline = build_zapata_lisp(
+                view, self.candidate, self.geometry, self.cover, self.rules, "entrada")
+            reference = emitted_points(baseline)
+            self.assertTrue(reference)
+            for factor in (1, 100, 1000):
+                with self.subTest(view=view, units_per_m=factor):
+                    result = build_zapata_lisp(
+                        view, self.candidate, self.geometry, self.cover, self.rules,
+                        "entrada", drawing_units_per_m=factor)
+                    converted = emitted_points(result)
+                    self.assertEqual(len(reference), len(converted))
+                    for point_m, point_cad in zip(reference, converted):
+                        for value_m, value_cad in zip(point_m, point_cad):
+                            self.assertAlmostEqual(value_cad, value_m * factor, delta=1e-6)
+                    self.assertNotIn('"_.SCALE"', result)
+                    self.assertNotIn('vla-ScaleEntity', result)
+                    self.assertNotIn('handent "ABC"', result)
+                    # Quantities and mark text do not change with drawing units.
+                    self.assertEqual(re.findall(r'"\([1-9][^"\n]*"', baseline),
+                                     re.findall(r'"\([1-9][^"\n]*"', result))
+
+    def test_millimetre_output_scales_bends_and_bar_sections(self):
+        result = build_zapata_lisp(
+            "FR", self.candidate, self.geometry, self.cover, self.rules, "entrada",
+            drawing_units_per_m=1000)
+        self.assertIn('"_.FILLET" "_R" 66', result)
+        self.assertIn('(cons 10 (list 127 7428 0.0)) (cons 40 11)', result)
+        self.assertIn('(cons 10 (list 69 152 0.0)) (cons 40 8)', result)
+
+    def test_only_command_points_are_converted_from_world_to_current_ucs(self):
+        source = build_zapata_lisp(
+            "FR", self.candidate, self.geometry, self.cover, self.rules, "entrada",
+            drawing_units_per_m=1000)
+        path_commands = [line for line in source.splitlines() if '(command "_.PLINE"' in line]
+        self.assertTrue(path_commands)
+        for command in path_commands:
+            self.assertEqual(command.count('"_NON" '), command.count('"_NON" (trans '))
+        self.assertNotIn('(cons 10 (trans ', source)
+        self.assertNotIn('(sincal:marked-dim (trans ', source)
+        self.assertNotIn('(sincal:mleader (trans ', source)
+        self.assertNotIn('"_.UCS"', source)
+
+    def test_invalid_drawing_units_are_rejected_before_generating(self):
+        for factor in (0, -1, 2, float('nan'), float('inf'), True, 'mm', None):
+            with self.subTest(factor=factor):
+                with self.assertRaisesRegex(ZapataCadError, 'unidades'):
+                    build_zapata_lisp(
+                        "FR", self.candidate, self.geometry, self.cover, self.rules,
+                        "entrada", drawing_units_per_m=factor)
+
+    def test_completion_reports_success_only_after_geometry_and_regeneration(self):
+        source = build_zapata_lisp(
+            "FR", self.candidate, self.geometry, self.cover, self.rules, "entrada")
+        command = source[source.index('(defun c:SINCAL-ZAPATA-GENERAR'):]
+        self.assertLess(command.index('(setq *SINCAL_LIVE_RESULT* nil)'),
+                        command.index('sincal:ensure-annotation-styles'))
+        self.assertLess(command.index('(vla-Regen doc 1)'),
+                        command.index('(setq *SINCAL_LIVE_RESULT* (list T'))
+        self.assertIn('(setq *SINCAL_LIVE_RESULT* (list nil', command)
+        self.assertNotIn('(alert ', command)
+
 
 if __name__ == "__main__":
     unittest.main()

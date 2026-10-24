@@ -21,6 +21,9 @@ from .rebar import (
     from_project,
     resolve_assistant_element,
     summarize_element_detection,
+    reference_sequence,
+    drawing_units_per_m,
+    reference_candidate,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -128,7 +131,8 @@ class Services:
                 process.kill()
                 process.communicate()
 
-    def cad(self, job, expected, command, metres=False, candidate=None, scope='active', completion=None, clipboard=False):
+    def cad(self, job, expected, command, metres=False, candidate=None, scope='active', completion=None, clipboard=False,
+            reference_mode=False, focus=False):
         if not isinstance(expected, dict) or expected.get('status') != 'ready' or not expected.get('instance'):
             raise ValueError('Comprueba y confirma el dibujo de destino antes de enviar.')
         if not self.cad_lock.acquire(blocking=False):
@@ -136,7 +140,8 @@ class Services:
         try:
             job.update('Preparando envío a los destinos confirmados. Si pide un punto, selecciónalo en CAD.')
             count = len(expected.get('documents', [])) if scope == 'all' else 1
-            return self.run_worker(job, dict(expected=expected, command=command, metres=metres, candidate=candidate, scope=scope, completion=completion, clipboard=clipboard),
+            return self.run_worker(job, dict(expected=expected, command=command, metres=metres, candidate=candidate, scope=scope, completion=completion, clipboard=clipboard,
+                                             reference_mode=reference_mode, focus=focus),
                                    timeout=min(3600, max(195, count * 195)))
         finally:
             self.cad_lock.release()
@@ -634,11 +639,17 @@ class Services:
         if key not in ('entrada', 'salida'):
             raise ValueError('Estribo no válido.')
         master = ruta_recurso('masters', 'FORMATOS ANOTATIVOS ACAD_2025.dwg')
+        if payload.get('selection_mode') == 'geometry':
+            return self.rebar_from_references(job, payload, geometry, cover, rules, key, master)
         candidate = None
         if payload.get('view') == 'detail':
-            source = build_zapata_detail_lisp(schedule, rules, geometry, key, master)
-            command = 'SINCAL-ZAPATA-DESPIECE'
             expected = payload.get('expected')
+            scale = drawing_units_per_m(expected, payload.get('drawing_units', 'auto'))
+            source = build_zapata_detail_lisp(schedule, rules, geometry, key, master,
+                                             drawing_units_per_m=scale)
+            path = self.lisp(job, source)
+            return self.cad(job, expected, f'(progn (load "{path}") (c:SINCAL-ZAPATA-DESPIECE))\n',
+                            reference_mode=True, completion='live-v1', focus=True)
         else:
             detection = self.detections.get(payload.get('detection'))
             if not detection:
@@ -657,6 +668,51 @@ class Services:
         path = self.lisp(job, source)
         return self.cad(job, expected, f'(progn (load "{path}") (c:{command}))\n', True,
                         asdict(candidate) if candidate else None)
+
+    def rebar_from_references(self, job, payload, geometry, cover, rules, key, master):
+        """Collect one view's rectangles, then insert only its defined recipe."""
+        from sincal.cad.moldajes import MoldajeContext
+        from sincal.cad.selected_moldaje import build_selection_lisp, parse_selected_moldaje
+        from sincal.cad.zapata_views import build_zapata_lisp
+        project, view = payload.get('project'), payload.get('view')
+        sequence = reference_sequence(project, key, view)
+        expected = payload.get('expected')
+        scale = drawing_units_per_m(expected, payload.get('drawing_units', 'auto'))
+        context = MoldajeContext('abutment', key, view)
+        folder = self.runtime / job.id
+        folder.mkdir(exist_ok=True)
+        output = folder / 'references.txt'
+        output.unlink(missing_ok=True)
+        source = build_selection_lisp(str(output), context, sequence)
+        path = self.lisp(job, source)
+        job.update(f'Vista {view}: indica dos esquinas por elemento en CAD. Sólo la zapata tiene armaduras definidas.')
+        self.cad(job, expected, f'(progn (load "{path}") (c:SINCAL-SELECCIONAR-MOLDAJE))\n',
+                 reference_mode=True, focus=True)
+        if not output.exists():
+            raise ValueError('CAD no devolvió las referencias. No se insertaron armaduras.')
+        result = parse_selected_moldaje(output.read_text(encoding='utf-8'), context)
+        if result.selection == 'cancelled':
+            return {'selection': 'cancelled', 'message': 'Selección cancelada. No se insertaron armaduras.'}
+        if result.selection != 'ok' or result.error:
+            raise ValueError(result.error or 'No se completaron los rectángulos de referencia.')
+        if list(result.rectangles) != [item['key'] for item in sequence]:
+            raise ValueError('La secuencia no corresponde a los elementos del JSON. No se insertaron armaduras.')
+        if result.insunits != expected.get('active', {}).get('insunits'):
+            raise ValueError('Cambió la unidad declarada durante la selección. Vuelve a enviar la vista.')
+        candidate = reference_candidate(result.rectangles['abutment.footing'], scale,
+                                        MoldajeContext('abutment.footing', key, view), geometry, project)
+        job.check()
+        source = build_zapata_lisp(view, candidate, geometry, cover, rules, key, master,
+                                  drawing_units_per_m=scale)
+        path = self.lisp(job, source)
+        inserted = self.cad(job, expected, f'(progn (load "{path}") (c:SINCAL-ZAPATA-GENERAR))\n',
+                            reference_mode=True, completion='live-v1')
+        references = {'instance': key, 'view': view, 'drawing': expected,
+                      'drawing_units_per_m': scale, 'rectangles': result.rectangles,
+                      'generated': ['abutment.footing'],
+                      'pending': [item['key'] for item in sequence if item['key'] != 'abutment.footing']}
+        return {**inserted, 'selection': 'ok', 'references': references,
+                'references_count': len(result.rectangles)}
 
     def profile(self, job, payload):
         from sincal.prospecciones import VsReport

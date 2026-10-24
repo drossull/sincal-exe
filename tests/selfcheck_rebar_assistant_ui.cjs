@@ -6,7 +6,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   const browser=await chromium.launch({channel:'msedge',headless:true});
   try{
     const page=await browser.newPage({viewport:{width:1360,height:900}}),errors=[],calls=[];
-    const completed=new Map();let sequence=0,activeDrawing='Puente.dwg',cancelNextDetection=false;
+    const jobPolls=new Map(),jobResults=new Map();let sequence=0,cadStatusCalls=0,previewDelay=0,nextJobResult={selection:'ok',references_count:3,references:[{element:'footing',corners:[[0,1],[2,0]]}]};
     page.setDefaultTimeout(10000);
     page.on('pageerror',error=>errors.push(error.message));
     page.on('dialog',dialog=>dialog.accept());
@@ -19,29 +19,34 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
         else if(p==='/api/modules/pasarela/status')data={installed:false};
         else if(p==='/api/files/choose')data=[{id:'root',name:'Proyecto',path:'C:/Proyecto'}];
         else if(p==='/api/files/project')data={root:{id:'root',path:'C:/Proyecto'},warnings:[],entries:[{name:'puente.json',relative:'puente.json',path:'C:/Proyecto/puente.json',grants:{session:'bridge'}}]};
-        else if(p==='/api/files/json')data={value:{bridge:'test'}};
+        else if(p==='/api/files/json')data={value:{bridge:'test',abutments:[{name:'entrada'}]}};
         else if(p==='/api/project/preview')data={warnings:[],sections:[],text:'Proyecto de prueba'};
         else if(p==='/api/rebar/from-project'){
           const state={geometry:{largo_cm:900,ancho_cm:2000,alto_cm:200,esviaje_grados:0},cover:{inferior_cm:7.5,superior_cm:5,lateral_cm:5},rules:[]};
           data={entrada:state,salida:structuredClone(state)};
         }else if(p==='/api/rebar/catalog')data={structures:[
           {key:'abutment',label:'ESTRIBO',folder:'1-ESTRIBO',instances:[{key:'entrada',label:'Estribo de entrada',source_index:0,elements:[
-            {key:'abutment.footing',label:'Zapata',folder_path:['1-ESTRIBO','1-1-ZAPATA'],optional:false,present:true,definition_pending:false,layers:['FR','AA','BB','CC','FF'].map(view=>({view,layer:view+'_ZAP',contour:'either',detail:false})),recipes:['orthogonal_mesh','face_bars','u_bars']},
-            {key:'abutment.pile',label:'Pilote de estribo',folder_path:['1-ESTRIBO','1-6-PILOTE'],optional:true,present:false,definition_pending:false,layers:[{view:'FR',layer:'FR_PIL',contour:'either',detail:false}],recipes:['longitudinal_bars']},
+            {key:'abutment.footing',label:'Zapata',folder_path:['1-ESTRIBO','1-1-ZAPATA'],optional:false,present:true,views:['FR','AA','BB','CC','FF'],layers:[{view:'EE',layer:'EE_ZAP'}],recipes:['orthogonal_mesh','face_bars','u_bars']},
+            {key:'abutment.front_wall',label:'Muro frontal',folder_path:['1-ESTRIBO','1-2-MFRONTAL'],optional:false,present:true,views:['FR'],layers:[{view:'FR',layer:'FR_MFR'}],recipes:['face_bars']},
+            {key:'abutment.pile',label:'Pilote de estribo',folder_path:['1-ESTRIBO','1-6-PILOTE'],optional:true,present:false,layers:[{view:'FR',layer:'FR_PIL'}],recipes:['longitudinal_bars']},
           ]}]},
-          {key:'pier',label:'CEPA',folder:'2-CEPA',instances:[]},
+          {key:'pier',label:'CEPA',folder:'2-CEPA',instances:[{key:'cepa-1',label:'Cepa 1',elements:[{key:'pier.cap',label:'Cabezal',present:true,layers:[{view:'FR',layer:'FR_CAB'}],recipes:[]}]}]},
+          {key:'beam',label:'VIGA',folder:'3-VIGA',instances:[{key:'viga-1',label:'Viga 1',elements:[{key:'beam.main',label:'Viga',present:true,layers:[{view:'EL',layer:'EL_VIG'}],recipes:[]}]}]},
+          {key:'crossbeam',label:'TRAVESAÑO',folder:'4-TRAVESAÑO',instances:[{key:'apoyo-1',label:'Sobre apoyos',elements:[{key:'crossbeam.support',label:'Travesaño sobre apoyos',present:true,layers:[{view:'FR',layer:'FR_TRAV'}],recipes:[]}]}]},
+          {key:'slab',label:'LOSA',folder:'5-LOSA',instances:[{key:'losa-1',label:'Losa',elements:[{key:'slab.main',label:'Losa',present:true,layers:[{view:'PLAN',layer:'PLAN_LOS'}],recipes:[]}]}]},
         ]};
-        else if(p==='/api/cad/status')data={status:'ready',message:'CAD listo',product:'AutoCAD',version:'2025',active:{name:activeDrawing,path:'C:/Planos/'+activeDrawing,insunits:6}};
-        else if(p==='/api/jobs'&&request.method()==='POST'){
-          const call=request.postDataJSON(),id='job-'+(++sequence);calls.push(call);
-          if(call.operation==='cad-prepare-layers')completed.set(id,{message:'Capas preparadas.',layers:['FR_ZAP','AA_ZAP','BB_ZAP','CC_ZAP','FF_ZAP']});
-          else if(call.operation==='cad-detect-element'){
-            if(cancelNextDetection){cancelNextDetection=false;completed.set(id,{detection:'cancelled',message:'Selección cancelada.',selection:'cancelled',uses_metres:true,insunits:6,detection_complete:false,generation_ready:false,assignments:{},missing_layers:[],ambiguous_layers:[],curved_layers:[],candidates:[]});}
-            else completed.set(id,{detection:'contextual',message:'5 vista(s) asignadas al elemento.',selection:'ok',uses_metres:activeDrawing==='Puente.dwg'?true:undefined,insunits:activeDrawing==='Puente.dwg'?6:null,detection_complete:activeDrawing==='Puente.dwg',generation_ready:activeDrawing==='Puente.dwg',assignments:{FR_ZAP:'A1',AA_ZAP:'A2',BB_ZAP:'A3',CC_ZAP:'A4',FF_ZAP:'A5'},missing_layers:[],ambiguous_layers:[],curved_layers:[],candidates:['FR','AA','BB','CC','FF'].map((view,index)=>({layer:view+'_ZAP',handle:'A'+(index+1),status:'OK',vertex_count:4,area_m2:12,vertices:[[0,0],[1,0],[1,1],[0,1]],closed:true,has_arcs:false}))});
-          }
-          else if(call.operation==='cad-detect')completed.set(id,{detection:'legacy',candidates:[{layer:'FF_ZAP',handle:'A5',status:'OK',vertex_count:4,area_m2:12}]});
-          data={id};
-        }else if(/^\/api\/jobs\/job-\d+$/.test(p))data={state:'completed',message:'OK',progress:100,result:completed.get(p.split('/').pop())};
+        else if(p==='/api/rebar/preview'){
+          if(previewDelay)await new Promise(resolve=>setTimeout(resolve,previewDelay));
+          data={issues:[],valid:true,total_kg:0,marks:[],details:[]};
+        }else if(p==='/api/cad/status'){
+          cadStatusCalls++;
+          data={status:'ready',message:'CAD listo',product:'AutoCAD',version:'2025',active:{name:'Puente.dwg',path:'C:/Planos/Puente.dwg',insunits:6}};
+        }else if(p==='/api/jobs'&&request.method()==='POST'){
+          const call=request.postDataJSON(),id='job-'+(++sequence);calls.push(call);jobPolls.set(id,0);jobResults.set(id,nextJobResult);nextJobResult={selection:'ok',references_count:1};data={id};
+        }else if(/^\/api\/jobs\/job-\d+$/.test(p)){
+          const id=p.split('/').pop(),polls=jobPolls.get(id)||0;jobPolls.set(id,polls+1);
+          data=polls===0?{state:'running',message:'Selecciona las referencias en CAD',progress:null}:{state:'completed',message:'OK',progress:100,result:jobResults.get(id)};
+        }
         await route.fulfill({json:data});return;
       }
       const name=p==='/'?'index.html':p.slice(1),file=path.resolve(__dirname,'../sincal/web/static',name);
@@ -56,68 +61,82 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
     await page.locator('[data-page="rebar"]').click();
     await page.getByRole('heading',{name:'Asistente de armaduras',exact:true}).waitFor();
     await page.getByText('1-ESTRIBO · ESTRIBO',{exact:true}).waitFor();
-    assert.equal(await page.getByText('2-CEPA · CEPA',{exact:true}).count(),1);
+    for(const heading of ['1-ESTRIBO · ESTRIBO','2-CEPA · CEPA','3-VIGA · VIGA','4-TRAVESAÑO · TRAVESAÑO','5-LOSA · LOSA'])assert.equal(await page.getByText(heading,{exact:true}).count(),1);
     assert.equal(await page.getByRole('button',{name:/Pilote de estribo.*No aplica/}).count(),1);
-    assert.equal(await page.getByText('FF_ZAP',{exact:true}).count(),1);
+    assert.equal(await page.getByRole('button',{name:/Muro frontal.*Cálculo pendiente/}).count(),1);
+    await page.getByText('F–F · FF',{exact:true}).waitFor();
+    assert.equal(await page.getByText('E–E · EE',{exact:true}).count(),0);
+    for(const forbidden of ['FR_ZAP','Capas esperadas','Preparar capas','Detectar moldajes','Seleccionar y detectar moldajes'])assert.equal(await page.getByText(forbidden,{exact:true}).count(),0);
 
-    await page.getByRole('button',{name:'Preparar capas',exact:true}).click();
-    await page.locator('.rebar-assistant-inspector .rebar-state').getByText('Capas listas',{exact:true}).waitFor();
-    await page.getByRole('button',{name:'Seleccionar y detectar moldajes',exact:true}).click();
-    await page.locator('.rebar-assistant-inspector .rebar-state').getByText('Listo',{exact:true}).waitFor();
-    await page.getByText('A5',{exact:true}).waitFor();
-    assert.equal(calls[0].operation,'cad-prepare-layers');
-    assert.deepEqual(Object.keys(calls[0].payload).sort(),['element_key','expected','instance_key','project','structure_key'].sort());
-    assert.equal(calls[1].operation,'cad-detect-element');assert.equal(calls[1].payload.interactive,true);
-    assert.equal(calls[1].payload.element_key,'abutment.footing');
+    await page.getByRole('button',{name:/Muro frontal.*Cálculo pendiente/}).click();
+    await page.getByText('La estructura está identificada desde el JSON, pero su cálculo y sus controles de inserción aún no están disponibles.',{exact:true}).waitFor();
+    await page.getByText('Naturaleza y distribución pendientes de definición.',{exact:true}).waitFor();
+    assert.equal(await page.locator('.rebar-assistant-inspector').getByText('Barras de cara',{exact:true}).count(),0);
+    assert.equal(await page.locator('.rebar-assistant-inspector').getByText('Armaduras previstas',{exact:true}).count(),0);
+    await page.getByRole('button',{name:/Zapata.*Configurable/}).click();
+    await page.locator('.rebar-assistant-inspector').getByText('Barras de cara',{exact:true}).waitFor();
 
     const screenshot=process.env.SINCAL_UI_SCREENSHOT;
     if(screenshot){
-      await page.evaluate(()=>scrollTo(0,0));
-      await page.screenshot({path:screenshot,fullPage:true});
-      await page.setViewportSize({width:850,height:1000});
-      await page.evaluate(()=>scrollTo(0,0));
-      await page.screenshot({path:screenshot.replace(/\.png$/,'_850.png'),fullPage:true});
+      await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:screenshot,fullPage:true});
+      await page.setViewportSize({width:850,height:1000});await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:screenshot.replace(/\.png$/,'_850.png'),fullPage:true});
       await page.setViewportSize({width:1360,height:900});
     }
 
-    await page.getByRole('button',{name:'Configurar y generar zapata',exact:true}).click();
+    await page.getByRole('button',{name:'Configurar y calcular zapata',exact:true}).click();
     await page.getByRole('heading',{name:'Estribos',exact:true}).waitFor();
-    const reusedFF=page.locator('label').filter({hasText:'F–F'}).locator('select');await reusedFF.waitFor();assert.equal(await reusedFF.inputValue(),'A5');
-    assert.equal(calls.filter(call=>call.operation==='cad-detect').length,0);
-    await page.locator('[data-page="rebar"]').click();
-    await page.locator('.rebar-assistant-inspector .rebar-state').getByText('Listo',{exact:true}).waitFor();
+    await page.getByRole('button',{name:'Calcular marcas',exact:true}).waitFor();
+    const viewButtons=['Insertar Frontal (FR)','Insertar A–A','Insertar B–B','Insertar C–C','Insertar F–F'].map(name=>page.getByRole('button',{name,exact:true}));
+    for(const control of viewButtons){assert.equal(await control.count(),1);assert(await control.isDisabled());}
+    assert(await page.getByRole('button',{name:'Generar despiece general',exact:true}).isDisabled());
+    assert.equal(cadStatusCalls,0);
+    const drawingUnits=page.locator('label').filter({hasText:'Unidades del dibujo CAD'}).locator('select');assert.equal(await drawingUnits.inputValue(),'auto');await drawingUnits.selectOption('mm');
 
-    cancelNextDetection=true;
-    await page.getByRole('button',{name:'Seleccionar y detectar moldajes',exact:true}).click();
-    await page.locator('.rebar-assistant-inspector .rebar-state').getByText('Pendiente',{exact:true}).waitFor();
-    assert.equal(await page.getByText('A5',{exact:true}).count(),0);
-    await page.getByRole('button',{name:'Seleccionar y detectar moldajes',exact:true}).click();
-    await page.locator('.rebar-assistant-inspector .rebar-state').getByText('Listo',{exact:true}).waitFor();
+    previewDelay=200;
+    await page.getByRole('button',{name:'Calcular marcas',exact:true}).click();
+    await page.getByLabel('Largo',{exact:true}).fill('950');
+    await page.getByText('Parámetros modificados. Pulsa Calcular marcas para actualizar.',{exact:true}).waitFor();
+    await page.waitForTimeout(300);
+    assert(await page.getByRole('button',{name:'Insertar F–F',exact:true}).isDisabled());
+    assert.equal(await page.getByRole('heading',{name:/^3\. Marcas/}).count(),0);
 
-    activeDrawing='Otro.dwg';
-    await page.getByRole('button',{name:'Preparar capas',exact:true}).click();
-    await page.locator('.rebar-assistant-inspector .rebar-state').getByText('Capas listas',{exact:true}).waitFor();
-    assert.equal(await page.getByText('A5',{exact:true}).count(),0);
-    await page.getByRole('button',{name:'Seleccionar y detectar moldajes',exact:true}).click();
-    await page.locator('.rebar-assistant-inspector .rebar-state').getByText('Revisar',{exact:true}).waitFor();
-    await page.locator('.rebar-assistant-inspector').getByText('No se pudieron verificar las unidades del dibujo.',{exact:false}).waitFor();
+    previewDelay=0;
+    await page.getByRole('button',{name:'Calcular marcas',exact:true}).click();
+    await page.getByRole('heading',{name:/^3\. Marcas/}).waitFor();
+    assert(await page.getByRole('button',{name:'Insertar F–F',exact:true}).isEnabled());
+    assert(await page.getByRole('button',{name:'Generar despiece general',exact:true}).isEnabled());
+    assert.equal(cadStatusCalls,0);
 
-    await page.locator('[data-page="project"]').click();
-    await page.getByRole('button',{name:'Usar JSON',exact:true}).click();
-    await page.locator('[data-page="rebar"]').click();
-    await page.locator('.rebar-assistant-inspector .rebar-state').getByText('Pendiente',{exact:true}).waitFor();
-    assert.equal(await page.getByText('A5',{exact:true}).count(),0);
+    await page.getByLabel('Largo',{exact:true}).fill('960');
+    assert(await page.getByRole('button',{name:'Insertar F–F',exact:true}).isDisabled());
+    await page.getByRole('button',{name:'Calcular marcas',exact:true}).click();
+    await page.getByRole('heading',{name:/^3\. Marcas/}).waitFor();
+    await page.getByRole('button',{name:'Insertar F–F',exact:true}).click();
+    await page.locator('#notice').getByText('En CAD indica la esquina superior izquierda e inferior derecha de cada elemento solicitado para la vista F–F. El JSON define la secuencia.',{exact:true}).waitFor();
+    await page.locator('#activity').waitFor({state:'hidden'});
+    await page.locator('#notice').getByText('Vista F–F insertada. Se seleccionaron 3 referencias; sólo la zapata se generó y las demás armaduras siguen pendientes.',{exact:true}).waitFor();
 
-    await page.getByRole('button',{name:/Pilote de estribo.*No aplica/}).click();
-    assert(await page.getByRole('button',{name:'Preparar capas',exact:true}).isDisabled());
-    await page.getByText('Elemento opcional no activado por el JSON.',{exact:true}).waitFor();
-    await page.getByRole('button',{name:/Zapata.*Pendiente/}).click();
-    await page.getByRole('button',{name:'Configurar y generar zapata',exact:true}).click();
-    await page.getByRole('heading',{name:'Estribos',exact:true}).waitFor();
-    await page.getByRole('button',{name:'Detectar moldajes',exact:true}).click();
-    await page.locator('label').filter({hasText:'F–F'}).locator('select').waitFor();
-    assert.equal(await page.locator('label').filter({hasText:'E–E'}).count(),0);
+    assert.equal(cadStatusCalls,1);
+    assert.equal(calls.length,1);
+    assert.equal(calls[0].operation,'cad-rebar');
+    assert.deepEqual(Object.keys(calls[0].payload).sort(),['abutment','drawing_units','expected','project','selection_mode','state','view'].sort());
+    assert.equal(calls[0].payload.abutment,'entrada');
+    assert.equal(calls[0].payload.view,'FF');
+    assert.equal(calls[0].payload.selection_mode,'geometry');
+    assert.equal(calls[0].payload.drawing_units,'mm');
+    assert.deepEqual(calls[0].payload.project,{bridge:'test',abutments:[{name:'entrada'}]});
+    assert.equal('handle' in calls[0].payload,false);
+    assert.equal('detection' in calls[0].payload,false);
+    assert.equal(calls.some(call=>call.operation.includes('detect')),false);
+    assert(await page.getByRole('button',{name:'Generar despiece general',exact:true}).isEnabled());
+
+    nextJobResult={selection:'cancelled',references_count:0};
+    await page.getByRole('button',{name:'Insertar A–A',exact:true}).click();
+    await page.locator('#notice').getByText('En CAD indica la esquina superior izquierda e inferior derecha de cada elemento solicitado para la vista A–A. El JSON define la secuencia.',{exact:true}).waitFor();
+    await page.locator('#activity').waitFor({state:'hidden'});
+    await page.locator('#notice').getByText('Selección cancelada para la vista A–A. No se insertó armadura.',{exact:true}).waitFor();
+    assert.equal(cadStatusCalls,2);assert.equal(calls.length,2);
     assert.deepEqual(errors,[]);
-    console.log('OK: catálogo dinámico, opcionales, capas, contexto CAD y vista FF_ZAP del asistente híbrido.');
+    console.log('OK: catálogo sin capas, cálculo vigente y referencias rectangulares independientes por vista.');
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

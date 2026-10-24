@@ -171,8 +171,16 @@ def _annotation_support(master_path):
   (or (sincal:detail-ready doc) (sincal:import-detail-styles acad doc)))'''
 
 
-def build_zapata_detail_lisp(schedule, rules, geometry, abutment_key, master_path):
-    """Construye un comando de despiece general con actualización confirmable."""
+def build_zapata_detail_lisp(schedule, rules, geometry, abutment_key, master_path,
+                            *, drawing_units_per_m=1.0):
+    """Keep detail block definitions in metres and place them in drawing units."""
+    if (isinstance(drawing_units_per_m, bool)
+            or not isinstance(drawing_units_per_m, (int, float))
+            or not math.isfinite(drawing_units_per_m)
+            or drawing_units_per_m not in (1, 100, 1000)):
+        raise ValueError("Selecciona unidades de dibujo en metros, centímetros o milímetros.")
+    drawing_scale = _fmt(drawing_units_per_m)
+    slot_pitch = _fmt(DETAIL_SLOT_PITCH_M * drawing_units_per_m)
     groups = build_detail_groups(schedule, rules, geometry)
     group_map = {group.group_id: group for group in groups}
     definitions = []
@@ -194,8 +202,8 @@ def build_zapata_detail_lisp(schedule, rules, geometry, abutment_key, master_pat
     for group_id, slot, prefix, exact_tag, block_name, label, layer in desired:
         infer_base.append(
             f'(if (and (not base) (setq old (sincal:find-detail "{prefix}"))) '
-            f'(progn (setq ip (cdr (assoc 10 (entget old)))) '
-            f'(setq base (list (car ip) (+ (cadr ip) {_fmt(slot * DETAIL_SLOT_PITCH_M)}) 0.0))))'
+            f'(progn (setq ip (trans (cdr (assoc 10 (entget old))) old 0)) '
+            f'(setq base (list (car ip) (+ (cadr ip) {_fmt(slot * DETAIL_SLOT_PITCH_M * drawing_units_per_m)}) 0.0))))'
         )
         planning.append(
             f'(setq plan (sincal:plan-detail "{prefix}" "{exact_tag}" "{block_name}" '
@@ -218,6 +226,11 @@ def build_zapata_detail_lisp(schedule, rules, geometry, abutment_key, master_pat
   (if xd (cdr (assoc 1000 (cdr (cadr xd))))))
 (defun sincal:starts-with (text prefix)
   (and text (= 0 (vl-string-search prefix text))))
+(defun sincal:detail-scale-p (ent / data)
+  (setq data (entget ent))
+  (and (equal (cdr (assoc 41 data)) {drawing_scale} 0.000000001)
+       (equal (cdr (assoc 42 data)) {drawing_scale} 0.000000001)
+       (equal (cdr (assoc 43 data)) {drawing_scale} 0.000000001)))
 (defun sincal:find-detail (prefix / ss index ent found)
   (setq found nil)
   (if (setq ss (ssget "_X" '((0 . "INSERT") (-3 ("SINCAL_REBAR")))))
@@ -312,10 +325,10 @@ def build_zapata_detail_lisp(schedule, rules, geometry, abutment_key, master_pat
 (defun sincal:plan-detail (prefix exact block-name label layer base slot / old oldtag action point)
   (setq old (sincal:find-detail prefix)
         oldtag (if old (sincal:xdata-value old) nil)
-        point (if old (cdr (assoc 10 (entget old)))
-                    (list (car base) (- (cadr base) (* slot {DETAIL_SLOT_PITCH_M})) 0.0)))
+        point (if old (trans (cdr (assoc 10 (entget old))) old 0)
+                    (list (car base) (- (cadr base) (* slot {slot_pitch})) 0.0)))
   (cond
-    ((and old (= oldtag exact)) nil)
+    ((and old (= oldtag exact) (sincal:detail-scale-p old)) nil)
     ((and (not old) (= block-name "")) nil)
     ((and (not old) (/= block-name "")) (list "Actualizar" nil block-name exact layer point))
     (T
@@ -337,32 +350,42 @@ def build_zapata_detail_lisp(schedule, rules, geometry, abutment_key, master_pat
   (cond
     ((= block-name "") (if old (entdel old)))
     ((tblsearch "BLOCK" block-name)
-      (if old (entdel old))
-      (setq obj (vla-InsertBlock ms (vlax-3d-point point) block-name 1.0 1.0 1.0 0.0))
+      (setq obj (vla-InsertBlock ms (vlax-3d-point point) block-name {drawing_scale} {drawing_scale} {drawing_scale} 0.0))
       (vla-put-Layer obj layer)
-      (sincal:tag (vlax-vla-object->ename obj) exact))
-    (T (alert (strcat "SINCAL no pudo construir el detalle " block-name
-                      ". Se conservo la referencia anterior.")))))
+      (sincal:tag (vlax-vla-object->ename obj) exact)
+      (if old (entdel old)))
+    (T
+      (setq sincal:abort T)
+      (setq *SINCAL_LIVE_RESULT* (list nil (strcat "SINCAL no pudo construir el detalle " block-name
+                          ". Se conservo la referencia anterior."))))))
 (defun c:SINCAL-ZAPATA-DESPIECE (/ acad doc ms ss base old ip plans plan sincal:update-all sincal:abort)
+  (setq *SINCAL_LIVE_RESULT* nil)
   (setq acad (vlax-get-acad-object) doc (vla-get-ActiveDocument acad)
         ms (vla-get-ModelSpace doc) plans nil sincal:update-all nil sincal:abort nil)
   (if (not (sincal:ensure-detail-styles acad doc))
-    (alert "SINCAL no pudo importar MARK, RomanD o los estilos de anotacion. No se modifico el despiece.")
+    (setq *SINCAL_LIVE_RESULT* (list nil "SINCAL no pudo importar MARK, RomanD o los estilos de anotacion. No se modifico el despiece."))
     (progn
       {infer_text}
-      (if (not base) (setq base (getpoint "\\nPunto superior izquierdo del despiece de zapata: ")))
+      (if (not base)
+        (progn
+          (setq base (getpoint "\\nPunto superior izquierdo del despiece de zapata: "))
+          (if base (setq base (trans base 1 0)))))
       (if base
         (progn
           {planning_text}
           (if sincal:abort
-            (princ "\\n[SINCAL] Actualizacion cancelada; no se reemplazo ningun detalle.")
+            (setq *SINCAL_LIVE_RESULT* (list nil "Actualizacion cancelada; no se reemplazo ningun detalle."))
             (progn
               {definitions_text}
               (if sincal:abort
-                (princ "\\n[SINCAL] No se crearon bloques; se conservaron los detalles anteriores.")
+                (setq *SINCAL_LIVE_RESULT* (list nil "No se completaron los bloques; se conservaron los detalles anteriores."))
                 (progn
-                  (foreach plan (reverse plans) (sincal:apply-plan plan))
+                  (foreach plan (reverse plans)
+                    (if (not sincal:abort) (sincal:apply-plan plan)))
                   (vla-Regen doc 1)
-                  (princ "\\n[SINCAL] Despiece de zapata revisado y actualizado.")))))))))
+                  (if (not sincal:abort)
+                    (setq *SINCAL_LIVE_RESULT* (list T "Despiece de zapata revisado y actualizado."))))))))
+        (setq *SINCAL_LIVE_RESULT* (list nil "Despiece cancelado; no se indico punto de insercion.")))))
+  (if *SINCAL_LIVE_RESULT* (princ (strcat "\\n[SINCAL] " (cadr *SINCAL_LIVE_RESULT*))))
   (princ))
 '''

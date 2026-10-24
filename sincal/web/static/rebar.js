@@ -6,7 +6,9 @@ export async function renderRebar(ctx){
   intro.append(node('p',project.identification.structure_name||'Proyecto sin nombre'));
   intro.append(node('p','Las dimensiones disponibles vienen del JSON (mm → cm). Completa las ausentes y revisa el cálculo antes de dibujar. El programa documenta armaduras; no sustituye la revisión del ingeniero.','muted'));
   const defaults=await api('rebar/from-project',project.data);if(!current())return;
-  project.rebar??={};let selected=['entrada','salida'].includes(project.rebarAssistant?.legacyAbutment)?project.rebarAssistant.legacyAbutment:'entrada',revision=0;
+  project.rebar??={};project.rebarAssistant??={};let selected=['entrada','salida'].includes(project.rebarAssistant.legacyAbutment)?project.rebarAssistant.legacyAbutment:'entrada',revision=0;
+  if(project.rebarAssistant){delete project.rebarAssistant.legacyDetection;delete project.rebarAssistant.cadContext;}
+  if(!['auto','m','cm','mm'].includes(project.rebarAssistant.drawingUnits))project.rebarAssistant.drawingUnits='auto';
   const controls=node('div',undefined,'actions');intro.append(controls);
   const body=node('div');intro.append(body);
   for(const [key,label] of [['entrada','Estribo de entrada'],['salida','Estribo de salida']]){
@@ -17,8 +19,15 @@ export async function renderRebar(ctx){
     if(!project.rebar[selected])project.rebar[selected]=structuredClone(defaults[selected]);
     const state=project.rebar[selected];
     body.append(node('h3',selected==='entrada'?'Estribo de entrada':'Estribo de salida'));
-    const output=node('div');
-    function invalidate(){revision++;changed();output.replaceChildren(node('p','Parámetros modificados. Pulsa Calcular marcas para actualizar.','muted'));}
+    const output=node('div'),insertionControls=[];let validCalculation=null;
+    function refreshInsertionState(){for(const entry of insertionControls)entry.control.disabled=entry.busy||!validCalculation;}
+    function calculationIsCurrent(ticket){return ticket===validCalculation&&ticket.generation===revision&&ticket.abutment===selected&&current();}
+    function insertionButton(text,action,primary=false){
+      const control=node('button',text,primary?'primary':'');control.type='button';const entry={control,busy:false};insertionControls.push(entry);
+      control.addEventListener('click',async()=>{if(entry.busy||!validCalculation)return;const ticket=validCalculation;entry.busy=true;refreshInsertionState();try{await action(ticket);}catch(error){notify(error.message);}finally{entry.busy=false;refreshInsertionState();}});
+      refreshInsertionState();return control;
+    }
+    function invalidate(){revision++;validCalculation=null;refreshInsertionState();changed();output.replaceChildren(node('p','Parámetros modificados. Pulsa Calcular marcas para actualizar.','muted'));}
     function numeric(label,obj,key,step){
       const field=node('label',label),input=node('input');input.type=key==='esviaje_grados'?'text':'number';input.inputMode='decimal';input.step=String(step);input.value=obj[key];
       input.addEventListener('input',()=>{obj[key]=input.value===''?null:Number(input.value);invalidate();});field.append(input);return field;
@@ -44,26 +53,49 @@ export async function renderRebar(ctx){
       const enabled=node('label','Activo'),check=node('input');check.type='checkbox';check.checked=rule.enabled;check.addEventListener('change',()=>{rule.enabled=check.checked;invalidate();});enabled.append(check);inputs.append(origin,enabled);card.append(inputs);rules.append(card);
     }
     body.append(rules,button('Calcular marcas',async()=>{
-      const generation=++revision;const response=await api('rebar/preview',state);
+      const generation=++revision,request=structuredClone(state);validCalculation=null;refreshInsertionState();output.replaceChildren(node('p','Calculando armadura…','badge'));
+      const response=await api('rebar/preview',request);
       if(generation!==revision||!current())return;
       output.replaceChildren();
       for(const issue of response.issues)output.append(node('p',issue.message,'badge'));
       if(!response.valid){output.append(node('p','Corrige los parámetros antes de obtener un detalle.'));return;}
+      validCalculation={generation,state:request,abutment:selected};refreshInsertionState();
       output.append(node('h3',`3. Marcas · ${response.total_kg.toFixed(1)} kg provisionales`));
       const wrap=node('div',undefined,'table-wrap'),table=node('table');
       const head=node('tr');for(const label of ['Marca','Parte','Ubicación','Cantidad','Ø mm','@ cm','L unit. cm','L total cm','Área cm²','kg','Vistas','Rol'])head.append(node('th',label));const thead=node('thead');thead.append(head);table.append(thead);const tbody=node('tbody');
       for(const mark of response.marks){const row=node('tr'),cell=node('td');cell.append(button(mark.mark,()=>detail(response.details.find(d=>d.mark===mark.mark),mark)));row.append(cell);for(const value of [mark.element,mark.location,mark.quantity,mark.diameter_mm,mark.spacing_cm,mark.unit_length_cm,mark.total_length_cm,mark.area_cm2.toFixed(3),mark.kg.toFixed(1),mark.views.join(', '),mark.piece_role])row.append(node('td',String(value)));tbody.append(row);}table.append(tbody);wrap.append(table);output.append(wrap,node('p','Pulsa una marca para ver el fierro y sus medidas.','muted'));
       output.append(button('Ampliar tabla de marcas',()=>{const dialog=node('dialog'),copy=table.cloneNode(true),container=node('div',undefined,'table-wrap');dialog.append(node('h2','Marcas · '+selected));copy.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const mark=response.marks.find(m=>m.mark===b.textContent);detail(response.details.find(d=>d.mark===mark.mark),mark);}));container.append(copy);dialog.append(container,button('Cerrar tabla',()=>dialog.close()));dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();}));
     },true),output);
-    const cad=node('fieldset');cad.append(node('legend','4. Dibujo CAD · ZAPATA'));
-    cad.append(node('p','1. Abre Model en metros. 2. Detecta moldajes. 3. Elige el contorno de cada vista. 4. Genera y revisa en CAD. Para el despiece, selecciona allí el punto de inserción.'));
-    const candidates=node('div'),retained=project.rebarAssistant?.legacyDetection;let detection=retained?.instance_key===selected&&retained.detection?.uses_metres===true?retained.detection:null;const selections={};
-    function showDetection(result){detection=result;candidates.replaceChildren();
-      for(const view of ['FR','AA','BB','CC','FF']){const label=node('label',view==='FR'?'Frontal':view[0]+'–'+view[1]),select=node('select');const empty=node('option','Selecciona un contorno');empty.value='';select.append(empty);for(const item of detection.candidates.filter(c=>c.layer===view+'_ZAP'&&c.status==='OK')){const option=node('option',`${item.handle} · ${item.vertex_count} vértices · ${item.area_m2.toFixed(2)} m²`);option.value=item.handle;select.append(option);}const assigned=detection.assignments?.[view+'_ZAP'];if(assigned&&[...select.options].some(option=>option.value===assigned))select.value=assigned;label.append(select);selections[view]=select;
-        label.append(button('Dibujar '+view,async()=>{if(!select.value)throw Error('Selecciona un contorno.');if(!confirm(`¿Generar vista ${view} en el contorno ${select.value}?`))return;await job('cad-rebar',{state,abutment:selected,view,handle:select.value,detection:detection.detection});notify('Orden terminada. Comprueba geometría, marcas y cotas en CAD.');}));candidates.append(label);}
+    const cad=node('fieldset');cad.append(node('legend','4. Insertar en CAD · ZAPATA'));
+    cad.append(node('p','Calcula la armadura, elige una vista y pulsa su botón. En CAD indicarás dos esquinas para definir el rectángulo de referencia de cada elemento solicitado por el JSON; no importa en qué capa esté dibujado. Para el despiece, selecciona allí el punto de inserción.'));
+    const unitsLabel=node('label','Unidades del dibujo CAD'),drawingUnits=node('select');
+    for(const [value,label] of [['auto','Automática'],['m','Metros'],['cm','Centímetros'],['mm','Milímetros']]){const option=node('option',label);option.value=value;drawingUnits.append(option);}
+    drawingUnits.value=project.rebarAssistant.drawingUnits;drawingUnits.addEventListener('change',()=>{project.rebarAssistant.drawingUnits=drawingUnits.value;changed();});unitsLabel.append(drawingUnits);
+    cad.append(unitsLabel,node('p','Automática usa la unidad declarada por el dibujo y valida el tamaño del rectángulo contra el cálculo. Una unidad explícita prevalece para esta operación sin modificar el DWG.','muted'));
+    const viewActions=node('div',undefined,'actions');
+    for(const [view,label] of [['FR','Frontal (FR)'],['AA','A–A'],['BB','B–B'],['CC','C–C'],['FF','F–F']]){
+      viewActions.append(insertionButton(`Insertar ${label}`,async ticket=>{
+        const expected=await api('cad/status');
+        if(!calculationIsCurrent(ticket))throw Error('El cálculo cambió. Calcula nuevamente antes de insertar.');
+        if(expected.status!=='ready')throw Error(expected.message);
+        notify(`En CAD indica la esquina superior izquierda e inferior derecha de cada elemento solicitado para la vista ${label}. El JSON define la secuencia.`);
+        const result=await job('cad-rebar',{state:ticket.state,project:project.data,abutment:ticket.abutment,view,expected,selection_mode:'geometry',drawing_units:drawingUnits.value});
+        if(!calculationIsCurrent(ticket))return;
+        if(result?.selection==='cancelled'){notify(`Selección cancelada para la vista ${label}. No se insertó armadura.`);return;}
+        if(result?.references){project.rebarAssistant.references??={};project.rebarAssistant.references[`${ticket.abutment}:${view}`]=structuredClone(result.references);changed();}
+        const references=Number(result?.references_count||0);
+        notify(references>1?`Vista ${label} insertada. Se seleccionaron ${references} referencias; sólo la zapata se generó y las demás armaduras siguen pendientes.`:`Vista ${label} insertada. Comprueba geometría, marcas y cotas en CAD.`);
+      }));
     }
-    cad.append(button('Detectar moldajes',async()=>{const expected=await api('cad/status');if(expected.status!=='ready')throw Error(expected.message);if(!confirm(`Leer moldajes de ${expected.active.name}?`))return;showDetection(await job('cad-detect',{expected}));}),candidates,button('Generar despiece general',async()=>{const expected=await api('cad/status');if(expected.status!=='ready')throw Error(expected.message);if(confirm(`¿Generar despiece de ${selected} en ${expected.active.name}? Selecciona el punto en CAD.`))await job('cad-rebar',{state,abutment:selected,view:'detail',expected});},true));
-    if(detection)showDetection(detection);
+    const detailAction=insertionButton('Generar despiece general',async ticket=>{
+      const expected=await api('cad/status');
+      if(!calculationIsCurrent(ticket))throw Error('El cálculo cambió. Calcula nuevamente antes de insertar.');
+      if(expected.status!=='ready')throw Error(expected.message);
+      if(!confirm(`¿Generar despiece de ${selected} en ${expected.active.name}? Selecciona el punto en CAD.`))return;
+      const result=await job('cad-rebar',{state:ticket.state,project:project.data,abutment:ticket.abutment,view:'detail',expected,drawing_units:drawingUnits.value});
+      if(result?.selection==='cancelled')notify('Selección cancelada. No se insertó el despiece.');
+    },true);
+    cad.append(viewActions,detailAction);
     cad.append(node('p','Muros y alas no tienen generador de zapata. No se inventa armadura para componentes todavía no definidos.','muted'));body.append(cad);
   }
   function detail(piece,mark){

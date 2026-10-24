@@ -115,6 +115,8 @@ def assistant_catalog(data):
                     "presence": element.presence.kind.value,
                     "present": element.presence.resolve(data, instance.key),
                     "definition_pending": element.definition_pending,
+                    "calculation_available": element.key == "abutment.footing",
+                    "views": list(dict.fromkeys(item.view for item in element.layers)),
                     "layers": [{
                         "view": layer.view,
                         "layer": layer.layer,
@@ -136,6 +138,77 @@ def assistant_catalog(data):
             "instances": instances,
         })
     return {"structures": structures}
+
+
+def reference_sequence(data, instance_key, view):
+    """User-guided rectangles: view names are context, never CAD layer filters."""
+    from sincal.rebar.model import VISTAS_ZAPATA
+    if view not in VISTAS_ZAPATA:
+        raise ValueError("Selecciona una vista de zapata válida.")
+    resolve_assistant_element(data, "abutment", instance_key, "abutment.footing")
+    elements = BRIDGE_REBAR_CATALOG.elements_for("abutment")
+    order = ("abutment.footing", "abutment.pile")
+    ordered = sorted(elements, key=lambda item: order.index(item.key) if item.key in order else 2)
+    return [{"key": item.key, "label": item.label} for item in ordered
+            if item.presence.resolve(data, instance_key)
+            and any(layer.view == view for layer in item.layers)]
+
+
+def drawing_units_per_m(expected, choice="auto"):
+    """Never infer units from dimensions or silently relabel a millimetre DWG."""
+    declared = (expected or {}).get("active", {}).get("insunits")
+    declared_scales = {4: 1000.0, 5: 100.0, 6: 1.0}
+    choices = {"mm": 1000.0, "cm": 100.0, "m": 1.0}
+    if not isinstance(choice, str):
+        raise ValueError("Unidad de dibujo no válida; elige mm, cm o m.")
+    if choice == "auto":
+        if declared not in declared_scales:
+            raise ValueError("El dibujo no declara una unidad compatible. Elige mm, cm o m antes de enviar la vista.")
+        return declared_scales[declared]
+    if choice not in choices:
+        raise ValueError("Unidad de dibujo no válida; elige mm, cm o m.")
+    # An explicit choice interprets the coordinates, never changes INSUNITS.
+    # Some Proyecto Puentes exports declare metres but contain millimetres.
+    return choices[choice]
+
+
+def reference_candidate(vertices, factor, context, geometry, project):
+    """Place the existing recipe without stretching it to a contradictory box."""
+    from sincal.cad.moldajes import MoldajeCandidate
+    if any(len(p) > 2 and abs(float(p[2])) > 1e-7 for p in vertices):
+        raise ValueError("La referencia de zapata debe estar en el plano XY con Z = 0.")
+    points = tuple((float(p[0]) / factor, float(p[1]) / factor) for p in vertices)
+    if len(points) != 4 or not all(math.isfinite(v) for point in points for v in point):
+        raise ValueError("El rectángulo de referencia no es válido.")
+    minx, maxx = min(p[0] for p in points), max(p[0] for p in points)
+    miny, maxy = min(p[1] for p in points), max(p[1] for p in points)
+    width, height = maxx - minx, maxy - miny
+    delta = 0.0
+    if context.view == "FR":
+        wanted_width, wanted_height = geometry.ancho_m, geometry.alto_m
+    elif context.view in ("AA", "BB", "CC"):
+        wanted_width, wanted_height = geometry.largo_m, geometry.alto_m
+    elif context.view == "FF":
+        orientation = project.get("estribos", {}).get(f"orientacion_dado_estribo_{context.instance}", "rectangular")
+        if orientation == "romboide":
+            delta = geometry.largo_m * math.tan(math.radians(geometry.esviaje_grados))
+        wanted_width, wanted_height = geometry.ancho_m + abs(delta), geometry.largo_m
+    else:
+        raise ValueError("Vista de referencia no válida.")
+    if any(abs(actual - wanted) > max(0.01, wanted * 0.005)
+           for actual, wanted in ((width, wanted_width), (height, wanted_height))):
+        raise ValueError(
+            f"El rectángulo mide {width:.3f} × {height:.3f} m, pero el cálculo de {context.view} "
+            f"requiere {wanted_width:.3f} × {wanted_height:.3f} m. "
+            "Revisa la unidad elegida, los puntos o las dimensiones del cálculo. No se insertaron armaduras.")
+    # Anchor the exact calculated dimensions at the selected lower-left corner.
+    startx = minx + max(0.0, -delta)
+    base = wanted_width - abs(delta)
+    contour = ((startx, miny), (startx + base, miny),
+               (startx + base + delta, miny + wanted_height),
+               (startx + delta, miny + wanted_height))
+    return MoldajeCandidate("", "", "OK", 4, base * wanted_height,
+                            contour, True, False, (), context)
 
 
 def resolve_assistant_element(data, structure_key, instance_key, element_key, *, require_present=True):

@@ -144,6 +144,11 @@ def execute(request):
         raise ValueError('CAD está ocupado. Termina el comando actual primero.')
     if request.get('metres') and (int(doc.GetVariable('INSUNITS')) != 6 or int(doc.GetVariable('TILEMODE')) != 1):
         raise ValueError('Abre Model en un dibujo con INSUNITS = 6 (metros).')
+    if request.get('reference_mode'):
+        if int(doc.GetVariable('TILEMODE')) != 1:
+            raise ValueError('Abre Model antes de indicar las referencias de la vista.')
+        if int(doc.GetVariable('INSUNITS')) != expected.get('active', {}).get('insunits'):
+            raise ValueError('Cambió la unidad declarada del dibujo. Vuelve a comprobar el destino.')
     if request.get('candidate'):
         candidate = request['candidate']
         entity = doc.HandleToObject(candidate['handle'])
@@ -153,6 +158,14 @@ def execute(request):
                 or any(abs(coords[i * 2 + j] - point[j]) > 1e-7 for i, point in enumerate(vertices) for j in (0, 1))
                 or any(abs(float(entity.GetBulge(i))) > 1e-7 for i in range(len(vertices)))):
             raise ValueError('El moldaje cambió. Detecta y confirma nuevamente.')
+    if request.get('focus'):
+        # A user-triggered view command may bring its existing CAD window forward.
+        # Never simulate keyboard input or start a second CAD instance.
+        try:
+            import win32gui
+            win32gui.SetForegroundWindow(int(app.HWND))
+        except Exception:
+            pass  # Windows may deny foreground focus; selection remains in CAD.
     try:
         doc.SendCommand(command_with_completion(request))
     except Exception as error:
