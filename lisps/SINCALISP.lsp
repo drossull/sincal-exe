@@ -59,6 +59,7 @@
     ("ST0" "Establece en cero la altura de TODOS los estilos de texto." "lisps/ST0.lsp")
     ("STO" "Alias de ST0 (letra O): pone en cero la altura de todos los estilos de texto." "lisps/ST0.lsp")
     ("TXT-JOIN" "Reconstruye TEXT fragmentados en MTEXT editable. No reconoce letras hechas de lineas." "lisps/TXT-JOIN.lsp")
+    ("UPDATEBLOCK" "Redefine un bloque desde el master y conserva sus inserciones y atributos. Afecta todas sus referencias." "lisps/UPDATEBLOCK.lsp")
     ("VG" "BORRA bloques con prefijo VINETA en Modelo y layouts y ejecuta PURGEALL." "lisps/VG.lsp")
     ("VPTOGGLE" "Enciende o apaga la capa de marcos llamada Viewport layer." "lisps/VPTOGGLE.lsp")
     ("VRAP" "Crea viewports en un layout a partir de areas indicadas previamente en Modelo." "lisps/VRAP.lsp")
