@@ -1,6 +1,7 @@
 ;;; UPDATEBLOCK -- redefine desde el master sin borrar referencias ni purgar.
 ;;; Windows: AutoCAD / ZWCAD, ActiveX + ObjectDBX.
 ;;; Los atributos existentes conservan valores/campos. No ejecuta ATTSYNC.
+;;; NIVEL_MM reconecta su formula a su propio BASE antes de sustituir el ATTDEF.
 (vl-load-com)
 
 (defun SUB:Fail (message) (princ (strcat "\nUPDATEBLOCK: " message)) (exit))
@@ -77,6 +78,119 @@
   (setq data (entget (vlax-vla-object->ename obj)))
   (mapcar '(lambda (code) (assoc code data)) '(5 8 10 41 42 43 50 67 210 410)))
 
+(defun SUB:FieldReplace (text token value / pos start)
+  (setq start 0)
+  (while (setq pos (vl-string-search token text start))
+    (setq text (strcat (substr text 1 pos) value
+                       (substr text (+ pos (strlen token) 1)))
+          start (+ pos (strlen value))))
+  text)
+
+(defun SUB:EntityData (entity / result)
+  ;; A lost FIELD reference can be ENTITY NAME:0 rather than nil in ZWCAD.
+  (setq result (vl-catch-all-apply 'entget (list entity)))
+  (if (not (vl-catch-all-error-p result)) result))
+
+(defun SUB:NivelField (field depth util / data code item idx target owner prefix child id eligible)
+  ;; Expand both nested fields and ZWCAD's inline AcExpr representation. Object
+  ;; indices are per FIELD; duplicate 331 entries are valid and retain order.
+  (if (or (> depth 16) (not (setq data (SUB:EntityData field))))
+    (progn (setq SUB:nbInvalid T) "")
+    (progn
+      (setq code "")
+      (foreach item data
+        (if (member (car item) '(2 3)) (setq code (strcat code (cdr item)))))
+      (setq idx 0)
+      (foreach item data
+        (if (= 331 (car item))
+          (progn
+            (setq target (SUB:EntityData (cdr item))
+                  owner (if target (SUB:EntityData (cdr (assoc 330 target))))
+                  id (if target (vla-GetObjectIdString util
+                        (vlax-ename->vla-object (cdr item)) :vlax-false) "0"))
+            (setq eligible (or (not target)
+                         (and (= "ATTDEF" (cdr (assoc 0 target)))
+                              (= "BASE" (strcase (cdr (assoc 2 target))))
+                              (equal "BLOCK_RECORD" (cdr (assoc 0 owner)))
+                              (= "NIVEL_MM" (strcase (cdr (assoc 2 owner)))))))
+            (if eligible
+              (progn
+                (if (not (member id SUB:nbTargets))
+                  (setq SUB:nbTargets (cons id SUB:nbTargets)))
+                ;; Record the actual BASE leaf, not an inline custom expression.
+                (if (= code (strcat "\\AcObjProp.16.2 Object(%<\\_ObjIdx "
+                                    (itoa idx) ">%,1).TextString"))
+                  (setq SUB:nbLeaves (cons (list id field (cdr item)) SUB:nbLeaves)))))
+            (setq code (SUB:FieldReplace code (strcat "%<\\_ObjIdx " (itoa idx) ">%")
+                         (strcat "%<\\_ObjId " id ">%")))
+            (setq idx (1+ idx)))))
+      (setq idx 0)
+      (foreach item data
+        (if (= 360 (car item))
+          (progn
+            (setq child (SUB:NivelField (cdr item) (1+ depth) util)
+                  code (SUB:FieldReplace code (strcat "%<\\_FldIdx " (itoa idx) ">%")
+                          (strcat "%<" child ">%"))
+                  idx (1+ idx)))))
+      (if (or (vl-string-search "\\_FldIdx " code) (vl-string-search "\\_ObjIdx " code))
+        (setq SUB:nbInvalid T))
+      code)))
+
+(defun SUB:RelinkNivelField (field target base / data result item state)
+  ;; Keep the native FIELD tree/code/options. Rebuilding TextString causes
+  ;; ZWCAD to create inline expressions that do not evaluate nested properties.
+  (setq data (SUB:EntityData field) base (vlax-vla-object->ename base))
+  (foreach item data
+    (cond ((= 6 (car item)) (setq state (cdr item)))
+          ((= 7 (car item)) (setq state nil)))
+    (setq result (cons
+      (if (and (equal target (cdr item))
+               (or (= 331 (car item))
+                   (and (= 330 (car item)) (equal "ObjectPropertyId" state))))
+        (cons (car item) base) item) result)))
+  (setq changed T)
+  (if (not (entmod (reverse result)))
+    (SUB:Fail "No se pudo reparar el vinculo BASE de NIVEL_MM. Se revierte.")))
+
+(defun SUB:RepairNivelBase (doc obj / base level a count ext fields field code util id
+                                    prefix suffix token pos matches target leaves leaf
+                                    SUB:nbTargets SUB:nbLeaves SUB:nbInvalid)
+  ;; Only the known NIVEL_MM formula is repaired. A literal NIVEL or a
+  ;; customized/ambiguous field is left intact; BASE stays an editable attribute.
+  (setq count 0 matches 0 SUB:nbTargets '("0"))
+  (if (= :vlax-true (vla-get-HasAttributes obj))
+    (foreach a (vlax-invoke obj 'GetAttributes)
+      (cond
+        ((= "BASE" (strcase (vla-get-TagString a))) (setq base a count (1+ count)))
+        ((= "NIVEL" (strcase (vla-get-TagString a))) (setq level a count (1+ count))))))
+  (if (and (= count 2) base level
+           (setq ext (cdr (assoc 360 (entget (vlax-vla-object->ename level)))))
+           (setq fields (dictsearch ext "ACAD_FIELD"))
+           (setq field (dictsearch (cdr (assoc -1 fields)) "TEXT")))
+    (progn
+      (setq util (vla-get-Utility doc)
+            code (SUB:NivelField (cdr (assoc -1 field)) 0 util))
+      (if (/= "_text" (cdr (assoc 1 field))) (setq code (strcat "%<" code ">%")))
+      ;; Recognize the complete known calculation, including the Y reference.
+      ;; Only its BASE link changes; outer formatting and text remain verbatim.
+      (setq prefix "%<\\AcExpr (%<\\AcObjProp.16.2 Object(%<\\_ObjId "
+            suffix (strcat ".TextString>%+(%<\\AcObjProp.16.2 Object(%<\\_ObjId "
+              (vla-GetObjectIdString util obj :vlax-false)
+              ">%).Parameter(85).UpdatedY \\f \"%lu2%pr8%ds46\">%/1000))"))
+      (foreach id SUB:nbTargets
+        (setq token (strcat prefix id ">%,1)" suffix) pos 0)
+        (while (setq pos (vl-string-search token code pos))
+          (setq matches (1+ matches) target id pos (+ pos (strlen token)))))
+      (foreach leaf SUB:nbLeaves
+        (if (equal target (car leaf)) (setq leaves (cons leaf leaves))))
+      (if (and (not SUB:nbInvalid) (= matches 1) (= (length leaves) 1))
+        (progn
+          ;; The outer _text field retains prefixes/suffixes such as "S.F. ".
+          ;; Change only BASE's reference and its cached ObjectPropertyId.
+          (setq leaf (car leaves))
+          (SUB:RelinkNivelField (cadr leaf) (caddr leaf) base)
+          (vla-Update level))))))
+
 (defun SUB:References (doc name / result b obj)
   ;; Include nested references and every layout, not only visible inserts.
   (vlax-for b (vla-get-Blocks doc)
@@ -111,8 +225,14 @@
   (if (or (= :vlax-true (vla-get-IsXRef source))
           (= :vlax-true (vla-get-IsLayout source)))
     (SUB:Fail "El origen no es una definicion de bloque local."))
-  (setq snapshots (SUB:References doc name)
-        seed (vl-filename-mktemp "SINCAL-UPDATEBLOCK-" nil ".dwg")
+  (setq snapshots (SUB:References doc name))
+  ;; Relink before replacing the source ATTDEF, including links already lost
+  ;; by a previous redefinition. Verify retention against the repaired fields.
+  (if (= "NIVEL_MM" (strcase name))
+    (setq snapshots (mapcar '(lambda (row)
+      (SUB:RepairNivelBase doc (car row))
+      (list (car row) (cadr row) (SUB:Attributes (car row)) (cadddr row))) snapshots)))
+  (setq seed (vl-filename-mktemp "SINCAL-UPDATEBLOCK-" nil ".dwg")
         exported seed n 0)
   ;; ZWCAD can reuse a name left by an interrupted run. Never overwrite it.
   (while (findfile exported)

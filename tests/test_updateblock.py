@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class UpdateBlockTests(unittest.TestCase):
     def test_lisp_syntax(self):
-        for relative in ('lisps/UPDATEBLOCK.lsp', 'tests/cad/updateblock_regression.lsp'):
+        for relative in ('lisps/UPDATEBLOCK.lsp', 'tests/cad/updateblock_regression.lsp',
+                         'tests/cad/nivel_base_regression.lsp'):
             balanced_lisp((ROOT / relative).read_text(encoding='utf-8'))
 
     def test_distribution_and_eager_loading(self):
