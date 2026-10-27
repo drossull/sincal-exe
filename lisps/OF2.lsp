@@ -21,7 +21,7 @@
       (list nil (vl-catch-all-error-message result)))
     (list T created)))
 
-(defun c:OF2 (/ *error* doc opened ss ent data obj distance result mode choice default)
+(defun c:OF2 (/ *error* doc opened ss ent data obj distance result mode reading default)
   (defun *error* (msg)
     (if opened (vl-catch-all-apply 'vla-EndUndoMark (list doc)))
     (if (and msg (not (wcmatch (strcase msg) "*CANCEL*,*QUIT*,*EXIT*,*BREAK*")))
@@ -29,9 +29,6 @@
     (princ))
   (setq ss (ssget "_I"))
   (setq mode (if (= (getenv "SINCAL_OF2_MODO") "L") "Lado" "Total"))
-  (initget "Total Lado")
-  (setq choice (getkword (strcat "\nMedida [Total/Lado] <" mode ">: ")))
-  (if choice (setq mode choice))
   (setenv "SINCAL_OF2_MODO" (if (= mode "Total") "T" "L"))
   (if (and ss (= (sslength ss) 1))
     (setq ent (ssname ss 0))
@@ -51,14 +48,26 @@
         (T
           ;; OF2:last siempre guarda el offset real por lado. Convertir el
           ;; valor sugerido al cambiar de modo evita duplicar/reducir el ancho.
-          (if (and (numberp OF2:last) (> OF2:last 0.0))
-            (setq default (* OF2:last (if (= mode "Total") 2.0 1.0))))
-          (initget 6)
-          (setq distance (getdist
-            (strcat (if (= mode "Total") "\nAncho TOTAL del muro o columna"
-                                         "\nDistancia a CADA lado del eje")
-              (if default (strcat " <" (rtos default 2 6) ">") "") ": ")))
-          (if (null distance) (setq distance default))
+          ;; Pedir directamente la medida. T/L cambian el modo dentro de este
+          ;; mismo paso, sin una pregunta de configuracion en cada ejecucion.
+          (setq reading T)
+          (while reading
+            (setq default nil)
+            (if (and (numberp OF2:last) (> OF2:last 0.0))
+              (setq default (* OF2:last (if (= mode "Total") 2.0 1.0))))
+            (initget 6 "Total Lado")
+            (setq distance (getdist
+              (strcat (if (= mode "Total") "\nAncho TOTAL del muro o columna"
+                                           "\nDistancia a CADA lado del eje")
+                " [Total/Lado]"
+                (if default (strcat " <" (rtos default 2 6) ">") "") ": ")))
+            (if (= (type distance) 'STR)
+              (progn
+                (setq mode distance)
+                (setenv "SINCAL_OF2_MODO" (if (= mode "Total") "T" "L")))
+              (progn
+                (if (null distance) (setq distance default))
+                (setq reading nil))))
           (if (and distance (> distance 0.0))
             (progn
               (if (= mode "Total") (setq distance (/ distance 2.0)))

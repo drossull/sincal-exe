@@ -65,11 +65,15 @@ def main():
             ('', '', 2.0, 'L', 'remember Lado and distance'),
             ('T', '', 2.0, 'T', 'convert default to total width'),
             ('L', '', 2.0, 'L', 'convert default back to per-side'),
+            ('T\nL\nT', '', 2.0, 'T', 'change mode repeatedly before entering measure'),
         )
         for mode, measure, offset, saved, label in cases:
             send(doc, '(OF2T:Select)\n')
             existing = retry(lambda: {obj.Handle for obj in list(doc.ModelSpace)})
-            send(doc, f'OF2\n{mode}\n{measure}\n')
+            # No initial confirmation for the remembered mode: a number (or
+            # Enter for the previous measure) is the very first response.
+            mode_input = f'{mode}\n' if mode else ''
+            send(doc, f'OF2\n{mode_input}{measure}\n')
             ys = retry(lambda: sorted(obj.StartPoint[1] for obj in list(doc.ModelSpace)
                                       if obj.Handle not in existing))
             ok = len(ys) == 2 and all(abs(a - b) < 1e-8
