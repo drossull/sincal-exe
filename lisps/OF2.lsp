@@ -1,5 +1,6 @@
 ;;; OF2: offset a ambos lados, conservando el objeto original.
-;;; La distancia indicada es POR LADO, en unidades del dibujo.
+;;; T = ancho total; L = distancia por lado, en unidades del dibujo.
+;;; Se recuerda el modo en CAD y la ultima distancia por lado en este dibujo.
 (vl-load-com)
 
 (defun OF2:Pair (obj distance / created result signed batch item)
@@ -20,13 +21,18 @@
       (list nil (vl-catch-all-error-message result)))
     (list T created)))
 
-(defun c:OF2 (/ *error* doc opened ss ent data obj distance result)
+(defun c:OF2 (/ *error* doc opened ss ent data obj distance result mode choice default)
   (defun *error* (msg)
     (if opened (vl-catch-all-apply 'vla-EndUndoMark (list doc)))
     (if (and msg (not (wcmatch (strcase msg) "*CANCEL*,*QUIT*,*EXIT*,*BREAK*")))
       (princ (strcat "\nOF2: " msg)))
     (princ))
   (setq ss (ssget "_I"))
+  (setq mode (if (= (getenv "SINCAL_OF2_MODO") "L") "Lado" "Total"))
+  (initget "Total Lado")
+  (setq choice (getkword (strcat "\nMedida [Total/Lado] <" mode ">: ")))
+  (if choice (setq mode choice))
+  (setenv "SINCAL_OF2_MODO" (if (= mode "Total") "T" "L"))
   (if (and ss (= (sslength ss) 1))
     (setq ent (ssname ss 0))
     (progn
@@ -43,14 +49,19 @@
         ((/= 0 (logand 4 (cdr (assoc 70 (tblsearch "LAYER" (cdr (assoc 8 data)))))))
           (princ "\nLa capa del objeto esta bloqueada. Desbloqueela antes de usar OF2."))
         (T
+          ;; OF2:last siempre guarda el offset real por lado. Convertir el
+          ;; valor sugerido al cambiar de modo evita duplicar/reducir el ancho.
+          (if (and (numberp OF2:last) (> OF2:last 0.0))
+            (setq default (* OF2:last (if (= mode "Total") 2.0 1.0))))
           (initget 6)
           (setq distance (getdist
-            (strcat "\nDistancia a CADA lado del eje"
-              (if (and (numberp OF2:last) (> OF2:last 0.0))
-                (strcat " <" (rtos OF2:last 2 6) ">") "") ": ")))
-          (if (and (null distance) (numberp OF2:last)) (setq distance OF2:last))
+            (strcat (if (= mode "Total") "\nAncho TOTAL del muro o columna"
+                                         "\nDistancia a CADA lado del eje")
+              (if default (strcat " <" (rtos default 2 6) ">") "") ": ")))
+          (if (null distance) (setq distance default))
           (if (and distance (> distance 0.0))
             (progn
+              (if (= mode "Total") (setq distance (/ distance 2.0)))
               (setq doc (vla-get-ActiveDocument (vlax-get-acad-object)))
               (vla-StartUndoMark doc)
               (setq opened T result (OF2:Pair obj distance))
@@ -66,5 +77,5 @@
                   " Pruebe una distancia menor o revise la geometria. Detalle: " (cadr result))))))))))
   (princ))
 
-(princ "\nOF2 cargado: offset a cada lado de una linea o curva.")
+(princ "\nOF2 cargado: offset a ambos lados por ancho Total (T) o distancia por Lado (L).")
 (princ)
