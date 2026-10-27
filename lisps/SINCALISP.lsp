@@ -62,7 +62,7 @@
     ("UPDATEBLOCK" "Redefine un bloque desde el master y conserva sus inserciones y atributos. Afecta todas sus referencias." "lisps/UPDATEBLOCK.lsp")
     ("VG" "BORRA bloques con prefijo VINETA en Modelo y layouts y ejecuta PURGEALL." "lisps/VG.lsp")
     ("VPTOGGLE" "Enciende o apaga la capa de marcos llamada Viewport layer." "lisps/VPTOGGLE.lsp")
-    ("VRAP" "Crea viewports en un layout a partir de areas indicadas previamente en Modelo." "lisps/VRAP.lsp")
+    ("VRAP" "Crea un viewport a la escala anotativa de Model; pasa al layout y pide solo su ubicacion." "lisps/VRAP.lsp")
     ("W08" "Establece factor de ancho 0.8 en TODOS los estilos de texto." "lisps/W08.lsp")
     ("ZE" "Hace zoom a la extension completa del dibujo en el espacio actual." "lisps/ZE.lsp")
     ("ZV" "Encuadra el tercio inferior derecho de la hoja del layout actual." "lisps/ZV.lsp")

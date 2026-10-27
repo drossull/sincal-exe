@@ -335,9 +335,9 @@
     },
     "VRAP": {
       "titulo": "Crear viewports desde áreas de Model",
-      "descripcion": "Registra varias ventanas rectangulares en Model y luego crea viewports independientes en Layout con el mismo encuadre.",
-      "pasos": ["Escribe VRAP y marca las esquinas de cada área en Model.", "Presiona Enter para pasar a Layout.", "Define el rectángulo físico de cada viewport en el mismo orden."],
-      "notas": ["El comando cambia entre Model y Layout automáticamente.", "Ajusta la escala de cada viewport después si corresponde."],
+      "descripcion": "Crea un viewport con el encuadre y la escala anotativa actual de Model, y pasa automáticamente al último layout utilizado.",
+      "pasos": ["Elige la escala anotativa en Model y escribe VRAP.", "Marca dos esquinas opuestas del área.", "Al cambiar automáticamente al layout, indica solo la esquina inferior izquierda del viewport.", "Presiona Enter para repetir VRAP con otra área."],
+      "notas": ["El tamaño se calcula automáticamente y el viewport queda bloqueado a la escala elegida, también con escalas en metros.", "Para cambiar de destino, visita primero el layout deseado.", "Requiere una vista sin perspectiva."],
       "tags": ["mview", "model", "layout"]
     },
     "VPTOGGLE": {
