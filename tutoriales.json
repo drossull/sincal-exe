@@ -277,6 +277,13 @@
       "notas": ["Conserva las 16 columnas y su orden: Cant., diámetro, Long., Pos, Calidad, Forma, Peso/ud, Peso, A max, A min, B max, B min, C max, C min, TOTAL MIN y TOTAL MAX. Forma se muestra como código; no se convierten unidades ni se agrupan marcas.", "Omite el encabezado del informe, separadores y encabezados repetidos. Conserva el total declarado y coloca kg junto al peso, no en A max. Rechaza filas incompletas o desconocidas para evitar una importación parcial.", "Importa TENSIONES si falta; si ya existe, respeta su definición en el dibujo. Conserva sus fuentes, colores, alineaciones y bordes, ajustando los anchos al contenido. La tabla se orienta según los ejes WCS.", "Permite celdas vacías y comillas CSV; no admite campos entre comillas que ocupen varias líneas. Los valores se insertan como texto literal para conservar códigos y precisión del origen.", "Funciona en el espacio actual, no modifica el CSV y no guarda automáticamente el DWG. UNDO permite deshacer la inserción. No hay vínculo automático con el archivo: una nueva importación crea otra tabla."],
       "tags": ["csv", "xsr", "tekla", "armaduras", "tabla", "tensiones"]
     },
+    "OF2": {
+      "titulo": "Offset a ambos lados de un eje",
+      "descripcion": "Genera contornos paralelos a ambos lados de una línea o curva, conservando el objeto original.",
+      "pasos": ["Selecciona un objeto y escribe OF2, o selecciónalo después de ejecutar el comando.", "Indica la distancia a CADA lado del eje, en unidades del dibujo. Enter reutiliza la última distancia aplicada correctamente."],
+      "notas": ["Por ejemplo, para un muro de 0,30 m centrado en un eje dibujado en metros, indica 0,15: los contornos quedan separados 0,30 m.", "Admite líneas, polilíneas 2D, arcos, círculos y otras curvas compatibles con OFFSET. En curvas cerradas genera un contorno interior y otro exterior. No cierra los extremos de un eje abierto.", "Conserva el original y trabaja en Model o Layout. No admite bloques, mallas ni polilíneas 3D, y no desbloquea capas.", "Si la geometría no permite uno de los lados, retira los offsets parciales. UNDO deshace ambos lados en una operación."],
+      "tags": ["offset", "eje", "muro", "columna", "paralelas"]
+    },
     "PNDMAKE": {
       "titulo": "Aplicar pendiente porcentual",
       "descripcion": "Rota un objeto completo hasta dar a su eje de referencia una pendiente absoluta respecto de la horizontal del UCS actual.",

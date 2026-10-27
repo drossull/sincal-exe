@@ -39,6 +39,7 @@
     ("MARCA-UP" "Actualiza bloques de marcas antiguos; sustituye referencias compatibles." "lisps/MARCAS-SC.lsp")
     ("MC" "Cambia TEXT/MTEXT a justificacion Medio Centro sin desplazarlos visualmente." "lisps/MC.lsp")
     ("MPEND" "Rota multileaders desde la punta para alinearlos con una pendiente porcentual." "lisps/MPEND.lsp")
+    ("OF2" "Crea un offset a cada lado de una linea o curva; la distancia es por lado y conserva el original." "lisps/OF2.lsp")
     ("P0" "Pega el portapapeles como bloque en 0,0,0 del espacio actual." "lisps/P0.lsp")
     ("PASTE-PROPS" "Pega las propiedades copiadas y solicita el nombre del plano." "lisps/SINCAL_PROPS.lsp")
     ("PLOTYA" "Genera un PDF junto al DWG con su mismo nombre y la configuracion de trazado actual." "lisps/PLOTYA.lsp")
