@@ -21,7 +21,6 @@
     ("C7" "Asigna color ACI 7 (blanco/negro segun el fondo) a la seleccion." "startup/SINCAL_STARTUP.lsp")
     ("C8" "Asigna color ACI 8 (gris oscuro) a los objetos seleccionados." "startup/SINCAL_STARTUP.lsp")
     ("C9" "Asigna color ACI 9 (gris claro) a los objetos seleccionados." "startup/SINCAL_STARTUP.lsp")
-    ("CEV" "Alias de CEVIADA: cotas alineadas continuas con longitud proyectada mediante un campo." "lisps/CEVIADA.lsp")
     ("CEVIADA" "Acota cada tramo esviado con una cota alineada y agrega la longitud proyectada mediante un campo." "lisps/CEVIADA.lsp")
     ("COPY-PROPS" "Copia las propiedades personalizadas del dibujo para pegarlas en otro." "lisps/SINCAL_PROPS.lsp")
     ("CPOL" "Dibuja una polilinea simetrica indicando su centro y uno de sus extremos." "lisps/CPOL.lsp")

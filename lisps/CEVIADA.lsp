@@ -154,5 +154,3 @@
   (setq *error* old_err)
   (princ)
 )
-
-(defun c:CEV () (c:CEVIADA))

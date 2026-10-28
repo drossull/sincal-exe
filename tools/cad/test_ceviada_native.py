@@ -1,4 +1,4 @@
-"""Exercise CEV/CEVIADA chains, fields and grip-equivalent edits in scratch CAD.
+"""Exercise CEVIADA chains, fields and grip-equivalent edits in scratch CAD.
 
 python tools/cad/test_ceviada_native.py --progid AutoCAD.Application.25
 python tools/cad/test_ceviada_native.py --progid AutoCAD.Application.26
@@ -117,7 +117,7 @@ def main():
             print(f'PASS {label}: {len(selected)} aligned dimensions, distances, placement and fields', flush=True)
 
         existing = dimensions()
-        send(doc, 'CEV\n30\n2\n0,0\n3,4\n1.4,5.2\n6,8\n10,8\n10,8\n10,12\n\n')
+        send(doc, 'CEVIADA\n30\n2\n0,0\n3,4\n1.4,5.2\n6,8\n10,8\n10,8\n10,12\n\n')
         created = {h: obj for h, obj in dimensions().items() if h not in existing}
         inspect('bent-chain-and-duplicate-point', created, [5, 5, 4, 4], 2)
 
@@ -142,13 +142,13 @@ def main():
 
         send(doc, '(command "_.ucs" "_z" 37.0) (command "_.ucs" "_x" 25.0)\n')
         existing = dimensions()
-        send(doc, 'CEV\n0,0\n3,4\n1.4,5.2\n6,8\n\n')
+        send(doc, 'CEVIADA\n0,0\n3,4\n1.4,5.2\n6,8\n\n')
         created = {h: obj for h, obj in dimensions().items() if h not in existing}
         inspect('rotated-and-tilted-ucs', created, [5, 5], 2)
 
         # Enter before the first point must finish without creating a dimension.
         existing = set(dimensions())
-        send(doc, 'CEV\n\n')
+        send(doc, 'CEVIADA\n\n')
         assert set(dimensions()) == existing
         assert retry(lambda: doc.GetVariable('CMDACTIVE')) == 0
         print('DONE failures=0', flush=True)
