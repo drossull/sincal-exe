@@ -1,6 +1,14 @@
 (vl-load-com) ; Carga las funciones de Visual LISP necesarias
 
-(defun c:CEVIADA ( / old_err *error* p1 p2 pre_ent last_ent ent_cursor ang_rad factor acadObj doc util user_ang user_prec loop format_tag _InyectarCampo)
+;; Normal unitaria en el plano del UCS. NIL si los puntos coinciden en XY.
+(defun CEVIADA:normal (p1 p2 / dx dy len)
+  (setq dx (- (car p2) (car p1))
+        dy (- (cadr p2) (cadr p1))
+        len (sqrt (+ (* dx dx) (* dy dy))))
+  (if (> len 1e-9) (list (/ (- dy) len) (/ dx len) 0.0))
+)
+
+(defun c:CEVIADA ( / old_err *error* p1 p2 p3 pre_ent last_ent normal dim_pt offset ang_rad factor acadObj doc util user_ang user_prec loop format_tag _InyectarCampo)
   
   ;; 1. Inicialización de entornos de Visual LISP
   (setq acadObj (vlax-get-acad-object)
@@ -48,18 +56,13 @@
   ;; ---> MANEJADOR DE ERRORES: Captura la tecla ESC para no perder el trabajo
   (setq old_err *error*)
   (defun *error* (msg)
-    (if (and last_ent (not (eq last_ent (entlast))))
-      (progn
-        (setq ent_cursor last_ent)
-        (while (setq ent_cursor (entnext ent_cursor))
-          (if (wcmatch (cdr (assoc 0 (entget ent_cursor))) "*DIMENSION")
-            (_InyectarCampo (vlax-ename->vla-object ent_cursor))
-          )
-        )
-        (vla-Regen doc acActiveViewport)
-      )
-    )
+    ;; Cada cota recibe su campo antes de solicitar el siguiente punto.
+    ;; ESC conserva las cotas terminadas sin recorrer otras entidades.
+    (if last_ent
+      (vl-catch-all-apply 'vla-Regen (list doc acActiveViewport)))
     (setq *error* old_err) 
+    (if (and msg (not (wcmatch (strcase msg) "*CANCEL*,*QUIT*,*EXIT*,*BREAK*")))
+      (princ (strcat "\nCEVIADA: " msg)))
     (princ "\nComando finalizado.")
     (princ)
   )
@@ -102,7 +105,7 @@
         (setq pre_ent (entlast)) 
         
         (princ "\nEspecifique la ubicación de la cota: ")
-        (command "_dimaligned" p1 p2 pause)
+        (command "_.dimaligned" "_non" p1 "_non" p2 pause)
 
         (if (not (eq pre_ent (entlast)))
           (progn
@@ -110,17 +113,35 @@
             (_InyectarCampo (vlax-ename->vla-object last_ent))
             (vla-Regen doc acActiveViewport) 
 
-            (princ "\nMODO CONTINUO -> Seleccione los siguientes puntos (Enter o ESC para terminar)...")
-            (command "_dimcontinue")
-            
-            (while (> (getvar "CMDACTIVE") 0)
-              (command pause)
-            )
-
-            (setq ent_cursor last_ent)
-            (while (setq ent_cursor (entnext ent_cursor))
-              (if (wcmatch (cdr (assoc 0 (entget ent_cursor))) "*DIMENSION")
-                (_InyectarCampo (vlax-ename->vla-object ent_cursor))
+            ;; DIMCONTINUE convierte los tramos siguientes en cotas rotadas.
+            ;; Crear cada tramo con DIMALIGNED mantiene su longitud y permite
+            ;; que siga a los extremos al mover los pinzamientos.
+            ;; DXF 10 esta en WCS; los puntos seleccionados estan en UCS.
+            (setq normal (CEVIADA:normal p1 p2)
+                  dim_pt (trans (cdr (assoc 10 (entget last_ent))) 0 1))
+            (if normal
+              (progn
+                (setq offset (apply '+ (mapcar '* normal (mapcar '- dim_pt p2))))
+                (princ "\nMODO CONTINUO ALINEADO -> Seleccione los siguientes puntos (Enter o ESC para terminar)...")
+                (while (setq p3 (getpoint p2 "\nSiguiente punto <Terminar>: "))
+                  (if (setq normal (CEVIADA:normal p2 p3))
+                    (progn
+                      ;; Conserva la separacion perpendicular y el lado de la
+                      ;; primera cota, incluso si el siguiente tramo gira.
+                      (setq dim_pt (mapcar '+ p3
+                                     (mapcar '(lambda (n) (* offset n)) normal))
+                            pre_ent (entlast))
+                      (command "_.dimaligned" "_non" p2 "_non" p3 "_non" dim_pt)
+                      (if (not (eq pre_ent (entlast)))
+                        (progn
+                          (setq last_ent (entlast))
+                          (_InyectarCampo (vlax-ename->vla-object last_ent))
+                          (vla-Update (vlax-ename->vla-object last_ent))
+                          (setq p2 p3)))
+                    )
+                    (princ "\nSeleccione un punto distinto del anterior.")
+                  )
+                )
               )
             )
             (vla-Regen doc acActiveViewport)
@@ -133,3 +154,5 @@
   (setq *error* old_err)
   (princ)
 )
+
+(defun c:CEV () (c:CEVIADA))

@@ -188,9 +188,9 @@
     },
     "CEVIADA": {
       "titulo": "Cotas para elementos esviados",
-      "descripcion": "Crea una cota alineada y muestra además la dimensión recta calculada con el coseno del ángulo de esviaje; admite cotas continuas.",
-      "pasos": ["Escribe CEVIADA.", "Define ángulo y precisión la primera vez o usa las opciones Angulo/Precision.", "Marca los dos puntos y ubica la cota.", "Continúa acotando o termina con Enter/ESC."],
-      "notas": ["El ángulo y la precisión se recuerdan durante la sesión."],
+      "descripcion": "Crea cotas alineadas en todos los tramos y muestra además la dimensión recta calculada con el coseno del ángulo de esviaje.",
+      "pasos": ["Escribe CEV o CEVIADA.", "Define ángulo y precisión la primera vez o usa las opciones Angulo/Precision.", "Marca los dos puntos y ubica la primera cota.", "Selecciona los siguientes puntos; cada tramo se alinea con sus propios extremos y conserva la separación de la primera cota. Termina con Enter/ESC."],
+      "notas": ["El ángulo y la precisión se recuerdan durante la sesión.", "Cada cota es de tipo Aligned Dimension, también en modo continuo. El cambio se aplica a cotas nuevas; las existentes no se convierten automáticamente."],
       "tags": ["cota", "esviaje"]
     },
     "CPOL": {
