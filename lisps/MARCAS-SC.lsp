@@ -735,5 +735,4 @@
   (if (and (not (vl-catch-all-error-p doc)) (= (type doc) 'VLA-OBJECT))
     (SCM:EnableAuto)))
 (SCM:EnableIfInteractive)
-(princ "\n[SINCAL] Marcas: MARCA-SC / MARCA-DE / MARCA-UP / MARCA-CONFIG / REASIGNAR-MARCA / ACTUALIZAR-MARCAS / REVISAR-MARCAS.")
 (princ)

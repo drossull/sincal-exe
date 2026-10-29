@@ -44,5 +44,4 @@
   (princ)
 )
 
-(princ "\nLISP cargado. Escriba P0 para pegar en el origen (Funciona en Model y Layout).")
 (princ)

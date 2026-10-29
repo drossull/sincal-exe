@@ -57,5 +57,4 @@
           (princ "\nRomanD actual: romand.shx, anotativo, papel 2.5, ancho 0.8, angulo 0; sin volteos ni orientacion al layout.")))))
   (princ))
 
-(princ "\nROMAND cargado: configurar el estilo RomanD anotativo (2.5 / 0.8).")
 (princ)

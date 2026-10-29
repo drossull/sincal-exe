@@ -25,6 +25,5 @@
   (c:DUP)
 )
 
-;; Mensaje que aparece en la consola al cargar el LISP
-(princ "\nRutina cargada. Escribe DUP o DUPLICAR para copiar en el mismo sitio.")
+;; Carga silenciosa
 (princ)

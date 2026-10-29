@@ -66,5 +66,4 @@
                 "%. Se conserva la forma y longitud del objeto."))))))))
   (princ))
 
-(princ "\nPNDMAKE cargado: orientar un objeto mediante pendiente porcentual.")
 (princ)

@@ -68,6 +68,5 @@
   (princ) ; Salida silenciosa
 )
 
-;;; Mensaje de confirmación al cargar
-(princ "\nComando BV cargado. Escriba BV en un Layout para bloquear sus ventanas.")
+;;; Carga silenciosa
 (princ)

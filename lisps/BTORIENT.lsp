@@ -111,5 +111,4 @@
   (princ)
 )
 
-(princ "\nBTORIENT cargado. Escriba BTORIENT para alinear un bloque mediante dos puntos.")
 (princ)

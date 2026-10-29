@@ -106,5 +106,4 @@
   (princ)
 )
 
-(princ "\nEscribe SETUP-A1 para configurar los Layouts.")
 (princ)

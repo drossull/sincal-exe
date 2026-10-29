@@ -171,5 +171,4 @@
   (princ)
 )
 
-(princ "\nDEL-VIN cargado. Escriba DEL-VIN para limpiar la vineta antigua.")
 (princ)

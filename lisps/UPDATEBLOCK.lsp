@@ -313,5 +313,4 @@
   (foreach v vars (setvar (car v) (cdr v)))
   (princ))
 
-(princ "\nUPDATEBLOCK cargado: actualizar un bloque desde el master de formatos anotativos.")
 (princ)

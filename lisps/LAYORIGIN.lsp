@@ -58,5 +58,4 @@
        (*error* "El CAD rechazo el cambio del origen interno."))))
   (princ))
 
-(princ "\nLAYORIGIN cargado. Restablece el origen interno del papel del layout actual.")
 (princ)

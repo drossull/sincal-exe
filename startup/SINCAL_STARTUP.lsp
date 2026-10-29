@@ -20,7 +20,6 @@
 (if (/= (getvar "MIRRTEXT") 0) (setvar "MIRRTEXT" 0))
 (if (/= (getvar "FIELDEVAL") 31) (setvar "FIELDEVAL" 31))
 (setvar "DYNMODE" 3)
-(princ "\n[SINCAL] Variables blindadas (MIRRTEXT, FIELDEVAL, DYNMODE).")
 
 ;;; =========================================================================
 ;;; 2. INYECCIÓN Y ORDENAMIENTO DE PROPIEDADES CUSTOM (Macro a Micro)
@@ -99,7 +98,7 @@
     (vl-catch-all-apply 'vla-AddCustomInfo (list props (cadr remaining) (cddr remaining)))
   )
 
-  (princ "\n[SINCAL] Diccionario de propiedades jerarquizado y verificado.")
+  (princ)
 )
 
 ;;; =========================================================================
@@ -157,7 +156,7 @@
   (command)
 
   (setvar "CMDECHO" origCmdEcho)
-  (princ "\n[SINCAL] Escalas oficiales (m) calibradas.")
+  (princ)
 )
 
 ;;; =========================================================================
@@ -198,5 +197,5 @@
 ;; aísla para que esa limitación no impida cargar escalas ni ejecutar el SCR.
 (vl-catch-all-apply 'SINCAL:AutoCrearPropiedad '())
 (vl-catch-all-apply 'SINCAL:GenerarEscalas '())
-(princ "\n--- SINCAL STARTUP CARGADO EXITOSAMENTE ---")
+(princ "\nSINCAL listo. Escribe SINCALISP para consultar los comandos")
 (princ)

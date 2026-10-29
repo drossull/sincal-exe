@@ -86,5 +86,4 @@
                   " Pruebe una distancia menor o revise la geometria. Detalle: " (cadr result))))))))))
   (princ))
 
-(princ "\nOF2 cargado: offset a ambos lados por ancho Total (T) o distancia por Lado (L).")
 (princ)

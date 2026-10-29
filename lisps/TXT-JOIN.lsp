@@ -537,5 +537,4 @@
   (princ)
 )
 
-(princ "\nTXT-JOIN cargado. Reconstruye TEXT fragmentados en un MTEXT.")
 (princ)

@@ -255,5 +255,4 @@
   (princ)
 )
 
-(princ "\nRPUENTE cargado. Seleccione una curva o use Trespuntos para estimar su radio.")
 (princ)

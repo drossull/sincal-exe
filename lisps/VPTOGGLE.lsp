@@ -46,5 +46,4 @@
   (princ)
 )
 
-(princ "\nComando VPTOGGLE cargado. Alterna la capa \"Viewport layer\".")
 (princ)

@@ -33,5 +33,4 @@
   (princ)
 )
 
-(princ "\nComando cargado exitosamente. Escribe CPOL para usarlo.")
 (princ)

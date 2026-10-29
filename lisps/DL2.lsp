@@ -40,5 +40,4 @@
   (princ) ; Salida limpia
 )
 
-(princ "\nComando cargado. Escribe DL2 para eliminar Layout2 y A1.")
 (princ)

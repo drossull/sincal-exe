@@ -77,5 +77,4 @@
   (princ)
 )
 
-(princ "\nZV cargado. Escriba ZV para ampliar el tercio inferior derecho del layout.")
 (princ)

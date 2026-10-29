@@ -301,5 +301,4 @@
           (vla-EndUndoMark doc) (setq begun nil SCSV:table nil)
           (princ "\nTabla TENSIONES creada. Celdas editables; sin vinculo automatico al archivo.")))))
   (princ))
-(princ "\nCSV-SC cargado: importar armaduras CSV/XSR a una tabla TENSIONES.")
 (princ)

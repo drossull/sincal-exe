@@ -34,6 +34,5 @@
   (princ)
 )
 
-;;; Mensaje al cargar
-(princ "\nComando MC cargado. Escriba MC para centrar textos.")
+;;; Carga silenciosa
 (princ)

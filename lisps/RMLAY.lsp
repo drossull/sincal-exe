@@ -49,6 +49,5 @@
   (princ) ; Sale limpiamente
 )
 
-;;; Mensaje de carga
-(princ "\nComando RMLAY cargado. Escribe RMLAY para cambiar el nombre de la pestaña.")
+;;; Carga silenciosa
 (princ)

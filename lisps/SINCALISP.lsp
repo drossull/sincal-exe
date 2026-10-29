@@ -138,5 +138,4 @@
   (*error* nil)
   (princ))
 
-(princ "\nSINCALISP cargado: catalogo de comandos SINCAL y sus descripciones.")
 (princ)

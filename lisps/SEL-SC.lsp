@@ -214,5 +214,4 @@
   (princ)
 )
 
-(princ "\nSEL-SC cargado. Escriba SEL-SC para usarlo.")
 (princ)

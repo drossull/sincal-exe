@@ -59,5 +59,4 @@
       (princ "\n[VG] Operacion terminada. El dibujo no se ha guardado automaticamente.")))
   (princ))
 
-(princ "\nVG cargado: eliminar bloques con prefijo VIÑETA y purgar el dibujo actual.")
 (princ)

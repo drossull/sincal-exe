@@ -128,5 +128,4 @@
                  " y bloqueado. Enter repite VRAP para otra area."))
   (princ))
 
-(princ "\nVRAP cargado. Dos esquinas en Model y un punto en Layout, a la escala anotativa actual.")
 (princ)
