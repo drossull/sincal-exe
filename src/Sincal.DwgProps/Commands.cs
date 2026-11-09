@@ -17,6 +17,7 @@ public class Commands
         public string[]? revisionValues { get; set; }
         public bool revisionEditorRead { get; set; }
         public RevisionEditor.Change[]? revisionEdits { get; set; }
+        public string[]? revisionFieldRepairTables { get; set; }
     }
 
     private static Dictionary<string, string> Properties(Database database)
@@ -109,6 +110,32 @@ public class Commands
             var desired = new Dictionary<string, string>(original, StringComparer.Ordinal);
             object? revisionResult = null;
             object? editorResult = null;
+            if (request.revisionFieldRepairTables is not null)
+            {
+                if (request.changes is not null || request.revisionRead || request.revisionValues is not null
+                    || request.revisionEditorRead || request.revisionEdits is not null)
+                    throw new InvalidOperationException("La reparación de Fields debe ejecutarse por separado.");
+                var stableInventory = EntityInventory(database, true);
+                RevisionFieldRepair.Snapshot repaired;
+                try
+                {
+                    HostApplicationServices.WorkingDatabase = database;
+                    repaired = RevisionFieldRepair.Repair(database, request.revisionFieldRepairTables);
+                    RevisionFieldRepair.Verify(database, repaired);
+                    database.SaveAs(request.saved, true, database.OriginalFileVersion, database.SecurityParameters);
+                }
+                finally { HostApplicationServices.WorkingDatabase = opened; }
+                using var verified = new Database(false, true);
+                verified.ReadDwgFile(request.saved, FileOpenMode.OpenForReadAndAllShare, true, "");
+                verified.CloseInput(true);
+                RevisionFieldRepair.Verify(verified, repaired);
+                ViewportIntegrity.Verify(verified, viewports);
+                var actual = Properties(verified);
+                if (actual.Count != original.Count || original.Any(p => !actual.TryGetValue(p.Key, out var value) || value != p.Value)
+                    || StandardProperties(verified) != standard || EntityInventory(verified, true) != stableInventory
+                    || verified.OriginalFileVersion != database.OriginalFileVersion)
+                    throw new InvalidOperationException("Cambió un dato ajeno a los Fields; no se reemplazará el original.");
+            }
             if(request.revisionEditorRead || request.revisionEdits is not null)
             {
                 if(request.changes is not null || request.revisionRead || request.revisionValues is not null)

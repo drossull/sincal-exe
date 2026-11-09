@@ -58,6 +58,10 @@ class Services:
         self.cad_lock = threading.Lock()
         self.shell_selection = None
         self.lock = threading.RLock()
+        self.resource_lock = threading.RLock()
+        self.resource_status_cache = None
+        self.resource_status_checked = 0
+        self.resource_state_signature = None
         self.clean_runtime()
 
     def clean_runtime(self):
@@ -176,8 +180,53 @@ class Services:
     def sync_check(self, job, payload):
         from sincal.resources import check_resource_updates
         job.update('Consultando manifiesto de recursos. Requiere Internet.')
-        plan = check_resource_updates()
+        with self.resource_lock:
+            plan = check_resource_updates()
+            self._remember_resource_status(plan)
         return {'plan': self.remember(self.plans, ('sync', plan)), **asdict(plan)}
+
+    @staticmethod
+    def _resource_state_signature():
+        from sincal.resources import state_path, _cad_activation_pending_path
+        signature = []
+        for path in (state_path(), _cad_activation_pending_path()):
+            try:
+                stat = os.stat(path)
+                signature.append((stat.st_mtime_ns, stat.st_size))
+            except OSError:
+                signature.append(None)
+        return tuple(signature)
+
+    def _remember_resource_status(self, plan):
+        self.resource_status_cache = {
+            'available': True, 'source_commit': plan.source_commit,
+            'tree_sha': plan.tree_sha, 'changed': len(plan.changed),
+            'removed': len(plan.removed),
+        }
+        self.resource_state_signature = self._resource_state_signature()
+        self.resource_status_checked = time.monotonic()
+
+    def resource_status(self):
+        """Check only publication metadata between revisions; never touch CAD."""
+        from sincal.resources import check_resource_updates, distribution_manifest_revision
+        with self.resource_lock:
+            signature = self._resource_state_signature()
+            unchanged = signature == self.resource_state_signature
+            cached = self.resource_status_cache
+            if cached and unchanged and time.monotonic() - self.resource_status_checked < 60:
+                return dict(cached)
+            try:
+                revision = distribution_manifest_revision()
+                if not cached or not unchanged or revision != cached['source_commit']:
+                    # Remember only the revision actually represented by this plan.
+                    # The publication may advance after the lightweight request.
+                    self._remember_resource_status(check_resource_updates())
+                else:
+                    self.resource_status_checked = time.monotonic()
+                return dict(self.resource_status_cache)
+            except Exception:
+                # Automatic checks stay quiet offline; manual sync-check reports errors.
+                return {'available': False}
 
     def properties_read(self, job, payload):
         from sincal.cad.dwgprops import process_file, CadUnavailable, CadBatch
@@ -292,16 +341,25 @@ class Services:
             return execute(job, self.shell_selection, payload.get('overwrite', False), self.runtime)
 
     def sync_apply(self, job, payload):
-        from sincal.resources import apply_resource_updates, materialize_cad_resources
+        from sincal.resources import apply_resource_updates, check_resource_updates, materialize_cad_resources
         with self.lock:
             item = self.plans.pop(payload.get('plan'), None)
         if not item or item[0] != 'sync':
             raise ValueError('Vuelve a comprobar las actualizaciones.')
         job.check()
-        job.update('Descargando y verificando recursos; espera a que termine esta etapa.')
-        result = apply_resource_updates(item[1])
-        job.update('Preparando carga automática de los comandos CAD actualizados.')
-        materialize_cad_resources()
+        with self.resource_lock:
+            try:
+                job.update('Comprobando que la publicación seleccionada siga vigente.')
+                fresh = check_resource_updates()
+                if fresh.tree_sha != item[1].tree_sha:
+                    raise ValueError('Hay una publicación más reciente. Vuelve a comprobar las actualizaciones.')
+                job.check()
+                job.update('Descargando y verificando recursos; espera a que termine esta etapa.')
+                result = apply_resource_updates(fresh)
+                job.update('Preparando carga automática de los comandos CAD actualizados.')
+                materialize_cad_resources()
+            finally:
+                self.resource_status_cache = None
         return {**asdict(result), 'message':
                 'Recursos y carga automática actualizados. Abre un dibujo nuevo o reinicia CAD para cargar los comandos.'}
 
@@ -311,9 +369,13 @@ class Services:
         from sincal.resources import materialize_cad_resources
         from sincal.cad.integration import registrar_ruta_cad_usuario, registrar_scripts_en_path
         job.check()
-        paths = materialize_cad_resources()
-        changes = registrar_ruta_cad_usuario()
-        registrar_scripts_en_path()
+        with self.resource_lock:
+            try:
+                paths = materialize_cad_resources()
+                changes = registrar_ruta_cad_usuario()
+                registrar_scripts_en_path()
+            finally:
+                self.resource_status_cache = None
         return {'resources': list(paths), 'changes': list(changes), 'message': 'Reinicia CAD para cargar la integración.'}
 
     def diagnostics(self, job, payload):

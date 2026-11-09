@@ -2,6 +2,7 @@
 import {renderRebar,renderCrossbeam} from '/rebar.js';
 import {renderRebarAssistant} from '/rebar_assistant.js';
 import {renderTools} from '/tools.js';
+import {createResourcePoller} from '/resources_status.js';
 import {renderNavigation,renderTabs,title,owner,destination} from '/navigation.js';
 import {createProjectFiles} from '/project_files.js';
 import {renderPasarela,createPasarelaPanel} from '/optional_modules.js';
@@ -156,5 +157,8 @@ async function start(){
   $('#theme').value=preferences.theme||'system';theme();$('#zoom').value=preferences.zoom||'100';document.documentElement.dataset.zoom=$('#zoom').value;
   document.body.classList.toggle('panels-hidden',preferences.sidebar===false);document.body.classList.toggle('outline-hidden',preferences.outline===false);
   await show(project?'consulta':'home');
+  const resourcePoller=createResourcePoller({api,notify,isBusy:()=>!!activeJob});
+  resourcePoller.start();
+  window.addEventListener('pagehide',()=>resourcePoller.stop(),{once:true});
 }
 start().catch(e=>{notify(e.message);show('home').catch(error=>notify(error.message));});

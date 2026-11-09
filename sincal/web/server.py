@@ -187,6 +187,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/modules/pasarela/status":
             return self.send(200, self.server.module_host.status())
+        if path == '/api/resources/status':
+            return self.send(200, self.server.services.resource_status())
         if path == "/api/rebar/defaults":
             return self.send(200, rebar_defaults())
         if path == "/api/cad/status":
@@ -242,6 +244,7 @@ class Handler(BaseHTTPRequestHandler):
                   "/rebar.js": (STATIC / "rebar.js", "text/javascript; charset=utf-8"),
                   "/rebar_assistant.js": (STATIC / "rebar_assistant.js", "text/javascript; charset=utf-8"),
                   "/tools.js": (STATIC / "tools.js", "text/javascript; charset=utf-8"),
+                  "/resources_status.js": (STATIC / "resources_status.js", "text/javascript; charset=utf-8"),
                   "/study_info.js": (STATIC / "study_info.js", "text/javascript; charset=utf-8"),
                   "/navigation.js": (STATIC / "navigation.js", "text/javascript; charset=utf-8"),
                   "/project_files.js": (STATIC / "project_files.js", "text/javascript; charset=utf-8"),

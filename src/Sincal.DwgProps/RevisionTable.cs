@@ -109,46 +109,65 @@ public static class RevisionTable
         var old = Read(db);
         if(string.Equals(values[0].Trim(),old.rows[0][0].Trim(),StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("La nueva revisión coincide con la actual; no se desplazó el historial.");
-        using var tr = db.TransactionManager.StartTransaction();
-        var found = Find(db,tr);
-        var evaluation=found.tables.ToDictionary(t=>t.ObjectId,t=>Enumerable.Range(0,6).Select(c=>t.Cells[0,c].Contents[0].FieldId.IsNull
-            ? FieldEvaluationOptions.Disable : ((Field)tr.GetObject(t.Cells[0,c].Contents[0].FieldId,OpenMode.ForRead)).EvaluationOption).ToArray());
-        var props = new DatabaseSummaryInfoBuilder(db.SummaryInfo);
-        for(int c=0;c<6;c++) if(old.properties[c] is string key) props.CustomPropertyTable[key]=values[c];
-        db.SummaryInfo=props.ToDatabaseSummaryInfo();
-        foreach(var table in found.tables)
+        using (var tr = db.TransactionManager.StartTransaction())
         {
-            table.UpgradeOpen();
-            for(int r=table.Rows.Count-1;r>=1;r--)
-                for(int c=0;c<6;c++) table.Cells[r,c].TextString=old.rows[r-1][c];
-            for(int c=0;c<6;c++)
+            var found = Find(db,tr);
+            var evaluation=found.tables.ToDictionary(t=>t.ObjectId,t=>Enumerable.Range(0,6).Select(c=>t.Cells[0,c].Contents[0].FieldId.IsNull
+                ? FieldEvaluationOptions.Disable : ((Field)tr.GetObject(t.Cells[0,c].Contents[0].FieldId,OpenMode.ForRead)).EvaluationOption).ToArray());
+            var props = new DatabaseSummaryInfoBuilder(db.SummaryInfo);
+            for(int c=0;c<6;c++) if(old.properties[c] is string key) props.CustomPropertyTable[key]=values[c];
+            db.SummaryInfo=props.ToDatabaseSummaryInfo();
+            foreach(var table in found.tables)
             {
-                if(old.fields[c] is null) table.Cells[0,c].TextString=values[c];
-                else
+                table.UpgradeOpen();
+                for(int r=table.Rows.Count-1;r>=1;r--)
+                    for(int c=0;c<6;c++) table.Cells[r,c].TextString=old.rows[r-1][c];
+                for(int c=0;c<6;c++)
                 {
-                    // Dynamic table variants can share field objects. Give each
-                    // updated table an independent field with the same expression.
-                    // A table cell needs a text field containing the AcVar child,
-                    // not a bare evaluator field (which displays #### in a cell).
-                    var field=new Field("%<" + old.fields[c] + ">%", true);
-                    field.EvaluationOption=evaluation[table.ObjectId][c];
-                    db.AddDBObject(field);
-                    tr.AddNewlyCreatedDBObject(field,true);
-                    field.Evaluate((int)FieldEvaluationContext.Preview,db);
-                    if(field.EvaluationStatus.Status != FieldEvaluationStatus.Success)
-                        throw new InvalidOperationException("No se pudo evaluar FIELD: " + field.EvaluationStatus.Status + " " + field.EvaluationStatus.ErrorMessage);
-                    var evaluated=field.GetFieldCode(FieldCodeFlags.EvaluatedText);
-                    var expected=old.fields[c]!.Contains("%tc1")?values[c].ToUpperInvariant():values[c];
-                    if(evaluated != expected) throw new InvalidOperationException("El FIELD de la columna " + (c+1) + " no muestra el valor solicitado.");
-                    table.Cells[0,c].Contents[0].FieldId=field.ObjectId;
-                    var attached=(Field)tr.GetObject(table.Cells[0,c].Contents[0].FieldId,OpenMode.ForWrite);
-                    attached.Evaluate((int)FieldEvaluationContext.Preview,db);
+                    if(old.fields[c] is null) table.Cells[0,c].TextString=values[c];
+                    else
+                    {
+                        // Dynamic table variants can share field objects. Give each
+                        // updated table an independent field with the same expression.
+                        // A table cell needs a text field containing the AcVar child,
+                        // not a bare evaluator field (which displays #### in a cell).
+                        var field=new Field("%<" + old.fields[c] + ">%", true);
+                        field.EvaluationOption=evaluation[table.ObjectId][c];
+                        db.AddDBObject(field);
+                        tr.AddNewlyCreatedDBObject(field,true);
+                        field.Evaluate((int)FieldEvaluationContext.Preview,db);
+                        if(field.EvaluationStatus.Status != FieldEvaluationStatus.Success)
+                            throw new InvalidOperationException("No se pudo evaluar FIELD: " + field.EvaluationStatus.Status + " " + field.EvaluationStatus.ErrorMessage);
+                        var evaluated=field.GetFieldCode(FieldCodeFlags.EvaluatedText);
+                        var expected=old.fields[c]!.Contains("%tc1")?values[c].ToUpperInvariant():values[c];
+                        if(evaluated != expected) throw new InvalidOperationException("El FIELD de la columna " + (c+1) + " no muestra el valor solicitado.");
+                        table.Cells[0,c].Contents[0].FieldId=field.ObjectId;
+                        var attached=(Field)tr.GetObject(table.Cells[0,c].Contents[0].FieldId,OpenMode.ForWrite);
+                        attached.Evaluate((int)FieldEvaluationContext.Preview,db);
+                    }
                 }
+                table.GenerateLayout();
+                table.RecomputeTableBlock(true);
             }
-            table.GenerateLayout();
-            table.RecomputeTableBlock(true);
+            tr.Commit();
         }
-        tr.Commit();
+        // Table regeneration/transaction closure materializes the new child
+        // Fields. Only now are their ObjectIds safe to open through a transaction.
+        // Values were already evaluated above; changing options does not need a
+        // second table regeneration, which could replace the newly captured tree.
+        using (var tr = db.TransactionManager.StartTransaction())
+        {
+            foreach(var table in Find(db,tr).tables)
+                for(int c=0;c<6;c++)
+                {
+                    var fieldId=table.Cells[0,c].Contents[0].FieldId;
+                    if(fieldId.IsNull) continue;
+                    var field=(Field)tr.GetObject(fieldId,OpenMode.ForRead);
+                    FieldEvaluation.InheritNewChildren(field,tr);
+                    FieldEvaluation.VerifyChildren(field,tr);
+                }
+            tr.Commit();
+        }
         return old;
     }
 
@@ -165,7 +184,12 @@ public static class RevisionTable
         using var tr=db.TransactionManager.StartOpenCloseTransaction();
         foreach(var table in Find(db,tr).tables)
             for(int c=0;c<6;c++)
+            {
+                var fieldId=table.Cells[0,c].Contents[0].FieldId;
+                if(!fieldId.IsNull)
+                    FieldEvaluation.VerifyChildren((Field)tr.GetObject(fieldId,OpenMode.ForRead),tr);
                 if(table.Cells[0,c].TextString != current.rows[0][c])
                     throw new InvalidOperationException("La presentación del FIELD de la columna " + (c+1) + " no se actualizó; no se reemplazará el original.");
+            }
     }
 }

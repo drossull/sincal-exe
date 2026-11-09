@@ -131,8 +131,11 @@ Al cerrar la ventana principal con **X**, SINCAL finaliza su proceso. La aplicac
 
 - Comprueba una nueva versión completa desde las Releases públicas.
 - Revisa recursos al iniciar y cada minuto mediante un manifiesto liviano.
+- Avisa en Home cuando hay recursos pendientes; la descarga se inicia con **Comprobar recursos** y **Aplicar actualización**. La revisión mostrada corresponde al commit de origen.
 - Descarga LISPs, startup, scripts, CTB, master, tutoriales y mapas autorizados.
 - Valida tipo, tamaño y SHA de Git antes de activar cada archivo.
+- Comprueba una publicación sin reutilizar respuestas antiguas y descarga sus archivos desde una revisión fija. Si la publicación cambia antes de aplicar, solicita comprobar nuevamente.
+- Detecta y repara archivos locales alterados o una preparación CAD interrumpida; reutiliza las copias verificadas y conserva los recursos locales cuando no hay conexión.
 - Prepara el cargador de AutoCAD/ZWCAD y la consola para procesos cerrados.
 
 ### Recursos CAD
@@ -184,6 +187,39 @@ trazado. No guarda el DWG y permite deshacer con `U`. Activa el layout afectado,
 ejecuta el comando y verifica la vista previa antes de guardar. Para un solo
 dibujo úsalo directamente en CAD; Comandos en vivo lo envía a cada dibujo abierto.
 Validado en AutoCAD 2025; pendiente de prueba en ZWCAD.
+
+### Reactivar Fields de la revisión actual en ZWCAD
+
+`ACTUALIZAR-VINETA` permite seleccionar una inserción `VIÑETA` / `VINETA` y
+reactivar los Fields DWGPROPS deshabilitados de la primera fila de su tabla de
+revisiones de seis columnas. Comprueba que las propiedades referidas existan y
+conserva los códigos de los Fields, las opciones de evaluación ya activas y las
+filas históricas. No cambia propiedades, no agrega una revisión ni guarda el plano.
+Revisa el resultado y guarda si corresponde; `U` permite deshacer. El comando
+actúa sobre la definición utilizada por la inserción seleccionada, por lo que
+otras inserciones que compartan esa definición verán la misma corrección.
+No recorre los demás bloques del dibujo ni modifica referencias externas.
+
+Es una recuperación inmediata: en la prueba con ZWCAD 2026 actualiza G → H y
+conserva historial, dimensiones y viewports, pero ese DWG vuelve a desactivar
+los campos al guardar/reabrir. Puede ser necesario repetir el comando después
+de otro cambio de DWGPROPS. No se considera una reparación permanente.
+
+El conector nativo corrige la creación de nuevas revisiones: después de que CAD
+materializa los Fields de la tabla, sus campos hijos heredan las opciones del
+padre. Comprueba estas opciones también después de guardar y reabrir; una
+evaluación forzada inicial no basta para aceptar el resultado.
+
+Para cuadros existentes, el conector incorpora una operación interna de
+mantenimiento `revisionFieldRepairTables`, sobre handles de tablas explícitos
+y copias temporales. Sólo admite el patrón conocido de los cuatro Fields de la
+revisión actual. Conserva DWGPROPS, historial, formato, dimensiones y viewports;
+verifica el archivo guardado antes de aceptarlo. La tabla puede reconstruir los
+identificadores internos de esos cuatro Fields, conservando sus expresiones y
+vínculos. No añade controles a la interfaz ni modifica dibujos abiertos.
+Esta corrección requiere distribuir el conector en una nueva release; sincronizar
+únicamente los LISPs no actualiza el binario. Pruebas y protocolo en
+[`tests/cad/REVISION_FIELDS.md`](tests/cad/REVISION_FIELDS.md).
 
 ### Procesamiento DWG desde CMD
 
@@ -383,9 +419,12 @@ El tab **Documentación** presenta el manual en el área central y usa el índic
 2. Para el master, trabaja sobre una copia y valida bloques, atributos y referencias antes de reemplazarlo.
 3. Haz commit y push a `main`.
 4. El workflow `publish-distribution.yml` exportará únicamente la lista blanca a `drossull/sincal-updates` y actualizará `manifest.json`.
-5. SINCAL detectará la nueva revisión dentro del siguiente ciclo de un minuto y ofrecerá instalarla.
+5. Espera que termine correctamente **Publicar recursos SINCAL**. El push al repositorio privado por sí solo todavía no actualiza el canal de distribución.
+6. Con el sincronizador actualizado y conexión disponible, SINCAL detectará la publicación en el siguiente ciclo de comprobación y avisará para instalarla desde Home. La comprobación manual consulta la publicación disponible en ese momento.
 
 Los cambios en Python, interfaz, plugin .NET o instalador requieren una release completa. Los recursos menores no reemplazan ejecutables.
+
+La corrección del sincronizador también requiere distribuir una nueva release e instalarla una vez en cada equipo: los ejecutables anteriores no reciben esta lógica mediante los LISPs. Después, las nuevas revisiones de recursos se detectan y aplican desde Home sin copiar archivos ni corregir estados a mano. Estas mejoras corresponden al código actual del repositorio; no implican que una release nueva ya esté publicada.
 
 ## Compilar una release de escritorio web
 

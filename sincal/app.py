@@ -1446,8 +1446,9 @@ class ActualizadorCAD(ctk.CTk):
                 return
 
             plan = check_resource_updates()
-            if manifest_revision:
-                self._resource_manifest_revision = manifest_revision
+            # Only remember the manifest belonging to the verified tree. A
+            # floating manifest may have advanced while this check was running.
+            self._resource_manifest_revision = plan.source_commit
             if plan.has_changes:
                 if not manual and plan.tree_sha == self._last_resource_offer_tree:
                     return
@@ -1474,6 +1475,8 @@ class ActualizadorCAD(ctk.CTk):
                     "Los recursos CAD ya coinciden con la rama main de GitHub.",
                 )
         except Exception as e:
+            self._resource_manifest_revision = ""
+            self._last_resource_offer_tree = ""
             self.logger.warning("No se pudieron verificar los recursos CAD: %s", e)
             record_incident("verificar_recursos", "error", {"error": str(e)})
             self.log(f"[!] No se pudieron verificar los recursos CAD; se conservarán las copias locales: {e}")
@@ -1518,12 +1521,17 @@ class ActualizadorCAD(ctk.CTk):
 
     def _hilo_aplicar_recursos(self, plan):
         try:
+            fresh = check_resource_updates()
+            if fresh.tree_sha != plan.tree_sha:
+                raise ValueError("Hay una publicación más reciente. Vuelve a comprobar las actualizaciones.")
             if hasattr(self, "actualizar_actividad"):
                 self.actualizar_actividad("actualizar_recursos", 15, "Descargando recursos")
-            resultado = apply_resource_updates(plan)
+            resultado = apply_resource_updates(fresh)
             if hasattr(self, "actualizar_actividad"):
                 self.actualizar_actividad("actualizar_recursos", 70, "Preparando integración CAD")
         except Exception as e:
+            self._resource_manifest_revision = ""
+            self._last_resource_offer_tree = ""
             self.logger.exception("Falló la actualización de recursos CAD")
             record_incident("actualizar_recursos", "error", {"error": str(e)})
             self.log(f"[X] No se pudo completar la actualización menor: {e}")
@@ -1544,6 +1552,8 @@ class ActualizadorCAD(ctk.CTk):
             self._preparar_archivos_cad()
             integracion_preparada = True
         except Exception as e:
+            self._resource_manifest_revision = ""
+            self._last_resource_offer_tree = ""
             self.logger.warning(
                 "Los recursos se instalaron, pero no se pudo preparar la integración CAD: %s",
                 e,

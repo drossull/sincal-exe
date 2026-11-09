@@ -6,7 +6,7 @@ import os
 import re
 import shutil
 import tempfile
-import time
+import uuid
 from dataclasses import dataclass
 from urllib.parse import quote
 
@@ -43,6 +43,7 @@ class ResourceEntry:
     path: str
     sha: str
     size: int
+    publication_commit: str = ""
 
 
 @dataclass(frozen=True)
@@ -52,6 +53,7 @@ class ResourceUpdatePlan:
     changed: tuple[ResourceEntry, ...]
     removed: tuple[str, ...]
     initial: bool
+    source_commit: str = ""
 
     @property
     def has_changes(self) -> bool:
@@ -63,6 +65,7 @@ class ResourceSyncResult:
     updated: tuple[str, ...]
     removed: tuple[str, ...]
     tree_sha: str
+    source_commit: str = ""
 
 
 def state_path() -> str:
@@ -181,6 +184,7 @@ def _serialize_state(plan: ResourceUpdatePlan) -> bytes:
         "repository": f"{DISTRIBUTION_OWNER}/{DISTRIBUTION_REPOSITORY}",
         "branch": DISTRIBUTION_BRANCH,
         "tree_sha": plan.tree_sha,
+        "source_commit": plan.source_commit,
         "resources": resources,
     }
     return json.dumps(state, indent=2, ensure_ascii=False, sort_keys=True).encode("utf-8")
@@ -190,9 +194,8 @@ def record_resource_state(plan: ResourceUpdatePlan) -> None:
     _atomic_write(state_path(), _serialize_state(plan))
 
 
-def _tree_url() -> str:
-    branch = quote(DISTRIBUTION_BRANCH, safe="")
-    return distribution_api_url(f"git/trees/{branch}?recursive=1")
+def _tree_url(revision: str = DISTRIBUTION_BRANCH) -> str:
+    return distribution_api_url(f"git/trees/{quote(revision, safe='')}?recursive=1")
 
 
 def _session_or_requests(session):
@@ -211,28 +214,81 @@ def _headers() -> dict[str, str]:
     }
 
 
-def distribution_manifest_revision(session=None) -> str:
-    """Obtiene una revisión liviana para decidir si hace falta consultar el árbol."""
-    client = _session_or_requests(session)
-    response = client.get(
-        DISTRIBUTION_MANIFEST_URL,
-        headers={
-            "Accept": "application/json",
-            "Cache-Control": "no-cache",
-            "User-Agent": _headers()["User-Agent"],
-        },
-        params={"minute": int(time.time() // 60)},
-        timeout=REQUEST_TIMEOUT,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    revision = str(payload.get("source_commit") or "").lower()
+def _fresh_request_options() -> dict:
+    # A second check in the same minute must not reuse the response from before
+    # a publication. Immutable trees/blobs below need no cache busting.
+    return {
+        "headers": {**_headers(), "Cache-Control": "no-cache", "Pragma": "no-cache"},
+        "params": {"_sincal_check": uuid.uuid4().hex},
+        "timeout": REQUEST_TIMEOUT,
+    }
+
+
+def _source_commit(payload) -> str:
+    revision = str(payload.get("source_commit") or "").lower() if isinstance(payload, dict) else ""
     if re.fullmatch(r"[0-9a-f]{40}", revision) is None:
         raise ValueError("El manifiesto público no contiene una revisión válida.")
     return revision
 
 
-def _entry_from_tree(raw: dict) -> ResourceEntry | None:
+def distribution_manifest_revision(session=None) -> str:
+    """Obtiene una revisión liviana para decidir si hace falta consultar el árbol."""
+    client = _session_or_requests(session)
+    response = client.get(
+        DISTRIBUTION_MANIFEST_URL,
+        **_fresh_request_options(),
+    )
+    response.raise_for_status()
+    return _source_commit(response.json())
+
+
+def _published_tree(client) -> tuple[dict, str]:
+    response = client.get(
+        distribution_api_url(f"commits/{quote(DISTRIBUTION_BRANCH, safe='')}"),
+        **_fresh_request_options(),
+    )
+    response.raise_for_status()
+    commit = response.json()
+    publication_commit = str(commit.get("sha") or "").lower()
+    tree_sha = str(commit.get("commit", {}).get("tree", {}).get("sha") or "").lower()
+    if any(re.fullmatch(r"[0-9a-f]{40}", value) is None for value in (publication_commit, tree_sha)):
+        raise ValueError("GitHub no devolvió una revisión publicada válida.")
+    response = client.get(_tree_url(tree_sha), headers=_headers(), timeout=REQUEST_TIMEOUT)
+    response.raise_for_status()
+    tree = response.json()
+    if tree.get("sha") != tree_sha:
+        raise ValueError("El árbol recibido no corresponde a la revisión publicada. Vuelve a comprobar.")
+    return tree, publication_commit
+
+
+def _tree_source_commit(tree, publication_commit, client) -> str:
+    manifests = [item for item in tree.get("tree", []) if item.get("path") == "manifest.json"]
+    if not manifests:
+        return ""  # Compatibility with distributions predating the manifest.
+    if len(manifests) != 1:
+        raise ValueError("La distribución contiene manifiestos duplicados.")
+    entry = manifests[0]
+    sha, size = str(entry.get("sha") or ""), int(entry.get("size") or 0)
+    if (entry.get("type") != "blob" or entry.get("mode") not in {"100644", "100755"}
+            or not re.fullmatch(r"[0-9a-f]{40}", sha) or not 0 < size <= 5 * 1024 * 1024):
+        raise ValueError("El manifiesto publicado no es válido.")
+    response = client.get(_raw_url("manifest.json", publication_commit),
+                          headers=_headers(),
+                          timeout=REQUEST_TIMEOUT, stream=True)
+    response.raise_for_status()
+    chunks, downloaded = [], 0
+    for chunk in response.iter_content(chunk_size=65536):
+        downloaded += len(chunk)
+        if downloaded > size:
+            raise ValueError("El tamaño del manifiesto no coincide con la revisión publicada.")
+        chunks.append(chunk)
+    data = b"".join(chunks)
+    if len(data) != size or git_blob_sha(data) != sha:
+        raise ValueError("El manifiesto no coincide con la revisión publicada.")
+    return _source_commit(json.loads(data.decode("utf-8-sig")))
+
+
+def _entry_from_tree(raw: dict, publication_commit: str = "") -> ResourceEntry | None:
     if raw.get("type") != "blob" or raw.get("mode") not in {"100644", "100755"}:
         return None
     path = str(raw.get("path") or "")
@@ -245,24 +301,26 @@ def _entry_from_tree(raw: dict) -> ResourceEntry | None:
     size = int(raw.get("size") or 0)
     if not 0 < size <= _max_size_for_path(path):
         raise ValueError(f"Tamaño publicado fuera de rango para {path}.")
-    return ResourceEntry(path, sha, size)
+    return ResourceEntry(path, sha, size, publication_commit)
 
 
-def _effective_file_matches(entry: ResourceEntry, previous_resources: dict) -> bool:
-    path = ruta_recurso(*entry.path.split("/"))
+def _file_matches(entry: ResourceEntry, path: str) -> bool:
     extension = os.path.splitext(entry.path.lower())[1]
     try:
         local_size = os.path.getsize(path)
-        if extension in TEXT_EXTENSIONS:
-            return _file_git_blob_sha(path, local_size, normalize_text=True) == entry.sha
-        if local_size != entry.size:
-            return False
-        previous = previous_resources.get(entry.path)
-        if isinstance(previous, dict) and previous.get("sha") == entry.sha:
+        if local_size == entry.size and _file_git_blob_sha(path, local_size) == entry.sha:
             return True
-        return _file_git_blob_sha(path, entry.size) == entry.sha
+        return extension in TEXT_EXTENSIONS and _file_git_blob_sha(path, local_size, normalize_text=True) == entry.sha
     except OSError:
         return False
+
+
+def _effective_file_matches(entry: ResourceEntry, previous_resources: dict) -> bool:
+    return _file_matches(entry, ruta_recurso(*entry.path.split("/")))
+
+
+def _cad_activation_pending_path() -> str:
+    return os.path.join(RUTA_RECURSOS_USUARIO, ".cad_activation_pending")
 
 
 def _is_lazy_resource(path: str) -> bool:
@@ -275,9 +333,7 @@ def _effective_resource_exists(entry: ResourceEntry) -> bool:
 
 def check_resource_updates(session=None) -> ResourceUpdatePlan:
     client = _session_or_requests(session)
-    response = client.get(_tree_url(), headers=_headers(), timeout=REQUEST_TIMEOUT)
-    response.raise_for_status()
-    payload = response.json()
+    payload, publication_commit = _published_tree(client)
     if payload.get("truncated"):
         raise ValueError("GitHub devolvió un árbol truncado; no se aplicarán cambios.")
 
@@ -287,7 +343,7 @@ def check_resource_updates(session=None) -> ResourceUpdatePlan:
 
     entries = []
     for raw in payload.get("tree") or []:
-        entry = _entry_from_tree(raw)
+        entry = _entry_from_tree(raw, publication_commit)
         if entry is not None:
             entries.append(entry)
     entries.sort(key=lambda item: item.path.lower())
@@ -299,11 +355,15 @@ def check_resource_updates(session=None) -> ResourceUpdatePlan:
 
     state = _load_state()
     previous_resources = state.get("resources") or {}
+    activation_pending = os.path.isfile(_cad_activation_pending_path())
+    integrated = activation_pending or os.path.isfile(_cad_state_path())
     changed = []
     for entry in entries:
         if _is_lazy_resource(entry.path) and not _effective_resource_exists(entry):
             continue
-        if not _effective_file_matches(entry, previous_resources):
+        cad_outdated = (integrated and entry.path.startswith(CAD_RESOURCE_PREFIXES)
+                        and (activation_pending or not _file_matches(entry, ruta_cad_usuario(*entry.path.split("/")))))
+        if not _effective_file_matches(entry, previous_resources) or cad_outdated:
             changed.append(entry)
     removed = sorted(set(previous_resources) - paths)
     total = sum(entry.size for entry in changed)
@@ -316,39 +376,46 @@ def check_resource_updates(session=None) -> ResourceUpdatePlan:
         changed=tuple(changed),
         removed=tuple(removed),
         initial=not bool(state),
+        source_commit=_tree_source_commit(payload, publication_commit, client),
     )
 
 
-def _raw_url(path: str) -> str:
-    encoded = quote(_normalize_relative_path(path), safe="/")
+def _raw_url(path: str, revision: str = DISTRIBUTION_BRANCH) -> str:
+    encoded = quote(path if path == "manifest.json" else _normalize_relative_path(path), safe="/")
     return (
         f"https://raw.githubusercontent.com/{DISTRIBUTION_OWNER}/"
-        f"{DISTRIBUTION_REPOSITORY}/{DISTRIBUTION_BRANCH}/{encoded}"
+        f"{DISTRIBUTION_REPOSITORY}/{quote(revision, safe='')}/{encoded}"
     )
 
 
 def _download_resource(entry: ResourceEntry, client) -> bytes:
-    installed = ruta_recurso_instalado(*entry.path.split("/"))
-    try:
-        with open(installed, "rb") as source:
-            data = source.read()
-        # Validate the same bytes that matched the published SHA. Windows
-        # installers can contain CRLF while Git publishes LF. Keep exact bytes
-        # when they already match (including resources published with CRLF).
-        if (git_blob_sha(data) != entry.sha
-                and os.path.splitext(entry.path.lower())[1] in TEXT_EXTENSIONS):
-            data = data.replace(b"\r\n", b"\n")
-        if git_blob_sha(data) == entry.sha:
-            _validate_resource_data(entry, data)
-            return data
-    except OSError:
-        pass
+    # A failed CAD activation can be retried from the verified local cache,
+    # without downloading files again or falling back to older installer bytes.
+    for local in (resource_cache_path(entry.path), ruta_recurso_instalado(*entry.path.split("/"))):
+        try:
+            with open(local, "rb") as source:
+                data = source.read()
+            # Windows installers can contain CRLF while Git publishes LF.
+            # Preserve exact bytes whenever they already match the publication.
+            if (git_blob_sha(data) != entry.sha
+                    and os.path.splitext(entry.path.lower())[1] in TEXT_EXTENSIONS):
+                data = data.replace(b"\r\n", b"\n")
+            if git_blob_sha(data) == entry.sha:
+                _validate_resource_data(entry, data)
+                return data
+        except OSError:
+            pass
 
+    # Both URLs are immutable. CDN downloads avoid spending the unauthenticated
+    # GitHub API quota once per file for teams sharing an Internet connection.
+    if entry.publication_commit:
+        if re.fullmatch(r"[0-9a-f]{40}", entry.publication_commit) is None:
+            raise ValueError("La revisión de descarga no es válida.")
+        url = _raw_url(entry.path, entry.publication_commit)
+    else:
+        url = distribution_api_url(f"git/blobs/{entry.sha}")
     response = client.get(
-        # The branch may advance between planning and downloading. Fetch the
-        # immutable blob we validated instead of whatever main contains now.
-        distribution_api_url(f"git/blobs/{entry.sha}"),
-        headers={**_headers(), "Accept": "application/vnd.github.raw+json"},
+        url, headers={**_headers(), "Accept": "application/vnd.github.raw+json"},
         timeout=REQUEST_TIMEOUT,
         stream=True,
     )
@@ -397,6 +464,7 @@ def apply_resource_updates(plan: ResourceUpdatePlan, session=None) -> ResourceSy
         updated=tuple(entry.path for entry in plan.changed),
         removed=plan.removed,
         tree_sha=plan.tree_sha,
+        source_commit=plan.source_commit,
     )
 
 
@@ -450,6 +518,8 @@ def _cad_state_path() -> str:
 
 
 def materialize_cad_resources() -> tuple[str, ...]:
+    pending = _cad_activation_pending_path()
+    _atomic_write(pending, b"CAD activation pending\n")
     active = active_resource_paths(CAD_RESOURCE_PREFIXES)
     copied = []
     for relative in active:
@@ -497,6 +567,7 @@ def materialize_cad_resources() -> tuple[str, ...]:
     payload = json.dumps({"resources": active}, indent=2, ensure_ascii=False).encode("utf-8")
     _atomic_write(_cad_state_path(), payload)
     write_cad_loaders(active)
+    os.remove(pending)
     return tuple(copied)
 
 
