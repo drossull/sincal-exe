@@ -17,7 +17,8 @@ CAPAS_ZAPATA = tuple(f"{vista}_ZAP" for vista in VISTAS_ZAPATA)
 DIAMETROS_DISPONIBLES_MM = (12, 16, 18, 22, 25, 28, 32, 36)
 LARGOS_TRASLAPO_CM = {12: 80, 16: 110, 18: 120, 22: 150, 25: 170, 28: 190, 32: 220, 36: 250}
 LARGO_COMERCIAL_CM = 1200.0
-_MARCA_RE = re.compile(r"^[1-9][0-9]*(?:-[A-Z0-9]+)?$", re.IGNORECASE)
+# Same contract as SCM:ValidMark: digits with an optional ASCII letter suffix.
+_MARCA_RE = re.compile(r"[0-9]+[A-Z]*", re.IGNORECASE | re.ASCII)
 
 
 @dataclass(frozen=True)
@@ -71,6 +72,45 @@ class Cover:
 
 
 @dataclass(frozen=True)
+class RemovedPiece:
+    """One explicit removal, bound to the selected piece's actual geometry."""
+    id: str
+    signature: str
+
+
+def parse_removed_pieces(values, key):
+    """Validate persisted removals without accepting arbitrary piece identities.
+
+    The ID identifies one manufactured piece, not an entire family or a run
+    of overlapping pieces. Its geometry signature is checked by the assembly
+    after generating the current parameters.
+    """
+    if key not in ("mesh_x", "mesh_y", "suple", "lateral_x", "lateral_y"):
+        raise ValueError("Familia desconocida para los fierros eliminados.")
+    if not isinstance(values, (tuple, list)) or len(values) > 50000:
+        raise ValueError("La lista de fierros eliminados no es válida.")
+    location = r"(?:-1|1)" if key.startswith("lateral_") else r"(?:superior|inferior)"
+    pattern = re.compile(re.escape(key) + ":" + location + r":[0-9]{1,6}:[0-9]{1,6}")
+    result, seen = [], set()
+    for value in values:
+        if isinstance(value, RemovedPiece):
+            identity, signature = value.id, value.signature
+        elif isinstance(value, Mapping) and set(value) == {"id", "signature"}:
+            identity, signature = value["id"], value["signature"]
+        else:
+            raise ValueError("Cada fierro eliminado debe conservar su identificador y firma.")
+        if not isinstance(identity, str) or not pattern.fullmatch(identity):
+            raise ValueError("El identificador del fierro eliminado no corresponde a su familia.")
+        if not isinstance(signature, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", signature):
+            raise ValueError("La firma del fierro eliminado no es válida.")
+        if identity in seen:
+            raise ValueError("Un fierro figura eliminado más de una vez.")
+        seen.add(identity)
+        result.append(RemovedPiece(identity, signature.lower()))
+    return tuple(result)
+
+
+@dataclass(frozen=True)
 class RebarRule:
     key: str
     label: str
@@ -86,13 +126,20 @@ class RebarRule:
     terminal_mark: str = ""
     placement_multiplier: int = 1
     origin: str = "inicio"
+    first_piece_cm: float = 0.0
+    removed_pieces: tuple[RemovedPiece, ...] = ()
 
     def validate(self):
-        if not self.enabled:
-            return ()
         issues = []
+        try:
+            parse_removed_pieces(self.removed_pieces, self.key)
+        except ValueError as error:
+            issues.append(ValidationIssue("error", str(error)))
+        if not self.enabled:
+            return tuple(issues)
         for label, mark in (("marca", self.mark), ("continuación", self.continuation_mark), ("terminal", self.terminal_mark)):
-            if mark and not _MARCA_RE.match(mark.strip()):
+            if not isinstance(mark, str) or (
+                    (label == "marca" or mark) and not _MARCA_RE.fullmatch(mark)):
                 issues.append(ValidationIssue("error", f"{label.title()} inválida para {self.label}: '{mark}'."))
         if self.diameter_mm not in DIAMETROS_DISPONIBLES_MM:
             issues.append(ValidationIssue("error", f"El diámetro de {self.label} no tiene bloque fiXX disponible."))
@@ -100,9 +147,23 @@ class RebarRule:
             issues.append(ValidationIssue("error", f"El espaciamiento de {self.label} debe ser mayor que cero."))
         if self.hook_cm < 0:
             issues.append(ValidationIssue("error", f"El gancho de {self.label} no puede ser negativo."))
+        if (isinstance(self.first_piece_cm, bool)
+                or not isinstance(self.first_piece_cm, (int, float))
+                or not math.isfinite(self.first_piece_cm)
+                or not 0 <= self.first_piece_cm <= LARGO_COMERCIAL_CM):
+            issues.append(ValidationIssue("error", f"El largo del primer fierro de {self.label} debe estar entre 0 y 1200 cm; 0 es automático."))
+        elif self.first_piece_cm and not self.continuation_mark:
+            issues.append(ValidationIssue("error", f"{self.label} no tiene un reparto de empalmes definido para ajustar el primer fierro."))
         if self.origin not in ("inicio", "final"):
             issues.append(ValidationIssue("error", f"Origen inválido para {self.label}."))
         return tuple(issues)
+
+
+@dataclass(frozen=True)
+class RebarLengthVariant:
+    """A developed cut length and its count within one linked mark."""
+    length_cm: float
+    quantity: int
 
 
 @dataclass(frozen=True)
@@ -120,6 +181,8 @@ class RebarMark:
     hook_count: int = 0
     bend_radius_cm: float = 0.0
     piece_role: str = "completa"
+    length_variants: tuple[RebarLengthVariant, ...] = ()
+    shape_data: Mapping | None = None
 
     @property
     def area_m2(self):
@@ -127,13 +190,16 @@ class RebarMark:
 
     @property
     def kg_steel(self):
-        return self.quantity * (self.unit_length_cm / 100.0) * self.area_m2 * DENSIDAD_ACERO_KG_M3
+        return (self.total_length_cm / 100.0) * self.area_m2 * DENSIDAD_ACERO_KG_M3
 
 
 @dataclass(frozen=True)
 class ZapataSchedule:
     marks: tuple[RebarMark, ...]
     issues: tuple[ValidationIssue, ...]
+    # Local straight-axis intervals that retain both physical splice partners.
+    # None keeps compatibility with older/manual schedule constructors.
+    splice_laps_m: Mapping[str, tuple[tuple[float, float], ...]] | None = None
 
     @property
     def is_valid(self):
@@ -160,13 +226,30 @@ def lap_length_cm(diameter_mm):
         raise ValueError(f"No existe traslapo definido para fi{diameter_mm:g}.") from error
 
 
-def distribution_positions_cm(span_cm, spacing_cm, origin="inicio"):
-    """Separa fijo; agrega barra final sólo cuando el residuo es al menos 10 cm."""
+def distribution_positions_cm(span_cm, spacing_cm, origin="inicio", *, include_endpoints=False,
+                              minimum_spacing_cm=0.0):
+    """Keep the regular pitch and optionally close at both exact endpoints.
+
+    The default retains the existing 10 cm remainder rule for other callers.
+    Footing distributions request both bend tangencies explicitly. If their
+    final residue is smaller than a bar diameter, share the last full interval
+    and the residue equally so parallel bars do not occupy the same space.
+    """
     if span_cm < 0 or spacing_cm <= 0:
         return ()
+    if include_endpoints and (not math.isfinite(minimum_spacing_cm) or minimum_spacing_cm < 0):
+        raise ValueError("La separación mínima del reparto no es válida.")
     positions = [index * spacing_cm for index in range(math.floor((span_cm + 1e-9) / spacing_cm) + 1)]
-    if span_cm - positions[-1] >= 10.0 - 1e-9:
+    remainder = span_cm - positions[-1]
+    if remainder >= 10.0 - 1e-9 or (include_endpoints and remainder > 1e-9):
+        if include_endpoints and remainder < minimum_spacing_cm - 1e-9:
+            if len(positions) < 2:
+                raise ValueError("No caben los dos fierros extremos sin superponerse.")
+            positions[-1] = (positions[-2] + span_cm) / 2
         positions.append(span_cm)
+    if include_endpoints and any(b - a < minimum_spacing_cm - 1e-9
+                                 for a, b in zip(positions, positions[1:])):
+        raise ValueError("No cabe el cierre del reparto sin superponer fierros.")
     if origin == "final":
         positions = [span_cm - value for value in reversed(positions)]
     return tuple(round(value, 9) for value in positions)
@@ -175,13 +258,13 @@ def distribution_positions_cm(span_cm, spacing_cm, origin="inicio"):
 def default_zapata_rules():
     return (
         RebarRule("mesh_x", "Malla 1–2 · superior e inferior", "1", 22, 20, 0,
-                  "superior e inferior", "X", continuation_mark="2", terminal_mark="2-A", placement_multiplier=2),
+                  "superior e inferior", "X", continuation_mark="2", terminal_mark="2A", placement_multiplier=2),
         RebarRule("mesh_y", "Fierro 3 · superior e inferior", "3", 22, 20, 0,
                   "superior e inferior", "Y", placement_multiplier=2),
-        RebarRule("suple", "Suple 3-A · solo superior", "3-A", 16, 20, 0,
+        RebarRule("suple", "Suple 3A · solo superior", "3A", 16, 20, 0,
                   "superior", "Y", enabled=False),
         RebarRule("lateral_x", "Laterales 4–5 · ambas caras", "4", 16, 20, 0,
-                  "lateral", "X", continuation_mark="5", terminal_mark="5-A", placement_multiplier=2),
+                  "lateral", "X", continuation_mark="5", terminal_mark="5A", placement_multiplier=2),
         RebarRule("lateral_y", "Laterales 6 · ambos extremos", "6", 16, 20, 0,
                   "lateral", "Y", placement_multiplier=2),
     )
@@ -196,88 +279,7 @@ _VIEW_NOTES = {
 }
 
 
-def _developed_two_hook_length_cm(run_cm, cover_cm, diameter_mm, hook_cm):
-    radius = bend_radius_cm(diameter_mm)
-    axis_cover = cover_cm + diameter_mm / 20.0
-    tangent_run = run_cm - 2.0 * (axis_cover + radius)
-    if tangent_run <= 0:
-        return 0.0
-    return tangent_run + 2.0 * (hook_cm + math.pi * radius / 2.0)
-
-
-def _append_mark(marks, rule, mark, quantity, length_cm, hook_count, role):
-    rounded = float(math.ceil(length_cm - 1e-9))
-    notes = dict(_VIEW_NOTES[rule.key])
-    marks.append(RebarMark(
-        rule.key, mark, "Zapata", rule.label, rule.diameter_mm, quantity,
-        rounded, quantity * rounded, tuple(notes), notes, hook_count,
-        bend_radius_cm(rule.diameter_mm), role,
-    ))
-
-
-def _append_split_group(marks, issues, rule, placements, developed_cm):
-    if developed_cm <= LARGO_COMERCIAL_CM + 1e-9:
-        _append_mark(marks, rule, rule.mark, placements, developed_cm, 2, "completa")
-        return
-    try:
-        lap_cm = lap_length_cm(rule.diameter_mm)
-    except ValueError as error:
-        issues.append(ValidationIssue("error", str(error)))
-        return
-    if not rule.continuation_mark:
-        issues.append(ValidationIssue("error", f"{rule.label} supera 12 m y no tiene marca de continuación."))
-        return
-    effective_piece = LARGO_COMERCIAL_CM - lap_cm
-    piece_count = max(2, math.ceil((developed_cm - lap_cm) / effective_piece))
-    terminal = developed_cm - LARGO_COMERCIAL_CM * (piece_count - 1) + lap_cm * (piece_count - 1)
-    _append_mark(marks, rule, rule.mark, placements, LARGO_COMERCIAL_CM, 1, "inicial")
-    if piece_count == 2:
-        _append_mark(marks, rule, rule.continuation_mark, placements, terminal, 1, "terminal")
-    else:
-        _append_mark(marks, rule, rule.continuation_mark, placements * (piece_count - 2), LARGO_COMERCIAL_CM, 0, "intermedia")
-        _append_mark(marks, rule, rule.terminal_mark or f"{rule.continuation_mark}-A", placements, terminal, 1, "terminal")
-
-
 def build_zapata_schedule(geometry, cover, rules):
-    """Calcula las marcas 1–6 y 3-A sin duplicarlas por vista."""
-    issues = list(geometry.validate()) + list(cover.validate(geometry))
-    marks = []
-    active = {rule.key: rule for rule in rules if rule.enabled}
-    for rule in rules:
-        issues.extend(rule.validate())
-    if any(issue.severity == "error" for issue in issues):
-        return ZapataSchedule((), tuple(issues))
-
-    length_cm, width_cm, height_cm = geometry.largo_m * 100, geometry.ancho_m * 100, geometry.alto_m * 100
-    cover_cm = cover.lateral_m * 100
-    default_hook = automatic_hook_cm(height_cm)
-    mesh_x, mesh_y = active.get("mesh_x"), active.get("mesh_y")
-
-    for rule in rules:
-        if not rule.enabled:
-            continue
-        hook_cm = rule.hook_cm or default_hook
-        if rule.key in ("mesh_x", "suple"):
-            reference = mesh_y or rule
-            span = length_cm - 2 * (cover_cm + reference.diameter_mm / 20 + bend_radius_cm(reference.diameter_mm))
-        elif rule.key == "mesh_y":
-            reference = mesh_x or rule
-            span = width_cm - 2 * (cover_cm + reference.diameter_mm / 20 + bend_radius_cm(reference.diameter_mm))
-        else:
-            reference = mesh_x or rule
-            span = height_cm - (cover.inferior_m + cover.superior_m) * 100 - reference.diameter_mm / 10
-        placements = len(distribution_positions_cm(span, rule.spacing_cm, rule.origin)) * rule.placement_multiplier
-        if placements <= 0:
-            issues.append(ValidationIssue("error", f"No existe rango útil para distribuir {rule.label}."))
-            continue
-        run = width_cm if rule.direction == "X" else length_cm
-        developed = _developed_two_hook_length_cm(run, cover_cm, rule.diameter_mm, hook_cm)
-        if developed <= 0:
-            issues.append(ValidationIssue("error", f"La geometría no permite construir {rule.label}."))
-        elif rule.continuation_mark:
-            _append_split_group(marks, issues, rule, placements, developed)
-        elif developed > LARGO_COMERCIAL_CM:
-            issues.append(ValidationIssue("error", f"{rule.label} desarrolla {math.ceil(developed):g} cm y requiere empalme."))
-        else:
-            _append_mark(marks, rule, rule.mark, placements, developed, 2, "completa")
-    return ZapataSchedule(tuple(marks), tuple(issues))
+    """Aggregate the same physical pieces used by details and every view."""
+    from .assembly import build_footing_assembly
+    return build_footing_assembly(geometry, cover, rules).schedule

@@ -30,6 +30,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
     else if(p==='/api/project/preview')data={warnings:[],sections:[],text:'Proyecto de prueba'};
     else if(p==='/api/rebar/from-project'){const state={geometry:{largo_cm:900,ancho_cm:2000,alto_cm:200,esviaje_grados:0},cover:{inferior_cm:7.5,superior_cm:5,lateral_cm:5},rules:[]};data={entrada:state,salida:structuredClone(state)};}
     else if(p==='/api/rebar/catalog')data={structures:[]};
+    else if(p==='/api/rebar/beam/preview')data={valid:false,boards:[],board_index:0,beam_index:0,issues:['Faltan datos de vigas en este JSON.'],views:{}};
     await route.fulfill({json:data});return;
    }
    const name=p==='/'?'index.html':p.slice(1),file=path.resolve(__dirname,'../sincal/web/static',name);
@@ -93,7 +94,11 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
   await page.locator('[data-page="rebar-crossbeam"]').click();await page.getByRole('button',{name:'Intermedio',exact:true}).click();
   await page.getByText('Intermedio: configuración específica pendiente',{exact:false}).waitFor();
   await page.locator('[data-page="rebar-abutments"]').click();assert.equal(await page.getByLabel('Largo',{exact:true}).inputValue(),'1100');
-  for(const structure of ['rebar-beam','rebar-pier','rebar-slab']){await page.locator(`[data-page="${structure}"]`).click();await page.getByText('Generador pendiente de desarrollo.',{exact:false}).waitFor();assert.equal(await page.locator('input[type=file]').count(),0);}
+  await page.locator('[data-page="rebar-beam"]').click();
+  await page.getByRole('heading',{name:'Viga',exact:true}).waitFor();
+  await page.getByText('Faltan datos de vigas en este JSON.',{exact:true}).waitFor();
+  assert.equal(await page.locator('input[type=file]').count(),0);
+  for(const structure of ['rebar-pier','rebar-slab']){await page.locator(`[data-page="${structure}"]`).click();await page.getByText('Generador pendiente de desarrollo.',{exact:false}).waitFor();assert.equal(await page.locator('input[type=file]').count(),0);}
   await page.locator('[data-page="rebar"]').click();await page.locator('#memorias tr').first().waitFor();assert.equal(await page.locator('#memorias tr').count(),3);
   await page.locator('[data-page="project"]').click();
   await page.setViewportSize({width:700,height:900});await page.locator('#panels').click();assert(await page.locator('#sidebar').isVisible());

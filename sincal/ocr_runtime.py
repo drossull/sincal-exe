@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import atexit
 import json
+import os
 from pathlib import Path
 import queue
 import subprocess
@@ -13,13 +14,35 @@ import time
 from sincal.runtime import RUTA_INSTALACION
 
 
+def find_runtime(application_dir=None, user_dir=None):
+    """Prefer the separately installed engine; retain pre-module installations."""
+    application = Path(application_dir or RUTA_INSTALACION)
+    user = Path(user_dir) if user_dir is not None else Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'SINCAL'
+    for module in (user / 'modules' / 'prospecciones-ocr', application / 'modules' / 'prospecciones-ocr'):
+        if not module.exists():
+            continue
+        try:
+            manifest = json.loads((module / 'module.json').read_text(encoding='utf-8'))
+            compatible = (manifest.get('schema') == 1 and manifest.get('id') == 'prospecciones-ocr'
+                          and type(manifest.get('worker_api')) is int and manifest['worker_api'] == 1
+                          and manifest.get('python_abi') == '3.12' and manifest.get('runtime') == 'ocr_runtime')
+            root = module / 'ocr_runtime'
+            if not compatible or not all((root / name).is_file() for name in ('python.exe', 'worker.pyc', 'runtime-manifest.json')):
+                raise ValueError('Módulo incompleto o incompatible.')
+            return root
+        except (OSError, ValueError, TypeError, AttributeError) as error:
+            raise RuntimeError('Reinstala el complemento OCR de Prospecciones: su instalación está incompleta o no es compatible.') from error
+    legacy = application / 'ocr_runtime'
+    if (legacy / 'python.exe').is_file() and (legacy / 'worker.pyc').is_file():
+        return legacy
+    raise RuntimeError('Falta el complemento OCR de Prospecciones. Instala Setup_SINCAL_OCR y vuelve a importar el informe; no necesitas reinstalar SINCAL.')
+
+
 class PaddleWorker:
     def __init__(self, *, cancel=None):
-        root = Path(RUTA_INSTALACION) / 'ocr_runtime'
+        root = find_runtime()
         python = root / 'python.exe'
         worker = root / 'worker.pyc'
-        if not python.is_file() or not worker.is_file():
-            raise RuntimeError('Falta el motor PaddleOCR. Reinstala la versión completa de SINCAL con OCR.')
         self.cancel = cancel
         self._close_lock = threading.Lock()
         self._closed = False

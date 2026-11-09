@@ -389,6 +389,59 @@ def validar(modelo, borrador=False):
                 if macizado > 0 and 2 * macizado >= longitud - sum(retranqueos):
                     error("macizados_excesivos", elemento, "Los macizados de ambos extremos deben dejar longitud de cajón hueca")
 
+    # An interior structural anchor belongs to a physical return, not to the
+    # pedestrian graph. Coordinates remain explicit in JSON and must agree;
+    # validation never silently repairs an imported project.
+    tramos_id = {t["id"]: t for t in tramos if _texto(t.get("id"))}
+    anclados_validos = set()
+
+    def perfil_interpolable(perfil, clave):
+        return (isinstance(perfil, list) and len(perfil) >= 2
+                and all(isinstance(p, dict) and _numero(p.get("t")) and _numero(p.get(clave)) for p in perfil)
+                and perfil[0]["t"] == 0 and perfil[-1]["t"] == 1
+                and all(a["t"] < b["t"] for a, b in zip(perfil, perfil[1:])))
+
+    for identificador, nodo in nodos_id.items():
+        if "anclaje_tramo" not in nodo:
+            continue
+        anclaje = nodo["anclaje_tramo"]
+        if not isinstance(anclaje, dict) or not _texto(anclaje.get("tramo")) or not _numero(anclaje.get("t")) or not 0 < anclaje["t"] < 1:
+            error("anclaje_tramo_invalido", identificador, "El anclaje necesita un tramo existente y una posición t estrictamente entre 0 y 1")
+            continue
+        tramo, t = tramos_id.get(anclaje["tramo"]), anclaje["t"]
+        if tramo is None or not (tramo.get("tipo") == "retorno" or tramo.get("funcion") == "retorno"):
+            error("anclaje_retorno_inexistente", identificador, "La columna interior debe estar vinculada a un retorno existente")
+            continue
+        if nodo.get("tipo") != "columna":
+            error("tipo_nodo_anclado", identificador, "El apoyo interior de un retorno debe ser una columna")
+            continue
+        if adyacencias[identificador]:
+            error("anclaje_en_recorrido", identificador, "Una columna interior vinculada a un retorno no puede ser extremo de un tramo peatonal")
+            continue
+        a, b = (nodos_id.get(tramo.get(k)) if _texto(tramo.get(k)) else None for k in ("desde", "hasta"))
+        perfil = _perfil(tramo)
+        if not a or not b or not all(_numero(n.get(k)) for n in (a, b, nodo) for k in "xyz") or not perfil_interpolable(perfil, "f"):
+            error("anclaje_geometria_invalida", identificador, "El retorno necesita extremos y rasante válidos para situar su apoyo interior")
+            continue
+        esperado = {k: a[k]+(b[k]-a[k])*(interpolar_rasante(perfil,t) if k == "z" else t) for k in "xyz"}
+        if any(abs(nodo[k]-esperado[k]) > .001 for k in "xyz"):
+            error("anclaje_coordenadas_incoherentes", identificador, "Las coordenadas del apoyo interior no coinciden con su posición vinculada al retorno")
+            continue
+        anclados_validos.add(identificador)
+        familia = familias.get(tramo.get("familia")) if _texto(tramo.get("familia")) else None
+        if not isinstance(familia, dict):
+            continue
+        familia = familia_del_tramo(familia, tramo, nodos_id)
+        cantos = familia.get("perfil_canto", [{"t":0,"canto_mm":familia.get("canto_mm")},
+                  {"t":1,"canto_mm":familia.get("canto_fin_mm",familia.get("canto_mm"))}])
+        if perfil_interpolable(cantos, "canto_mm"):
+            for p, q in zip(cantos,cantos[1:]):
+                if t <= q["t"]:
+                    canto = p["canto_mm"]+(q["canto_mm"]-p["canto_mm"])*(t-p["t"])/(q["t"]-p["t"])
+                    if canto > 0:
+                        intrados_por_nodo[identificador].append(nodo["z"]-canto)
+                    break
+
     fundaciones_id = {}
     pertenencias = defaultdict(list)
     marcos_dados = {}
@@ -438,6 +491,13 @@ def validar(modelo, borrador=False):
                 if (abs(pilote["dx_mm"]) + diametro / 2 > medidas_dado["largo_mm"] / 2 + 1e-6 or
                         abs(pilote["dy_mm"]) + diametro / 2 > medidas_dado["ancho_mm"] / 2 + 1e-6):
                     error("pilote_fuera_dado", id_pilote, "La huella circular del pilote debe quedar contenida en el dado")
+        interpretables = [p for p in pilotes if isinstance(p,dict)
+                          and all(_numero(p.get(k)) for k in ("dx_mm","dy_mm","diametro_mm")) and p["diametro_mm"] > 0]
+        for i, p in enumerate(interpretables):
+            for q in interpretables[i+1:]:
+                if math.hypot(p["dx_mm"]-q["dx_mm"],p["dy_mm"]-q["dy_mm"]) < (p["diametro_mm"]+q["diametro_mm"])/2-.001:
+                    error("pilotes_superpuestos", elemento,
+                          f"Las huellas de los pilotes {p.get('id','sin id')} y {q.get('id','sin id')} se superponen dentro de la fundación")
     referencias_soportes = {s.get("nodo") for s in soportes if _texto(s.get("nodo"))}
     for identificador, nodo in nodos_id.items():
         cantidad = len(pertenencias[identificador])
@@ -522,32 +582,33 @@ def validar(modelo, borrador=False):
             error("cantidad_soportes", identificador, "Un encuentro admite como máximo un soporte")
 
     recorrido = []
-    if nodos_id:
+    nodos_peatonales = set(nodos_id)-anclados_validos
+    if nodos_peatonales:
         visitados = set()
-        pendientes_grafo = deque([next(iter(nodos_id))])
+        pendientes_grafo = deque([next(n for n in nodos_id if n in nodos_peatonales)])
         while pendientes_grafo:
             actual = pendientes_grafo.popleft()
             if actual in visitados:
                 continue
             visitados.add(actual)
             pendientes_grafo.extend(v for v in adyacencias[actual] if v not in visitados)
-        if len(visitados) != len(nodos_id):
+        if visitados != nodos_peatonales:
             error("recorrido_desconectado", "tramos", "Los tramos no conectan todos los nodos; compartir dado no crea continuidad peatonal", pendiente=True)
-        grados = {n: len(vecinos) for n, vecinos in adyacencias.items()}
+        grados = {n: len(vecinos) for n, vecinos in adyacencias.items() if n in nodos_peatonales}
         extremos = [n for n, grado in grados.items() if grado == 1]
         if any(grado > 2 for grado in grados.values()):
             aviso("recorrido_bifurcado", "tramos", "El recorrido tiene bifurcaciones; no existe una única ordenación lineal")
-        elif len(visitados) == len(nodos_id) and len(extremos) == 2:
+        elif visitados == nodos_peatonales and len(extremos) == 2:
             inicio = "E1" if "E1" in extremos else next((e for e in sorted(extremos) if e != "E2"), extremos[0])
             anterior, actual = None, inicio
             while actual is not None and actual not in recorrido:
                 recorrido.append(actual)
                 siguientes = [v for v in adyacencias[actual] if v != anterior]
                 anterior, actual = actual, siguientes[0] if siguientes else None
-        elif len(visitados) == len(nodos_id) and len(nodos_id) > 1:
+        elif visitados == nodos_peatonales and len(nodos_peatonales) > 1:
             aviso("recorrido_circuito", "tramos", "El recorrido conectado no es un camino simple; conserve sus conexiones explícitas")
-        elif len(nodos_id) == 1:
-            recorrido = list(nodos_id)
+        elif len(nodos_peatonales) == 1:
+            recorrido = list(nodos_peatonales)
     resumen.update(nodos=len(nodos), tramos=len(tramos), vigas=sum(t.get("tipo") == "viga" for t in tramos),
                    retornos=sum(t.get("tipo") == "retorno" for t in tramos), dados=len(fundaciones), pilotes=total_pilotes,
                    fustes=sum(nodos_id.get(s.get("nodo") if _texto(s.get("nodo")) else "", {}).get("tipo") == "columna" for s in soportes),

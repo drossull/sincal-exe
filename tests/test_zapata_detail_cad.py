@@ -1,8 +1,10 @@
 import re
 import unittest
+from dataclasses import replace
 
 from sincal.rebar.model import Cover, ZapataGeometry, build_zapata_schedule, default_zapata_rules
-from sincal.cad.zapata_detail import build_zapata_detail_lisp
+from sincal.cad.zapata_detail import _group_definition, _label_recipe, build_zapata_detail_lisp
+from sincal.rebar.detail import build_detail_groups
 
 
 class ZapataDetailCadTests(unittest.TestCase):
@@ -29,19 +31,94 @@ class ZapataDetailCadTests(unittest.TestCase):
         self.assertIn("Actualizacion cancelada; no se reemplazo ningun detalle", self.lisp)
         self.assertIn("defun sincal:apply-plan", self.lisp)
 
-    def test_uses_approved_styles_mark_and_description(self):
+    def test_uses_native_detail_marks_and_only_geometry_dimension_styles(self):
         self.assertIn('"GSG_ARM-COTAS"', self.lisp)
         self.assertIn('"<>\\\\XALTERNADO"', repr(self.lisp))
-        self.assertIn('"MARK" 1.0 1.0 1.0', self.lisp)
-        self.assertIn('(vla-get-TagString attribute)) "MARCA"', self.lisp)
-        self.assertIn('vla-put-StyleName text "RomanD"', self.lisp)
-        self.assertIn('vla-put-Height text 0.0025', self.lisp)
-        self.assertIn('%%c22 @20 L=1200', self.lisp)
-        self.assertIn("vl-catch-all-apply 'getvar (list \"CANNOSCALEVALUE\")", self.lisp)
+        self.assertIn('"SINCAL_MARCA_DE_V2"', self.lisp)
+        self.assertIn('(srb:label point (nth 1 recipe) (nth 2 recipe) T', self.lisp)
+        self.assertNotIn('"MARK"', self.lisp)
+        self.assertNotIn('vla-AddMText', self.lisp)
+        self.assertNotIn('sincal:set-mark', self.lisp)
+        self.assertNotIn('sincal:detail-label (', self.lisp)
+
+    def test_dynamic_marks_are_not_nested_and_recipe_uses_calculated_totals(self):
+        for group in build_detail_groups(self.schedule, self.rules, self.geometry):
+            name, definition = _group_definition(group, 'entrada')
+            self.assertIn('_DE2_', name)
+            self.assertNotIn('srb:label', definition)
+            self.assertNotIn('MARK', definition)
+            recipe = _label_recipe(group)
+            for piece in group.pieces:
+                if len(piece.length_variants) > 1:
+                    self.assertIn(f'"{piece.mark}" "NORMAL" {piece.quantity} "VAR.', recipe)
+                else:
+                    self.assertIn(f'"{piece.mark}" "NORMAL" {piece.quantity} {piece.total_cm}', recipe)
+        self.assertIn('SINCAL_DETAIL|ENTRADA|G12|DE2|', self.lisp)
+
+    def test_suple_uses_native_superior_supplement_visibility(self):
+        rules = tuple(replace(rule, enabled=True) if rule.key == 'suple' else rule
+                      for rule in self.rules)
+        schedule = build_zapata_schedule(self.geometry, self.cover, rules)
+        group = next(g for g in build_detail_groups(schedule, rules, self.geometry)
+                     if g.group_id == 'G3A')
+        self.assertIn('"SUP_SUPLE"', _label_recipe(group))
+
+    def test_existing_manual_values_are_kept_until_update_is_accepted(self):
+        self.assertIn('((and previous (not replace-values)) (setq label previous))', self.lisp)
+        self.assertIn('(sincal:sync-detail-labels old nil nil)', self.lisp)
+        self.assertIn('(sincal:sync-detail-labels (vlax-vla-object->ename obj) old T)', self.lisp)
+        self.assertIn('(setq srb:preserve-keys (cons rule-key srb:preserve-keys))', self.lisp)
+        command = self.lisp[self.lisp.index('(defun sincal:generate-detail'):]
+        self.assertLess(command.index('(sincal:plan-detail'), command.index('(srb:sync-table)'))
+
+    def test_accepted_update_changes_native_values_in_place_preserving_presentation(self):
+        native_branch = self.lisp[self.lisp.index('((and previous\n            (= "SINCAL_MARCA_DE_V2"'):]
+        native_branch = native_branch[:native_branch.index('(setq label previous))')]
+        self.assertIn('(SCM:PutText (cdr (assoc "CANT_TOTAL" attrs))', native_branch)
+        self.assertIn('(SCM:PutText (cdr (assoc "LARGO" attrs))', native_branch)
+        self.assertIn('(SCM:Bind obj srb:table-object', native_branch)
+        self.assertNotIn('entdel', native_branch)
+        self.assertNotIn('InsertBlock', native_branch)
+        self.assertNotIn('srb:state', native_branch)
+        self.assertNotIn('Rotation', native_branch)
+        self.assertNotIn('ScaleFactor', native_branch)
+        self.assertNotIn('sincal:rescale-detail-mark', self.lisp)
+
+    def test_cleanup_is_limited_to_explicitly_owned_top_level_marks(self):
+        self.assertIn('SINCAL_DETAIL_LABELS_V1', self.lisp)
+        self.assertIn('(sincal:label-owner-p label owner)', self.lisp)
+        self.assertIn('(foreach label (sincal:detail-label-refs owner)', self.lisp)
+        self.assertIn('(SCM:WritableMark (vlax-ename->vla-object label))', self.lisp)
+        self.assertNotIn('"_.PURGE"', self.lisp)
 
     def test_lisp_parentheses_are_balanced(self):
         without_strings = re.sub(r'"(?:\\.|[^"\\])*"', '""', self.lisp)
         self.assertEqual(without_strings.count("("), without_strings.count(")"))
+
+    def test_variable_series_keeps_one_native_mark_and_documents_every_length(self):
+        self.geometry = replace(self.geometry, esviaje_grados=12)
+        self.schedule = build_zapata_schedule(self.geometry, self.cover, self.rules)
+        group = next(group for group in build_detail_groups(self.schedule, self.rules, self.geometry)
+                     if group.group_id == 'G3')
+        self.assertEqual(len(group.pieces), 1)
+        piece = group.pieces[0]
+        self.assertGreater(len(piece.length_variants), 1)
+        self.assertEqual(group.laps_m, ())
+        _, definition = _group_definition(group, 'entrada')
+        self.assertIn('SERIE VARIABLE - CANT. x L DESARROLLADO (cm)', definition)
+        self.assertIn('Geometria representativa: largo maximo', definition)
+        self.assertIn('"VAR.', definition)
+        for variant in piece.length_variants:
+            self.assertIn(f'"{variant.quantity} x {variant.length_cm:g}"', definition)
+        # The length list belongs to the geometry block; the only mark stays
+        # linked through the top-level MARCA-DE, with its total quantity.
+        self.assertNotIn('srb:label', definition)
+        recipe = _label_recipe(group)
+        self.assertEqual(recipe.count(f'"{piece.mark}" "NORMAL"'), 1)
+        lower = min(v.length_cm for v in piece.length_variants)
+        upper = max(v.length_cm for v in piece.length_variants)
+        self.assertIn(f'"VAR. {lower:g}-{upper:g} cm"', recipe)
+        self.assertNotIn(f' {piece.quantity} {piece.total_cm} "', recipe)
 
     def test_objectdbx_release_remains_inside_the_valid_if_branch(self):
         self.assertIn(
@@ -63,7 +140,11 @@ class ZapataDetailCadTests(unittest.TestCase):
                 self.assertIn(f'block-name {factor} {factor} {factor} 0.0)', source)
                 self.assertIn(f'(* slot {3 * factor})', source)
                 self.assertIn(f'(+ (cadr ip) {3 * factor})', source)
-                self.assertIn('"MARK" 1.0 1.0 1.0', source)
+                # InsertBlock takes paper-sized factors, including for metres;
+                # the annotation context applies its actual paper/drawing ratio.
+                self.assertIn('(sincal:xdata-value owner)) 2.5)', source)
+                self.assertIn('(sincal:detail-world-point owner (car recipe))', source)
+                self.assertNotIn('sincal:annotation-scale', source)
                 self.assertNotIn('"_.SCALE"', source)
 
     def test_update_retains_world_position_and_detects_changed_insert_scale(self):
@@ -87,12 +168,12 @@ class ZapataDetailCadTests(unittest.TestCase):
                         drawing_units_per_m=factor)
 
     def test_completion_covers_cancel_and_style_failure_without_modal(self):
-        command = self.lisp[self.lisp.index('(defun c:SINCAL-ZAPATA-DESPIECE'):]
-        self.assertIn('(setq *SINCAL_LIVE_RESULT* nil)', command)
-        self.assertIn('(list nil "Despiece cancelado;', command)
-        self.assertIn('(list nil "Actualizacion cancelada;', command)
-        self.assertIn('(list nil "SINCAL no pudo importar', command)
-        self.assertLess(command.index('(vla-Regen doc 1)'),
+        command = self.lisp[self.lisp.index('(defun sincal:generate-detail'):]
+        self.assertIn("(srb:run 'sincal:generate-detail)", command)
+        self.assertIn('(srb:fail "Despiece cancelado;', command)
+        self.assertIn('(srb:fail "Actualizacion cancelada;', command)
+        self.assertIn('(srb:fail "SINCAL no pudo importar', command)
+        self.assertLess(command.index('(srb:finish)'),
                         command.index('(list T "Despiece de zapata'))
         self.assertNotIn('(alert ', self.lisp)
 

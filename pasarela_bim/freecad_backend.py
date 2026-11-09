@@ -426,7 +426,7 @@ def _crear_ejes(doc, Part, App, datos, portable, anclas, por_id, revision):
             ids_nodos = [eje["nodo"]]
         else:
             puntos = eje["puntos_directriz"]
-            ids_nodos = eje["nodos"]
+            ids_nodos = list(dict.fromkeys(eje["nodos"]+eje.get("nodos_apoyo_interiores",[])))
         obj = doc.addObject("Part::Feature", "EJE_"+_nombre(eje["id"]))
         obj.Label = f"Eje {eje.get('nombre',eje['id'])} · {eje['id']}"
         obj.Shape = Part.makePolygon([App.Vector(*p) for p in puntos])

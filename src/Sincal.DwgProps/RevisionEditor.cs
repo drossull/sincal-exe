@@ -72,7 +72,15 @@ public static class RevisionEditor
                 result.Add(new Group(definition.Handle+":"+table.Handle,definition.Name,root.Value.ToArray(),variants.Select(v=>v[i]).Prepend(table).ToList()));
             }
         }
-        if(result.Count==0) throw new InvalidOperationException("No se encontraron tablas dentro de bloques con prefijo VIÑETA.");
+        if(result.Count==0)
+        {
+            if(roots.Count==0)
+                throw new InvalidOperationException("No se encontraron bloques insertados con prefijo VIÑETA.");
+            var names=roots.Keys.Select(id=>((BlockTableRecord)tr.GetObject(id,OpenMode.ForRead)).Name);
+            throw new InvalidOperationException("Se encontró la viñeta ("+string.Join(", ",names)+"), pero su cuadro de revisiones no es compatible. "
+                +"El editor requiere una tabla de AutoCAD de seis columnas, directamente dentro del bloque, con el FIELD Revision en la primera celda. "
+                +"Los cuadros dibujados con textos y líneas aún no están admitidos.");
+        }
         if(result.Count>100) throw new InvalidOperationException("Demasiadas tablas de viñeta en un DWG.");
         return result;
     }

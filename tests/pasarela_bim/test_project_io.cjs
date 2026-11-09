@@ -58,4 +58,34 @@ assert.ok(Math.abs(displayed-345.638)<1e-10);
 const edited=io.newProject({norte_desde_y_horario_deg:displayed});
 for(const [i,v] of io.localToWorld(legacy,15,5,6.5).entries())assert.ok(Math.abs(io.localToWorld(edited,15,5,6.5)[i]-v)<1e-10);
 for(const angle of [-1,360,Infinity,NaN])assert.throws(()=>io.newProject({norte_desde_y_horario_deg:angle}));
-console.log('Project IO: metres, legacy import, geographic rotation and round-trip passed.');
+// PTL coordinates are the drawing's X/Y, not offsets from a projected origin
+// inferred by the application. At 90 degrees clockwise from local +Y, local
+// +X points north and local +Y points west.
+const ptl=io.newProject({este_m:187606.2952,norte_m:2923164.8346,cota_m:14.818,norte_desde_y_horario_deg:90,crs:'EPSG:32718'});
+assert.equal(ptl.proyecto.georreferencia.crs,'PTL');
+const origin=[187606.2952,2923164.8346,14.818];
+const closePoint=(actual,expected)=>actual.forEach((value,i)=>assert.ok(Math.abs(value-expected[i])<1e-8,`${actual} != ${expected}`));
+closePoint(io.localToWorld(ptl,0,0,0),origin);
+closePoint(io.worldToLocal(ptl,...origin),[0,0,0]);
+closePoint(io.worldToLocal(ptl,origin[0],origin[1]+10,origin[2]+2),[10,0,2]);
+closePoint(io.worldToLocal(ptl,origin[0]+10,origin[1],origin[2]),[0,-10,0]);
+closePoint(io.localToWorld(ptl,10,0,2),[origin[0],origin[1]+10,origin[2]+2]);
+ptl.emplazamiento={planta:{unidades:'m',marco:'este_norte',capas:['CAMINO'],entidades:[{capa:'CAMINO',puntos_m:[origin,[origin[0],origin[1]+10,origin[2]+2]]}]}};
+require('../../pasarela_bim/web/emplazamiento.js');
+const bounds=globalThis.SitePlan.bounds(ptl);
+closePoint(bounds[0],[0,0,0]);
+closePoint(bounds[1],[10000,0,0]);
+const ptlReopened=io.toInternal(JSON.parse(JSON.stringify(io.toPortable(ptl))));
+assert.deepEqual(ptlReopened.proyecto.georreferencia,ptl.proyecto.georreferencia);
+assert.deepEqual(ptlReopened.emplazamiento,ptl.emplazamiento);
+closePoint(io.worldToLocal(ptlReopened,...origin),[0,0,0]);
+// Existing JSON retains the explicitly declared CRS and arbitrary reference
+// metadata. A new-project default must never relabel imported coordinates.
+const declaredLegacy=structuredClone(ptl);
+declaredLegacy.proyecto.georreferencia={...ptl.proyecto.georreferencia,crs:'EPSG:32718',fuente:{nombre:'planta original',revision:'B'},nota:'Referencia declarada por su autor'};
+const legacySaved=JSON.parse(JSON.stringify(io.toPortable(declaredLegacy)));
+const legacyLoaded=io.toInternal(legacySaved);
+assert.deepEqual(legacyLoaded.proyecto.georreferencia,declaredLegacy.proyecto.georreferencia);
+assert.deepEqual(legacyLoaded.emplazamiento,declaredLegacy.emplazamiento);
+assert.deepEqual(io.toPortable(legacyLoaded).proyecto.georreferencia,legacySaved.proyecto.georreferencia);
+console.log('Project IO: metres, PTL drawing coordinates, legacy reference preservation, rotation and round-trip passed.');

@@ -2,6 +2,7 @@
 const {chromium}=require('playwright');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process');
+const base=(process.env.PASARELA_TEST_URL||'http://127.0.0.1:8767').replace(/\/$/,'');
 const output=path.resolve('pasarela_bim/generados/prueba_editor');fs.mkdirSync(output,{recursive:true});
 function equivalent(actual,expected){
  if(typeof expected==='number'){assert.ok(Math.abs(actual-expected)<=1e-10,`${actual} differs from ${expected}`);return;}
@@ -32,12 +33,14 @@ with zipfile.ZipFile(sys.argv[1]) as z:
   fs.writeFileSync(path.join(output,'resultado_comprobacion_ejes.json'),JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result,null,2));return;
  }
  const browser=await chromium.launch({channel:'msedge',headless:true});
- const page=await browser.newPage({viewport:{width:1600,height:1100},acceptDownloads:true});
+ const page=await browser.newPage({viewport:{width:1600,height:1100}});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const select=async(type,id)=>page.locator(`#entity-list [data-select-type="${type}"][data-select-id="${id}"]`).click();
- const dump=async(name)=>{const event=page.waitForEvent('download');await page.locator('#export-json').click();const file=await event;const target=path.join(output,name);await file.saveAs(target);return JSON.parse(fs.readFileSync(target,'utf8'));};
+ await page.route('**/api/estado',async route=>{const response=await route.fetch();await route.fulfill({response,json:{...await response.json(),guardado_local:true}});});
+ await page.route('**/api/proyecto/guardar',async route=>{const payload=route.request().postDataJSON();await route.fulfill({json:{guardado:true,documento:{id:payload.documento_id||'ensayo-editor',nombre:'proyecto.json',ruta:path.join(output,'proyecto.json')}}});});
+ const dump=async(name)=>{const pending=page.waitForResponse(r=>r.url()===base+'/api/proyecto/guardar');await page.locator('#export-json').click();const response=await pending;assert.equal(response.status(),200);assert.equal((await response.json()).guardado,true);await page.waitForFunction(()=>!document.querySelector('#export-json').disabled);const model=response.request().postDataJSON().modelo;fs.writeFileSync(path.join(output,name),JSON.stringify(model,null,2)+'\n');return model;};
  try{
-  await page.goto('http://127.0.0.1:8767/');await page.locator('#new-project').click();
+  await page.goto(base+'/');await page.locator('#new-project').click();
   await page.locator('[name="nombre"]').fill('Ensayo de pasarela desde cero');
   for(const [key,value] of Object.entries({este_m:350000,norte_m:6000000,cota_m:120,norte_desde_y_horario_deg:0}))await page.locator(`[name="${key}"]`).fill(String(value));
   await page.getByRole('button',{name:'Crear proyecto',exact:true}).click();
@@ -92,11 +95,11 @@ with zipfile.ZipFile(sys.argv[1]) as z:
    await page.locator('#generate').click();const started=await(await dispatch).json();assert.ok(started.trabajo_id);
    await page.waitForFunction(()=>['DISPONIBLE','CON AVISOS','ERROR'].includes(document.querySelector('#delivery-status').textContent),{},{timeout:240000});
    assert.notEqual(await page.locator('#delivery-status').innerText(),'ERROR',await page.locator('#delivery-content').innerText());
-   const result=await(await page.request.get(`http://127.0.0.1:8767/api/trabajos/${encodeURIComponent(started.trabajo_id)}`)).json();
+   const result=await(await page.request.get(`${base}/api/trabajos/${encodeURIComponent(started.trabajo_id)}`)).json();
    assert.equal(result.estado,'completado');assert.equal(result.resultado.valido,true);
    const elevations=result.archivos.filter(f=>/^elevacion_.*\.svg$/i.test(f.nombre));
    assert.ok(elevations.length>=3,JSON.stringify(result.archivos));
-   for(const file of elevations){assert.equal(await page.locator('.download-link').filter({hasText:file.nombre}).count(),1);const response=await page.request.get(new URL(file.url,'http://127.0.0.1:8767').href);assert.equal(response.status(),200);assert.match(await response.text(),/<svg\b/);}
+   for(const file of elevations){assert.equal(await page.locator('.download-link').filter({hasText:file.nombre}).count(),1);const response=await page.request.get(new URL(file.url,base).href);assert.equal(response.status(),200);assert.match(await response.text(),/<svg\b/);}
    assert.equal(result.resultado.ejes.length,model.ejes.length);assert.equal(result.resultado.verificacion.ejes_referencia_conservados,model.ejes.length);
    assert.equal(result.resultado.verificacion.elevaciones_derivadas,elevations.length);assert.equal(result.resultado.verificacion.guardado_y_reabierto,true);
    verifyPersistedAxes(model,result.resultado);

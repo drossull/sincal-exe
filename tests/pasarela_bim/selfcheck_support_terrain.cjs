@@ -7,22 +7,26 @@ const io=require('../../pasarela_bim/web/proyecto.js');
  try{
   const page=await browser.newPage({viewport:{width:1600,height:1100},acceptDownloads:true}),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
+  let savedModel;
   await page.route('http://pasarela.test/**',route=>{
    const url=new URL(route.request().url());
-   if(url.pathname.startsWith('/api/'))return route.fulfill({json:url.pathname==='/api/estado'?{freecad_disponible:false}:{valido:true,generable:false,errores:[],avisos:[],pendientes:[]}});
+   if(url.pathname==='/api/proyecto/guardar'){savedModel=route.request().postDataJSON().modelo;return route.fulfill({json:{guardado:true,documento:{id:'terrain-test',nombre:'terreno.json',ruta:'C:/proyectos/terreno.json'}}});}
+   if(url.pathname.startsWith('/api/'))return route.fulfill({json:url.pathname==='/api/estado'?{freecad_disponible:false,guardado_local:true}:{valido:true,generable:false,errores:[],avisos:[],pendientes:[]}});
    return route.fulfill({path:path.resolve('pasarela_bim/web',url.pathname==='/'?'index.html':url.pathname.slice(1))});
   });
   const select=async id=>page.locator(`#entity-list [data-select-type="node"][data-select-id="${id}"]`).click();
   const terrain=page.locator('[data-field="support:0:cota_terreno_proyectado_mm"]');
   const editTerrain=async value=>{await terrain.fill(value);await terrain.press('Tab');};
   const dump=async()=>{
-   const downloaded=page.waitForEvent('download');await page.locator('#export-json').click();
-   const stream=await(await downloaded).createReadStream(),chunks=[];
-   for await(const chunk of stream)chunks.push(chunk);
-   return JSON.parse(Buffer.concat(chunks).toString());
+   const response=page.waitForResponse('**/api/proyecto/guardar');await page.locator('#export-json').click();await response;
+   await page.waitForFunction(()=>document.querySelector('#export-json').textContent==='Guardar cambios');
+   return structuredClone(savedModel);
   };
   await page.goto('http://pasarela.test/');await page.locator('#new-project').click();
   assert.equal(await page.locator('[name="carretera"],[name="terreno"]').count(),0);
+  assert.equal(await page.locator('[name="crs"]').inputValue(),'PTL');
+  assert(await page.locator('[name="crs"]').evaluate(el=>el.readOnly));
+  assert((await page.locator('[data-coordinate-reference]').textContent()).includes('0,0 de la planta DWG'));
   await page.locator('[name="cota_m"]').fill('14.818');
   await page.getByRole('button',{name:'Crear proyecto',exact:true}).click();
   await page.locator('[name="canto"]').fill('2');
@@ -35,6 +39,7 @@ const io=require('../../pasarela_bim/web/proyecto.js');
    await page.getByRole('button',{name:'Crear apoyo',exact:true}).click();
   }
   const initial=await dump();
+  assert.equal(initial.proyecto.georreferencia.crs,'PTL');
   assert(!Object.hasOwn(initial.proyecto,'cota_terreno_m'));assert(!Object.hasOwn(initial.proyecto,'cota_carretera_m'));
   assert.equal(initial.soportes[0].cota_terreno_proyectado_m,-6.8);
   assert(!Object.hasOwn(initial.soportes[1],'cota_terreno_proyectado_m'));
@@ -63,6 +68,18 @@ const io=require('../../pasarela_bim/web/proyecto.js');
   assert.equal(await page.locator('.projected-terrain-level[data-node-id="C1"]').getAttribute('data-z-mm'),'-6250');
   await page.locator('#model-canvas').screenshot({path:'tmp/terreno-proyectado-por-apoyo.png'});
   await page.locator('#inspector').screenshot({path:'tmp/terreno-proyectado-inspector.png'});
+  // Fixed PTL for new projects must not silently relabel an explicit legacy CRS.
+  const legacy=structuredClone(result);
+  legacy.proyecto.georreferencia.crs='EPSG:32718';
+  legacy.proyecto.georreferencia.referencia_levantamiento='Referencia antigua';
+  legacy.georreferencia=structuredClone(legacy.proyecto.georreferencia);
+  await page.locator('#file-input').setInputFiles({name:'legacy-reference.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(legacy))});
+  await page.locator('#project-settings').click();
+  assert.equal(await page.locator('[name="crs"]').inputValue(),'EPSG:32718');
+  await page.getByRole('button',{name:'Guardar emplazamiento',exact:true}).click();
+  const legacySaved=await dump();
+  assert.deepEqual(legacySaved.proyecto.georreferencia,legacy.proyecto.georreferencia);
+  assert.deepEqual(legacySaved.georreferencia,legacy.georreferencia);
   assert.deepEqual(errors,[]);
   console.log('Support terrain UI: create, edit, clear, zero, undo, JSON exchange, independent shared-base levels and axis markers passed.');
  }finally{await browser.close();}

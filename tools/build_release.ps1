@@ -5,11 +5,13 @@ param(
     [string]$InnoSetupPath = '',
     [switch]$SkipSigning,
     [switch]$DesktopWeb = $true,
-    [switch]$SkipPasarelaModule
+    [switch]$SkipPasarelaModule,
+    [switch]$CleanBuild
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'build_components.ps1')
 
 if (-not $DesktopWeb) {
     throw 'Las releases de SINCAL usan la interfaz web. No se permite sustituirla por el arranque Tk.'
@@ -127,7 +129,7 @@ function Invoke-AutoCAD2025PluginBuild([string]$ProjectRoot) {
         throw "No existe el manifiesto del bundle: $bundleManifest"
     }
 
-    & dotnet build $project -c Release
+    & dotnet build $project -c Release -t:Rebuild
     if ($LASTEXITCODE -ne 0) {
         throw 'Falló la compilación del plugin AutoCAD 2025.'
     }
@@ -145,12 +147,13 @@ function Invoke-AutoCAD2025PluginBuild([string]$ProjectRoot) {
 function Invoke-DwgPropsBuild([string]$ProjectRoot) {
     $project = Join-Path $ProjectRoot 'src\Sincal.DwgProps\Sincal.DwgProps.csproj'
     foreach ($year in @(2025, 2027)) {
+        if (Test-ComponentReceipt $dwgComponents[$year]) { continue }
         $cadDirectory = Join-Path $env:ProgramFiles "Autodesk\AutoCAD $year"
         if (-not (Test-Path -LiteralPath (Join-Path $cadDirectory 'acdbmgd.dll'))) {
             throw "Falta el SDK instalado de AutoCAD $year para el conector DWGPROPS."
         }
         $framework = if ($year -eq 2025) { 'net8.0-windows' } else { 'net10.0-windows' }
-        & dotnet build $project -c Release "-p:AutoCADDir=$cadDirectory" "-p:CadTargetFramework=$framework" -o (Join-Path $ProjectRoot "src\Sincal.DwgProps\bin\$year") --nologo
+        & dotnet build $project -c Release -t:Rebuild "-p:AutoCADDir=$cadDirectory" "-p:CadTargetFramework=$framework" -o (Join-Path $ProjectRoot "src\Sincal.DwgProps\bin\$year") --nologo
         if ($LASTEXITCODE -ne 0) { throw "No se pudo compilar DWGPROPS para AutoCAD $year." }
     }
 }
@@ -178,6 +181,11 @@ function Get-SigningCertificate([string]$Subject, [string]$Thumbprint) {
 }
 
 function Sign-File([string]$Path, $Certificate, [int]$MaxAttempts = 3) {
+    $existing = Get-AuthenticodeSignature -FilePath $Path
+    if ($existing.Status -eq 'Valid' -and $null -ne $existing.TimeStamperCertificate -and
+        $existing.SignerCertificate.Thumbprint -eq $Certificate.Thumbprint) {
+        return $existing
+    }
     $lastError = $null
 
     for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
@@ -266,11 +274,6 @@ function Assert-AppPayloadContents([string]$Path) {
         $entries = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
         $required = @(
             'SINCAL.exe',
-            'ocr_runtime/python.exe',
-            'ocr_runtime/worker.pyc',
-            'ocr_runtime/runtime-manifest.json',
-            'ocr_runtime/models/PP-OCRv6_medium_det/inference.pdiparams',
-            'ocr_runtime/models/PP-OCRv6_medium_rec/inference.pdiparams',
             'version.json',
             'tutoriales.json',
             'lisps/SINCAL.lsp',
@@ -312,6 +315,9 @@ function Assert-AppPayloadContents([string]$Path) {
         }
         if (@($entries | Where-Object { $_ -match '(?i)(^|/)(pasarela_bim|pasarela-bim)(/|$)|SINCAL-Pasarela\.exe$' }).Count -gt 0) {
             throw 'Pasarela BIM debe distribuirse como módulo independiente, fuera del paquete principal.'
+        }
+        if (@($entries | Where-Object { $_ -match '(?i)(^|/)(ocr_runtime|prospecciones-ocr)(/|$)' }).Count -gt 0) {
+            throw 'El OCR debe distribuirse mediante su instalador independiente.'
         }
     }
     finally {
@@ -357,7 +363,6 @@ function New-ReleasePayloads(
             Copy-Item (Join-Path $ProjectRoot "src\Sincal.DwgProps\bin\$year\Sincal.DwgProps.dll") $target
         }
     }
-    Copy-Item (Join-Path $ProjectRoot 'ocr_runtime') (Join-Path $appStage 'ocr_runtime') -Recurse -Force
     $fontStage = Join-Path $appStage 'assets\fonts'
     New-Item -ItemType Directory -Force -Path $fontStage | Out-Null
     Get-ChildItem (Join-Path $ProjectRoot 'assets\fonts') -File | Where-Object {
@@ -492,7 +497,19 @@ Invoke-PowerShellParse -ProjectRoot $projectRoot
 Invoke-SelfCheck -ProjectRoot $projectRoot
 
 Write-Step "Compilando plugin AutoCAD 2025"
-Invoke-AutoCAD2025PluginBuild -ProjectRoot $projectRoot
+if ($CleanBuild) { Remove-ArtifactIfExists (Join-Path $projectRoot 'build') }
+$nativeContext = (& dotnet --info | Out-String)
+if ($LASTEXITCODE -ne 0) { throw 'No se pudo identificar la herramienta .NET.' }
+$pluginComponent = New-ComponentReceipt -Name 'autocad-2025' `
+    -Inputs (@((Join-Path $projectRoot 'src\Sincal.AutoCAD2025')) + @(Get-CadSdkInputs 2025)) `
+    -Outputs @($pluginDll) -Context $nativeContext
+$dwgComponents = @{}
+foreach ($year in @(2025, 2027)) {
+    $dwgComponents[$year] = New-ComponentReceipt -Name "dwgprops-$year" `
+        -Inputs (@((Join-Path $projectRoot 'src\Sincal.DwgProps')) + @(Get-CadSdkInputs $year)) `
+        -Outputs @((Join-Path $projectRoot "src\Sincal.DwgProps\bin\$year\Sincal.DwgProps.dll")) -Context $nativeContext
+}
+if (-not (Test-ComponentReceipt $pluginComponent)) { Invoke-AutoCAD2025PluginBuild -ProjectRoot $projectRoot }
 if ($DesktopWeb) { Invoke-DwgPropsBuild -ProjectRoot $projectRoot }
 if ($DesktopWeb) {
     Write-Step 'Compilando integración del Explorador'
@@ -504,21 +521,22 @@ if ($DesktopWeb) {
         }
     }
     if (-not $cmake) { throw 'Instala Visual C++ Build Tools con CMake antes de compilar.' }
+    $shellInputs = @((Join-Path $projectRoot 'src\Sincal.Shell'), $cmake)
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    $shellContext = if (Test-Path $vswhere) { & $vswhere -latest -products '*' -format json | Out-String } else { $nativeContext }
+    $shellComponent = New-ComponentReceipt -Name 'explorer-shell' -Inputs $shellInputs `
+        -Outputs @((Join-Path $projectRoot 'shell_build\Release\SincalShell.dll')) -Context $shellContext
+    if (-not (Test-ComponentReceipt $shellComponent)) {
     & $cmake -S (Join-Path $projectRoot 'src\Sincal.Shell') -B (Join-Path $projectRoot 'shell_build') -A x64
     if ($LASTEXITCODE -ne 0) { throw 'No se pudo configurar SincalShell: instala CMake y Visual C++ Build Tools.' }
-    & $cmake --build (Join-Path $projectRoot 'shell_build') --config Release
+    & $cmake --build (Join-Path $projectRoot 'shell_build') --config Release --clean-first
     if ($LASTEXITCODE -ne 0) { throw 'Falló SincalShell.' }
     & python (Join-Path $projectRoot 'tests\selfcheck_shell.py') (Join-Path $projectRoot 'shell_build\Release\SincalShell.dll')
     if ($LASTEXITCODE -ne 0) { throw 'Falló la comprobación COM aislada de SincalShell.' }
+    }
 }
 
-Write-Step "Preparando runtime OCR local"
-& python (Join-Path $projectRoot 'tools\build_ocr_runtime.py')
-if ($LASTEXITCODE -ne 0) { throw 'Falló el empaquetado del runtime OCR.' }
-
 Write-Step "Limpiando artefactos previos"
-Remove-ArtifactIfExists (Join-Path $projectRoot 'build')
-Remove-ArtifactIfExists $distExe
 Remove-ArtifactIfExists $installerExe
 Remove-ArtifactIfExists $appPayload
 Remove-ArtifactIfExists $pluginPayload
@@ -527,16 +545,34 @@ Remove-ArtifactIfExists $payloadStage
 Remove-ArtifactIfExists (Join-Path $releaseOutputDir 'SHA256SUMS.txt')
 
 Write-Step "Compilando ejecutable"
+$pythonContext = & python (Join-Path $projectRoot 'tools\build_cache.py') environment
+if ($LASTEXITCODE -ne 0) { throw 'No se pudo identificar el entorno de compilación Python.' }
+$environmentFile = Join-Path $projectRoot 'build\python-environment.txt'
+$pythonEnvironmentChanged = -not (Test-Path $environmentFile)
+if (-not $pythonEnvironmentChanged) { $pythonEnvironmentChanged = (Get-Content $environmentFile -Raw).Trim() -ne $pythonContext.Trim() }
+$appComponent = New-ComponentReceipt -Name 'desktop-web' `
+    -Inputs @((Join-Path $projectRoot 'sincal'), (Join-Path $projectRoot 'desktop_main.py'),
+        (Join-Path $projectRoot 'packaging\windows\SINCAL_Web.spec'),
+        (Join-Path $projectRoot 'packaging\windows\SINCAL.manifest'),
+        (Join-Path $projectRoot 'assets\fonts'), (Join-Path $projectRoot 'assets\icons'),
+        (Join-Path $projectRoot 'requirements-build.txt'), (Join-Path $projectRoot 'requirements-desktop-web.txt')) `
+    -Outputs @($distExe) -Context $pythonContext
+if (-not (Test-ComponentReceipt $appComponent)) {
+# An altered EXE must be regenerated even if its timestamp looks newer.
+Remove-ArtifactIfExists $distExe
 Push-Location $projectRoot
 try {
     $applicationSpec = if ($DesktopWeb) { 'packaging\windows\SINCAL_Web.spec' } else { 'packaging\windows\SINCAL.spec' }
-    & python -m PyInstaller --noconfirm $applicationSpec
+    $pyInstallerArguments = @('-m', 'PyInstaller', '--noconfirm')
+    if ($CleanBuild -or $pythonEnvironmentChanged) { $pyInstallerArguments += '--clean' }
+    & python @pyInstallerArguments $applicationSpec
     if ($LASTEXITCODE -ne 0) {
         throw 'PyInstaller terminó con error.'
     }
 }
 finally {
     Pop-Location
+}
 }
 Assert-ArtifactExists $distExe
 
@@ -562,6 +598,10 @@ if (-not $SkipSigning) {
         }
     }
 }
+Save-ComponentReceipt $pluginComponent
+Save-ComponentReceipt $appComponent
+foreach ($component in $dwgComponents.Values) { Save-ComponentReceipt $component }
+if ($DesktopWeb) { Save-ComponentReceipt $shellComponent }
 
 Write-Step "Creando paquetes remotos"
 $payloadInfo = New-ReleasePayloads `
@@ -581,20 +621,57 @@ $pluginPayloadUrl = "$releaseBaseUrl/$([IO.Path]::GetFileName($pluginPayload))"
 # principal ni obliga a recompilar CAD/OCR cuando se distribuye por separado.
 $pasarelaInfo = $null
 if (-not $SkipPasarelaModule) {
-    Write-Step 'Compilando módulo opcional Pasarela BIM'
+    Write-Step 'Preparando módulo opcional Pasarela BIM'
     $moduleBuild = Join-Path $projectRoot 'tools\build_pasarela_module.py'
-    $moduleJson = & python $moduleBuild --output-dir $releaseOutputDir --skip-installer
+    $moduleDescriptor = Get-Content (Join-Path $projectRoot 'packaging\windows\pasarela-bim\module.json') -Raw | ConvertFrom-Json
+    $moduleCacheDir = Join-Path $projectRoot "installer_output\pasarela-bim\v$($moduleDescriptor.version)"
+    $moduleExecutable = Join-Path $projectRoot 'dist\pasarela-bim\SINCAL-Pasarela.exe'
+    $moduleArchive = Join-Path $moduleCacheDir "SINCAL_Pasarela_v$($moduleDescriptor.version).zip"
+    $moduleInstaller = Join-Path $moduleCacheDir "Setup_SINCAL_Pasarela_v$($moduleDescriptor.version).exe"
+    $moduleReport = Join-Path $moduleCacheDir 'pasarela-module-build.json'
+    $moduleIscc = Resolve-InnoSetupPath -Provided $InnoSetupPath
+    $signingContext = if ($SkipSigning) { 'unsigned' } else { $certificate.Thumbprint }
+    $moduleComponent = New-ComponentReceipt -Name 'pasarela-bim' `
+        -Inputs @((Join-Path $projectRoot 'pasarela_bim'), $moduleBuild, $moduleIscc,
+            (Join-Path $projectRoot 'packaging\windows\SINCAL_Pasarela.spec'),
+            (Join-Path $projectRoot 'packaging\windows\SINCAL_Pasarela_Installer.iss'),
+            (Join-Path $projectRoot 'packaging\windows\pasarela_entry.py'),
+            (Join-Path $projectRoot 'packaging\windows\pasarela-bim\module.json'),
+            (Join-Path $projectRoot 'assets\icons\logo.ico')) `
+        -Outputs @($moduleExecutable, $moduleArchive, $moduleInstaller, $moduleReport) `
+        -Context "$pythonContext | $signingContext"
+    $reuseModule = Test-ComponentReceipt $moduleComponent
+    if ($reuseModule -and -not $SkipSigning) {
+        foreach ($signedFile in @($moduleExecutable, $moduleInstaller)) {
+            $moduleSignature = Get-AuthenticodeSignature -FilePath $signedFile
+            if ($moduleSignature.Status -ne 'Valid' -or $null -eq $moduleSignature.TimeStamperCertificate) { $reuseModule = $false }
+        }
+    }
+    if (-not $reuseModule) {
+    Remove-ArtifactIfExists $moduleExecutable
+    $moduleBuildArguments = @('--output-dir', $moduleCacheDir, '--skip-installer')
+    if ($CleanBuild -or $pythonEnvironmentChanged) { $moduleBuildArguments += '--clean' }
+    $moduleJson = & python $moduleBuild @moduleBuildArguments
     if ($LASTEXITCODE -ne 0) { throw 'Falló la compilación del módulo Pasarela BIM.' }
     $pasarelaInfo = $moduleJson | ConvertFrom-Json
     if (-not $SkipSigning) {
         Sign-File -Path $pasarelaInfo.executable -Certificate $certificate
     }
     # Rehacer manifiesto y ZIP DESPUÉS de firmar: el hash cubre el binario final.
-    $moduleJson = & python $moduleBuild --output-dir $releaseOutputDir --skip-build --iscc (Resolve-InnoSetupPath -Provided $InnoSetupPath) --smoke-test
+    $moduleJson = & python $moduleBuild --output-dir $moduleCacheDir --skip-build --iscc $moduleIscc --smoke-test
     if ($LASTEXITCODE -ne 0) { throw 'Falló el empaquetado/verificación del módulo Pasarela BIM.' }
     $pasarelaInfo = $moduleJson | ConvertFrom-Json
     if (-not $SkipSigning) {
         Sign-File -Path $pasarelaInfo.installer -Certificate $certificate
+    }
+    Save-ComponentReceipt $moduleComponent
+    }
+    $pasarelaInfo = Get-Content $moduleReport -Raw | ConvertFrom-Json
+    foreach ($asset in @('zip', 'installer')) {
+        $source = $pasarelaInfo.$asset
+        $destination = Join-Path $releaseOutputDir ([IO.Path]::GetFileName($source))
+        Copy-Item -LiteralPath $source -Destination $destination -Force
+        $pasarelaInfo.$asset = $destination
     }
     $pasarelaInfo | Add-Member -NotePropertyName url -NotePropertyValue "$releaseBaseUrl/$([IO.Path]::GetFileName($pasarelaInfo.zip))"
 }
@@ -660,6 +737,8 @@ if ($null -ne $pasarelaInfo) {
     $releasePaths += @($pasarelaInfo.zip, $pasarelaInfo.installer)
 }
 $checksumFile = Write-Checksums -OutputDirectory $releaseOutputDir -Paths $releasePaths
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $environmentFile) | Out-Null
+Set-Content -LiteralPath $environmentFile -Value $pythonContext -Encoding UTF8
 
 Write-Step "Resumen"
 Get-Item $distExe, $pluginDll, $installerExe, $appPayload, $pluginPayload, $releaseManifest, $checksumFile | Select-Object FullName,Length,LastWriteTime | Format-List

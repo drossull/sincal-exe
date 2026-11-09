@@ -12,6 +12,9 @@ fieldset{border:1px solid var(--line);padding:20px;margin:24px 0}legend{padding:
 @media(max-width:1050px){#outline{display:none}.layout{grid-template-columns:minmax(0,1fr);padding:30px}#sidebar{width:220px}#workspace{margin-left:220px}.fields{grid-template-columns:1fr}}
 @media(max-width:700px){#sidebar{display:none}#workspace{margin-left:0}.layout{padding:24px}header{padding:12px 20px}.status{font-size:10px}.rows{grid-template-columns:1fr}.rows dd{padding-left:0}body.mobile-open #sidebar{display:flex;z-index:5;top:65px;width:260px}h1{font-size:28px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+#notice{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start;max-width:min(500px,calc(100vw - 48px))}
+#notice .notice-message{overflow-wrap:anywhere}
+#notice .notice-close{width:28px;height:28px;padding:0;margin:-4px -8px -4px 0;border:0;box-shadow:none;background:transparent;font-size:22px;line-height:1}
 /* Shared controls and one document scroll; only tables scroll horizontally. */
 #sidebar{overflow-y:auto}#sidebar nav{gap:2px}#sidebar nav button{padding:7px 10px}.nav-group{padding:12px 10px 3px;color:var(--muted)}#sidebar nav .subnav{padding-left:26px}footer{padding-top:20px}.prewrap{white-space:pre-line}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}.command-row{display:flex;align-items:center;gap:20px;border-bottom:1px solid var(--line);padding:12px 0}.command-row button{min-width:100px}details{padding:18px 0;border-bottom:1px solid var(--line)}summary{cursor:pointer;color:var(--accent)}.evidence{max-width:100%;height:auto}.zoom-label{display:flex;gap:8px;align-items:center;margin:0 0 0 auto}.zoom-label select{width:auto;padding:4px}.status{margin-left:0}.outline-hidden #outline{display:none}.outline-hidden .layout{grid-template-columns:minmax(0,980px);justify-content:center}body.panels-hidden:not(.outline-hidden) #outline{display:block}body.panels-hidden:not(.outline-hidden) .layout{grid-template-columns:minmax(0,900px) 180px;max-width:1240px}#activity{position:fixed;right:24px;bottom:100px;z-index:8;max-width:390px;padding:18px;background:var(--bg);border:1px solid var(--line);display:grid;gap:10px}#activity[hidden]{display:none}#activity img{animation:pulse 1.5s ease-in-out infinite}#activity span{font-family:Condensed,Roboto,sans-serif;color:var(--accent)}progress{width:100%;accent-color:var(--accent)}@keyframes pulse{50%{opacity:.4;transform:translateY(-3px)}}html[data-zoom="90"] body{font-size:12.6px}html[data-zoom="115"] body{font-size:16.1px}table,.rows dd{font-size:1em}input,button,select{font-size:1em}#anchors a{overflow-wrap:anywhere}article{scroll-margin-top:100px}#notice{z-index:9}.hero p{font-size:1.1em}
 @media(max-width:700px){body.panels-hidden:not(.outline-hidden) #outline{display:none}body.panels-hidden:not(.outline-hidden) .layout{grid-template-columns:minmax(0,1fr)}.status{display:none}.zoom-label{font-size:12px}header{gap:10px}}@media(prefers-reduced-motion:reduce){#activity img{animation:none}}
@@ -107,3 +110,262 @@ body.pasarela-embedded-active{overflow:hidden}
 .rebar-detection{border-top:1px solid var(--line);margin-top:22px;padding-top:8px}.rebar-detection .rows{grid-template-columns:minmax(110px,.8fr) 1.4fr}
 .rebar-candidates{font:12px/1.6 Mono,monospace;overflow-wrap:anywhere}
 @media(max-width:900px){.rebar-assistant-shell{grid-template-columns:1fr}.rebar-assistant-tree{max-height:none}.rebar-assistant-inspector{position:static}}
+
+/* Only the abutment parameter page expands to accommodate its live viewer. */
+body:has(#armaduras.rebar-live-page) .layout{max-width:none;grid-template-columns:minmax(0,1fr) 128px;gap:20px;padding:32px 24px 80px}
+body.outline-hidden:has(#armaduras.rebar-live-page) .layout{grid-template-columns:minmax(0,1fr)}
+body:has(#armaduras.rebar-live-page) #main{min-width:0}
+.rebar-live-page{container:rebar-parameters / inline-size}
+.rebar-live-help{max-width:100ch}
+.rebar-live-shell{display:grid;grid-template-columns:minmax(320px,var(--rebar-editor-width,.95fr)) 24px minmax(420px,1.25fr);gap:0;align-items:start}
+.rebar-panel-divider{align-self:stretch;min-height:240px;cursor:col-resize;touch-action:none;user-select:none;display:flex;justify-content:center;background:linear-gradient(to right,transparent 11px,var(--line) 11px,var(--line) 13px,transparent 13px);border-radius:3px}
+.rebar-panel-divider span{position:sticky;top:45vh;width:4px;height:44px;border-radius:2px;background:var(--muted)}
+.rebar-panel-divider:hover span,.rebar-panel-divider:focus-visible span,.rebar-panels-resizing .rebar-panel-divider span{background:var(--accent)}
+.rebar-panel-divider:focus-visible{outline:1px solid var(--accent);outline-offset:-4px}
+.rebar-panels-resizing,.rebar-panels-resizing *{cursor:col-resize!important;user-select:none!important}
+.rebar-live-editor,.rebar-live-preview{min-width:0}
+.rebar-live-editor fieldset{min-inline-size:0;padding:18px}
+.rebar-live-editor fieldset:first-child{margin-top:0}
+.rebar-live-editor .fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.rebar-live-editor label,.rebar-live-editor input,.rebar-live-editor select{min-width:0}
+.rebar-live-editor .table-wrap{max-width:100%}
+.rebar-live-preview{position:sticky;top:90px;max-height:calc(100dvh - 110px);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+@container rebar-parameters (max-width:820px){.rebar-live-shell{grid-template-columns:minmax(0,1fr);gap:24px}.rebar-panel-divider{display:none}.rebar-live-preview{position:static;max-height:none;overflow:visible;scrollbar-gutter:auto}}
+@container rebar-parameters (max-width:380px){.rebar-live-editor .fields{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:1050px){body:has(#armaduras.rebar-live-page) .layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){body:has(#armaduras.rebar-live-page) .layout{padding:24px 16px 60px}}
+
+/* Only the selected wing inspector expands for its requested local viewer. */
+body:has(#asistente-armaduras .rebar-wing) .layout{max-width:none;grid-template-columns:minmax(0,1fr) 128px;gap:20px;padding:32px 24px 80px}
+body.outline-hidden:has(#asistente-armaduras .rebar-wing) .layout{grid-template-columns:minmax(0,1fr)}
+.rebar-assistant-shell:has(.rebar-wing){grid-template-columns:260px minmax(0,1fr)}
+.rebar-wing{container:rebar-parameters / inline-size;min-width:0}
+.rebar-wing .rebar-wing-confirmation{display:flex;align-items:flex-start;gap:10px;margin-top:16px}
+.rebar-wing .rebar-wing-confirmation input{flex:none;width:18px;height:18px;margin:2px 0 0}
+.rebar-wing .rebar-wing-confirmation span{min-width:0}
+.rebar-wing .rebar-wing-messages{margin-top:16px}
+.rebar-wing .rebar-wing-output{min-width:0;margin-top:18px}
+.rebar-wing .rebar-wing-output table{font-size:12px;min-width:920px}
+.rebar-wing .rebar-wing-output th,.rebar-wing .rebar-wing-output td{white-space:normal}
+.rebar-wing-supplements{min-width:0}
+.rebar-wing-supplements .wing-supplement-fields{display:grid;gap:14px}
+.rebar-wing-supplements .wing-supplement-fields fieldset{margin:0;min-width:0}
+.rebar-wing-supplements .fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+.rebar-wing-supplements .wing-supplement-validation{color:#ffd07a;font-size:13px;margin:10px 0 0}
+.rebar-wing-supplements input[aria-invalid="true"]{border-color:#ffd07a}
+.rebar-wing-supplements .wing-supplement-hint{font-size:13px;margin:12px 0}
+.rebar-wing-supplements svg{display:block;width:100%;height:auto;min-height:220px;border:1px solid var(--line);background:#24262d}
+.rebar-wing-supplements svg[hidden]{display:none}
+.rebar-wing-supplements svg text{fill:#fff;font-size:24px;font-family:inherit;pointer-events:none}
+.rebar-wing-supplements .wing-supplement-profile{fill:#ffffff0a;stroke:#d5d8df;stroke-width:1.5;vector-effect:non-scaling-stroke}
+.rebar-wing-supplements .wing-supplement-zero,.rebar-wing-supplements .wing-supplement-guide{stroke:#9199a8;stroke-width:1;vector-effect:non-scaling-stroke;pointer-events:none}
+.rebar-wing-supplements .wing-supplement-zero{stroke-dasharray:3 6}
+.rebar-wing-supplements .wing-supplement-band{fill:#4fda8b;fill-opacity:.3;pointer-events:none}
+.rebar-wing-supplements .wing-supplement-band-back{fill-opacity:.4}
+.rebar-wing-supplements .wing-supplement-fixed{stroke:#d5d8df;stroke-width:1;stroke-dasharray:4 5;vector-effect:non-scaling-stroke;pointer-events:none}
+.rebar-wing-supplements .wing-supplement-limit{cursor:ns-resize;outline:none;touch-action:none}
+.rebar-wing-supplements .wing-supplement-limit-line{stroke:#5be898;stroke-width:1.4;stroke-dasharray:7 4;vector-effect:non-scaling-stroke}
+.rebar-wing-supplements .wing-supplement-limit-hit{stroke:transparent;stroke-width:24;pointer-events:stroke}
+.rebar-wing-supplements .wing-supplement-limit circle{fill:#5be898;stroke:#15171b;stroke-width:2}
+.rebar-wing-supplements .wing-supplement-limit:focus circle{fill:#fff;stroke:#5be898;stroke-width:4}
+@media(max-width:480px){.rebar-wing-supplements .fields{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:1050px){body:has(#asistente-armaduras .rebar-wing) .layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:900px){.rebar-assistant-shell:has(.rebar-wing){grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){body:has(#asistente-armaduras .rebar-wing) .layout{padding:24px 16px 60px}}
+
+/* GSG_COTAS from the CAD master; RomanD uses the font already installed by CAD. */
+@font-face{font-family:GSGRomanD;src:local('RomanD');font-weight:400;font-style:normal}
+.rebar-detail-dialog{max-width:1100px}
+.rebar-detail-dialog .rebar-detail-preview{display:block;width:100%;height:auto;max-height:420px;margin:24px 0 28px;overflow:visible}
+.rebar-detail-preview .rebar-line{stroke:var(--accent);stroke-width:3;fill:none}
+.rebar-detail-preview .dimension-line,.rebar-detail-preview .dimension-extension{stroke:#fff;stroke-width:1;fill:none}
+.rebar-detail-preview .dimension-arrow{fill:#fff;stroke:none}
+.rebar-detail-preview .dimension-text{fill:#fff;font-family:GSGRomanD,Roboto,sans-serif;font-weight:400}
+.rebar-detail-dialog p{overflow-wrap:anywhere}
+.rebar-splice-actions{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:8px;min-width:0}
+.rebar-splice-actions button{white-space:normal;text-align:left}
+.rebar-splice-dialog{max-width:1100px}
+.rebar-splice-dialog>label{display:block;max-width:340px;margin:14px 0}
+.rebar-splice-dialog .rebar-splice-preview{display:block;width:100%;max-height:none}
+.rebar-splice-legend{display:flex;flex-wrap:wrap;gap:12px 24px}
+.rebar-splice-legend span{border-left:4px solid var(--piece-color);padding-left:8px}
+.rebar-splice-dialog .dimension-text{fill:#fff;font-size:18px;letter-spacing:-.3px}
+
+/* Expanded marks use the available screen without hiding any schedule columns. */
+dialog.rebar-marks-dialog{width:calc(100vw - 32px);max-width:none;max-height:calc(100dvh - 32px);padding:18px;overflow:hidden}
+dialog.rebar-marks-dialog[open]{display:flex;flex-direction:column;gap:16px}
+.rebar-marks-dialog .rebar-marks-header,.rebar-marks-dialog .rebar-marks-footer{flex:0 0 auto}
+.rebar-marks-dialog h2{margin:0}
+.rebar-marks-dialog .rebar-marks-scroll{min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain}
+.rebar-marks-dialog table{width:100%;min-width:840px;table-layout:fixed;font-size:13px;line-height:1.45}
+.rebar-marks-dialog th,.rebar-marks-dialog td{white-space:normal;overflow-wrap:anywhere;padding:10px 6px;vertical-align:middle}
+.rebar-marks-dialog th{position:sticky;top:0;z-index:1;background:var(--bg)}
+.rebar-marks-dialog th:nth-child(1){width:6%}.rebar-marks-dialog th:nth-child(2){width:7%}.rebar-marks-dialog th:nth-child(3){width:19%}
+.rebar-marks-dialog th:nth-child(4){width:7%}.rebar-marks-dialog th:nth-child(5),.rebar-marks-dialog th:nth-child(6){width:4.5%}
+.rebar-marks-dialog th:nth-child(7){width:10%}.rebar-marks-dialog th:nth-child(8){width:9%}
+.rebar-marks-dialog th:nth-child(9),.rebar-marks-dialog th:nth-child(10){width:7%}.rebar-marks-dialog th:nth-child(11){width:11%}.rebar-marks-dialog th:nth-child(12){width:8%}
+.rebar-marks-dialog td button{min-width:28px;max-width:100%;padding:7px 5px;box-shadow:none;overflow-wrap:anywhere}
+@media(max-width:700px){dialog.rebar-marks-dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);padding:12px}}
+
+/* Viewer styles stay in the stylesheet permitted by the desktop CSP. */
+.rebar-isometric{min-width:0;color:var(--text)}
+dialog.rebar-isometric{width:calc(100vw - 32px);max-width:1600px;height:calc(100dvh - 32px);max-height:1100px;padding:20px;overflow:hidden}
+dialog.rebar-isometric[open]{display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:14px}
+.rebar-isometric h2,.rebar-isometric h3{margin:0}
+.rebar-isometric p{margin:0;overflow-wrap:anywhere}
+.rebar-isometric button{box-shadow:none;min-height:34px;transition:background .15s,border-color .15s,color .15s,box-shadow .15s}
+.rebar-isometric button:active{transform:none}
+.rebar-isometric .iso-header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.rebar-isometric .iso-heading{min-width:0;flex:1 1 270px}
+.rebar-isometric .iso-heading h2{font-size:23px;line-height:1.2}
+.rebar-isometric .iso-heading p{font-size:12px;margin-top:5px}
+.rebar-isometric .iso-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
+.rebar-isometric .iso-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-width:0}
+.rebar-isometric .iso-actions button{padding:7px 11px;font-size:13px;white-space:nowrap}
+.rebar-isometric .iso-toolbar button[aria-label=Alejar],.rebar-isometric .iso-toolbar button[aria-label=Acercar]{width:34px;padding:7px 0}
+.rebar-isometric .iso-expand{border-color:var(--accent);color:var(--accent)}
+.rebar-isometric .iso-close{margin-left:5px}
+.rebar-isometric .iso-content{min-width:0;min-height:0;overflow:hidden}
+.rebar-isometric .iso-layout{display:grid;grid-template-columns:clamp(340px,28vw,400px) minmax(0,1fr);gap:18px;height:100%;min-width:0;min-height:0}
+.rebar-isometric .iso-stage{min-width:0;min-height:0;display:flex;flex-direction:column}
+.rebar-isometric .iso-viewport{position:relative;flex:1;min-width:0;min-height:0;overflow:hidden;border:1px solid var(--line);background:var(--field,var(--bg))}
+.rebar-isometric .iso-viewport svg{display:block;width:100%;height:100%;max-height:none;touch-action:none;cursor:grab;user-select:none}
+.rebar-isometric .iso-viewport svg:active{cursor:grabbing}
+.rebar-isometric .iso-viewport svg text{fill:var(--text);font:14px Roboto,sans-serif}
+.rebar-isometric .iso-aside{min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable;padding:14px;background:var(--field,var(--bg));border:1px solid var(--line)}
+.rebar-isometric .iso-aside h3{font-size:18px;margin-bottom:8px}
+.rebar-isometric .iso-aside>.muted{font-size:12px;line-height:1.5;margin:8px 0 12px}
+.rebar-isometric .iso-aside>button{padding:6px 10px;font-size:12px}
+.rebar-isometric .iso-element-list{display:grid;gap:5px;margin-top:14px}
+.rebar-isometric .iso-element{display:grid;grid-template-columns:minmax(138px,.95fr) minmax(100px,1fr);align-items:start;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+.rebar-isometric .iso-element:last-child{border-bottom:0}
+.rebar-isometric .iso-element-name{display:flex;align-items:center;gap:8px;min-width:0}
+.rebar-isometric .iso-element input[type=checkbox]{flex:0 0 18px;width:18px;height:18px;margin:0;cursor:pointer}
+.rebar-isometric .iso-element-focus{flex:1;min-width:0;text-align:left;padding:6px 5px;font-size:13px;line-height:1.35;border-color:transparent;background:transparent;overflow-wrap:anywhere}
+.rebar-isometric .iso-element-focus[aria-pressed=true]{color:var(--accent);border-color:var(--accent);background:var(--bg)}
+.rebar-isometric .iso-marks{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;padding:1px 0}
+.rebar-isometric .iso-mark{min-width:32px;max-width:100%;padding:5px 8px;font:600 13px/1.4 Mono,monospace;color:var(--muted);border-color:var(--line);background:var(--bg);overflow-wrap:anywhere}
+.rebar-isometric .iso-mark[aria-pressed=true][data-visible=true]{background:var(--mark-color,var(--accent));border-color:var(--mark-color,var(--accent));color:#17191d;box-shadow:0 0 0 1px color-mix(in srgb,var(--mark-color,var(--accent)) 30%,transparent),0 0 12px color-mix(in srgb,var(--mark-color,var(--accent)) 22%,transparent)}
+.rebar-isometric .iso-mark[data-visible=false]{box-shadow:none;opacity:.65}
+.rebar-isometric .iso-mark:hover{border-color:var(--mark-color,var(--accent));opacity:1}
+.rebar-isometric .iso-opacity{display:block;margin:20px 0 14px;font-size:12px}
+.rebar-isometric .iso-opacity input[type=range]{display:block;width:100%;margin:10px 0 0;padding:0;accent-color:var(--accent)}
+.rebar-isometric .iso-setting{display:flex;align-items:center;gap:9px;margin:14px 0;font-size:13px}
+.rebar-isometric .iso-setting input[type=checkbox]{flex:0 0 18px;width:18px;height:18px;margin:0}
+.rebar-isometric .iso-note{border-left:2px solid var(--line);padding-left:10px;margin-top:14px;font-size:12px;line-height:1.5;color:var(--muted)}
+.rebar-isometric .iso-issues{margin-top:16px;padding:14px 0 0;border-top:1px solid var(--line);border-bottom:0;font-size:12px}
+.rebar-isometric .iso-issues summary{line-height:1.4}
+.rebar-isometric .iso-issues p{margin-top:10px;line-height:1.5;color:var(--muted)}
+.rebar-isometric .iso-footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 16px;min-width:0}
+.rebar-isometric .iso-live-status,.rebar-isometric .iso-help{font-size:12px;line-height:1.5;color:var(--muted)}
+.rebar-isometric .iso-live-status:empty{display:none}
+.rebar-isometric .iso-piece-panel{flex:none;display:grid;gap:9px;margin-top:10px;padding:12px;border:1px solid var(--accent);background:var(--field,var(--bg));font-size:12px;line-height:1.5;min-width:0}
+.rebar-isometric .iso-piece-panel strong{font-size:13px;overflow-wrap:anywhere}
+.rebar-isometric .iso-piece-panel label{margin:0;font-size:12px}
+.rebar-isometric .iso-piece-panel select{display:block;width:100%;max-width:100%;margin-top:5px;padding:6px;font-size:12px}
+.rebar-isometric .iso-piece-actions,.rebar-isometric .iso-piece-history{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.rebar-isometric .iso-piece-actions button,.rebar-isometric .iso-piece-history button,.rebar-isometric .iso-removed-piece button{font-size:12px;padding:6px 9px}
+.rebar-isometric .iso-piece-delete{color:#ffb3a9;border-color:#d8786b}
+.rebar-isometric .iso-piece-history{flex:none;margin-top:9px;font-size:12px;color:var(--muted)}
+.rebar-isometric .iso-removed-pieces{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);font-size:12px}
+.rebar-isometric .iso-removed-piece{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding:8px 0;border-top:1px solid var(--line)}
+.rebar-isometric .iso-removed-piece span{min-width:0;overflow-wrap:anywhere}
+.rebar-isometric .iso-removed-piece button{flex:none}
+.rebar-isometric .iso-piece-panel[hidden],.rebar-isometric .iso-piece-history[hidden],.rebar-isometric .iso-piece-history button[hidden],.rebar-isometric .iso-removed-pieces[hidden]{display:none}
+.rebar-isometric.iso-pending .iso-viewport{opacity:.45}
+.rebar-isometric.iso-embedded{padding:14px;border:1px solid var(--line);background:var(--bg);container:iso-preview / inline-size}
+.rebar-isometric.iso-embedded .iso-header{display:block;padding-bottom:12px}
+.rebar-isometric.iso-embedded .iso-heading h2{font-size:19px}
+.rebar-isometric.iso-embedded .iso-actions{justify-content:space-between;margin-top:12px;gap:8px}
+.rebar-isometric.iso-embedded .iso-actions button{font-size:12px;padding:6px 9px}
+.rebar-isometric.iso-embedded .iso-toolbar button[aria-label=Alejar],.rebar-isometric.iso-embedded .iso-toolbar button[aria-label=Acercar]{padding:6px 0}
+.rebar-isometric.iso-embedded .iso-content{margin-top:12px}
+.rebar-isometric.iso-embedded .iso-layout{display:block;height:auto}
+.rebar-isometric.iso-embedded .iso-viewport{height:clamp(280px,46dvh,500px);flex:none}
+.rebar-isometric.iso-embedded .iso-footer{display:block;margin-top:10px}
+.rebar-isometric.iso-embedded .iso-footer p+p{margin-top:4px}
+@container iso-preview (max-width:345px){.rebar-isometric.iso-embedded .iso-actions{gap:7px}.rebar-isometric.iso-embedded .iso-actions button{padding:6px 7px}.rebar-isometric.iso-embedded .iso-toolbar{gap:4px}.rebar-isometric.iso-embedded .iso-toolbar button[aria-label=Alejar],.rebar-isometric.iso-embedded .iso-toolbar button[aria-label=Acercar]{width:30px}}
+@media(max-width:900px){
+  dialog.rebar-isometric{width:calc(100vw - 20px);height:calc(100dvh - 20px);padding:14px}
+  dialog.rebar-isometric[open]{gap:10px}
+  dialog.rebar-isometric .iso-header{gap:8px;padding-bottom:10px}
+  dialog.rebar-isometric .iso-heading{flex-basis:100%}
+  dialog.rebar-isometric .iso-actions{width:100%;justify-content:space-between}
+  dialog.rebar-isometric .iso-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(220px,1.1fr) minmax(120px,1fr);gap:10px}
+  dialog.rebar-isometric .iso-stage{grid-row:1}
+  dialog.rebar-isometric .iso-aside{grid-row:2;padding:10px 12px}
+  dialog.rebar-isometric .iso-element{grid-template-columns:minmax(145px,.7fr) minmax(100px,1fr)}
+  dialog.rebar-isometric .iso-footer{font-size:11px}
+}
+@media(max-width:480px){
+  dialog.rebar-isometric{padding:10px}
+  dialog.rebar-isometric .iso-heading h2{font-size:20px}
+  dialog.rebar-isometric .iso-actions{gap:5px}
+  dialog.rebar-isometric .iso-actions button{padding:6px 7px;font-size:12px}
+  dialog.rebar-isometric .iso-toolbar{gap:4px}
+  dialog.rebar-isometric .iso-toolbar button[aria-label=Alejar],dialog.rebar-isometric .iso-toolbar button[aria-label=Acercar]{width:30px;padding:6px 0}
+  dialog.rebar-isometric .iso-close{margin-left:0}
+  dialog.rebar-isometric .iso-element{grid-template-columns:minmax(135px,.95fr) minmax(90px,1fr);gap:8px}
+  dialog.rebar-isometric .iso-help{font-size:11px}
+}
+
+/* Beam mouldage views stay within the existing Viga page. */
+.rebar-beam-page{min-width:0}
+.rebar-beam-intro,.rebar-beam-summary,.rebar-beam-status{overflow-wrap:anywhere}
+.rebar-beam-selectors{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:18px;margin:20px 0 12px}
+.rebar-beam-selectors label{min-width:0}
+.rebar-beam-selectors select{margin-top:6px;max-width:100%}
+.rebar-beam-summary{color:var(--text);margin:10px 0}
+.rebar-beam-status{color:var(--muted);font-size:.9em;margin:8px 0 16px}
+.rebar-beam-messages{color:var(--muted);overflow-wrap:anywhere}
+.rebar-beam-viewer{min-width:0;border:1px solid var(--line);background:#202329}
+.rebar-beam-viewer[hidden],.rebar-beam-selectors[hidden]{display:none}
+.rebar-beam-view-buttons{display:flex;flex-wrap:wrap;gap:8px;padding:12px;border-bottom:1px solid #414854}
+.rebar-beam-view-buttons button{padding:7px 15px;box-shadow:none;background:#202329;color:#f2f5f8;border-color:#606875}
+.rebar-beam-view-buttons button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#171a20;font-weight:700}
+.rebar-beam-view-buttons button:hover{border-color:var(--accent)}
+.rebar-beam-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:9px;padding:12px;border-bottom:1px solid #414854;color:#f2f5f8}
+.rebar-beam-toolbar button{padding:6px 11px;box-shadow:none;background:#202329;color:#f2f5f8;border-color:#606875}
+.rebar-beam-toolbar button:hover{border-color:var(--accent);color:var(--accent)}
+.rebar-beam-toolbar .rebar-beam-expand{margin-left:auto}
+.rebar-beam-toolbar .rebar-beam-expand[hidden]{display:none}
+.rebar-beam-scope{display:flex;align-items:center;gap:8px;font-size:12px;margin:0 10px 0 0;min-width:0}
+.rebar-beam-scope select{width:auto;max-width:190px;margin:0;padding:7px 24px 7px 9px;background:#202329;color:#f2f5f8;font-size:12px}
+.rebar-beam-zoom{color:#c0c8d4;min-width:52px;text-align:center;font-size:12px}
+.rebar-beam-drawings{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+.rebar-beam-view{min-width:0;overflow:hidden;padding:14px 6px 0}
+.rebar-beam-view+.rebar-beam-view{border-top:1px solid #414854}
+.rebar-beam-view h3{margin:0 14px;color:#f2f5f8;font-size:17px}
+.rebar-beam-svg{display:block;width:100%;height:clamp(360px,52vh,620px);max-height:none;overflow:hidden;touch-action:pan-y}
+.rebar-beam-svg:focus-visible{outline-offset:-3px}
+.rebar-beam-svg text{fill:#fff;font:12px Roboto,Arial,sans-serif}
+.rebar-beam-outline{fill:#aab8c01b;stroke:#e6b95f;stroke-width:1.5;stroke-linejoin:round}
+.rebar-beam-edge{fill:none;stroke:#acb7c6;stroke-width:1;stroke-dasharray:5 4;stroke-linejoin:round}
+.rebar-beam-face{fill:#aab8c00b;stroke:none}
+.rebar-beam-scene-edge{fill:none;stroke:#aab4c0;stroke-opacity:.42;stroke-width:1;stroke-linejoin:round}
+.rebar-beam-bar{fill:none;stroke:#ffca70;stroke-linecap:round;stroke-linejoin:round}
+.rebar-beam-mark-1{stroke:#ffca70}.rebar-beam-mark-2{stroke:#6bdeef}.rebar-beam-mark-3{stroke:#f2f5fb}
+.rebar-beam-mark-6{stroke:#c5a4f4}.rebar-beam-mark-7{stroke:#f191ad}.rebar-beam-mark-11{stroke:#8ee4ab}
+.rebar-beam-dimension,.rebar-beam-extension{stroke:#fff;stroke-width:1;fill:none}
+.rebar-beam-extension{stroke-opacity:.6}
+.rebar-beam-arrow{fill:#fff}
+.rebar-beam-panning{cursor:grabbing}
+.rebar-beam-help{color:#b8c2d0;font-size:12px;margin:0;padding:12px 16px;border-top:1px solid #414854}
+.rebar-beam-dialog{width:calc(100vw - 48px);max-width:1600px;max-height:calc(100vh - 48px);padding:18px;overflow:auto}
+.rebar-beam-dialog-heading{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:16px}
+.rebar-beam-dialog-heading h2{margin:0}
+.rebar-beam-dialog-heading button{flex:none;box-shadow:none}
+.rebar-beam-dialog .rebar-beam-svg{width:100%;height:clamp(300px,60vh,750px);max-height:none}
+@media(max-width:600px){
+  .rebar-beam-selectors{grid-template-columns:minmax(0,1fr);gap:6px}
+  .rebar-beam-toolbar{gap:7px;padding:10px}
+  .rebar-beam-toolbar button{font-size:12px;padding:6px 9px}
+  .rebar-beam-toolbar .rebar-beam-expand{margin-left:0}
+  .rebar-beam-scope{flex-basis:100%}
+  .rebar-beam-view-buttons{gap:6px;padding:10px}
+  .rebar-beam-view-buttons button{padding:7px 10px;font-size:12px}
+  .rebar-beam-dialog{width:calc(100vw - 16px);max-height:calc(100vh - 16px);padding:10px}
+  .rebar-beam-dialog-heading{align-items:flex-start;gap:12px}
+  .rebar-beam-dialog-heading h2{font-size:20px}
+  .rebar-beam-dialog-heading button{font-size:12px;padding:7px}
+}

@@ -92,10 +92,10 @@
     for(const part of capitals(model,support))for(const face of part.faces){const poly=document.createElementNS(NS,'polygon');poly.setAttribute('points',face.map(p=>project(...p).join(',')).join(' '));poly.setAttribute('fill','#dbc39b');poly.setAttribute('stroke','#9a7d52');poly.setAttribute('stroke-width','.7');poly.setAttribute('vector-effect','non-scaling-stroke');group.append(poly);}
     return group;
   }
-  function edge(model,connection,project,view,active,orbitAngle=0){
+  function edge(model,connection,project,view,active,orbitAngle=0,cameraDepth=null){
     const NS='http://www.w3.org/2000/svg',g=document.createElementNS(NS,'g');g.setAttribute('class','volume-preview');g.style.pointerEvents='none';
     const polygons=faces(model,connection);
-    if(view==='iso'){const c=Math.cos(orbitAngle),s=Math.sin(orbitAngle),depth=p=>(p[0]*c-p[1]*s)+(p[0]*s+p[1]*c)+p[2];polygons.sort((a,b)=>a.reduce((sum,p)=>sum+depth(p),0)/a.length-b.reduce((sum,p)=>sum+depth(p),0)/b.length);}
+    if(view==='iso'){const c=Math.cos(orbitAngle),s=Math.sin(orbitAngle),depth=cameraDepth||(p=>(p[0]*c-p[1]*s)+(p[0]*s+p[1]*c)+p[2]);polygons.sort((a,b)=>a.reduce((sum,p)=>sum+depth(p),0)/a.length-b.reduce((sum,p)=>sum+depth(p),0)/b.length);}
     for(const polygon of polygons){
       const poly=document.createElementNS(NS,'polygon');poly.setAttribute('points',polygon.map(p=>project(...p).join(',')).join(' '));
       poly.setAttribute('fill',active?'#b8dae8':connection.funcion==='escalera'?'#d6ddd0':'#d5e1e5');poly.setAttribute('stroke',active?'#4382a1':'#94abb6');poly.setAttribute('stroke-width','.6');poly.setAttribute('vector-effect','non-scaling-stroke');g.append(poly);

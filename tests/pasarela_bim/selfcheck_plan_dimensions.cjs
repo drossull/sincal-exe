@@ -8,7 +8,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('http://pasarela.test/**',async route=>{
    const url=new URL(route.request().url());
-   if(url.pathname.startsWith('/api/'))return route.fulfill({json:url.pathname==='/api/ejemplo'?JSON.parse(fs.readFileSync('pasarela_bim/ejemplos/los_batros.json','utf8')):url.pathname==='/api/estado'?{freecad_disponible:false}:{valido:true,generable:false,errores:[],avisos:[],pendientes:[]}});
+   if(url.pathname.startsWith('/api/'))return route.fulfill({json:url.pathname==='/api/ejemplo'?JSON.parse(fs.readFileSync('pasarela_bim/ejemplos/los_batros.json','utf8')):url.pathname==='/api/estado'?{freecad_disponible:false,guardado_local:true}:{valido:true,generable:false,errores:[],avisos:[],pendientes:[]}});
    const file=path.resolve('pasarela_bim/web',url.pathname==='/'?'index.html':url.pathname.slice(1));
    if(!fs.existsSync(file))return route.fulfill({status:404,body:''});
    return route.fulfill({path:file});
@@ -18,6 +18,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   await page.locator('.plan-dimensions text').first().waitFor();
   const example=JSON.parse(fs.readFileSync('pasarela_bim/ejemplos/los_batros.json','utf8'));
   assert.equal(await page.locator('[data-dimension-edge]').count(),example.tramos.length);
+  assert.equal(await page.locator('.plan-dimensions .dimension-arrowhead[data-arrow-style="GSG_COTAS"]').count(),example.tramos.length*2);
   for(const e of example.tramos){
    const a=example.nodos.find(n=>n.id===e.desde),b=example.nodos.find(n=>n.id===e.hasta);
    const label=await page.locator(`[data-dimension-edge="${e.id}"] text`).textContent();
@@ -27,6 +28,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   await page.locator('#model-canvas').screenshot({path:'tmp/cotas-planta.png'});
   await page.locator('#zoom-in').click();
   assert.equal(await page.locator('[data-dimension-edge]').count(),example.tramos.length);
+  assert.equal(await page.locator('.plan-dimensions .dimension-arrowhead').count(),example.tramos.length*2);
   await page.locator('#show-plan-dimensions').uncheck();assert.equal(await page.locator('[data-dimension-edge]').count(),0);
   await page.locator('#show-plan-dimensions').check();
   await page.locator('#view-iso').click();assert.equal(await page.locator('[data-dimension-edge]').count(),0);
@@ -53,7 +55,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    await page.mouse.move(box.x+145,box.y+95,{steps:8});await page.mouse.up({button});
    if(shift)await page.keyboard.up('Shift');
   };
-  await drag();
+  await drag('middle',true);
   assert.notDeepEqual(await position(),initial);
   assert.notEqual(await page.locator('#north-symbol').innerHTML(),north);
   // Existing support drawing must stay vertical on screen at every azimuth.
@@ -63,9 +65,11 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   await page.locator('#model-canvas').screenshot({path:'tmp/orbita-isometrica.png'});
   const turned=await position();
   const beforePan=await page.locator('#model-canvas').getAttribute('viewBox');
-  await drag('left',true);assert.deepEqual(await position(),turned);
-  assert.notEqual(await page.locator('#model-canvas').getAttribute('viewBox'),beforePan);
   await drag('middle');assert.deepEqual(await position(),turned);
+  assert.notEqual(await page.locator('#model-canvas').getAttribute('viewBox'),beforePan);
+  const afterPan=await page.locator('#model-canvas').getAttribute('viewBox');
+  await drag('left');assert.deepEqual(await position(),turned);
+  assert.equal(await page.locator('#model-canvas').getAttribute('viewBox'),afterPan,'Left dragging is reserved for selection, not navigation.');
   const beforeZoom=await page.locator('#model-canvas').getAttribute('viewBox');
   await page.mouse.wheel(0,-100);await page.waitForTimeout(100);
   assert.notEqual(await page.locator('#model-canvas').getAttribute('viewBox'),beforeZoom);
@@ -73,8 +77,8 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   assert.equal(await page.locator('#model-canvas').getAttribute('viewBox'),viewport);
   await page.locator('#view-plan').click();
   assert(await page.locator('#reset-orbit').isHidden());
-  const planBefore=await position();await drag();assert.deepEqual(await position(),planBefore);
-  assert.deepEqual(errors,[]);console.log('Orbit: Z vertical, north, pan modifiers, zoom, reset and plan pan passed.');
+  const planBefore=await position();await drag('middle');assert.deepEqual(await position(),planBefore);
+  assert.deepEqual(errors,[]);console.log('Orbit: Z vertical, north, modified middle orbit, middle pan, selection-only left mouse, zoom, reset and plan pan passed.');
   await page.locator('#suggest-axes').click();
   await page.getByRole('button',{name:'Aplicar propuesta',exact:true}).click();
   await page.locator('#view-elevation').click();
@@ -115,7 +119,9 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   assert((await page.locator('#project-reference').textContent()).includes('105,000'));
   await page.locator('#new-project').click();
   assert.equal(await page.locator('input[name="carretera"],input[name="terreno"]').count(),0);
-  const help=page.locator('.field-help-popup'),road=page.locator('input[name="crs"]');
+  assert.equal(await page.locator('input[name="crs"]').inputValue(),'PTL');
+  assert(await page.locator('input[name="crs"]').evaluate(el=>el.readOnly));
+  const help=page.locator('.field-help-popup'),road=page.locator('input[name="este_m"]');
   const roadTitle=road.locator('..').locator('.field-help-label');
   const showRoadHelp=async()=>{await road.hover();await roadTitle.hover();await help.waitFor({state:'visible',timeout:3000});};
   const assertHelpPlacement=async input=>{
@@ -123,13 +129,13 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    assert(h.x>=0&&h.y>=0&&h.x+h.width<=v.width&&h.y+h.height<=v.height);
    assert(h.y+h.height<=f.y||h.y>=f.y+f.height||h.x+h.width<=f.x||h.x>=f.x+f.width,'Help overlaps its input');
   };
-  await showRoadHelp();assert((await help.textContent()).includes('coordenadas'));
+  await showRoadHelp();assert((await help.textContent()).includes('DWG'));
   await assertHelpPlacement(road);
   assert.equal(await help.evaluate(el=>getComputedStyle(el).pointerEvents),'none');
-  await page.locator('dialog').screenshot({path:'tmp/ayuda-sistema-referencia.png'});
+  await page.locator('dialog').screenshot({path:'tmp/ayuda-este-ptl.png'});
   await page.keyboard.press('Escape');assert(await help.isHidden());assert(await page.locator('dialog').isVisible());
-  await showRoadHelp();await road.click();await road.fill('UTM 18S');
-  await page.waitForTimeout(450);assert(await help.isHidden());assert.equal(await road.inputValue(),'UTM 18S');
+  await showRoadHelp();await road.click();await road.fill('187606.2952');
+  await page.waitForTimeout(450);assert(await help.isHidden());assert.equal(await road.inputValue(),'187606.2952');
   await road.hover();await page.waitForTimeout(450);assert(await help.isHidden());
   await roadTitle.hover();await page.waitForTimeout(100);await road.click();
   await page.waitForTimeout(450);assert(await help.isHidden(),'Cancelled hover must not reopen during editing');
@@ -138,7 +144,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   // Even with the pointer resting on a label, typing dismisses the explanation.
   await road.focus();await showRoadHelp();await page.keyboard.press('ArrowLeft');assert(await help.isHidden());
   const description=await road.getAttribute('aria-describedby');assert(description);
-  assert((await page.locator('#'+description).textContent()).includes('coordenadas'));
+  assert((await page.locator('#'+description).textContent()).includes('DWG'));
   await page.setViewportSize({width:800,height:600});
   await showRoadHelp();await assertHelpPlacement(road);
   await page.locator('dialog').screenshot({path:'tmp/ayuda-campo-ventana-pequena.png'});

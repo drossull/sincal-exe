@@ -19,6 +19,7 @@ import uuid
 import webbrowser
 
 from . import __version__
+from .archivos import ProjectFiles, FileConflict, FileBusy
 from .ejecucion import generar_aislado, localizar_freecad, nueva_salida
 from .topologia import validar
 from .planta import importar_planta, localizar_conversor, MAX_UPLOAD
@@ -49,6 +50,8 @@ class Aplicacion(ThreadingHTTPServer):
         self.lock = threading.Lock()
         self.cerrando = False
         self.importaciones = 0
+        self.operaciones_archivo = 0
+        self.project_files = ProjectFiles()
         self.host_control = False
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="pasarela-freecad")
 
@@ -108,7 +111,8 @@ class Manejador(BaseHTTPRequestHandler):
         if ruta == "/api/ejemplo":
             return self.enviar(json.loads((raiz_recursos() / "ejemplos" / "los_batros.json").read_text(encoding="utf-8")))
         if ruta == "/api/estado":
-            return self.enviar({"freecad_disponible": localizar_freecad() is not None, "dwg_disponible": localizar_conversor() is not None, "version": __version__})
+            return self.enviar({"freecad_disponible": localizar_freecad() is not None, "dwg_disponible": localizar_conversor() is not None,
+                                "guardado_local": self.server.project_files.available, "version": __version__})
         if ruta == "/api/host-status":
             if not self.server.host_control:
                 return self.enviar({"mensaje":"No encontrado"},404)
@@ -140,7 +144,9 @@ class Manejador(BaseHTTPRequestHandler):
             return self.enviar(contenido, tipo=mimetypes.guess_type(nombre)[0] or "application/octet-stream")
         recursos = {"/": "index.html", "/index.html": "index.html", "/app.js": "app.js", "/style.css": "style.css",
                     "/proyecto.js": "proyecto.js", "/emplazamiento.js": "emplazamiento.js", "/secciones.js": "secciones.js",
-                    "/volumen.js": "volumen.js", "/ejes.js": "ejes.js", "/integracion.js": "integracion.js", "/ayudas.js": "ayudas.js"}
+                    "/volumen.js": "volumen.js", "/ejes.js": "ejes.js", "/integracion.js": "integracion.js", "/ayudas.js": "ayudas.js",
+                    "/guardado.js": "guardado.js", "/cotas.js": "cotas.js", "/navegacion.js": "navegacion.js",
+                    "/retornos.js": "retornos.js", "/pilotes.js": "pilotes.js"}
         if ruta not in recursos:
             return self.enviar({"mensaje": "No encontrado"}, 404)
         archivo = raiz_recursos() / "web" / recursos[ruta]
@@ -178,11 +184,13 @@ class Manejador(BaseHTTPRequestHandler):
             with self.server.lock:
                 if self.server.cerrando:
                     return self.enviar({"mensaje":"El módulo se está cerrando."},409)
+                if self.server.operaciones_archivo:
+                    return self.enviar({"mensaje":"Espera a que termine la apertura o el guardado del proyecto."},409)
                 self.server.parent_origin = origen
             return self.enviar({"embedding":1,"parent_origin":origen})
         if ruta == "/api/cerrar":
             with self.server.lock:
-                if self.server.importaciones or any(t["estado"] == "ejecutando" for t in self.server.trabajos.values()):
+                if self.server.importaciones or self.server.operaciones_archivo or any(t["estado"] == "ejecutando" for t in self.server.trabajos.values()):
                     return self.enviar({"mensaje":"Espera a que termine el trabajo en curso antes de cerrar el módulo."},409)
                 self.server.cerrando = True
             self.enviar({"ok":True})
@@ -191,6 +199,8 @@ class Manejador(BaseHTTPRequestHandler):
         with self.server.lock:
             if self.server.cerrando:
                 return self.enviar({"mensaje":"El módulo se está cerrando."},409)
+        if ruta in ("/api/proyecto/abrir", "/api/proyecto/guardar"):
+            return self.archivo_proyecto(ruta)
         if ruta == "/api/planta":
             with self.server.lock:
                 if self.server.cerrando:
@@ -238,6 +248,52 @@ class Manejador(BaseHTTPRequestHandler):
                                                "archivos": [], "carpeta": str(salida)}
         self.server.executor.submit(self.server.ejecutar, id_trabajo, modelo, salida)
         self.enviar({"trabajo_id": id_trabajo}, 202)
+
+    def archivo_proyecto(self, ruta):
+        """Opera solo sobre rutas elegidas en el selector nativo, nunca recibidas del editor."""
+        if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
+            return self.enviar({"mensaje": "Se requiere JSON"}, 415)
+        if not self.server.project_files.available:
+            return self.enviar({"mensaje": "El guardado local no está disponible en este equipo."}, 503)
+        with self.server.lock:
+            if self.server.cerrando:
+                return self.enviar({"mensaje": "El módulo se está cerrando."}, 409)
+            if self.server.operaciones_archivo:
+                return self.enviar({"mensaje": "Ya hay una apertura o un guardado de proyecto en curso."}, 409)
+            self.server.operaciones_archivo += 1
+        try:
+            longitud = int(self.headers.get("Content-Length", "0"))
+            if not 0 < longitud <= MAX_BODY:
+                return self.enviar({"mensaje": "Archivo vacío o demasiado grande (máximo 20 MB)."}, 413)
+            datos = json.loads(self.rfile.read(longitud))
+            if not isinstance(datos, dict):
+                raise ValueError("Se requiere un objeto JSON.")
+            if ruta == "/api/proyecto/abrir":
+                if datos:
+                    raise ValueError("El archivo se elige en el selector; no se admiten rutas de entrada.")
+                resultado = self.server.project_files.open_project()
+            else:
+                if set(datos) - {"modelo", "documento_id", "guardar_como", "nombre_sugerido"}:
+                    raise ValueError("La solicitud contiene campos de guardado no admitidos.")
+                if not isinstance(datos.get("modelo"), dict):
+                    raise ValueError("Se requiere el modelo del proyecto.")
+                if "documento_id" in datos and datos["documento_id"] is not None and not isinstance(datos["documento_id"], str):
+                    raise ValueError("El identificador del documento no es válido.")
+                if "guardar_como" in datos and not isinstance(datos["guardar_como"], bool):
+                    raise ValueError("La opción Guardar como no es válida.")
+                if "nombre_sugerido" in datos and not isinstance(datos["nombre_sugerido"], str):
+                    raise ValueError("El nombre sugerido no es válido.")
+                resultado = self.server.project_files.save_project(datos)
+            return self.enviar(resultado)
+        except (FileConflict, FileBusy) as exc:
+            return self.enviar({"mensaje": str(exc)}, 409)
+        except (ValueError, TypeError, KeyError, RecursionError) as exc:
+            return self.enviar({"mensaje": f"Entrada no válida: {exc}"}, 400)
+        except OSError as exc:
+            return self.enviar({"mensaje": f"No se pudo completar la operación de archivo: {exc}"}, 500)
+        finally:
+            with self.server.lock:
+                self.server.operaciones_archivo -= 1
 
 
 def _publicar_inicio(archivo, url, control_token):

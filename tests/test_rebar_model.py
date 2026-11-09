@@ -1,4 +1,5 @@
 import unittest
+from dataclasses import replace
 
 from sincal.rebar.model import (
     Cover,
@@ -56,10 +57,10 @@ class ZapataScheduleTests(unittest.TestCase):
         very_wide = ZapataGeometry.from_centimetres(750, 2300, 150)
         schedule = build_zapata_schedule(very_wide, self.cover, default_zapata_rules())
         marks = {mark.mark: mark for mark in schedule.marks}
-        self.assertIn("2-A", marks)
-        self.assertIn("5-A", marks)
+        self.assertIn("2A", marks)
+        self.assertIn("5A", marks)
         self.assertEqual(marks["2"].piece_role, "intermedia")
-        self.assertEqual(marks["2-A"].piece_role, "terminal")
+        self.assertEqual(marks["2A"].piece_role, "terminal")
 
     def test_optional_suple_has_complete_range_when_enabled(self):
         rules = list(default_zapata_rules())
@@ -70,7 +71,7 @@ class ZapataScheduleTests(unittest.TestCase):
             enabled=True,
         )
         schedule = build_zapata_schedule(self.geometry, self.cover, tuple(rules))
-        suple = next(mark for mark in schedule.marks if mark.mark == "3-A")
+        suple = next(mark for mark in schedule.marks if mark.mark == "3A")
         self.assertEqual(suple.views, ("FR", "AA", "BB", "CC", "FF"))
         self.assertEqual(suple.hook_count, 2)
 
@@ -79,6 +80,54 @@ class ZapataScheduleTests(unittest.TestCase):
             self.geometry, Cover.from_centimetres(5, 5, 400), default_zapata_rules())
         self.assertFalse(schedule.is_valid)
         self.assertTrue(any("espacio útil" in issue.message for issue in schedule.issues))
+
+    def test_mark_contract_matches_native_table(self):
+        original = default_zapata_rules()[0]
+        for mark in ("1", "3A", "3a", "12AB", "01", "0"):
+            with self.subTest(mark=mark):
+                self.assertFalse(replace(original, mark=mark).validate())
+        for mark in ("", "3-A", "1 2", "1A2", "1\n", "1İ", "１", '1\") (quit)', None):
+            with self.subTest(mark=mark):
+                self.assertTrue(replace(original, mark=mark).validate())
+
+    def test_duplicate_marks_ignore_case(self):
+        rules = list(default_zapata_rules())
+        rules[1] = replace(rules[1], mark="3a")
+        rules[2] = replace(rules[2], enabled=True)
+        schedule = build_zapata_schedule(self.geometry, self.cover, rules)
+        self.assertFalse(schedule.is_valid)
+        self.assertTrue(any("Marca duplicada '3A'" in issue.message for issue in schedule.issues))
+
+    def test_duplicate_generated_continuation_and_terminal_marks_are_blocked(self):
+        rules = list(default_zapata_rules())
+        rules[0] = replace(rules[0], continuation_mark="3")
+        schedule = build_zapata_schedule(self.geometry, self.cover, rules)
+        self.assertFalse(schedule.is_valid)
+        rules = list(default_zapata_rules())
+        rules[0] = replace(rules[0], continuation_mark="2a", terminal_mark="2A")
+        schedule = build_zapata_schedule(
+            ZapataGeometry.from_centimetres(750, 2300, 150), self.cover, rules)
+        self.assertFalse(schedule.is_valid)
+        self.assertTrue(any("Marca duplicada '2A'" in issue.message for issue in schedule.issues))
+
+    def test_fallback_terminal_uses_native_suffix(self):
+        rules = tuple(replace(rule, terminal_mark="") for rule in default_zapata_rules())
+        schedule = build_zapata_schedule(
+            ZapataGeometry.from_centimetres(750, 2300, 150), self.cover, rules)
+        self.assertTrue(schedule.is_valid, schedule.issues)
+        self.assertIn("2A", {mark.mark for mark in schedule.marks})
+        self.assertIn("5A", {mark.mark for mark in schedule.marks})
+
+    def test_rectangular_schedule_counts_the_usable_lateral_cage_and_same_meshes(self):
+        # Both mesh and lateral distributions include both real tangencies;
+        # the extra closing bars also belong to the schedule quantities.
+        rectangular = replace(self.geometry, esviaje_grados=0)
+        schedule = build_zapata_schedule(rectangular, self.cover, default_zapata_rules())
+        self.assertEqual([(mark.mark, mark.quantity, mark.unit_length_cm) for mark in schedule.marks], [
+            ("1", 76, 1200), ("2", 76, 302), ("3", 116, 943),
+            ("4", 14, 1200), ("5", 14, 264), ("6", 16, 944),
+        ])
+        self.assertAlmostEqual(schedule.total_kg, sum(mark.total_length_cm / 100 * mark.area_m2 * 7850 for mark in schedule.marks))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 'use strict';
 import {renderRebar,renderCrossbeam} from '/rebar.js';
 import {renderRebarAssistant} from '/rebar_assistant.js';
+import {renderBeamPreview} from '/rebar_beam.js';
 import {renderTools} from '/tools.js';
 import {createResourcePoller} from '/resources_status.js';
 import {renderNavigation,renderTabs,title,owner,destination} from '/navigation.js';
@@ -22,7 +23,24 @@ function updatePasarelaMenuStatus(status){
 const projectFiles=createProjectFiles({api,node,button,section,notify});
 const pasarelaPanel=createPasarelaPanel({api,node,notify,current:()=>page==='pasarela',onStatus:updatePasarelaMenuStatus,onSettings:()=>show('pasarela',{settings:true})});
 function node(tag, text, className){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(className)e.className=className;return e;}
-function notify(text){$('#notice').textContent=text;}
+const notice=$('#notice'),noticeHome=notice.parentElement;
+function placeNotice(){
+  // A modal makes the rest of the page inert. Keep the close button inside
+  // the active dialog, and restore the notice when that dialog is removed.
+  const host=[...document.querySelectorAll('dialog:modal')].at(-1)||noticeHome;
+  if(notice.parentElement!==host)host.append(notice);
+}
+new MutationObserver(records=>{
+  if(records.some(record=>record.target===document.body||record.target.tagName==='DIALOG'))placeNotice();
+}).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['open']});
+function notify(text){
+  notice.replaceChildren();
+  if(!text)return;
+  const message=node('span',text,'notice-message'),close=node('button','×','notice-close');
+  close.type='button';close.setAttribute('aria-label','Cerrar aviso');close.title='Cerrar aviso';
+  close.addEventListener('click',()=>notice.replaceChildren());
+  notice.append(message,close);placeNotice();
+}
 async function api(path, payload){const response=await fetch('/api/'+path,{method:payload?'POST':'GET',headers:{'X-Sincal-Token':token,'Content-Type':'application/json'},body:payload?JSON.stringify(payload):undefined});const data=await response.json();if(!response.ok)throw Error(data.error);return data;}
 async function uploadPackage(file){
   if(!file||!/\.zip$/i.test(file.name)||file.size===0||file.size>150*1024*1024)throw Error('Selecciona un ZIP no vacío de hasta 150 MiB.');
@@ -135,8 +153,10 @@ const guide=section('guia-armadura','Cómo funciona');const steps=node('ol');for
 await renderRebar({...toolContext(page),project});
 }else if(page==='rebar-crossbeam'){
 await renderCrossbeam({...toolContext(page),project});
-}else if(['rebar-beam','rebar-pier','rebar-slab'].includes(page)){
-const names={'rebar-beam':'Viga','rebar-pier':'Cepa','rebar-slab':'Losa'},s=section('estructura',names[page]);s.append(node('p',page==='rebar-pier'?'Se utilizará cuando el puente incluya cepas.':'Estructura incluida en el flujo del módulo.'));s.append(node('p','Generador pendiente de desarrollo. No se realizan cálculos ni se generan armaduras desde esta página todavía.'));
+}else if(page==='rebar-beam'){
+await renderBeamPreview({...toolContext(page),project});
+}else if(['rebar-pier','rebar-slab'].includes(page)){
+const names={'rebar-pier':'Cepa','rebar-slab':'Losa'},s=section('estructura',names[page]);s.append(node('p',page==='rebar-pier'?'Se utilizará cuando el puente incluya cepas.':'Estructura incluida en el flujo del módulo.'));s.append(node('p','Generador pendiente de desarrollo. No se realizan cálculos ni se generan armaduras desde esta página todavía.'));
 }else{section('no-disponible','Sección no disponible').append(node('p','Selecciona una herramienta del menú lateral.'));}
 }
 document.addEventListener('click',event=>{const b=event.target.closest('[data-page]');if(!b||event.defaultPrevented||destination(b.dataset.page)===page)return;if(activeJob){notify('Espera a que termine la operación actual o cancélala antes de cambiar de herramienta.');return;}show(b.dataset.page).catch(e=>notify(e.message));});

@@ -19,6 +19,8 @@ def verify(path: Path) -> None:
     if missing or 'main' in entries:
         raise ValueError(f'Interfaz empaquetada incorrecta. Faltan: {sorted(missing)}; arranque Tk: {"main" in entries}')
     modules = archive.open_embedded_archive('PYZ.pyz').toc
+    if any(name.split('.')[0] in {'paddle', 'paddleocr', 'paddlex'} for name in modules):
+        raise ValueError('El motor OCR pesado debe quedar en su complemento independiente.')
     for name in ('sincal.web.desktop', 'sincal.web.server', 'sincal.rebar.catalog'):
         if name not in modules:
             raise ValueError(f'Falta el módulo web requerido: {name}')

@@ -24,6 +24,7 @@ from .rebar import (
     reference_sequence,
     drawing_units_per_m,
     reference_candidate,
+    wing_mark_conflicts,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -697,6 +698,9 @@ class Services:
         schedule = build_zapata_schedule(geometry, cover, rules)
         if not schedule.is_valid:
             raise ValueError('Corrige las advertencias del cálculo antes de dibujar.')
+        conflicts = wing_mark_conflicts(payload['state'], schedule)
+        if conflicts:
+            raise ValueError('Marcas de zapata reservadas por un ala: ' + ', '.join(conflicts) + '. Usa marcas únicas.')
         key = payload.get('abutment')
         if key not in ('entrada', 'salida'):
             raise ValueError('Estribo no válido.')
@@ -732,7 +736,7 @@ class Services:
                         asdict(candidate) if candidate else None)
 
     def rebar_from_references(self, job, payload, geometry, cover, rules, key, master):
-        """Collect one view's references, then insert only its defined recipe."""
+        """Collect the footing reference for one view and insert its reinforcement."""
         from sincal.cad.moldajes import MoldajeContext
         from sincal.cad.selected_moldaje import build_selection_lisp, parse_selected_moldaje
         from sincal.cad.zapata_views import build_zapata_lisp
@@ -751,8 +755,8 @@ class Services:
         path = self.lisp(job, source)
         instructions = ('marca tres esquinas consecutivas de la zapata: superior izquierda, superior derecha e inferior derecha'
                         if sequence[0]['reference_mode'] == 'parallelogram'
-                        else 'indica dos esquinas por elemento en CAD')
-        job.update(f'Vista {selection_view}: {instructions}. Sólo la zapata tiene armaduras definidas.')
+                        else 'indica la esquina superior izquierda e inferior derecha de la zapata en CAD')
+        job.update(f'Vista {selection_view}: {instructions}. Se selecciona únicamente la zapata.')
         self.cad(job, expected, f'(progn (load "{path}") (c:SINCAL-SELECCIONAR-MOLDAJE))\n',
                  reference_mode=True, focus=True)
         if not output.exists():
@@ -763,7 +767,7 @@ class Services:
         if result.selection != 'ok' or result.error:
             raise ValueError(result.error or 'No se completaron las referencias.')
         if list(result.rectangles) != [item['key'] for item in sequence]:
-            raise ValueError('La secuencia no corresponde a los elementos del JSON. No se insertaron armaduras.')
+            raise ValueError('La secuencia debe contener únicamente la zapata de esta vista. No se insertaron armaduras.')
         if result.reference_modes != {item['key']: item['reference_mode'] for item in sequence}:
             raise ValueError('La cantidad de esquinas no corresponde a esta vista. No se insertaron armaduras.')
         if result.insunits != expected.get('active', {}).get('insunits'):
@@ -781,7 +785,7 @@ class Services:
                       'drawing_units_per_m': scale, 'rectangles': result.rectangles,
                       'reference_modes': result.reference_modes,
                       'generated': ['abutment.footing'],
-                      'pending': [item['key'] for item in sequence if item['key'] != 'abutment.footing']}
+                      'pending': []}
         return {**inserted, 'selection': 'ok', 'references': references,
                 'references_count': len(result.rectangles)}
 

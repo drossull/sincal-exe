@@ -21,6 +21,8 @@ from .rebar import (
 from .cad_connection import connection_status
 from .services import Services, COMMANDS
 from .rebar import from_project
+from .piles import from_project as pile_from_project, preview as pile_preview
+from .abutment_scene import build_scene as abutment_scene
 from sincal.optional_modules import PasarelaModule, MAX_PACKAGE_BYTES
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -243,6 +245,13 @@ class Handler(BaseHTTPRequestHandler):
                   "/app.js": (STATIC / "app.js", "text/javascript; charset=utf-8"),
                   "/rebar.js": (STATIC / "rebar.js", "text/javascript; charset=utf-8"),
                   "/rebar_assistant.js": (STATIC / "rebar_assistant.js", "text/javascript; charset=utf-8"),
+                  "/rebar_pile.js": (STATIC / "rebar_pile.js", "text/javascript; charset=utf-8"),
+                  "/rebar_beam.js": (STATIC / "rebar_beam.js", "text/javascript; charset=utf-8"),
+                  "/rebar_wing.js": (STATIC / "rebar_wing.js", "text/javascript; charset=utf-8"),
+                  "/rebar_wing_ranges.js": (STATIC / "rebar_wing_ranges.js", "text/javascript; charset=utf-8"),
+                  "/rebar_isometric.js": (STATIC / "rebar_isometric.js", "text/javascript; charset=utf-8"),
+                  "/rebar_splitter.js": (STATIC / "rebar_splitter.js", "text/javascript; charset=utf-8"),
+                  "/rebar_splices.js": (STATIC / "rebar_splices.js", "text/javascript; charset=utf-8"),
                   "/tools.js": (STATIC / "tools.js", "text/javascript; charset=utf-8"),
                   "/resources_status.js": (STATIC / "resources_status.js", "text/javascript; charset=utf-8"),
                   "/study_info.js": (STATIC / "study_info.js", "text/javascript; charset=utf-8"),
@@ -310,6 +319,26 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, rebar_assistant_catalog(payload))
             if self.path == '/api/rebar/from-project':
                 return self.send(200, from_project(payload))
+            if self.path == '/api/rebar/beam/preview':
+                from .beam_preview import preview as beam_preview
+                return self.send(200, beam_preview(payload.get('project'), payload.get('board_index', 0),
+                                                   payload.get('beam_index', 0)))
+            if self.path == '/api/rebar/pile/from-project':
+                return self.send(200, pile_from_project(payload.get('project'), payload.get('instance_key')))
+            if self.path == '/api/rebar/pile/preview':
+                return self.send(200, pile_preview(payload.get('state')))
+            if self.path == '/api/rebar/wing/from-project':
+                from .wing_exterior import from_project as wing_from_project
+                return self.send(200, wing_from_project(payload.get('project'), payload.get('instance_key'),
+                                                       payload.get('side'), payload.get('abutment_state')))
+            if self.path == '/api/rebar/wing/preview':
+                from .wing_exterior import preview as wing_preview
+                return self.send(200, wing_preview(payload.get('project'), payload.get('instance_key'),
+                                                  payload.get('side'), payload.get('state'),
+                                                  payload.get('abutment_state')))
+            if self.path == '/api/rebar/abutment/scene':
+                return self.send(200, abutment_scene(payload.get('project'), payload.get('instance_key'), payload.get('state'),
+                                                    use_state_geometry=payload.get('use_state_geometry') is True))
             if self.path == '/api/prospect/preview':
                 from sincal.prospecciones import VsReport
                 return self.send(200, self.server.services.describe_report(VsReport.from_dict(payload), payload.get('annotation_scale',10.0)))

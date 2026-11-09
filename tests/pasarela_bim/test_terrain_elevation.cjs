@@ -8,6 +8,7 @@ class Element {
   append(...items){this.children.push(...items);}
 }
 global.document={createElementNS:(_ns,name)=>new Element(name)};
+const descendants=el=>[...(el.children||[]).flatMap(child=>[child,...descendants(child)])];
 const markers=view=>view.group.children.filter(e=>e.attributes.class==='projected-terrain-level');
 function fixture(){return {
   nodos:[{id:'A',tipo:'columna',x:1000,y:2000,z:0},{id:'B',tipo:'columna',x:11000,y:2000,z:0},{id:'C',tipo:'columna',x:21000,y:2000,z:0}],
@@ -25,14 +26,14 @@ test('terreno proyectado usa el centro de cada apoyo y niveles propios sobre una
   for(const [i,level] of levels.entries()){
     assert.equal(level.attributes['data-support-id'],['SA','SB'][i]);
     assert.equal(level.attributes['data-node-id'],['A','B'][i]);
-    const circle=level.children.find(e=>e.name==='circle'),line=level.children.find(e=>e.name==='line'),text=level.children.find(e=>e.name==='text');
+    const circle=descendants(level).find(e=>e.name==='circle'),line=descendants(level).find(e=>e.name==='line'),text=descendants(level).find(e=>e.name==='text');
     assert.equal(Number(circle.attributes.cx),i*140); // 10 m between support centres, not footing centre.
     assert.equal(Number(circle.attributes.cy),[70,77][i]);
     assert.equal((Number(line.attributes.x1)+Number(line.attributes.x2))/2,Number(circle.attributes.cx));
     assert.equal(Number(line.attributes.x2)-Number(line.attributes.x1),22);
     assert.equal(text.attributes['text-anchor'],'middle');
     assert.match(text.textContent,/Terreno proyectado -5\.[05]00 m/);
-    assert.equal(level.children.some(e=>e.name==='polyline'||e.name==='polygon'),false);
+    assert.equal(descendants(level).some(e=>e.name==='polyline'||e.name==='polygon'),false);
   }
   assert.deepEqual(m,before,'Renderizar la cota no modifica soportes ni fundaciones');
 });
@@ -44,5 +45,5 @@ test('ausencia de cota no inventa terreno; encuadre incluye cotas extremas',()=>
   const view=Axis.elevation(m,'ER');
   assert.ok(Math.max(...view.bounds.map(p=>p[1]))>210);
   assert.ok(Math.min(...view.bounds.map(p=>p[1])) < -28);
-  for(const level of markers(view)){const c=level.children.find(e=>e.name==='circle');assert.ok(view.bounds.some(p=>p[1]===Number(c.attributes.cy)));}
+  for(const level of markers(view)){const c=descendants(level).find(e=>e.name==='circle');assert.ok(view.bounds.some(p=>p[1]===Number(c.attributes.cy)));}
 });

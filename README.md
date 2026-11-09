@@ -1,6 +1,6 @@
 # SINCAL Suite — Ingeniería y estándares CAD
 
-**SINCAL Suite** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 3.0. Esta guía corresponde a la release `v3.0.31`, con interfaz de escritorio web y Pasarela BIM como módulo opcional.
+**SINCAL Suite** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 3.0. Esta guía corresponde a la release `v3.0.40`, con interfaz de escritorio web y Pasarela BIM como módulo opcional.
 
 La disponibilidad de los instaladores se confirma en las
 [publicaciones oficiales](https://github.com/drossull/sincal-updates/releases).
@@ -85,7 +85,7 @@ El servidor se limita a loopback: no es apto para publicarlo en Internet.
 ### Validación y compilación
 
 El arranque de escritorio usa `desktop_main.py` y
-`packaging/windows/SINCAL_Web.spec`. La release `v3.0.31` se construye con
+`packaging/windows/SINCAL_Web.spec`. La release `v3.0.40` se construye con
 `tools/build_release.ps1`; la interfaz web es la opción predeterminada.
 `-DesktopWeb` se conserva como parámetro compatible. El pipeline rechaza el
 arranque Tk y verifica el contenido real del EXE antes de firmarlo.
@@ -100,7 +100,7 @@ sus pendientes históricos no sustituyen el resultado de verificación de cada r
 ## Instalación web y distribución
 
 SINCAL Suite se distribuye mediante un instalador web firmado. El archivo
-`Setup_SINCAL_v3.0.31.exe` descarga desde su release pública los paquetes exactos
+`Setup_SINCAL_v3.0.40.exe` descarga desde su release pública los paquetes exactos
 de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y después los instala.
 El componente **Pasarela BIM** aparece **desmarcado por defecto**: su paquete
 independiente sólo se descarga si se selecciona. También puede instalarse más adelante.
@@ -111,7 +111,7 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
 
 ## Primer inicio
 
-1. Descarga y ejecuta el instalador de `v3.0.31` desde su publicación oficial, con SINCAL y CAD cerrados.
+1. Descarga y ejecuta el instalador de `v3.0.40` desde su publicación oficial, con SINCAL y CAD cerrados.
 2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
 3. Abre **Diagnóstico**, verifica el motor CAD sugerido y cámbialo si necesitas otra versión.
 4. Pulsa **Preparar integración CAD**.
@@ -336,21 +336,61 @@ Las instrucciones de compilación independiente y distribución están en
 
 ### Generador de armadura
 
+La pantalla de parámetros de **Estribos** ocupa el ancho disponible y muestra el visor a la derecha, junto a las dimensiones y reglas de armadura. La vista se actualiza al editar y conserva giro, zoom y filtros. Las medidas editadas reconstruyen localmente el moldaje de zapata y su distribución de acero; el JSON original se conserva. Los valores incompletos o inválidos se señalan sin mostrar una armadura anterior como actual. **Calcular marcas** e **Insertar en CAD** siguen siendo acciones explícitas. En ventanas estrechas, los paneles se apilan.
+
+El panel del visor reúne los controles de navegación y **Ampliar visor** en su cabecera; debajo del dibujo sólo muestra un estado breve y la ayuda de navegación. En el visor ampliado, los elementos y sus marcas aparecen a la izquierda del dibujo. Las marcas visibles se iluminan con el color de sus fierros; las ocultas se apagan. Los controles de moldaje y los avisos de datos/alcance están allí, con desplazamiento independiente para mantener visible el dibujo. Al cerrar, el panel conserva la cámara y los filtros elegidos. Se omiten la leyenda de familias y el párrafo largo de descripción del acero.
+
+**Ampliar tabla de marcas** aprovecha el ancho de pantalla para mostrar sus doce columnas completas. Los textos largos se ajustan a varias líneas, sin ocultar valores. Si hay muchas filas, se desplazan dentro de la tabla y el botón de cierre permanece visible. Pulsar una marca sigue abriendo su despiece.
+
+**Ampliar visor** abre la isométrica en una ventana ampliada dentro del programa; el asistente conserva **Abrir isométrica del estribo**. Ambos visores permiten girar el conjunto y acercar. El ampliado incorpora los controles para resaltar u ocultar elementos y atenuar los moldajes. Su navegación sigue la del visor de Cadence: **botón central para desplazar**, **Mayús + botón central para orbitar** y **rueda para acercar o alejar hacia el cursor**. El eje Z permanece vertical y la escala se conserva al orbitar u ocultar elementos. Seleccionar un elemento centra la órbita en él; **Ajustar** encuadra la geometría visible y **Isométrica** restablece la cámara. En pantalla táctil, un dedo desplaza y dos desplazan y acercan. Los perfiles nominales y las piezas sin datos suficientes se declaran en el visor. La zapata muestra todas las piezas de sus familias activadas: mallas, suples y laterales, con ganchos, radios 3Ø y empalmes. Cálculo, despiece, vistas CAD e isométrica comparten el mismo modelo físico. Las piezas empalmadas se colocan lado a lado, en contacto según sus diámetros reales, manteniendo el traslapo y los recubrimientos. El visor y el ajuste de empalmes muestran esas posiciones físicas; el despiece conserva las formas y largos de cada pieza. Los ganchos de las mallas son verticales a 90°; los laterales siguen el contorno en planta y sus ángulos de esviaje. Las cotas de corte se redondean hacia arriba al centímetro, sin alargar ni deformar la geometría: el modelo conserva también el desarrollo exacto. Los recubrimientos se verifican hasta la superficie de cada fierro; un gancho incompatible genera un aviso y no se recorta. Las armaduras de los demás elementos siguen pendientes. La navegación y los filtros del visor no consultan CAD ni modifican cantidades o marcas; sólo la eliminación explícita de una pieza modifica el cálculo. La elección de navegación por elemento o por corte continúa abierta.
+
+Los laterales se colocan por fuera de las patas verticales de las mallas, conservando el recubrimiento a su superficie. Las patas se ajustan hacia adentro según los diámetros y el reparto lateral empieza en la tangencia del doblez superior; el origen inverso empieza abajo. La malla X queda por fuera de la Y en las caras superior e inferior, conservando esa jerarquía al cambiar de corte. Las vistas de la zapata no muestran cotas de empalme; el despiece y la vista previa de ajuste sí las conservan.
+
+La orientación de la malla longitudinal se decide automáticamente por la magnitud del esviaje. Con menos de 10° (incluidos los valores decimales entre 9° y 10°), sus fierros y suples siguen las caras laterales de la fundación y tienen largos constantes. Desde 10°, la malla es perpendicular y recorre la proyección útil completa, incluidas las cuñas de ambos extremos, con largos variables. Los signos positivo y negativo orientan la geometría sin cambiar el criterio. La malla transversal conserva su dirección y la separación se mide en la dirección transversal de reparto existente. Cálculo, planta E–E e isométrica comparten sus ejes de reparto. Los largos variables se agrupan bajo una misma marca: la tabla conserva su cantidad total y el despiece muestra `VAR`, el rango y el listado de largos desarrollados con sus cantidades. El dibujo de despiece representa la pieza de mayor longitud, no una longitud única para toda la serie. Longitud total y peso suman las variantes reales; las cantidades no dependen de la vista visible. Una serie que requiera empalmes aún no definidos se detiene con un mensaje explícito.
+
+En CAD, los círculos transversales se presentan tangentes a la línea fina del longitudinal; esta convención no desplaza los ejes físicos del despiece ni de la isométrica. El reparto rectangular y los laterales fijan sus dos extremos en las tangencias de los dobleces. El cierre conserva el paso nominal, añade el extremo antes omitido y, si el residuo es menor que el diámetro, divide por igual el último intervalo completo y ese residuo para no superponer barras. Las cantidades incorporan esas piezas reales. En el borde esviado, la malla Y se ancla físicamente a las dos tangencias del fierro X representativo de la vista frontal. En la malla perpendicular, el resto del reparto cubre ambas cuñas desde esos anclajes. Cuando los longitudinales siguen las caras laterales, sus ejes mantienen el amarre frontal y el giro indicado por el esviaje. Este amarre corresponde sólo a la sección mostrada, no a todas las tangencias de la arista inclinada. Una separación incompatible se informa sin recortar ni desplazar piezas arbitrariamente.
+
+Un clic sobre un fierro de la isométrica lo resalta y permite **Eliminar este fierro**. Si coinciden varias piezas bajo el cursor, el selector permite escoger cuál; una pieza de empalme se elimina por separado de su continuación. Se recalculan la cantidad, las variantes de largo y el peso de su marca, sin renumerar las demás. **Deshacer eliminación** recupera la última baja de la sesión; la lista de eliminados del visor ampliado permite restaurarlas después de guardar y reabrir el proyecto. Entrada y salida guardan sus propias bajas. Si un cambio de parámetros altera la identidad geométrica de una pieza eliminada, el cálculo pide revisar esa baja antes de insertar para no aplicarla a otro fierro. Las vistas del DWG ya insertadas se actualizan al regenerarlas expresamente; seleccionar, filtrar o eliminar en el visor no contacta AutoCAD.
+
+B–B y C–C siguen la cara lateral esviada: su rectángulo mide `largo / cos(esviaje)` por el alto, mientras A–A conserva el largo perpendicular. Con 7,50 m y 12°, B–B/C–C miden 7,668 m. Sólo en el plano CAD, estos dos cortes muestran un longitudinal representativo de recubrimiento a recubrimiento, conservando ganchos y radios. Esta representación no cambia los fierros fabricados: la isométrica conserva su orientación y geometría reales, y tabla, peso, despiece y marcas se obtienen del modelo físico. Las bajas individuales siguen vigentes y no se reemplaza una pieza eliminada por una vecina. Las referencias se validan como antes; el dibujo representativo no permite estirar una selección incompatible. Las ubicaciones independientes de B/C en planta siguen pendientes y conservan por ahora la estación representativa central.
+
+La vista previa de cada marca reproduce la tipografía y proporciones de **GSG_COTAS** del master, con textos, líneas de cota, auxiliares y flechas en blanco. Usa la fuente RomanD instalada con CAD. Las cotas se expresan en cm y los ángulos muestran la abertura interior real entre tramos cuando el doblez deja de ser recto; el detalle del ángulo también informa el giro de doblado. Las series rotulan la parcial cambiante como **VAR. L= mínimo - máximo**, descontando los ganchos fijos del rango total. Por ejemplo, largos totales de 221–946 cm con dos ganchos de 100 cm corresponden a una parcial variable de 21–746 cm. Esta presentación no modifica la geometría, cantidades, marcas ni la inserción CAD.
+
 Prepara vistas, despieces y cubicación de fierro mediante comandos temporales enviados al CAD abierto:
 
 - Estribos: separa **Estribo de entrada** y **Estribo de salida**, con dimensiones, reglas y marcas propias. Primero se carga el JSON, se revisan los parámetros y se calcula la zapata. Después se usa un botón por vista: frontal, A–A, B–B, C–C o planta E–E. La zapata conserva las marcas y reglas ya definidas; las otras familias requieren definiciones del usuario.
 - Travesaños: extremos, cuadrantes sobre tope, macizos y viga; geometría y despiece.
 - Proyecto activo: recibe automáticamente desde **Proyecto → Consulta** los parámetros compatibles y los convierte a las unidades de la interfaz.
 
-Las vistas de zapata generan cotas coordinadas con `MARK`, `GSG_COTAS` y `GSG_MLEADER`. El **despiece general de zapata** se inserta en Model, agrupa los empalmes, acota parciales con `GSG_ARM-COTAS` y describe cada pieza con RomanD a 2,5 mm de papel. Cada grupo queda identificado de manera independiente; cuando sus parámetros cambian, AutoCAD/ZWCAD permite actualizarlo, conservarlo, aceptar todos los cambios o cancelar desde la línea de comandos.
+Todos los elementos, vistas y despieces de un **estribo completo** comparten una tabla nativa de `MARCA-SC`: A = marca, B = cantidad total de piezas de esa marca en el estribo, C = diámetro en mm, D = separación en cm. La primera inserción solicita seleccionar una tabla compatible o crearla en un punto indicado; después se reutiliza la asociación de esa instancia (entrada o salida). Cada elemento sólo actualiza sus propias filas: recalcular la zapata conserva las de muros, alas, topes y otros elementos, además de las filas manuales ajenas al cálculo. Los identificadores permanecen estables y las marcas son únicas en toda la tabla, también entre elementos. Las marcas usan el formato `3A`; los proyectos anteriores con `3-A` se migran al leerlos. Sólo la zapata dispone actualmente de reglas de armadura definidas.
 
-El **Asistente** construye desde el JSON el árbol de estribos, cepas, vigas, travesaños y losas. Cada orden de vista pide en CAD una secuencia de rectángulos de referencia: esquina superior izquierda e inferior derecha de la zapata, pilotes si el JSON los activa y los demás elementos presentes en esa vista. Las vistas rectangulares usan dos esquinas opuestas. La planta esviada E–E pide tres esquinas consecutivas (superior izquierda, superior derecha e inferior derecha) y reconstruye la cuarta. Los puntos no son ventanas de selección de objetos. No se buscan moldajes por nombre de capa ni se recorre el dibujo para reconocerlos. Sólo la zapata genera armaduras; las demás referencias se conservan en el estado de la sesión como pendientes.
+Las tablas nuevas toman el prototipo `TABLA-FIERROS` del master, con estilo `SINCAL - Tabla`, capa `SINCAL - Tablas`, fuente romans y encabezados `MARCA | # | Ø | @`. Se eliminan las filas de ejemplo y se ajusta el formato a la escala anotativa real: a 1:75 en metros, el ancho es 6, las filas miden 0,375 y el texto 0,18 (2,4 mm en papel). Al reutilizar una tabla antigua que coincida exactamente con la firma genérica del generador, se corrige su formato dentro de la misma operación, sin reemplazar el objeto ni sus identidades de fila. Las tablas administradas por el generador reaplican el formato después de escribir las marcas, para que las filas nuevas no hereden tamaños y márgenes desproporcionados. Las tablas manuales conservan su presentación.
+
+Las vistas insertan `SINCAL_MARCA_SC_V3`, con campos vinculados a la tabla y estados superior/inferior/suple. Usan los estados sin cantidad porque cada vista puede representar sólo una cara y B contiene el total de esa marca. Las cotas geométricas conservan `GSG_COTAS`; las directrices se asocian al bloque nativo. El despiece acota parciales con `GSG_ARM-COTAS` e inserta `SINCAL_MARCA_DE_V2` directamente en Model, fuera de los bloques de geometría, para mantener editables sus atributos y propiedades dinámicas. El cálculo inicializa cantidad total y largo en cm; las actualizaciones ordinarias de `MARCA-DE` conservan esos atributos manuales. Cuando cambia un grupo de despiece, se puede actualizar, conservar, aceptar todos los cambios o cancelar; aceptar su regeneración aplica los nuevos valores calculados. La geometría de otras vistas requiere regenerar su botón cuando cambia el cálculo: actualizar campos de una tabla no recalcula el dibujo por sí solo.
+
+La entrega del estribo se divide mediante **dos copias completas del DWG**, usando Guardar como y ocultando las vistas que no correspondan. El primer archivo muestra frontal, A–A, B–B y C–C; el segundo muestra D–D, E–E y la armadura de los topes sísmicos. Ambos conservan toda la información, la tabla completa y los vínculos locales de los bloques. La visibilidad no interviene en las cantidades ni en las marcas. No se exportan sólo entidades seleccionadas ni se eliminan las vistas ocultas. Las dos copias son independientes: no se ha implementado sincronización de cambios entre archivos. La conservación nativa de vínculos después de Guardar como debe comprobarse en CAD al validar la integración.
+
+Para las siguientes etapas se acuerdan tablas independientes por plano: una para cepa (una por cada cepa cuando haya varias distintas), otra para viga, otra para travesaños y otra para losa. Cada tabla conserva sus propios vínculos y cantidades; actualizar una estructura no modifica las tablas de las otras. Este alcance está registrado para el desarrollo posterior y no implica que sus reglas de armadura ya estén implementadas.
+
+El generador ya no utiliza el bloque antiguo `MARK`, MText separado ni textos de marca en las cotas. Los recursos y comandos de marcaje usados por otros módulos se conservan. La implementación cuenta con pruebas automatizadas; la comprobación visual de esta integración en AutoCAD/ZWCAD se debe realizar en una copia desechable antes de usarla en producción.
+
+El **Asistente** construye desde el JSON el árbol de estribos, cepas, vigas, travesaños y losas. Actualmente cada orden de vista pide en CAD **únicamente los puntos de la zapata**, aunque el JSON incluya pilotes u otros elementos. Las vistas rectangulares usan dos esquinas opuestas: superior izquierda e inferior derecha. La planta esviada E–E pide tres esquinas consecutivas (superior izquierda, superior derecha e inferior derecha) y reconstruye la cuarta. Los puntos no son ventanas de selección de objetos. No se buscan moldajes por nombre de capa ni se recorre el dibujo para reconocerlos. Se incorporarán referencias de los demás elementos cuando sus armaduras e inserción estén implementadas.
 
 Las coordenadas CAD se interpretan explícitamente en metros, centímetros o milímetros. El modo automático usa la declaración del dibujo, pero las dimensiones y el esviaje de la referencia se contrastan con el cálculo antes de insertar. La base superior debe estar horizontal; las plantas giradas se rechazan de forma explícita en esta versión. Si no coincide, se detiene el envío y se informan ambas medidas. Una elección explícita de unidades no modifica `INSUNITS`. Cancelar la secuencia no inserta armaduras.
 
 El flujo web conserva las referencias devueltas por instancia y vista durante la sesión. Cada nueva inserción vuelve a pedir los puntos y verifica el dibujo de destino; no reutiliza handles ni detecciones de otro dibujo.
 
-Los apartados **Muros**, **Consolas**, **Topes**, **Pilotes**, **Contrafuerte**, **Cepas**, **Vigas** y **Losa** forman parte del catálogo. Su armadura está pendiente de las reglas que debe definir el usuario. No se inventan diámetros, distribuciones ni recetas para completar esas familias. Los controles mantienen dimensiones en cm, diámetros en mm y esviaje en grados.
+Los apartados **Muros**, **Consolas**, **Topes**, **Pilotes**, **Contrafuerte**, **Cepas**, **Vigas** y **Losa** forman parte del catálogo. Sus armaduras completas siguen pendientes de las reglas que debe definir el usuario. No se inventan diámetros, distribuciones ni recetas para completar esas familias. Los controles mantienen dimensiones en cm, diámetros en mm y esviaje en grados.
+
+En **Ala izquierda/Ala derecha** están disponibles las **mallas exterior e interior** para cálculo y vista previa. Sus parámetros y bajas individuales se guardan por malla, ala y estribo, sin alterar la zapata ni el JSON importado. El perfil distingue el cuerpo apoyado y la aleta activada por el JSON: los verticales del cuerpo llegan al recubrimiento inferior de la zapata; los cortos de la aleta terminan en su diagonal. Los verticales tienen dos ganchos editables de 40 cm; los horizontales separan el gancho del ala (40 cm iniciales) y el del encuentro (ingreso explícito). Los horizontales bajos llegan al frontal y los altos al espaldar. Los radios son 3Ø; si una pieza supera 12 m o un gancho no cabe, se informa el problema sin inventar empalmes ni acortarlo.
+
+El cálculo del ala exige diámetros, separaciones y recubrimientos propios y una revisión explícita de las cotas nominales. Sus piezas reales alimentan la isométrica, cantidades, pesos y despiece GSG_COTAS; las series variables mantienen una marca por grupo. Las marcas se reservan en el mismo estribo y no pueden coincidir entre mallas ni con las de la zapata u otra ala. Los verticales quedan junto a la cara de hormigón respectiva y los horizontales pegados hacia el centro del espesor; el reparto horizontal comienza sobre la zapata, en la base del muro. Cuando el ala está girada, el horizontal conserva el quiebre de la unión con el espaldar, su radio y su desarrollo real. La inserción CAD de estas mallas todavía no está habilitada; las órdenes existentes siguen solicitando únicamente la zapata.
+
+La malla interior se activa dentro del mismo elemento. Al activarla por primera vez copia los parámetros exteriores, conservando marcas independientes; la copia posterior es explícita. Sus ganchos inferiores tienen la misma dirección que los exteriores sólo en los verticales anclados dentro de la zapata. En los cortos de aleta ambos ganchos vuelven hacia el espesor. Los horizontales interiores comparten la dirección del gancho frontal/espaldar con los exteriores, mientras el gancho libre del ala vuelve hacia el espesor. Desactivar la malla conserva sus datos, marcas y bajas para la siguiente activación; los proyectos anteriores mantienen únicamente la exterior.
+
+Los suples verdes se intercalan en la malla interior: un grupo llega con su gancho al frontal y el superior al espaldar. El límite inferior del primero se edita sobre el perfil como una altura hacia abajo desde la coronación del frontal; los grupos comparten su encuentro y cierran con un salto máximo de 20 cm. Cada grupo tiene activación, diámetro, separación, marca, gancho y tramo hasta el extremo libre propios. Los antiguos rangos de axila no se aplican a esta distribución corregida.
+
+Con aleta, el fierro de canto es obligatorio. Se ingresa cantidad, diámetro, marca y largo total, con gancho superior opcional (20 cm iniciales). Las piezas se reparten uniformemente entre recubrimientos y la prolongación resultante debe ser de al menos 100 cm. El programa no redondea el largo elegido ni acorta piezas para encajarlas; valida el recorrido completo contra el ala y la zapata. Los refuerzos comparten la tabla del estribo y conservan su identidad para eliminar y restaurar piezas individuales.
 
 ### Módulo de ubicación
 
@@ -434,33 +474,44 @@ python -m pip install -r requirements-desktop-web.txt
 pwsh -NoProfile -File tools/build_release.ps1 -DesktopWeb
 ```
 
-El proceso valida código y pruebas, compila y firma el plugin y la aplicación,
-y construye Pasarela BIM como ejecutable y paquete independientes. Firma el
-ejecutable del módulo antes de calcular sus hashes, compila y firma ambos
-instaladores y genera el manifiesto de release y `SHA256SUMS.txt`.
-Los artefactos de `v3.0.31` quedan en `installer_output/v3.0.31/`.
-Reserva una versión nueva y prepara un checkout de compilación aislado antes
-de ejecutar el pipeline: volver a compilar la misma versión sustituye sus
+El proceso valida código y pruebas, compila los componentes que cambiaron y
+reutiliza aplicación, conectores CAD, integración del Explorador y Pasarela BIM
+cuando coinciden sus fuentes, herramientas y hashes de salida. Los archivos
+faltantes o alterados invalidan su comprobante. Las firmas se verifican antes
+de reutilizarlas. Genera los instaladores, el manifiesto y `SHA256SUMS.txt`.
+Los artefactos de `v3.0.40` quedan en `installer_output/v3.0.40/`.
+Reserva una versión nueva y usa un checkout de compilación aislado y estable:
+conservar ese directorio permite reutilizar su caché. Volver a compilar la misma versión sustituye sus
 artefactos locales. Para una compilación local no publicable puede usarse
 `-SkipSigning`. `-SkipPasarelaModule` omite el paquete y la opción del módulo;
-no debe usarse para esta release que incorpora Pasarela BIM.
+`-CleanBuild` fuerza reconstrucción y limpia la caché local de compilación;
+por defecto se conservan `build/`, `dist/`, las salidas nativas y los paquetes
+de módulos. Las pruebas de la release siguen ejecutándose.
 
-La compilación utiliza CPython 3.12 x64 de python.org. `tools/build_ocr_runtime.py`
-prepara un runtime aislado en `ocr_runtime/`, con dependencias fijadas en
-`requirements-ocr-lock.txt` y modelos comprobados por SHA-256. Se incluye dentro del
-paquete de aplicación (aumenta su tamaño); no se descarga nada al leer un informe.
+La compilación utiliza CPython 3.12 x64 de python.org. El motor OCR se distribuye
+como complemento independiente y **no se prepara, copia ni comprime en cada
+release principal**. `python tools/build_ocr_module.py` construye su ZIP e
+instalador en `installer_output/prospecciones-ocr/v1.0.0/`; admite
+`--skip-runtime` para reutilizar el runtime existente tras validar fuentes y modelos.
+Los artefactos idénticos se reutilizan comprobando sus hashes. El complemento
+se instala por usuario y se detecta desde Prospecciones, sin cambiar su pantalla.
+Las actualizaciones de SINCAL conservan el OCR de instalaciones anteriores.
+`tools/build_ocr_runtime.py` prepara el runtime aislado con dependencias fijadas
+en `requirements-ocr-lock.txt` y modelos comprobados por SHA-256.
+No se descarga nada al leer un informe. Véase
+[`packaging/windows/prospecciones-ocr/README.md`](packaging/windows/prospecciones-ocr/README.md).
 Los avisos y licencias de terceros acompañan al runtime. No se incorpora PyMuPDF.
 Para probar el PDF completo localmente: define `SINCAL_TEST_LORETO` con su ruta y
 ejecuta `python -m pytest tests/test_prospecciones_ocr.py -q` después de preparar el runtime.
 
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v3.0.31.exe`
-- `SINCAL_App_v3.0.31.zip`
-- `SINCAL_AutoCAD_v3.0.31.zip`
+- `Setup_SINCAL_v3.0.40.exe`
+- `SINCAL_App_v3.0.40.zip`
+- `SINCAL_AutoCAD_v3.0.40.zip`
 - `SINCAL_Pasarela_v0.3.2.zip`
 - `Setup_SINCAL_Pasarela_v0.3.2.exe`
-- `release-manifest_v3.0.31.json`
+- `release-manifest_v3.0.40.json`
 - `SHA256SUMS.txt`
 
 No renombres ni vuelvas a firmar los paquetes después de calcular sus hashes:

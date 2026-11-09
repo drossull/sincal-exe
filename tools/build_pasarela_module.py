@@ -120,7 +120,7 @@ def smoke_test(executable, output):
             if not re.fullmatch(r"http://127\.0\.0\.1:\d+/?",url):
                 raise RuntimeError("La interfaz no se limitó al equipo local")
             results = {}
-            for path in ("/","/api/estado","/api/ejemplo","/app.js","/style.css"):
+            for path in ("/","/api/estado","/api/ejemplo","/app.js","/ejes.js","/cotas.js","/navegacion.js","/retornos.js","/pilotes.js","/guardado.js","/style.css"):
                 with opener.open(url.rstrip("/")+path,timeout=10) as response:
                     content = response.read()
                     if not content:
@@ -165,6 +165,7 @@ def main(argv=None):
     parser.add_argument("--skip-installer",action="store_true")
     parser.add_argument("--iscc",type=Path)
     parser.add_argument("--smoke-test",action="store_true")
+    parser.add_argument("--clean",action="store_true",help="Limpiar la caché de PyInstaller explícitamente")
     args = parser.parse_args(argv)
     manifest = descriptor()
     output = (args.output_dir or ROOT/f"installer_output/pasarela-bim/v{manifest['version']}").resolve()
@@ -172,7 +173,7 @@ def main(argv=None):
     executable = ROOT/"dist/pasarela-bim"/manifest["entrypoint"]
     if not args.skip_build:
         with (output/"pyinstaller.log").open("wb") as log:
-            subprocess.run([sys.executable,"-m","PyInstaller","--noconfirm","--clean",
+            subprocess.run([sys.executable,"-m","PyInstaller","--noconfirm", *(['--clean'] if args.clean else []),
                             "--distpath",str(executable.parent),"--workpath",str(ROOT/"build/pasarela-bim"),
                             str(ROOT/"packaging/windows/SINCAL_Pasarela.spec")],cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,check=True)
     result = crear_paquete(executable,output,manifest)

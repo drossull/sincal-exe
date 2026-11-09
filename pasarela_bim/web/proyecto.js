@@ -54,7 +54,7 @@
         id: uid(), nombre: params.nombre || params.name || "Nueva pasarela", estado: "borrador", unidades: "mm",
         revision: 0, motor: "pasarela-bim", version_motor: "0.3.2", esquema_intercambio: 2,
         reglas: {pendiente_rampas_pct: 8},
-        georreferencia: {este_m: Number(params.este_m || 0), norte_m: Number(params.norte_m || 0), cota_m: Number(params.cota_m || 0), norte_desde_x_horario_deg: northFromX, crs: params.crs || "Por definir"},
+        georreferencia: {este_m: Number(params.este_m || 0), norte_m: Number(params.norte_m || 0), cota_m: Number(params.cota_m || 0), norte_desde_x_horario_deg: northFromX, crs: "PTL"},
         galibo_m: Number(params.galibo_mm ?? 5500) / 1000,
         referencia_vertical: "tope_atravieso",
         origen_local: "Punto medio del atravieso en la cara superior de la viga sobre su eje; X atravieso, Y transversal local, Z arriba."
@@ -73,6 +73,9 @@
     if (!g || ![g.este_m,g.norte_m,g.cota_m,g.norte_desde_x_horario_deg].every(Number.isFinite)) throw new Error("Define primero Este, Norte, cota y orientación del proyecto.");
     return g;
   }
+  // New projects use the DWG's PTL coordinates: X = Este, Y = Norte, in metres
+  // measured from the drawing's (0, 0). Only rotate and translate the bridge's
+  // local frame; never infer a cartographic reprojection from the CRS label.
   function localToWorld(model, x, y, z = 0) {
     const g = reference(model), a = g.norte_desde_x_horario_deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
     return [g.este_m - x*s - y*c, g.norte_m + x*c - y*s, g.cota_m + z];

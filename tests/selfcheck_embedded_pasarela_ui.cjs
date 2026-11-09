@@ -6,16 +6,22 @@ const output=path.resolve('tmp/prueba_pasarela_integrada');fs.mkdirSync(output,{
 (async()=>{
   const browser=await chromium.launch({channel:'msedge',headless:true});
   try{
-    const page=await browser.newPage({viewport:{width:1360,height:900},acceptDownloads:true}),errors=[],calls=[];
+    const page=await browser.newPage({viewport:{width:1360,height:900}}),errors=[],calls=[],savedPayloads=[];
     page.setDefaultTimeout(15000);
-    let status={installed:true,source:'user',version:'0.3.0',embedded_supported:false,running:false,online_install_available:true},badAddress=true,closeFails=false,acceptClose=false;
+    let status={installed:true,source:'user',version:'0.3.0',embedded_supported:false,running:false,online_install_available:true},badAddress=true,closeFails=false,acceptClose=false,saveMode='success';
     page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>acceptClose?d.accept():d.dismiss());
     await page.route('**/*',async route=>{
       const request=route.request(),url=new URL(request.url()),p=url.pathname,module=url.origin===editor;
       if(p.startsWith('/api/')){
         let data={},code=200;
         if(module){
-          if(p==='/api/estado')data={freecad_disponible:false};
+          if(p==='/api/estado')data={freecad_disponible:false,guardado_local:true};
+          else if(p==='/api/proyecto/guardar'){
+            const payload=request.postDataJSON();savedPayloads.push(payload);
+            if(saveMode==='error'){code=500;data={mensaje:'No se pudo guardar el archivo de prueba.'};}
+            else if(saveMode==='cancel')data={cancelado:true};
+            else data={guardado:true,documento:{id:payload.documento_id||'ensayo-integrado',nombre:'proyecto.json',ruta:path.join(output,'proyecto.json')}};
+          }
           else if(p==='/api/validar')data={valido:true,generable:false,errores:[],avisos:[],pendientes:[{codigo:'SOPORTE',elemento:'C1',mensaje:'Completa los apoyos.'}],resumen:{nodos:3,tramos:2,vigas:2,retornos:0,fustes:0,estribos:0,dados:0,pilotes:0}};
         }else{
           if(p==='/api/preferences')data={theme:'dark',palette:'sincal',zoom:'100'};
@@ -71,10 +77,19 @@ const output=path.resolve('tmp/prueba_pasarela_integrada');fs.mkdirSync(output,{
     assert.equal(await frame.evaluate(()=>window.navigationSentinel),sentinel);assert.equal(await frame.locator('#inspector').innerText(),selected);
     assert(await frame.locator('#undo').isEnabled());assert.equal(await page.evaluate(()=>window.removedPasarelaFrames),0);
     assert.equal(await page.evaluate(()=>document.querySelector('iframe')===window.savedPasarelaFrame),true);
-    const save=async name=>{const download=page.waitForEvent('download');await frame.locator('#export-json').click();const file=await download,target=path.join(output,name);await file.saveAs(target);return JSON.parse(fs.readFileSync(target,'utf8'));};
-    const saved=await save('proyecto.json');assert.equal(saved.version,2);assert.equal(saved.nodos.length,4);assert.equal(saved.tramos.length,3);
-    // A blob download cannot confirm that a native Save dialog actually wrote the file.
+    const saveAttempt=async()=>{const pending=page.waitForResponse(r=>r.url()===editor+'/api/proyecto/guardar');await frame.locator('#export-json').click();const response=await pending;await frame.waitForFunction(()=>!document.querySelector('#export-json').disabled);return response;};
+    const save=async name=>{const response=await saveAttempt();assert.equal(response.status(),200);assert.equal((await response.json()).guardado,true);const model=response.request().postDataJSON().modelo;fs.writeFileSync(path.join(output,name),JSON.stringify(model,null,2)+'\n');return model;};
+    // Failed or cancelled writes retain the dirty guard; only native confirmation clears it.
+    saveMode='error';assert.equal((await saveAttempt()).status(),500);
+    await frame.locator('#toast').filter({hasText:'No se pudo guardar el archivo de prueba.'}).waitFor();
     await page.locator('#pasarela-editor-status').getByText('Cambios sin guardar en JSON',{exact:true}).waitFor();assert.equal(await guarded(),true);
+    saveMode='cancel';assert.deepEqual(await(await saveAttempt()).json(),{cancelado:true});
+    await page.locator('#pasarela-editor-status').getByText('Cambios sin guardar en JSON',{exact:true}).waitFor();assert.equal(await guarded(),true);
+    saveMode='success';
+    const saved=await save('proyecto.json');assert.equal(saved.version,2);assert.equal(saved.nodos.length,4);assert.equal(saved.tramos.length,3);
+    await page.locator('#pasarela-editor-status').getByText('Editor listo',{exact:true}).waitFor();assert.equal(await guarded(),false);
+    assert.equal(await frame.locator('#export-json').textContent(),'Guardar cambios');
+    await save('proyecto_actualizado.json');assert.equal(savedPayloads.at(-1).documento_id,'ensayo-integrado');
     await frame.locator('#file-input').setInputFiles(path.join(output,'proyecto.json'));await frame.locator('#toast').filter({hasText:'Configuración importada.'}).waitFor();
     await page.locator('#pasarela-editor-status').getByText('Editor listo',{exact:true}).waitFor();assert.equal(await guarded(),false);
     const reopened=await save('reabierto.json');for(const key of ['nodos','tramos','familias','ejes'])assert.deepEqual(reopened[key],saved[key]);
@@ -90,7 +105,7 @@ const output=path.resolve('tmp/prueba_pasarela_integrada');fs.mkdirSync(output,{
     closeFails=false;await page.getByRole('button',{name:'Cerrar editor',exact:true}).click();await frameElement.waitFor({state:'detached'});
     await page.getByRole('button',{name:'Abrir editor',exact:true}).waitFor();assert.equal(await guarded(),false);
     assert.deepEqual(errors,[]);assert.equal(calls.filter(v=>v==='open').length,2);assert.equal(calls.filter(v=>v==='install').length,1);
-    fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({ok:true,bounds,iframePersistent:true,selectionAndUndoPreserved:true,jsonRoundtrip:true,messageOriginAndSourceVerified:true,errors},null,2));
-    console.log('OK: embedded editor, update, URL guards, persistence, real JSON download/import, dirty/busy and safe close. Evidence: '+output);
+    fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({ok:true,bounds,iframePersistent:true,selectionAndUndoPreserved:true,jsonRoundtrip:true,nativeSaveConfirmed:true,failedOrCancelledSaveKeepsDirty:true,messageOriginAndSourceVerified:true,errors},null,2));
+    console.log('OK: embedded editor, update, URL guards, persistence, confirmed native JSON save/import, dirty/busy and safe close. Evidence: '+output);
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -131,7 +131,9 @@ def test_invalid_vertices_fail_cleanly(points):
 @pytest.mark.parametrize("view,width", [("FR", 11.596), ("AA", 7.5),
                                        ("BB", 7.5), ("CC", 7.5)])
 def test_existing_rectangular_section_reference_is_preserved(view, width):
-    geometry, _, project = fixture()
+    # Equal A/B/C widths apply to a non-skewed footing. Oblique B/C references
+    # are covered separately in test_rebar_reference_flow.
+    geometry, _, project = fixture(0)
     context = MoldajeContext("abutment.footing", "entrada", view)
     rectangle = ((0, 0), (width, 0), (width, 1.5), (0, 1.5))
     candidate = reference_candidate(rectangle, 1, context, geometry, project)

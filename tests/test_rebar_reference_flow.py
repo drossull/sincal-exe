@@ -1,5 +1,6 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
+import math
 
 import pytest
 
@@ -8,20 +9,11 @@ from sincal.web import cad_worker
 from sincal.web.rebar import defaults
 from sincal.web.rebar import domain, reference_candidate, reference_sequence, drawing_units_per_m
 from sincal.cad.moldajes import MoldajeContext
+from sincal.cad.selected_moldaje import build_selection_lisp
 from sincal.web.services import Services
 
 
-FR_WITHOUT_PILE = [
-    "abutment.footing",
-    "abutment.front_wall",
-    "abutment.back_wall",
-]
-FR_WITH_PILE = [
-    "abutment.footing",
-    "abutment.pile",
-    "abutment.front_wall",
-    "abutment.back_wall",
-]
+FOOTING_ONLY = ["abutment.footing"]
 
 
 @pytest.mark.parametrize('view,width,height', [('FR',11.596,1.5),('AA',7.5,1.5),
@@ -36,6 +28,49 @@ def test_reference_preserves_location_and_calculated_dimensions(view,width,heigh
     assert min(p[1] for p in result.vertices) == pytest.approx(200)
     assert result.area_m2 == pytest.approx(width*height)
     assert result.layer == '' and result.handle == ''
+
+
+@pytest.mark.parametrize('view', ['BB', 'CC'])
+@pytest.mark.parametrize('skew', [0, -12, 12, -30, 30])
+@pytest.mark.parametrize('factor', [1, 100, 1000])
+def test_side_section_reference_uses_skewed_side_length_without_fitting(view, skew, factor):
+    state = defaults()
+    state['geometry'].update(esviaje_grados=skew, alto_cm=200)
+    geometry, _, _ = domain(state)
+    side = geometry.largo_m / math.cos(math.radians(skew))
+    # CAD's displayed 7.668 m is the rounded real side at 12 degrees. Keep
+    # the existing measurement tolerance, then construct the exact reference.
+    picked = round(side, 3)
+    points = [(x * factor, y * factor, 0) for x, y in
+              [(-10, 22), (-10 + picked, 22), (-10 + picked, 20), (-10, 20)]]
+    candidate = reference_candidate(points, factor,
+                                    MoldajeContext('abutment.footing', 'entrada', view),
+                                    geometry, {})
+    xs, ys = zip(*candidate.vertices)
+    assert min(xs) == pytest.approx(-10)
+    assert min(ys) == pytest.approx(20)
+    assert max(xs) - min(xs) == pytest.approx(side)
+    assert max(ys) - min(ys) == pytest.approx(2)
+    assert candidate.area_m2 == pytest.approx(side * 2)
+
+
+@pytest.mark.parametrize('skew', [-12, 12, -30, 30])
+@pytest.mark.parametrize('factor', [1, 100, 1000])
+def test_side_and_perpendicular_sections_do_not_accept_each_others_width(skew, factor):
+    state = defaults()
+    state['geometry']['esviaje_grados'] = skew
+    geometry, _, _ = domain(state)
+    depth = geometry.largo_m
+    side = depth / math.cos(math.radians(skew))
+    for view, accepted, rejected in [('AA', depth, side), ('BB', side, depth), ('CC', side, depth)]:
+        context = MoldajeContext('abutment.footing', 'entrada', view)
+        def rectangle(width):
+            return [(x * factor, y * factor, 0) for x, y in
+                    [(0, 1.5), (width, 1.5), (width, 0), (0, 0)]]
+        result = reference_candidate(rectangle(accepted), factor, context, geometry, {})
+        assert result.area_m2 == pytest.approx(accepted * 1.5)
+        with pytest.raises(ValueError, match=f'cálculo de {view}'):
+            reference_candidate(rectangle(rejected), factor, context, geometry, {})
 
 
 def test_skewed_plan_rejects_two_corner_box_instead_of_assuming_json_skew():
@@ -60,13 +95,26 @@ def test_unknown_units_and_nonzero_plane_require_explicit_correction():
                             MoldajeContext('abutment.footing','entrada','FR'),geometry,{})
 
 
-def test_reference_sequence_is_specific_to_view():
-    project={'estribos':{'tipo_estribo_entrada':'muro_lleno','incluir_pilotes_dado_estribo_entrada':True}}
-    assert [e['key'] for e in reference_sequence(project,'entrada','FF')] == ['abutment.footing']
-    bb=[e['key'] for e in reference_sequence(project,'entrada','BB')]
-    cc=[e['key'] for e in reference_sequence(project,'entrada','CC')]
-    assert 'abutment.left_wing' in bb and 'abutment.right_wing' not in bb
-    assert 'abutment.right_wing' in cc and 'abutment.left_wing' not in cc
+@pytest.mark.parametrize('view', ['FR', 'AA', 'BB', 'CC', 'FF', 'EE'])
+@pytest.mark.parametrize('instance', ['entrada', 'salida'])
+@pytest.mark.parametrize('optional', [False, True])
+def test_every_view_requests_only_footing_even_when_other_elements_exist(view, instance, optional):
+    project = {'estribos': {
+        f'tipo_estribo_{instance}': 'muro_lleno',
+        f'incluir_pilotes_dado_estribo_{instance}': optional,
+        f'incluir_consola_frontal_{instance}': optional,
+        f'incluir_contrafuertes_mura_ala_{instance}': optional,
+    }, 'parametros_generales': {'angulo_esviaje_puente': -12}}
+    sequence = reference_sequence(project, instance, view)
+    assert sequence == [{'key': 'abutment.footing', 'label': 'Zapata',
+                         'reference_mode': 'parallelogram' if view in ('FF', 'EE') else 'rectangle'}]
+    source = build_selection_lisp('references.txt', MoldajeContext('abutment', instance, view), sequence)
+    assert 'META|EXPECTED|1' in source
+    assert 'META|ELEMENTS|abutment.footing' in source
+    assert 'getpoint' in source
+    for pending in ('pile', 'front_wall', 'back_wall', 'left_wing', 'right_wing',
+                    'front_console', 'back_console', 'front_stop', 'counterfort'):
+        assert f'abutment.{pending}' not in source
 
 
 def test_reference_sequence_uses_three_only_for_the_skewed_footing_plan():
@@ -196,7 +244,7 @@ def test_fr_flow_collects_references_without_layers_or_handles_and_generates_onl
     calls, fake_cad = _cad_collector(
         service,
         job,
-        _references_text(FR_WITHOUT_PILE),
+        _references_text(FOOTING_ONLY),
     )
 
     with patch.object(service, "cad", side_effect=fake_cad), \
@@ -212,7 +260,7 @@ def test_fr_flow_collects_references_without_layers_or_handles_and_generates_onl
     assert "modelspace" not in collector["source"].lower()
     assert "handle" not in collector["source"].lower()
     assert "FR_ZAP" not in collector["source"]
-    assert "META|ELEMENTS|" + ";".join(FR_WITHOUT_PILE) in collector["source"]
+    assert "META|ELEMENTS|" + ";".join(FOOTING_ONLY) in collector["source"]
     assert collector["kwargs"] == {"reference_mode": True, "focus": True}
 
     assert "c:SINCAL-ZAPATA-GENERAR" in calls[1]["command"]
@@ -226,16 +274,16 @@ def test_fr_flow_collects_references_without_layers_or_handles_and_generates_onl
 
     references = result["references"]
     assert result["selection"] == "ok"
-    assert result["references_count"] == 3
+    assert result["references_count"] == 1
     assert references["generated"] == ["abutment.footing"]
-    assert references["pending"] == ["abutment.front_wall", "abutment.back_wall"]
-    assert list(references["rectangles"]) == FR_WITHOUT_PILE
+    assert references["pending"] == []
+    assert list(references["rectangles"]) == FOOTING_ONLY
 
 
-def test_optional_pile_is_collected_second_and_explicit_mm_scales_generation_with_insunits_6(service):
+def test_optional_pile_needs_no_points_and_explicit_mm_scales_footing_with_insunits_6(service):
     job = _job("b")
     text = _references_text(
-        FR_WITH_PILE,
+        FOOTING_ONLY,
         insunits=6,
         footing_width=11596,
         footing_height=1500,
@@ -248,15 +296,13 @@ def test_optional_pile_is_collected_second_and_explicit_mm_scales_generation_wit
         result = service.rebar(job, _payload(pile=True, drawing_units="mm"))
 
     assert len(calls) == 2
-    assert "META|ELEMENTS|" + ";".join(FR_WITH_PILE) in calls[0]["source"]
-    assert list(result["references"]["rectangles"]) == FR_WITH_PILE
+    assert "META|ELEMENTS|" + ";".join(FOOTING_ONLY) in calls[0]["source"]
+    assert 'abutment.pile' not in calls[0]['source']
+    assert list(result["references"]["rectangles"]) == FOOTING_ONLY
+    assert result['references_count'] == 1
     assert result["references"]["drawing_units_per_m"] == 1000.0
     assert result["references"]["generated"] == ["abutment.footing"]
-    assert result["references"]["pending"] == [
-        "abutment.pile",
-        "abutment.front_wall",
-        "abutment.back_wall",
-    ]
+    assert result["references"]["pending"] == []
     assert result["references"]["rectangles"]["abutment.footing"][1][0] == 11596.0
     candidate = build.call_args.args[1]
     assert [value for point in candidate.vertices for value in point] == pytest.approx(
@@ -265,10 +311,24 @@ def test_optional_pile_is_collected_second_and_explicit_mm_scales_generation_wit
     assert build.call_args.kwargs["drawing_units_per_m"] == 1000.0
 
 
+@pytest.mark.parametrize('extra', ['abutment.pile', 'abutment.front_wall', 'abutment.back_wall'])
+def test_old_multi_element_response_is_rejected_before_generation(service, extra):
+    job = _job('j')
+    calls, fake_cad = _cad_collector(
+        service, job, _references_text(FOOTING_ONLY + [extra]))
+    with patch.object(service, 'cad', side_effect=fake_cad), \
+         patch('sincal.runtime.ruta_recurso', return_value='master.dwg'), \
+         patch('sincal.cad.zapata_views.build_zapata_lisp', wraps=real_build_zapata_lisp) as build, \
+         pytest.raises(ValueError, match='secuencia'):
+        service.rebar(job, _payload(pile=True))
+    assert len(calls) == 1
+    build.assert_not_called()
+
+
 def test_cancelled_reference_sequence_does_not_send_generation(service):
     job = _job("c")
     text = _references_text(
-        FR_WITHOUT_PILE,
+        FOOTING_ONLY,
         selection="CANCELLED",
         error="Cancelado en abutment.footing.",
     )
@@ -290,7 +350,7 @@ def test_cancelled_reference_sequence_does_not_send_generation(service):
 def test_declared_metres_with_millimetre_sized_rectangle_blocks_before_insertion(service):
     job = _job("d")
     text = _references_text(
-        FR_WITHOUT_PILE,
+        FOOTING_ONLY,
         insunits=6,
         footing_width=11596,
         footing_height=1500,
@@ -309,7 +369,7 @@ def test_declared_metres_with_millimetre_sized_rectangle_blocks_before_insertion
 
 def test_change_in_declared_units_after_confirmation_blocks_before_insertion(service):
     job = _job("e")
-    text = _references_text(FR_WITHOUT_PILE, insunits=4)
+    text = _references_text(FOOTING_ONLY, insunits=4)
     calls, fake_cad = _cad_collector(service, job, text)
 
     with patch.object(service, "cad", side_effect=fake_cad), \

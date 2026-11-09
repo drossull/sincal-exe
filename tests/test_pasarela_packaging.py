@@ -1,5 +1,6 @@
 """Contrato y separación del complemento opcional, sin instalar aplicaciones."""
 
+import ast
 import hashlib
 import json
 from pathlib import Path
@@ -47,7 +48,12 @@ class PasarelaPackagingTests(unittest.TestCase):
     def test_core_excluye_modulo_y_spec_separada_excluye_freecad(self):
         for name in ("SINCAL.spec","SINCAL_Web.spec"):
             source = (ROOT/"packaging/windows"/name).read_text(encoding="utf-8")
-            self.assertIn("excludes=['pasarela_bim']",source)
+            analysis = next(node for node in ast.walk(ast.parse(source))
+                            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == 'Analysis')
+            excluded = ast.literal_eval(next(keyword.value for keyword in analysis.keywords if keyword.arg == 'excludes'))
+            self.assertIn('pasarela_bim', excluded)
+            if name == 'SINCAL_Web.spec':
+                self.assertTrue({'paddle', 'paddleocr', 'paddlex'} <= set(excluded))
             self.assertNotIn("runtime/pasarela_bim",source)
         source = (ROOT/"packaging/windows/SINCAL_Pasarela.spec").read_text(encoding="utf-8")
         self.assertIn('"runtime/pasarela_bim"',source)

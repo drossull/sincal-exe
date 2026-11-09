@@ -3,16 +3,19 @@ from dataclasses import asdict, replace
 from copy import deepcopy
 from collections.abc import Mapping
 import math
+import re
 
 from sincal.rebar.catalog import BRIDGE_REBAR_CATALOG, ContourPolicy
-from sincal.rebar.model import Cover, ZapataGeometry, default_zapata_rules, build_zapata_schedule
-from sincal.rebar.detail import build_detail_groups, polyline_render_points, polyline_developed_length_m
+from sincal.rebar.model import Cover, ZapataGeometry, default_zapata_rules, parse_removed_pieces
+from sincal.rebar.assembly import build_footing_assembly
+from sincal.rebar.splices import physical_laps
+from sincal.rebar.detail import build_detail_groups, detail_dimension_metadata, polyline_render_points, polyline_developed_length_m
 
 
 def defaults():
     return {"geometry": {"largo_cm": 750, "ancho_cm": 1159.6, "alto_cm": 150, "esviaje_grados": 0},
             "cover": {"inferior_cm": 7.5, "superior_cm": 5, "lateral_cm": 5},
-            "rules": [asdict(rule) for rule in default_zapata_rules()]}
+            "rules": [{**asdict(rule), "removed_pieces": []} for rule in default_zapata_rules()]}
 
 
 def number(data, key, minimum, maximum):
@@ -40,11 +43,20 @@ def domain(payload):
             raise ValueError("Grupo de armadura desconocido o fuera de orden.")
         if not isinstance(values.get("enabled"), bool):
             raise ValueError("Activo debe ser booleano.")
-        mark = values.get('mark', original.mark)
-        if not isinstance(mark, str) or len(mark) > 32:
-            raise ValueError('Marca no válida.')
-        rules.append(replace(original, mark=mark.strip(), diameter_mm=number(values, "diameter_mm", 12, 36),
+        marks = {}
+        for field in ('mark', 'continuation_mark', 'terminal_mark'):
+            mark = values.get(field, getattr(original, field))
+            if not isinstance(mark, str) or len(mark) > 32:
+                raise ValueError('Marca no válida.')
+            mark = mark.strip()
+            # Existing saved generator projects used 3-A/2-A/5-A. Migrate only
+            # that exact legacy form; do not reinterpret arbitrary invalid input.
+            match = re.fullmatch(r'([0-9]+)-([A-Za-z]+)', mark)
+            marks[field] = ''.join(match.groups()) if match else mark
+        rules.append(replace(original, **marks, diameter_mm=number(values, "diameter_mm", 12, 36),
             spacing_cm=number(values, "spacing_cm", 1, 1000), hook_cm=number(values, "hook_cm", 0, 1200),
+            first_piece_cm=number({"first_piece_cm": values.get("first_piece_cm", 0)}, "first_piece_cm", 0, 1200),
+            removed_pieces=parse_removed_pieces(values.get("removed_pieces", ()), original.key),
             enabled=values["enabled"], origin=values.get("origin", "inicio")))
     return geometry, cover, rules
 
@@ -64,6 +76,15 @@ def from_project(data):
 
 def validate_draft(state):
     """Allow unfinished fields in saved work; execution still needs valid numbers."""
+    if "wings" in state:
+        from .wing_exterior import validate_draft as validate_wing_draft
+        if not isinstance(state["wings"], Mapping) or set(state["wings"]) - {"left", "right"}:
+            raise ValueError("Selecciona ala izquierda o derecha para guardar su armadura.")
+        for wing in state["wings"].values():
+            validate_wing_draft(wing)
+    if "pile" in state:
+        from .piles import validate_draft as validate_pile_draft
+        validate_pile_draft(state["pile"])
     candidate = deepcopy(state)
     base = defaults()
     for group in ('geometry', 'cover'):
@@ -71,25 +92,91 @@ def validate_draft(state):
             if candidate[group].get(key) is None:
                 candidate[group][key] = value
     for rule, original in zip(candidate['rules'], base['rules']):
-        for key in ('diameter_mm', 'spacing_cm', 'hook_cm'):
+        for key in ('diameter_mm', 'spacing_cm', 'hook_cm', 'first_piece_cm'):
             if rule.get(key) is None:
                 rule[key] = original[key]
     domain(candidate)
 
 
+def wing_mark_conflicts(payload, schedule):
+    from .wing_exterior import mesh_marks
+    wings = payload.get('wings', {})
+    if not isinstance(wings, Mapping) or any(not isinstance(wing, Mapping) for wing in wings.values()):
+        raise ValueError('Configuración de alas no válida.')
+    wing_marks = {mark for wing in wings.values() for mark in mesh_marks(wing)}
+    return sorted({mark.mark.upper() for mark in schedule.marks} & wing_marks)
+
+
 def preview(payload):
     geometry, cover, rules = domain(payload)
-    schedule = build_zapata_schedule(geometry, cover, rules)
+    assembly = build_footing_assembly(geometry, cover, rules)
+    schedule = assembly.schedule
+    conflicts = wing_mark_conflicts(payload, schedule)
+    if conflicts:
+        from sincal.rebar.model import ValidationIssue
+        schedule = replace(schedule, issues=(*schedule.issues, ValidationIssue('error',
+            'Marcas de zapata ya reservadas por un ala: ' + ', '.join(conflicts) + '. Usa marcas únicas en el estribo.')))
     details = []
     if schedule.is_valid:
         for group in build_detail_groups(schedule, rules, geometry):
             for piece in group.pieces:
-                details.append({**asdict(piece), "points_m": polyline_render_points(piece),
+                details.append({**asdict(piece), **detail_dimension_metadata(piece), "points_m": polyline_render_points(piece),
                                 "measured_cm": polyline_developed_length_m(piece) * 100})
     return {"valid": schedule.is_valid, "issues": [asdict(issue) for issue in schedule.issues],
             "marks": [{**asdict(mark), "kg": mark.kg_steel, 'area_cm2': mark.area_m2 * 10000,
                        'spacing_cm': next(rule.spacing_cm for rule in rules if rule.key == mark.key)} for mark in schedule.marks],
-            "total_kg": schedule.total_kg, "details": details}
+            "total_kg": schedule.total_kg, "details": details,
+            "splice_groups": _splice_groups(assembly, rules) if schedule.is_valid else []}
+
+
+def _splice_groups(assembly, rules):
+    """One physical run per spliced family, in a shared orthonormal 3D frame.
+
+    Coordinates stay in metres and retain the exact assembly origin/frame;
+    these are the actual pieces, never reassembled from rounded cut labels.
+    """
+    groups = []
+    for rule in rules:
+        first = next((bar for bar in (assembly.reference_bars or assembly.bars)
+                      if bar.key == rule.key and bar.piece_role == "inicial"), None)
+        if first is None:
+            continue
+        run = [bar for bar in assembly.bars if bar.placement_id == first.placement_id]
+        if not run:
+            continue
+
+        normal = (first.axis_u[1]*first.axis_v[2]-first.axis_u[2]*first.axis_v[1],
+                  first.axis_u[2]*first.axis_v[0]-first.axis_u[0]*first.axis_v[2],
+                  first.axis_u[0]*first.axis_v[1]-first.axis_u[1]*first.axis_v[0])
+
+        def local(point):
+            delta = tuple(value - origin for value, origin in zip(point, first.origin_m))
+            return tuple(sum(value * axis for value, axis in zip(delta, vector))
+                         for vector in (first.axis_u, first.axis_v, normal))
+
+        laps = physical_laps(run)
+        lap_segments = {bar.id: tuple((local(lap.start_m), local(lap.end_m))
+                                     for lap in laps if lap.piece_id == bar.id)
+                        for bar in run}
+        original_run = [bar for bar in (assembly.reference_bars or assembly.bars)
+                        if bar.placement_id == first.placement_id]
+
+        pieces = [{"id": bar.id, "mark": bar.mark, "piece_role": bar.piece_role,
+                   "diameter_mm": bar.diameter_mm,
+                   "length_cm": bar.length_cm, "developed_length_cm": bar.developed_length_cm,
+                   "points_m": tuple(map(local, bar.points_m)),
+                   "vertices_m": tuple(map(local, bar.vertices_m)), "bulges": bar.bulges,
+                   "main_start_m": local(bar.main_start_m), "main_end_m": local(bar.main_end_m),
+                   "lap_segments_m": lap_segments[bar.id]}
+                  for bar in run]
+        groups.append({"key": rule.key, "label": rule.label, "first_piece_cm": rule.first_piece_cm,
+                       "projection": "oblique_orthographic", "frame_origin_m": first.origin_m,
+                       "frame_axes": (first.axis_u, first.axis_v, normal),
+                       "placement_id": first.placement_id, "diameter_mm": first.diameter_mm,
+                       "lap_cm": round(max((lap.length_cm for lap in laps), default=0.), 10), "pieces": pieces,
+                       "removed_piece_count": len(original_run)-len(run),
+                       "main_start_m": local(first.main_start_m), "main_end_m": local(original_run[-1].main_end_m)})
+    return groups
 
 
 def assistant_catalog(data):
@@ -115,7 +202,10 @@ def assistant_catalog(data):
                     "presence": element.presence.kind.value,
                     "present": element.presence.resolve(data, instance.key),
                     "definition_pending": element.definition_pending,
-                    "calculation_available": element.key == "abutment.footing",
+                    "calculation_available": element.key in ("abutment.footing", "abutment.left_wing", "abutment.right_wing"),
+                    "calculation_scope": ("wing_meshes" if element.key in ("abutment.left_wing", "abutment.right_wing")
+                                          else "footing" if element.key == "abutment.footing" else None),
+                    "cad_insertion_available": element.key == "abutment.footing",
                     "views": list(dict.fromkeys(
                         "EE" if element.key == "abutment.footing" and item.view == "FF" else item.view
                         for item in element.layers)),
@@ -152,26 +242,22 @@ def footing_plan_orientation(data, instance_key):
 
 
 def reference_sequence(data, instance_key, view, *, geometry=None):
-    """Select two corners for rectangles and three for a skewed footing plan."""
+    """Request only the footing, whose reinforcement recipe is implemented."""
     from sincal.rebar.model import VISTAS_ZAPATA
     view = "FF" if view == "EE" else view
     if view not in VISTAS_ZAPATA:
         raise ValueError("Selecciona una vista de zapata válida.")
-    resolve_assistant_element(data, "abutment", instance_key, "abutment.footing")
-    elements = BRIDGE_REBAR_CATALOG.elements_for("abutment")
-    order = ("abutment.footing", "abutment.pile")
-    ordered = sorted(elements, key=lambda item: order.index(item.key) if item.key in order else 2)
+    _, _, footing = resolve_assistant_element(data, "abutment", instance_key, "abutment.footing")
     orientation = footing_plan_orientation(data, instance_key)
     skew = (geometry.esviaje_grados if geometry is not None else
             float(data.get("parametros_generales", {}).get("angulo_esviaje_puente", 0)))
     if view == "FF" and orientation == "rectangular_rotado" and abs(skew) > 1e-9:
         raise ValueError("La planta rectangular está girada. Esta versión requiere la base horizontal; no se envió una orden a CAD.")
     skewed_plan = view == "FF" and orientation == "romboide" and abs(skew) > 1e-9
-    return [{"key": item.key, "label": item.label,
-             "reference_mode": "parallelogram" if skewed_plan and item.key == "abutment.footing" else "rectangle"}
-            for item in ordered
-            if item.presence.resolve(data, instance_key)
-            and any(layer.view == view for layer in item.layers)]
+    # Presence in the JSON does not mean that an element has an insertion
+    # recipe. Do not ask for unused references while those recipes are pending.
+    return [{"key": footing.key, "label": footing.label,
+             "reference_mode": "parallelogram" if skewed_plan else "rectangle"}]
 
 
 def drawing_units_per_m(expected, choice="auto"):
@@ -274,8 +360,13 @@ def reference_candidate(vertices, factor, context, geometry, project, *, referen
     delta = 0.0
     if context.view == "FR":
         wanted_width, wanted_height = geometry.ancho_m, geometry.alto_m
-    elif context.view in ("AA", "BB", "CC"):
+    elif context.view == "AA":
         wanted_width, wanted_height = geometry.largo_m, geometry.alto_m
+    elif context.view in ("BB", "CC"):
+        # B-B/C-C run along the skewed side, not along A-A's perpendicular
+        # depth. Use the actual side length; never stretch steel to the pick.
+        wanted_width = geometry.largo_m / math.cos(math.radians(geometry.esviaje_grados))
+        wanted_height = geometry.alto_m
     elif context.view == "FF":
         if orientation == "romboide":
             delta = geometry.largo_m * math.tan(math.radians(geometry.esviaje_grados))

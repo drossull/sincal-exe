@@ -6,7 +6,7 @@ import hashlib
 import json
 import math
 
-from sincal.rebar.model import automatic_hook_cm, lap_length_cm
+from sincal.rebar.model import RebarLengthVariant, automatic_hook_cm, lap_length_cm
 
 
 DETAIL_GROUP_ORDER = ("G12", "G3", "G3A", "G45", "G6")
@@ -34,6 +34,17 @@ class DetailPiece:
     partial_segments_m: tuple[tuple[tuple[float, float], tuple[float, float]], ...]
     main_start_x_m: float
     main_end_x_m: float
+    # One representative shape and one linked mark describe the whole series.
+    # Each entry carries the real quantity at that developed length; the
+    # representative total must never be multiplied by the series quantity.
+    length_variants: tuple[RebarLengthVariant, ...] = ()
+    variable_partial_index: int | None = None
+    # The manufactured cut is rounded to centimetres for the schedule. Its
+    # physical centreline is kept exact, so rounding never stretches a bar.
+    developed_length_cm: float | None = None
+    # Preserve the physical splice lane when another mark is removed. The
+    # fabrication detail unfolds each piece, but never substitutes a 5 mm gap.
+    splice_lane_index: int | None = None
 
 
 @dataclass(frozen=True)
@@ -122,6 +133,39 @@ def _build_piece(mark, rule, height_cm, skew_degrees):
     total_cm = int(math.ceil(mark.unit_length_cm - 1e-9))
     radius_cm = float(mark.bend_radius_cm)
     hook_cm = rule.hook_cm or automatic_hook_cm(height_cm)
+    variants = mark.length_variants
+    variable_partial_index = (0 if mark.hook_count == 0 or
+                              (mark.hook_count == 1 and mark.piece_role == "terminal")
+                              else 1) if len(variants) > 1 else None
+    shape = getattr(mark, "shape_data", None)
+    # The assembly supplies the exact same piece to CAD and the isometric
+    # viewer. An individual series variant with a different length must not
+    # accidentally reuse the representative (longest) shape.
+    if shape and shape["cut_length_cm"] == total_cm:
+        raw = tuple(tuple(point) for point in shape["raw_m"])
+        return DetailPiece(
+            mark=mark.mark,
+            key=mark.key,
+            diameter_mm=int(mark.diameter_mm),
+            quantity=mark.quantity,
+            spacing_cm=rule.spacing_cm,
+            total_cm=total_cm,
+            layer=f"fi{int(mark.diameter_mm)}",
+            vertices_m=tuple(tuple(point) for point in shape["vertices_m"]),
+            bulges=tuple(shape["bulges"]),
+            partials_cm=tuple(shape["partials_cm"]),
+            partial_segments_m=tuple(zip(raw, raw[1:])),
+            main_start_x_m=shape["main_start_x_m"],
+            main_end_x_m=shape["main_end_x_m"],
+            length_variants=variants,
+            variable_partial_index=variable_partial_index,
+            developed_length_cm=shape["developed_length_cm"],
+            splice_lane_index=shape.get("splice_lane_index"),
+        )
+    # Mesh hooks bend in a vertical plane. Plan skew changes their chord,
+    # never their 90-degree bend. Only the lateral bars turn in the plan plane.
+    if mark.key in ("mesh_x", "mesh_y", "suple") or variants:
+        skew_degrees = 0.0
     sweeps = _piece_bend_sweeps(mark, skew_degrees)
     partials, arcs = _effective_partials(total_cm, hook_cm, radius_cm, sweeps)
     radius_m = radius_cm / 100.0
@@ -195,6 +239,9 @@ def _build_piece(mark, rule, height_cm, skew_degrees):
         partial_segments_m=segments,
         main_start_x_m=main_start,
         main_end_x_m=main_end,
+        length_variants=variants,
+        variable_partial_index=variable_partial_index,
+        developed_length_cm=float(total_cm),
     )
 
 
@@ -207,6 +254,9 @@ def _group_fingerprint(group_id, pieces, offsets, laps):
                 "quantity": piece.quantity, "spacing": piece.spacing_cm,
                 "total": piece.total_cm, "vertices": piece.vertices_m,
                 "bulges": piece.bulges, "partials": piece.partials_cm,
+                **({"length_variants": [(variant.length_cm, variant.quantity)
+                                      for variant in piece.length_variants]}
+                   if piece.length_variants else {}),
             }
             for piece in pieces
         ],
@@ -238,8 +288,15 @@ def build_detail_groups(schedule, rules, geometry):
         laps = []
         current_main_end = None
         for index, piece in enumerate(pieces):
-            y = -0.005 * index
-            if index == 0 or current_main_end is None:
+            lane = piece.splice_lane_index if piece.splice_lane_index is not None else index % 2
+            # This is an unfolded cutting detail, not a projection of the
+            # assembled hooks. Adjacent lanes retain the real bar diameter.
+            y = -lane * piece.diameter_mm / 1000.0
+            if schedule.splice_laps_m is not None:
+                # Shape data retains its original run coordinates. Never pull
+                # a terminal piece toward the initial after deleting a middle.
+                x = 0.0
+            elif index == 0 or current_main_end is None:
                 x = 0.0
             else:
                 overlap = lap_length_cm(piece.diameter_mm) / 100.0
@@ -247,9 +304,54 @@ def build_detail_groups(schedule, rules, geometry):
                 laps.append((current_main_end - overlap, current_main_end, y - 0.28 - 0.16 * (index - 1)))
             offsets.append((x, y))
             current_main_end = x + piece.main_end_x_m
+        if schedule.splice_laps_m is not None:
+            for start, end in schedule.splice_laps_m.get(key, ()):
+                covering = [index for index, piece in enumerate(pieces)
+                            if piece.main_start_x_m <= start + 1e-8
+                            and piece.main_end_x_m >= end - 1e-8]
+                if len(covering) >= 2:
+                    index = max(covering)
+                    laps.append((start, end, offsets[index][1] - .28 - .16 * (index - 1)))
         fingerprint = _group_fingerprint(group_id, pieces, tuple(offsets), tuple(laps))
         result.append(DetailGroup(group_id, pieces, tuple(offsets), tuple(laps), fingerprint))
     return tuple(result)
+
+
+def detail_dimension_metadata(piece):
+    """Describe display dimensions without changing the manufactured shape.
+
+    Partials retain the developed-length convention of the existing detail:
+    fixed hooks keep their nominal length and the main partial absorbs the
+    bend arcs. A variable label therefore ranges over that partial, not over
+    the total length of the bar. Bend angles come from the actual raw segment
+    directions; a skewed plan does not imply skewed bends in every bar plane.
+    """
+    ranges = [{"min_cm": value, "max_cm": value} for value in piece.partials_cm]
+    variable = piece.variable_partial_index
+    if variable is not None and piece.length_variants:
+        fixed = sum(value for index, value in enumerate(piece.partials_cm)
+                    if index != variable)
+        lengths = [variant.length_cm - fixed for variant in piece.length_variants]
+        ranges[variable] = {"min_cm": min(lengths), "max_cm": max(lengths)}
+
+    bends = []
+    segments = piece.partial_segments_m
+    for previous, following in zip(segments, segments[1:]):
+        incoming = _unit(tuple(b - a for a, b in zip(*previous)))
+        outgoing = _unit(tuple(b - a for a, b in zip(*following)))
+        turn = abs(_signed_turn(incoming, outgoing))
+        if turn <= 1e-10:
+            continue
+        bend_degrees = round(math.degrees(turn), 10)
+        bends.append({
+            "vertex_m": list(previous[1]),
+            "incoming_unit": list(incoming),
+            "outgoing_unit": list(outgoing),
+            "bend_degrees": bend_degrees,
+            "interior_degrees": round(180.0 - bend_degrees, 10),
+            "skewed": not math.isclose(bend_degrees, 90.0, abs_tol=1e-7),
+        })
+    return {"partial_ranges_cm": ranges, "bends": bends}
 
 
 def polyline_developed_length_m(piece):

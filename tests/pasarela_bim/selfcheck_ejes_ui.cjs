@@ -2,15 +2,18 @@
 const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
+const base=(process.env.PASARELA_TEST_URL||'http://127.0.0.1:8767').replace(/\/$/,'');
 (async()=>{
   const browser=await chromium.launch({channel:'msedge',headless:true});
-  const page=await browser.newPage({viewport:{width:1600,height:1100},acceptDownloads:true}),errors=[];
+  const page=await browser.newPage({viewport:{width:1600,height:1100}}),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   const output=path.resolve('pasarela_bim/generados/prueba_ejes');fs.mkdirSync(output,{recursive:true});
   const select=async(type,id)=>page.locator(`#entity-list [data-select-type="${type}"][data-select-id="${id}"]`).click();
-  const dump=async()=>{const waiting=page.waitForEvent('download');await page.locator('#export-json').click();const d=await waiting,stream=await d.createReadStream(),chunks=[];for await(const c of stream)chunks.push(c);return JSON.parse(Buffer.concat(chunks).toString('utf8'));};
+  await page.route('**/api/estado',async route=>{const response=await route.fetch();await route.fulfill({response,json:{...await response.json(),guardado_local:true}});});
+  await page.route('**/api/proyecto/guardar',async route=>{const payload=route.request().postDataJSON();await route.fulfill({json:{guardado:true,documento:{id:payload.documento_id||'ensayo-ejes',nombre:'ejes.json',ruta:path.join(output,'ejes.json')}}});});
+  const dump=async()=>{const waiting=page.waitForResponse(r=>r.url()===base+'/api/proyecto/guardar');await page.locator('#export-json').click();const response=await waiting;assert.equal(response.status(),200);assert.equal((await response.json()).guardado,true);await page.waitForFunction(()=>!document.querySelector('#export-json').disabled);return response.request().postDataJSON().modelo;};
   try{
-    await page.goto('http://127.0.0.1:8767/');await page.locator('#new-project').click();
+    await page.goto(base+'/');await page.locator('#new-project').click();
     await page.locator('[name="nombre"]').fill('Ensayo independiente de ejes');
     await page.getByRole('button',{name:'Crear proyecto',exact:true}).click();await page.locator('[name="vanos"]').selectOption('2');
     await page.getByRole('dialog').getByRole('button',{name:'Instalar atravieso',exact:true}).click();

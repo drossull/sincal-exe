@@ -6,7 +6,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   const browser=await chromium.launch({channel:'msedge',headless:true});
   try{
     const page=await browser.newPage({viewport:{width:1360,height:900}}),errors=[],calls=[];
-    const jobPolls=new Map(),jobResults=new Map();let sequence=0,cadStatusCalls=0,previewDelay=0,nextJobResult={selection:'ok',references_count:3,references:[{element:'footing',corners:[[0,1],[2,0]]}]};
+    const jobPolls=new Map(),jobResults=new Map();let sequence=0,cadStatusCalls=0,previewDelay=0,nextJobResult={selection:'ok',references_count:1,references:[{element:'footing',corners:[[0,1],[2,0]]}]};
     page.setDefaultTimeout(10000);
     page.on('pageerror',error=>errors.push(error.message));
     page.on('dialog',dialog=>dialog.accept());
@@ -65,7 +65,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
     assert.equal(await page.getByRole('button',{name:/Pilote de estribo.*No aplica/}).count(),1);
     assert.equal(await page.getByRole('button',{name:/Muro frontal.*Cálculo pendiente/}).count(),1);
     await page.getByText('Planta E–E · EE',{exact:true}).waitFor();
-    await page.getByText('El JSON define qué elementos pedir en cada vista. CAD solicita dos esquinas para una referencia rectangular y tres puntos sólo para una planta E–E romboide con esviaje; SINCAL valida esas referencias contra las dimensiones del JSON antes de insertar.',{exact:true}).waitFor();
+    await page.getByText('Por ahora se solicitan únicamente los puntos de la zapata: dos esquinas para una vista rectangular y tres puntos para la planta E–E romboide con esviaje. SINCAL valida esas referencias contra las dimensiones del JSON antes de insertar. Los demás elementos se incorporarán cuando sus armaduras estén implementadas.',{exact:true}).waitFor();
     assert.equal(await page.getByText('F–F · FF',{exact:true}).count(),0);
     for(const forbidden of ['FR_ZAP','Capas esperadas','Preparar capas','Detectar moldajes','Seleccionar y detectar moldajes'])assert.equal(await page.getByText(forbidden,{exact:true}).count(),0);
 
@@ -113,9 +113,9 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
     await page.getByRole('button',{name:'Calcular marcas',exact:true}).click();
     await page.getByRole('heading',{name:/^3\. Marcas/}).waitFor();
     await page.getByRole('button',{name:'Insertar planta (E–E)',exact:true}).click();
-    await page.locator('#notice').getByText('En CAD sigue la guía para indicar tres puntos por cada elemento de la planta E–E romboide. SINCAL validará las dimensiones contra el JSON antes de insertar.',{exact:true}).waitFor();
+    await page.locator('#notice').getByText('En CAD indica tres esquinas de la zapata en la planta E–E: superior izquierda, superior derecha e inferior derecha. SINCAL validará las dimensiones contra el JSON antes de insertar.',{exact:true}).waitFor();
     await page.locator('#activity').waitFor({state:'hidden'});
-    await page.locator('#notice').getByText('Vista planta (E–E) insertada. Se seleccionaron 3 referencias; sólo la zapata se generó y las demás armaduras siguen pendientes.',{exact:true}).waitFor();
+    await page.locator('#notice').getByText('Armadura de zapata insertada en la vista planta (E–E). Comprueba geometría, marcas y cotas en CAD.',{exact:true}).waitFor();
 
     assert.equal(cadStatusCalls,1);
     assert.equal(calls.length,1);
@@ -133,7 +133,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 
     nextJobResult={selection:'cancelled',references_count:0};
     await page.getByRole('button',{name:'Insertar A–A',exact:true}).click();
-    await page.locator('#notice').getByText('En CAD indica la esquina superior izquierda e inferior derecha de cada elemento solicitado para la vista A–A. SINCAL validará las dimensiones contra el JSON antes de insertar.',{exact:true}).waitFor();
+    await page.locator('#notice').getByText('En CAD indica la esquina superior izquierda e inferior derecha de la zapata en la vista A–A. SINCAL validará las dimensiones contra el JSON antes de insertar.',{exact:true}).waitFor();
     await page.locator('#activity').waitFor({state:'hidden'});
     await page.locator('#notice').getByText('Selección cancelada para la vista A–A. No se insertó armadura.',{exact:true}).waitFor();
     assert.equal(cadStatusCalls,2);assert.equal(calls.length,2);
@@ -143,7 +143,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
     await page.getByRole('button',{name:'Calcular marcas',exact:true}).click();
     await page.getByRole('heading',{name:/^3\. Marcas/}).waitFor();
     await page.getByRole('button',{name:'Insertar planta (E–E)',exact:true}).click();
-    await page.locator('#notice').getByText('En CAD indica la esquina superior izquierda e inferior derecha de cada elemento solicitado para la vista planta (E–E). SINCAL validará las dimensiones contra el JSON antes de insertar.',{exact:true}).waitFor();
+    await page.locator('#notice').getByText('En CAD indica la esquina superior izquierda e inferior derecha de la zapata en la vista planta (E–E). SINCAL validará las dimensiones contra el JSON antes de insertar.',{exact:true}).waitFor();
     await page.locator('#activity').waitFor({state:'hidden'});
     assert.equal(cadStatusCalls,3);assert.equal(calls.length,3);
     assert.equal(calls[2].payload.abutment,'salida');assert.equal(calls[2].payload.view,'EE');

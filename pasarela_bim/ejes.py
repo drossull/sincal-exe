@@ -307,6 +307,7 @@ def resolver_ejes(modelo):
         fundaciones = [dados[i] for i in dict.fromkeys(s["fundacion"] for s in ss)]
         return {"nodo":ref,"tipo_nodo":nodo["tipo"],"estacion_mm":distancia,
                 **{k:nodo[k] for k in "xyz"},"ejes_apoyo":deepcopy(marcadores[ref]),
+                **({"anclaje_tramo":deepcopy(nodo["anclaje_tramo"])} if "anclaje_tramo" in nodo else {}),
                 "soportes":[{k:s[k] for k in ("id","fundacion","cota_superior_mm","cota_terreno_proyectado_mm","diametro_mm","ancho_mm","largo_mm") if k in s} for s in ss],
                 "fundaciones":[{"id":f["id"],"cota_superior_mm":f["cota_superior_mm"],
                                 "cota_inferior_mm":f["cota_superior_mm"]-f["alto_mm"]} for f in fundaciones]}
@@ -321,7 +322,7 @@ def resolver_ejes(modelo):
             continue
         cadena = nodos_de_cadena(eje,tramos)
         puntos = [[nodos[n][k] for k in "xyz"] for n in cadena]
-        resuelto.update(nodos=cadena,puntos_directriz=puntos,es_recto=_es_recto(puntos),estaciones=[estacion(cadena[0],0)],segmentos=[])
+        resuelto.update(nodos=cadena,puntos_directriz=puntos,es_recto=_es_recto(puntos),estaciones=[estacion(cadena[0],0)],segmentos=[],nodos_apoyo_interiores=[])
         acumulada = 0.0
         for indice,ref in enumerate(eje["tramos"]):
             tramo = tramos[ref]
@@ -343,8 +344,18 @@ def resolver_ejes(modelo):
                 "estacion_inicio_mm":acumulada,"estacion_fin_mm":acumulada+largo,
                 "estacion_inicio_util_mm":perfil[0]["estacion_mm"],"estacion_fin_util_mm":perfil[-1]["estacion_mm"],
                 "puntos_rasante":perfil,"perfil_canto":[{"estacion_mm":abscisa(t),"canto_mm":_interpolar(cantos,t,"canto_mm")} for t in ts]})
+            for nodo in nodos.values():
+                anclaje = nodo.get("anclaje_tramo")
+                if not isinstance(anclaje,dict) or anclaje.get("tramo") != ref:
+                    continue
+                t = anclaje.get("t")
+                if not isinstance(t,(int,float)) or isinstance(t,bool) or not math.isfinite(t) or not 0 < t < 1:
+                    raise ValueError(f"{nodo['id']}: el anclaje interior necesita 0 < t < 1")
+                resuelto["estaciones"].append(estacion(nodo["id"],abscisa(t)))
+                resuelto["nodos_apoyo_interiores"].append(nodo["id"])
             acumulada += largo
             resuelto["estaciones"].append(estacion(cadena[indice+1],acumulada))
+        resuelto["estaciones"].sort(key=lambda p:p["estacion_mm"])
         resuelto["longitud_mm"] = acumulada
         salida.append(resuelto)
     return salida

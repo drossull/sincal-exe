@@ -53,22 +53,64 @@ versión no sincroniza de vuelta cambios manuales hechos sobre sólidos FreeCAD.
 ## Flujo de uso
 
 1. **Nuevo proyecto**: nombre, Este/Norte/cota del origen, orientación y gálibo.
-   El origen local `(0,0,0)` es el punto medio del atravieso al nivel del terreno.
+   Este y Norte están siempre en PTL, respecto del `(0,0)` de la planta DWG.
+   El origen local `(0,0,0)` es el punto medio del atravieso, en la cara superior
+   de la viga sobre su eje. El norte se indica con giro horario desde Y positivo.
    X sigue el atravieso, Y es transversal local y Z positivo apunta arriba.
 2. Cargar una **planta DWG/DXF** como referencia, si está disponible. Puede
    cancelarse el diálogo inicial del atravieso y reabrirlo después de cargarla.
-3. **Instalar atravieso**: previsualizar longitud, ancho, canto y uno o dos vanos.
-   Su cota inicial es `cota de carretera local + gálibo + canto`.
+3. **Instalar atravieso**: previsualizar longitud, ancho de sección, alto de viga
+   y uno o dos vanos. Su cara superior en el eje queda en Z = 0.
 4. Usar **+** en un nodo para añadir una conexión X+, X−, Y+ o Y−. Los encuentros
    pueden ramificarse; las fundaciones compartidas son otra relación independiente.
 5. Seleccionar tramos para editar su sección gráfica: cajón, losa maciza o
    escalera recta. Una familia puede aplicarse a varios tramos o duplicarse.
 6. Completar apoyos y fundaciones, individuales o compartidas. Los cambios de
    cota muestran sus efectos antes de aplicarse y respetan las cotas fijas.
-7. **Guardar JSON** en cualquier momento, también con datos pendientes. **Abrir
-   JSON** conserva familias, conexiones, identidad, georreferencia y fondo CAD.
+7. **Guardar JSON…** permite elegir un archivo local, también con datos pendientes.
+   Después, **Guardar cambios** (Ctrl+S) sobrescribe ese mismo archivo sin volver a
+   pedir la ruta. **Guardar como…** (Ctrl+Mayús+S) permite elegir otra copia.
+   **Abrir JSON** vincula el archivo seleccionado para guardar directamente en él;
+   conserva familias, conexiones, identidad, georreferencia y fondo CAD. La ruta
+   sólo se recuerda durante la sesión del editor y no viaja dentro del JSON.
+   Si se cancela el selector, falla la escritura o el archivo cambia externamente,
+   el editor conserva sus cambios pendientes. Sólo un guardado confirmado los marca
+   como guardados; las ediciones posteriores siguen pendientes.
 8. Completar los pendientes, validar y **Generar en FreeCAD**. Cada ejecución
    produce un nuevo modelo y vistas en una carpeta independiente.
+
+## Retornos, columnas y pilotes
+
+Al añadir un retorno se elige **Una columna en el centro** o **Dos columnas en
+los extremos**. Las dos columnas nuevas pueden tener fundaciones individuales
+o una compartida. En un retorno existente, **Configurar apoyos del retorno…**
+muestra la disposición resultante antes de aplicar. Los apoyos existentes con
+otras conexiones o pilotes se conservan y se indica qué requiere revisión.
+Cambiar la disposición no borra automáticamente una fundación ya desarrollada.
+
+La columna central tiene un nodo estructural con `anclaje_tramo: {tramo, t: 0.5}`.
+El retorno sigue siendo una única pieza y conserva su recorrido peatonal. El
+centro, su columna y su fundación acompañan al retorno cuando éste se mueve;
+su propio eje de apoyo aparece en la elevación. La posición central se obtiene
+del retorno; las dimensiones del apoyo y la fundación se editan por separado.
+Las dimensiones iniciales de los apoyos nuevos deben revisarse. La cota de
+terreno proyectado se define en el centro de cada apoyo y puede quedar pendiente;
+no se supone una superficie horizontal bajo toda la pasarela.
+
+Desde una fundación o su columna, **Planta y distribución de pilotes…** abre
+una planta del contorno y las columnas asociadas. Se pueden añadir, seleccionar,
+arrastrar y quitar pilotes, así como editar diámetro, longitud y posición X/Y
+respecto del centro de la fundación. También se pueden introducir separaciones
+X/Y, distancia entre centros y dirección respecto de otro pilote. La planta
+respeta el giro de la fundación y muestra cotas con flechas.
+
+El diálogo trabaja sobre una copia: **Aplicar** actualiza el modelo y admite
+**Deshacer**; **Cancelar** o Escape conserva la distribución anterior. Se
+comprueban dimensiones positivas, contención dentro del dado y ausencia de
+superposición entre pilotes. Son comprobaciones geométricas, sin imponer una
+separación estructural normativa. Con pilotes, la fundación se denomina dado;
+al quitar todos desde este diálogo vuelve a zapata. Sus posiciones, dimensiones
+e identidades se guardan en el JSON en metros y llegan al modelo FreeCAD.
 
 ## Ejes de estructura y elevaciones
 
@@ -96,9 +138,34 @@ reexpresan las coordenadas locales para mantener allí el `(0,0,0)` en planta.
 La vista previa indica este cambio de marco antes de aplicarlo.
 
 **Elevación por eje** muestra estaciones acumuladas en planta, distancias entre
-nodos, cotas locales y ejes de apoyos. Los recorridos con giros se presentan como
-elevaciones desarrolladas. El editor muestra la envolvente longitudinal; los
-apoyos son referencias de eje y niveles. La generación guarda referencias de
+nodos, cotas locales y ejes de apoyos. **Cotas en elevación**, activado al inicio,
+permite mostrar u ocultar las dimensiones del corte: distancias entre nodos,
+longitud total desarrollada, descanso, alto de viga, alturas de apoyos, espesor
+de fundaciones y longitud de pilotes intersectados. Las medidas se actualizan
+con el modelo y se expresan en metros. Las cotas de planta y elevación usan
+puntas triangulares cerradas y rellenas, según las flechas de **GSG_COTAS** del
+maestro `FORMATOS ANOTATIVOS ACAD_2025.dwg`: largo igual a la altura de texto y
+base de un tercio del largo. En intervalos cortos las puntas se sitúan por fuera.
+En esta vista se pueden seleccionar las piezas o sus rótulos para editarlas en
+**Propiedades**, sin cambiar de eje: vigas, nodos, columnas, estribos, fundaciones
+y pilotes. Al seleccionar un pilote se muestra su ficha dentro del dado al que
+pertenece. Los cabezales y el terreno proyectado llevan al apoyo correspondiente;
+las burbujas y el título llevan al eje. Los cambios actualizan el corte y las cotas
+con las mismas reglas del editor de planta. La selección admite clic, Enter y
+Espacio; las cotas no bloquean los elementos situados detrás de ellas.
+El visor utiliza los controles del visor IFC de Cadence: botón central para
+desplazar, Mayús + central para orbitar en la vista isométrica y clic izquierdo
+para seleccionar. La órbita permite giro horizontal y vertical con Z siempre
+vertical, sin inercia ni inversión al llegar a los polos. Ctrl o Meta + central
+también permiten orbitar. La rueda acerca hacia el cursor al subir y aleja al
+bajar, con factor 1,20 por paso estándar; los botones de zoom usan el mismo paso.
+En planta y elevaciones sólo se desplaza y se hace zoom. Un dedo desplaza y dos
+dedos desplazan y amplían sin inclinar la vista. Seleccionar en isométrica sitúa
+el pivote en la pieza sin cambiar la escala; **Encuadrar** recupera la orientación
+inicial y el conjunto del modelo. La navegación no modifica el JSON del proyecto.
+Los recorridos con giros se presentan
+como elevaciones desarrolladas. El editor muestra el corte longitudinal central.
+La generación guarda referencias de
 ejes en FreeCAD, sin contarlas como hormigón, y exporta una elevación SVG por eje
 longitudinal, además de las cuatro vistas base. Las elevaciones exportadas
 incluyen rasantes, cantos, retranqueos y referencias de los apoyos: todavía no
@@ -111,15 +178,17 @@ de la viga; no representa automáticamente el ancho libre entre barandas.
 
 ## Coordenadas, norte y planta
 
-`proyecto.georreferencia` contiene `este_m`, `norte_m`, `cota_m`,
-`norte_desde_x_horario_deg` y un texto opcional `crs`. El ángulo se mide desde X
-positivo en sentido horario en planta: 0° sitúa el norte hacia X+, y 270° hacia
-Y+. La flecha del lienzo y la transformación del fondo utilizan la misma regla.
-Para un ángulo θ y coordenadas locales x/y/z en metros:
+`proyecto.georreferencia` contiene `este_m`, `norte_m`, `cota_m` y `crs: "PTL"`
+en los proyectos nuevos. El editor mide el ángulo al norte desde Y positivo,
+en sentido horario: 0° sitúa el norte hacia Y+ y 90° hacia X+.
+Para mantener compatibles los archivos existentes, el JSON conserva el campo
+`norte_desde_x_horario_deg`, equivalente al ángulo del editor menos 90°,
+normalizado entre 0° y 360°. La flecha y el fondo utilizan la misma orientación.
+Para el ángulo θ mostrado en el editor y coordenadas locales x/y/z en metros:
 
 ```
-Este  = Este_origen − x·sin(θ) − y·cos(θ)
-Norte = Norte_origen + x·cos(θ) − y·sin(θ)
+Este  = Este_origen + x·cos(θ) − y·sin(θ)
+Norte = Norte_origen + x·sin(θ) + y·cos(θ)
 Cota  = Cota_origen + z
 ```
 
@@ -127,8 +196,9 @@ No se efectúa una reproyección entre sistemas cartográficos. El DWG/DXF debe
 estar en el mismo sistema Este/Norte declarado. La planta es una referencia 2D;
 sus entidades y capas quedan embebidas en el JSON en metros. No se convierte
 automáticamente en una superficie de terreno ni se extrae una rasante viaria.
-La comprobación inicial de gálibo usa la cota viaria local introducida y el
-intradós de los tramos de cruce, sin certificar normativa.
+El gálibo queda como requisito del proyecto. Las cotas de terreno de los apoyos
+no describen las pistas ni su pendiente transversal; por sí solas no permiten
+comprobar el gálibo sobre la carretera.
 
 El lector admite líneas, polilíneas con arcos, círculos, arcos, puntos, textos y
 bloques básicos. Indica qué entidades no representa. Las referencias externas

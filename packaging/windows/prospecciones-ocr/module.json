@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "id": "prospecciones-ocr",
+  "version": "1.0.0",
+  "worker_api": 1,
+  "python_abi": "3.12",
+  "runtime": "ocr_runtime"
+}

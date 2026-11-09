@@ -125,7 +125,7 @@ Source: "{#PasarelaPayloadUrl}"; DestDir: "{app}\modules\pasarela-bim"; DestName
 #endif
 
 [InstallDelete]
-Type: filesandordirs; Name: "{app}\ocr_runtime"
+; Preserve the OCR from earlier installations. New releases distribute it separately.
 Type: filesandordirs; Name: "{app}\lisps"
 Type: filesandordirs; Name: "{app}\mapas"
 Type: filesandordirs; Name: "{app}\masters"

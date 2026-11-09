@@ -27,6 +27,10 @@ manifiesto y ZIP; posteriormente firma también el instalador complementario.
 `--skip-installer` genera sólo el ejecutable y ZIP. `--skip-build` vuelve a empaquetar
 el ejecutable existente, útil después de firmarlo. `--output-dir` permite escoger
 la carpeta de salida. El empaquetado no compila los proyectos CAD ni OCR.
+La caché de PyInstaller se conserva; `--clean` la limpia explícitamente.
+En `build_release.ps1` se reutilizan el ejecutable firmado, ZIP e instalador
+del módulo si sus fuentes, herramientas y hashes no cambiaron. Se copian a
+la nueva release sin volver a comprimirlos. Las firmas se vuelven a verificar.
 
 ## Instalación y datos
 
