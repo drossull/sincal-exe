@@ -23,6 +23,24 @@ class PurgeAllTests(unittest.TestCase):
         self.assertIn('(defun *error* (msg)', source)
         self.assertEqual(source.count('(setvar "CMDECHO" old-cmdecho)'), 2)
 
+    def test_regapp_option_is_compatible_with_both_cad_engines(self):
+        # ZWCAD names this option Regapp (singular); AutoCAD uses Regapps.
+        # Their shared abbreviation must be used by every entry point.
+        for relative in ("lisps/PURGEALL.lsp", "scripts/PURGEALL.scr",
+                         "scripts/PURGEALL.ps1"):
+            with self.subTest(path=relative):
+                source = (ROOT / relative).read_text(encoding="utf-8")
+                normalized = re.sub(r'["\s]+', ' ', source).upper()
+                self.assertIn("_.-PURGE _R * _N", normalized)
+                self.assertNotIn("_REGAPPS", normalized)
+
+    def test_lisp_stops_if_native_command_is_still_waiting(self):
+        source = (ROOT / "lisps/PURGEALL.lsp").read_text(encoding="utf-8")
+        self.assertIn('(apply \'command args)', source)
+        self.assertIn('(logand (getvar "CMDACTIVE") 1)', source)
+        self.assertRegex(source, r'\(command\)\s*\(princ[\s\S]*?\(quit\)')
+        self.assertEqual(source.count('(SPG:Command \'('), 3)
+
     def test_cmd_script_keeps_scale_answers_on_separate_lines(self):
         source = (ROOT / "scripts/PURGEALL.ps1").read_text(encoding="utf-8")
         generated = re.search(r'\$scrContent = @"\n(.*?)\n"@', source, re.S).group(1)

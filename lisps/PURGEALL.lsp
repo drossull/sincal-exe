@@ -1,3 +1,14 @@
+(defun SPG:Command (args)
+  (apply 'command args)
+  ;; A script can keep bit 4 active; only bit 1 means a native command is
+  ;; still waiting for input. Do not feed the next cleanup step into it.
+  (if (= 1 (logand (getvar "CMDACTIVE") 1))
+    (progn
+      (command)
+      (princ (strcat "\n[SINCAL] PURGEALL detenido: " (car args)
+        " no termino. Revise las opciones admitidas por el motor CAD."))
+      (quit))))
+
 (defun c:PURGEALL (/ *error* old-cmdecho)
   (setq old-cmdecho (getvar "CMDECHO"))
   (defun *error* (msg)
@@ -12,15 +23,15 @@
   ;; Ejecutamos la limpieza 3 veces para atrapar elementos anidados
   (repeat 3
     ;; "A" = All (Todo), "*" = Todos los nombres, "N" = No verificar (Sin cuadros de diálogo)
-    (command "_.-PURGE" "_All" "*" "_No")
+    (SPG:Command '("_.-PURGE" "_All" "*" "_No"))
     
-    ;; "R" = Regapps (Aplicaciones registradas)
-    (command "_.-PURGE" "_Regapps" "*" "_No")
+    ;; AutoCAD uses Regapps; ZWCAD uses Regapp. _R works in both engines.
+    (SPG:Command '("_.-PURGE" "_R" "*" "_No"))
   )
 
   ;; El CAD protege la escala actual y las referenciadas por objetos.
   ;; Delete * elimina solo las no utilizadas; Reset recrearia escalas.
-  (command "_.-SCALELISTEDIT" "_Delete" "*" "_Exit")
+  (SPG:Command '("_.-SCALELISTEDIT" "_Delete" "*" "_Exit"))
 
   ;; Conserva la configuracion original, tambien si falla o se cancela.
   (setvar "CMDECHO" old-cmdecho)
