@@ -9,6 +9,31 @@ Estas reglas se aplican a todo el repositorio.
 - Una solicitud de corrección, compilación, actualización o instalación no autoriza cambios adicionales de interfaz ni de organización de módulos.
 - Si el cambio solicitado requiere alterar la interfaz o reorganizar módulos fuera del alcance autorizado, explicar la necesidad y obtener autorización explícita antes de hacerlo.
 
+## Ejecución eficiente obligatoria
+
+- El tiempo del usuario y la capacidad consumida forman parte de la calidad del trabajo. Resolver el alcance completo con el menor trabajo necesario.
+- Reutilizar las autorizaciones ya dadas para la tarea activa, sin volver a pedir permiso por lo mismo. No extenderlas a tareas distintas ni a acciones fuera del alcance acordado.
+- Antes de actuar, comprobar brevemente qué está hecho, qué queda pendiente y qué verificaciones siguen siendo válidas. Conservar el trabajo existente; no empezar de nuevo por un cambio de turno o contexto.
+- No repetir comprobaciones que ya pasaron salvo que cambios posteriores, fallos o una duda concreta invaliden su resultado. Ejecutar las verificaciones necesarias y proporcionales al cambio; no ampliar la batería por rutina.
+- Paralelizar búsquedas y tareas independientes cuando reduzca tiempo o mejore el resultado. Evitar agentes que dupliquen investigaciones y coordinar la edición para no pisar archivos.
+- Informar pronto de un bloqueo concreto, su consecuencia y el siguiente paso útil. No encadenar investigaciones generales ni ampliar el alcance para resolver problemas ajenos a la tarea.
+- Preguntar sólo por información indispensable que no pueda obtenerse del repositorio o las herramientas disponibles. Continuar mientras tanto el trabajo independiente de esa respuesta.
+- Detener el trabajo al completar y verificar el resultado solicitado. Entregar un resumen breve de lo realizado y de cualquier limitación material; no añadir revisiones, refactorizaciones ni mejoras no solicitadas.
+
+## PONYTAIL obligatorio
+
+Aplicar estas reglas en todas las tareas y transmitirlas a los agentes delegados. Adaptación de la [versión compacta oficial de Ponytail](https://github.com/DietrichGebert/ponytail/blob/main/AGENTS.md), de DietrichGebert, bajo [licencia MIT](docs/third-party/ponytail-LICENSE.txt). Complementan las reglas específicas del proyecto, sin sustituirlas.
+
+- Resolver el problema completo con el mínimo código nuevo y legible.
+- Antes de editar, revisar el código afectado, sus llamadores, pruebas, datos de prueba, configuración y exportaciones; identificar riesgos para los datos y usuarios.
+- Elegir la primera solución suficiente: eliminar una necesidad no solicitada; reutilizar código y patrones del proyecto; usar biblioteca estándar o plataforma; aprovechar dependencias instaladas; finalmente escribir el mínimo código necesario.
+- No añadir dependencias por unas pocas líneas, abstracciones, envoltorios, conversiones, opciones o código para necesidades futuras no solicitadas. Respetar componentes, capas y convenciones existentes.
+- Corregir la causa compartida tras localizar sus llamadores. Completar los ajustes afectados; conservar validaciones y manejo de errores al mover o integrar código.
+- Preferir claridad y corrección en casos límite. Comentar sólo razones no evidentes; documentar límites de atajos y cuándo sustituirlos.
+- Verificar lógica nueva no trivial con una prueba pequeña y significativa. Los cambios triviales no necesitan pruebas nuevas.
+- No recortar seguridad, accesibilidad, validación de entradas, protección contra pérdida de datos, calibración necesaria ni requisitos del usuario.
+- Al entregar, indicar brevemente las limitaciones o comprobaciones relevantes pendientes, si existen.
+
 ## Compilación y módulos independientes
 
 - El usuario autorizó separar el motor OCR de Prospecciones como complemento instalable, conservando la interfaz y la ubicación de los módulos. La aplicación principal mantiene la lectura y edición de Prospecciones; el motor pesado tiene instalador y versión independientes.
