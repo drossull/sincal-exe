@@ -52,7 +52,7 @@
       version: 1,
       proyecto: {
         id: uid(), nombre: params.nombre || params.name || "Nueva pasarela", estado: "borrador", unidades: "mm",
-        revision: 0, motor: "pasarela-bim", version_motor: "0.3.2", esquema_intercambio: 2,
+        revision: 0, motor: "pasarela-bim", version_motor: "0.3.3", esquema_intercambio: 2,
         reglas: {pendiente_rampas_pct: 8},
         georreferencia: {este_m: Number(params.este_m || 0), norte_m: Number(params.norte_m || 0), cota_m: Number(params.cota_m || 0), norte_desde_x_horario_deg: northFromX, crs: "PTL"},
         galibo_m: Number(params.galibo_mm ?? 5500) / 1000,

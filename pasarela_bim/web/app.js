@@ -164,7 +164,7 @@
   function saveHistory() { if (state.model) {const saved=clone(state.model);historyEpoch.set(saved,fileController.snapshot().epoch);state.history.push(saved);if (state.history.length > 40) state.history.shift();} }
   function changed({fit = false, inspector = false, projectEdit = true, dirty = true} = {}) {
     if(state.model)syncLandings(state.model);
-    if(state.model&&window.ReturnSupports){ReturnSupports.sync(state.model);window.AxisManager?.syncSupports(state.model);}
+    if(state.model&&window.ReturnSupports){ReturnSupports.sync(state.model);if(projectEdit)window.AxisManager?.syncSupports(state.model);}
     if(state.model?.proyecto?.referencia_vertical==="tope_atravieso"&&state.model.tramos.some(e=>e.funcion==="cruce"))state.model=ProjectIO.rebaseToCrossing(state.model).model;
     state.revision++;state.validationRevision = -1;state.validation = null;
     state.dirty=dirty;integration?.setDirty(dirty);
