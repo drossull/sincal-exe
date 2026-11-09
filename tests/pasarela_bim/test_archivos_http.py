@@ -34,7 +34,10 @@ class TestArchivosHTTP(unittest.TestCase):
         cabeceras = {"Content-Type": "application/json", "X-Pasarela-Token": self.servidor.token}
         cabeceras.update(headers or {})
         cuerpo = raw if raw is not None else json.dumps(datos if datos is not None else {}).encode("utf-8")
-        conexion.request(metodo, ruta, cuerpo if metodo == "POST" else None, cabeceras)
+        # Evita que Windows aborte el envio del cuerpo tras un rechazo temprano.
+        with patch.object(conexion, "send") as enviar:
+            conexion.request(metodo, ruta, cuerpo if metodo == "POST" else None, cabeceras)
+        conexion.send(b"".join(llamada.args[0] for llamada in enviar.call_args_list))
         respuesta = conexion.getresponse()
         status, contenido = respuesta.status, respuesta.read()
         conexion.close()

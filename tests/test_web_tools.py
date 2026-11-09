@@ -88,6 +88,7 @@ def test_failed_job_records_error(tmp_path):
     try:
         key = jobs.submit('bad', lambda job: (_ for _ in ()).throw(ValueError('test failure')))['id']
         assert wait(jobs, key)['state'] == 'failed'
+        jobs.pool.shutdown(wait=True)  # El estado cambia antes de terminar de escribir el registro.
         assert 'test failure' in jobs.logfile(key).read_text()
     finally:
         jobs.close()
