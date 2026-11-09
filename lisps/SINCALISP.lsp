@@ -50,7 +50,7 @@
     ("REPARAR-PROPS" "Elimina propiedades personalizadas duplicadas, conserva valores y guarda el DWG." "lisps/SINCAL_PROPS.lsp")
     ("REVISAR-MARCAS" "Revisa las marcas y comunica problemas de vinculacion, sin repararlas." "lisps/MARCAS-SC.lsp")
     ("RMLAY" "Renombra la presentacion actual." "lisps/RMLAY.lsp")
-    ("ROMAND" "Configura RomanD anotativo (romand.shx, 2.5 / 0.8) y lo aplica a TEXT/MTEXT seleccionados conservando contenido y anclaje. Enter: solo estilo." "lisps/ROMAND.lsp")
+    ("ROMAND" "Aplica RomanD anotativo (romand.shx, 2.5 / 0.8) a TEXT/MTEXT conservando contenido, anclaje y campos vinculados. Enter: solo estilo." "lisps/ROMAND.lsp")
     ("RPUENTE" "Mide el radio de una curva o de tres puntos y permite marcar su centro." "lisps/RPUENTE.lsp")
     ("SEL-SC" "Permite escoger una unica escala anotativa para conservar en la seleccion." "lisps/SEL-SC.lsp")
     ("SETUP-A1" "Configura todas las presentaciones para PDF A1, escala 1:1 y plumillas SINCAL." "lisps/SETUP-A1.lsp")

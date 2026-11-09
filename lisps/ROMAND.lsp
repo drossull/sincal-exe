@@ -70,6 +70,31 @@
 (defun SRD:HasFields (data / dict)
   (and (setq dict (cdr (assoc 360 data))) (dictsearch dict "ACAD_FIELD")))
 
+(defun SRD:TextField (data / dict fields)
+  (if (and (setq dict (cdr (assoc 360 data)))
+           (setq fields (dictsearch dict "ACAD_FIELD")))
+    (dictsearch (cdr (assoc -1 fields)) "TEXT")))
+
+(defun SRD:FieldCode (data / result pair)
+  (setq result "")
+  (foreach pair data
+    (if (member (car pair) '(2 3)) (setq result (strcat result (cdr pair)))))
+  result)
+
+;; Comparar formulas y referencias, nunca el resultado calculado en cache.
+(defun SRD:FieldSignature (data depth / result pair code)
+  (if (or (not data) (> depth 32)) (exit))
+  (setq code (SRD:FieldCode data)
+        result (list (assoc 1 data)
+          (if (= (strcase (cdr (assoc 1 data))) "_TEXT") (SRD:UniformMText code) code)))
+  (foreach pair data
+    (cond
+      ((= (car pair) 331) (setq result (append result (list pair))))
+      ((= (car pair) 360)
+       (setq result (append result (list
+         (SRD:FieldSignature (entget (cdr pair)) (1+ depth))))))))
+  result)
+
 (defun SRD:SetMText (data text / chunks)
   (while (> (strlen text) 250)
     (setq chunks (cons (cons 3 (substr text 1 250)) chunks)
@@ -77,7 +102,7 @@
   (append (vl-remove-if '(lambda (pair) (member (car pair) '(1 3))) data)
           (reverse chunks) (list (cons 1 text))))
 
-(defun SRD:Prepare (en / data kind anchor content layer)
+(defun SRD:Prepare (en / data kind anchor content layer field)
   (setq data (entget en '("*")) kind (cdr (assoc 0 data))
         layer (tblsearch "LAYER" (cdr (assoc 8 data))))
   (if (and (member kind '("TEXT" "MTEXT")) (= 0 (logand 4 (cdr (assoc 70 layer)))))
@@ -85,18 +110,19 @@
       ;; En Alineado/Ajustado, los dos extremos mandan sobre altura/ancho.
       ;; Omitirlos evita desplazar extremos o cambiar su justificacion.
       ((and (= kind "TEXT") (member (cdr (assoc 72 data)) '(3 5))) nil)
-      ;; ZWCAD puede convertir campos MTEXT en texto literal al reescribir
-      ;; su formato. Conservar estos objetos completos y avisar al usuario.
-      ((and (= kind "MTEXT") (SRD:HasFields data)) nil)
+      ((and (= kind "MTEXT") (SRD:HasFields data))
+       (if (setq field (SRD:TextField data))
+         (list en data 10 (SRD:UniformMText (vla-FieldCode (vlax-ename->vla-object en)))
+               (SRD:FieldSignature field 0))))
       ((= kind "TEXT")
        (setq anchor (if (and (= 0 (cdr (assoc 72 data))) (= 0 (cdr (assoc 73 data)))) 10 11))
        (list en data anchor nil))
       ((setq content (SRD:RawText data))
        (list en data 10 (SRD:UniformMText content))))))
 
-(defun SRD:Apply (item / en original anchor data kind scale)
+(defun SRD:Apply (item / en original anchor data kind scale signature)
   (setq en (car item) original (cadr item) anchor (caddr item)
-        kind (cdr (assoc 0 original)) data (entget en))
+        kind (cdr (assoc 0 original)) data (entget en) signature (nth 4 item))
   (if (entmod (SRD:Put 7 "RomanD" data))
     (progn
       (command "_.ANNOUPDATE" en "")
@@ -105,16 +131,27 @@
       (setq data (SRD:Put 40 (/ 2.5 scale) data))
       (if (= kind "TEXT")
         (setq data (SRD:Put 41 0.8 (SRD:Put 51 0.0 (SRD:Put 71 0 data))))
-        (setq data (SRD:SetMText data (cadddr item))))
+        (if (not signature) (setq data (SRD:SetMText data (cadddr item)))))
       ;; Guardar el anclaje, no el extremo calculado de un texto justificado.
       (setq data (SRD:Put anchor (cdr (assoc anchor original)) data))
       (if (entmod data)
         (progn
+          (if signature
+            (progn
+              ;; Escribir el codigo completo AL FINAL. Un entmod posterior
+              ;; del MTEXT aplana los campos pendientes de evaluar en ZWCAD.
+              ;; Vaciar primero fuerza al CAD a reconstruir campos activos,
+              ;; no a guardar sus expresiones como texto literal.
+              (vla-put-TextString (vlax-ename->vla-object en) "")
+              (vla-put-TextString (vlax-ename->vla-object en) (cadddr item))
+              (command "_.UPDATEFIELD" en "")))
           (entupd en)
           (setq data (entget en '("*")))
           (and (= (strcase (cdr (assoc 7 data))) "ROMAND")
                (equal (cdr (assoc anchor data)) (cdr (assoc anchor original)) 1e-8)
                (equal (cdr (assoc 40 data)) (/ 2.5 scale) 1e-8)
+               (or (not signature)
+                   (equal signature (SRD:FieldSignature (SRD:TextField data) 0)))
                (or (= (cdr (assoc 67 data)) 1) (= (SRD:Flag data "AcadAnnotative") 1))))))))
 
 (defun SRD:Run (selection / *error* echo begun items skipped i item result failed)
@@ -159,7 +196,7 @@
                               ". Contenido, anclaje y giro conservados.")))
              (if (> skipped 0)
                (princ (strcat "\nOmitidos: " (itoa skipped)
-                 " (capa bloqueada, texto Alineado/Ajustado o MTEXT con campos)."))))))
+                 " (capa bloqueada, texto Alineado/Ajustado o campo no accesible)."))))))
        (*error* "No se pudo verificar la configuracion del estilo"))))
   (princ))
 

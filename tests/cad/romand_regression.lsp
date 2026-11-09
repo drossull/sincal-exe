@@ -61,7 +61,13 @@
 (if (vl-catch-all-error-p SRDT:fieldobj) (setq SRDT:fieldobj nil))
 (if SRDT:fieldobj
   (progn
-    (vla-put-TextString SRDT:fieldobj "{\\H2x;Valor %<\\AcExpr (2+3) \\f \"%lu2%pr0\">%}")
+    (setq SRDT:line (entmakex '((0 . "LINE") (10 0.0 0.0 0.0) (11 100.0 0.0 0.0)))
+          SRDT:lineobj (vlax-ename->vla-object SRDT:line)
+          SRDT:util (vla-get-Utility (vla-get-ActiveDocument (vlax-get-acad-object)))
+          SRDT:id (vla-GetObjectIdString SRDT:util SRDT:lineobj :vlax-false))
+    (vla-put-TextString SRDT:fieldobj (strcat
+      "{\\fArial;\\H2x;\\W2;\\Q12;Valor %<\\AcExpr (2+3) \\f \"%lu2%pr0\">%}\\P"
+      "Largo %<\\AcObjProp Object(%<\\_ObjId " SRDT:id ">%).Length \\f \"%lu2%pr0\">%"))
     (setq SRDT:fieldcode (vla-FieldCode SRDT:fieldobj)
           SRDT:fieldbefore (entget SRDT:field '("*")))
     (SRDT:Assert (and (SRD:HasFields (entget SRDT:field)) SRDT:fieldcode) "field fixture is live"))
@@ -89,8 +95,19 @@
   (= (cdr (assoc 71 SRDT:data)) 1)) "MTEXT formatting content anchor attachment width")
 (SRDT:Assert (equal SRDT:before (entget SRDT:untouched)) "unselected text unchanged")
 (if SRDT:fieldobj (SRDT:Assert (and (SRD:HasFields (entget SRDT:field))
-  (= (vla-FieldCode SRDT:fieldobj) SRDT:fieldcode)
-  (equal (entget SRDT:field '("*")) SRDT:fieldbefore))
-  "MTEXT with fields skipped intact"))
+  (= (vla-FieldCode SRDT:fieldobj) (SRD:UniformMText SRDT:fieldcode))
+  (= (cdr (assoc 7 (entget SRDT:field))) "RomanD")
+  (equal (cdr (assoc 10 (entget SRDT:field))) '(10.0 200.0 0.0) 1e-8))
+  "MTEXT fields formatted with live formula and same anchor"))
+(if SRDT:fieldobj (progn
+  (vla-put-EndPoint SRDT:lineobj (vlax-3d-point '(175.0 0.0 0.0)))
+  (command "_.UPDATEFIELD" SRDT:field "")
+  (SRDT:Assert (and (vl-string-search "175" (vla-get-TextString SRDT:fieldobj))
+    (= (vla-FieldCode SRDT:fieldobj) (SRD:UniformMText SRDT:fieldcode)))
+    "linked length updates from 100 to 175 after ROMAND")
+  (SRD:Run (ssadd SRDT:field))
+  (SRDT:Assert (and (vl-string-search "175" (vla-get-TextString SRDT:fieldobj))
+    (= (vla-FieldCode SRDT:fieldobj) (SRD:UniformMText SRDT:fieldcode)))
+    "repeated ROMAND retains live links")))
 (SRDT:Log (strcat "ROMAND-TEST DONE failures=" (itoa SRDT:failures)))
 (princ)
