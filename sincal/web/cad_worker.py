@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import sys
 import time
+from sincal.cad.engine import application_prog_ids
 from .cad_readiness import active_document, read_when_ready, wait_for_document
 
 
@@ -124,7 +125,7 @@ def active_application():
     if len(processes) != 1:
         raise ValueError('Debe existir una sola instancia AutoCAD/ZWCAD abierta.')
     family = 'ZWCAD' if str(processes[0].Name).lower() == 'zwcad.exe' else 'AutoCAD'
-    for identifier in [family + '.Application'] + [f'{family}.Application.{v}' for v in range(15, 36)]:
+    for identifier in application_prog_ids(family):
         try:
             return win32com.client.GetActiveObject(identifier)
         except Exception:

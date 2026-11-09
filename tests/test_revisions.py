@@ -41,7 +41,7 @@ def test_unconfirmed_revision_rejected(tmp_path):
 
 
 @pytest.mark.skipif(not os.environ.get('SINCAL_TEST_REVISION_DWG'),reason='Requires explicit example DWG; tests modify temporary copies only')
-@pytest.mark.parametrize('year',[2025,2027])
+@pytest.mark.parametrize('year',[2025,2026,2027])
 def test_native_revision_on_temporary_copies(tmp_path,year):
     source=Path(os.environ['SINCAL_TEST_REVISION_DWG'])
     source_hash=fingerprint(source)

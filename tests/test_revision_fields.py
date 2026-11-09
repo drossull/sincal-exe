@@ -44,7 +44,7 @@ def test_field_repair_accepts_only_verified_output(tmp_path, monkeypatch, outcom
 
 @pytest.mark.skipif(not os.environ.get('SINCAL_TEST_FIELD_DWG'),
                     reason='Requires an explicitly supplied DWG; modifies temporary copies only')
-@pytest.mark.parametrize('year', [2025, 2027])
+@pytest.mark.parametrize('year', [2025, 2026, 2027])
 def test_native_field_repair_preserves_original_and_rejects_invalid_target(tmp_path, monkeypatch, year):
     source = Path(os.environ['SINCAL_TEST_FIELD_DWG'])
     table = os.environ['SINCAL_TEST_FIELD_TABLE']

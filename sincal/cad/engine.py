@@ -18,6 +18,14 @@ ENGINE_FILENAMES = {
 }
 
 
+def application_prog_ids(*families: str) -> list[str]:
+    identifiers = [f"{family}.Application" for family in families]
+    if "AutoCAD" in families:
+        identifiers.append("AutoCAD.Application.25.1")
+    return identifiers + [f"{family}.Application.{version}"
+                          for version in range(15, 36) for family in families]
+
+
 @dataclass(frozen=True)
 class CadEngine:
     path: str

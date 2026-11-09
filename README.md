@@ -1,6 +1,6 @@
 # SINCAL Suite — Ingeniería y estándares CAD
 
-**SINCAL Suite** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 3.0. Esta guía corresponde a la release `v3.0.40`, con interfaz de escritorio web y Pasarela BIM como módulo opcional.
+**SINCAL Suite** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 3.0. Esta guía corresponde a la release `v3.0.41`, con interfaz de escritorio web y Pasarela BIM como módulo opcional.
 
 La disponibilidad de los instaladores se confirma en las
 [publicaciones oficiales](https://github.com/drossull/sincal-updates/releases).
@@ -85,7 +85,7 @@ El servidor se limita a loopback: no es apto para publicarlo en Internet.
 ### Validación y compilación
 
 El arranque de escritorio usa `desktop_main.py` y
-`packaging/windows/SINCAL_Web.spec`. La release `v3.0.40` se construye con
+`packaging/windows/SINCAL_Web.spec`. La release `v3.0.41` se construye con
 `tools/build_release.ps1`; la interfaz web es la opción predeterminada.
 `-DesktopWeb` se conserva como parámetro compatible. El pipeline rechaza el
 arranque Tk y verifica el contenido real del EXE antes de firmarlo.
@@ -100,7 +100,7 @@ sus pendientes históricos no sustituyen el resultado de verificación de cada r
 ## Instalación web y distribución
 
 SINCAL Suite se distribuye mediante un instalador web firmado. El archivo
-`Setup_SINCAL_v3.0.40.exe` descarga desde su release pública los paquetes exactos
+`Setup_SINCAL_v3.0.41.exe` descarga desde su release pública los paquetes exactos
 de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y después los instala.
 El componente **Pasarela BIM** aparece **desmarcado por defecto**: su paquete
 independiente sólo se descarga si se selecciona. También puede instalarse más adelante.
@@ -111,7 +111,7 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
 
 ## Primer inicio
 
-1. Descarga y ejecuta el instalador de `v3.0.40` desde su publicación oficial, con SINCAL y CAD cerrados.
+1. Descarga y ejecuta el instalador de `v3.0.41` desde su publicación oficial, con SINCAL y CAD cerrados.
 2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
 3. Abre **Diagnóstico**, verifica el motor CAD sugerido y cámbialo si necesitas otra versión.
 4. Pulsa **Preparar integración CAD**.
@@ -479,7 +479,7 @@ reutiliza aplicación, conectores CAD, integración del Explorador y Pasarela BI
 cuando coinciden sus fuentes, herramientas y hashes de salida. Los archivos
 faltantes o alterados invalidan su comprobante. Las firmas se verifican antes
 de reutilizarlas. Genera los instaladores, el manifiesto y `SHA256SUMS.txt`.
-Los artefactos de `v3.0.40` quedan en `installer_output/v3.0.40/`.
+Los artefactos de `v3.0.41` quedan en `installer_output/v3.0.41/`.
 Reserva una versión nueva y usa un checkout de compilación aislado y estable:
 conservar ese directorio permite reutilizar su caché. Volver a compilar la misma versión sustituye sus
 artefactos locales. Para una compilación local no publicable puede usarse
@@ -506,12 +506,12 @@ ejecuta `python -m pytest tests/test_prospecciones_ocr.py -q` después de prepar
 
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v3.0.40.exe`
-- `SINCAL_App_v3.0.40.zip`
-- `SINCAL_AutoCAD_v3.0.40.zip`
+- `Setup_SINCAL_v3.0.41.exe`
+- `SINCAL_App_v3.0.41.zip`
+- `SINCAL_AutoCAD_v3.0.41.zip`
 - `SINCAL_Pasarela_v0.3.2.zip`
 - `Setup_SINCAL_Pasarela_v0.3.2.exe`
-- `release-manifest_v3.0.40.json`
+- `release-manifest_v3.0.41.json`
 - `SHA256SUMS.txt`
 
 No renombres ni vuelvas a firmar los paquetes después de calcular sus hashes:
@@ -536,7 +536,7 @@ de preparación, registros y `pasarela-module-build.json` son salidas internas.
 #### Edición de propiedades
 
 - Abre **Editor DWGPROPS**, selecciona una carpeta y espera la lectura de sus DWG (sin subcarpetas, hasta 500 archivos).
-- Requiere Windows y AutoCAD 2025 o 2027 con Core Console y el conector DWGPROPS correspondiente. El selector permite elegir la versión disponible; no usa COM, los dibujos abiertos del usuario ni ZWCAD.
+- Requiere Windows y AutoCAD 2025, 2026 o 2027 con Core Console. AutoCAD 2026 reutiliza el conector compatible de 2025; 2025 y 2027 conservan sus conectores propios. El selector permite elegir la versión disponible; no usa COM, los dibujos abiertos del usuario ni ZWCAD.
 - Selecciona un archivo para editarlo individualmente o varios para aplicar cambios comunes. El buscador y **Seleccionar visibles** permiten preparar un lote específico.
 - Los valores diferentes se indican como tales. Solo las propiedades marcadas se modifican; un valor vacío no equivale a eliminar. Puedes crear propiedades o marcar su eliminación.
 - Confirma la lista de planos y cambios antes de guardar. Se edita una copia temporal, se reabre para verificarla y se crea un respaldo en `SINCAL_Backups/<ejecución>` junto al original antes de reemplazarlo.
@@ -545,7 +545,7 @@ de preparación, registros y `pasarela-module-build.json` son salidas internas.
 - Los archivos cuyos valores ya coinciden se muestran como **Sin cambios**: se verifica que el original siga intacto, pero no se inicia CAD ni se crea un respaldo o se reescribe ese DWG innecesariamente.
 - Cancelar se atiende entre dibujos. El conector reabre cada archivo guardado, comprueba propiedades, formato DWG e inventario de entidades y señala que cerró las bases de datos. Un timeout anterior a esa confirmación nunca reemplaza el original. Los registros se consultan en el historial de ejecuciones de Home.
 - Las propiedades estándar de DWGPROPS y las propiedades personalizadas no marcadas se conservan. La actualización visual de los FIELD depende de la evaluación de campos del propio DWG al abrir o regenerar.
-- Prueba nativa optativa (usa únicamente copias temporales de fixtures del repositorio): define `SINCAL_TEST_NATIVE_DWGPROPS=1` y ejecuta `python -m pytest tests/test_dwgprops_native.py -q`. Requiere conectores compilados y firmados en `src/Sincal.DwgProps/bin/2025` y `2027`. La compilación del instalador los firma e incluye automáticamente.
+- Prueba nativa optativa (usa únicamente copias temporales de fixtures del repositorio): define `SINCAL_TEST_NATIVE_DWGPROPS=1` y ejecuta `python -m pytest tests/test_dwgprops_native.py -q`. Requiere conectores compilados y firmados en `src/Sincal.DwgProps/bin/2025` y `2027`. La compilación del instalador los firma e incluye automáticamente. El SDK administrado de AutoCAD 2025 está admitido en AutoCAD 2026 según la [compatibilidad oficial de Autodesk](https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Customization/files/GUID-A6C680F2-DE2E-418A-A182-E4884073338A.htm).
 
 El repositorio de desarrollo puede ser privado. El canal público contiene únicamente recursos autorizados y binarios de release; no recibe fuentes Python/.NET ni secretos. Protege `main`, limita el acceso de escritura y conserva la revisión de los LISPs y scripts, ya que son código ejecutable.
 

@@ -43,7 +43,7 @@ from sincal.cad.commands import (
     construir_comando_cad_con_marcador,
     normalizar_comando_cad_autonomo,
 )
-from sincal.cad.engine import ensure_cad_engine
+from sincal.cad.engine import application_prog_ids, ensure_cad_engine
 from sincal.cad.integration import registrar_ruta_cad_usuario, registrar_scripts_en_path
 from sincal.diagnostics import record_incident
 from sincal.resources import (
@@ -1623,9 +1623,7 @@ class ActualizadorCAD(ctk.CTk):
         command = f'(load "{loader}")\n'
         pythoncom.CoInitialize()
         try:
-            prog_ids = ["ZWCAD.Application", "AutoCAD.Application"]
-            for version in range(15, 36):
-                prog_ids.extend((f"ZWCAD.Application.{version}", f"AutoCAD.Application.{version}"))
+            prog_ids = application_prog_ids("ZWCAD", "AutoCAD")
 
             processed = set()
             count = 0
@@ -2154,9 +2152,7 @@ class ActualizadorCAD(ctk.CTk):
         self.iniciar_actividad("cad_activo", descripcion)
         pythoncom.CoInitialize()
         try:
-            prog_ids = ["ZWCAD.Application", "AutoCAD.Application"]
-            for index in range(15, 36):
-                prog_ids.extend((f"ZWCAD.Application.{index}", f"AutoCAD.Application.{index}"))
+            prog_ids = application_prog_ids("ZWCAD", "AutoCAD")
 
             visited = set()
             for prog_id in prog_ids:
@@ -2289,10 +2285,7 @@ class ActualizadorCAD(ctk.CTk):
             )
 
         try:
-            prog_ids = ["ZWCAD.Application", "AutoCAD.Application"]
-            for i in range(15, 36):
-                prog_ids.append(f"ZWCAD.Application.{i}")
-                prog_ids.append(f"AutoCAD.Application.{i}")
+            prog_ids = application_prog_ids("ZWCAD", "AutoCAD")
 
             apps_encontradas = []
             aplicaciones_vistas = set()

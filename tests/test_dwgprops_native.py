@@ -22,7 +22,7 @@ class NativeJob:
 
 
 @pytest.mark.skipif(os.environ.get('SINCAL_TEST_NATIVE_DWGPROPS') != '1', reason='Explicit native CAD test opt-in required')
-@pytest.mark.parametrize('year', [2025, 2027])
+@pytest.mark.parametrize('year', [2025, 2026, 2027])
 def test_native_individual_and_multiple_properties(tmp_path, year, monkeypatch):
     import sincal.cad.dwgprops as module
     launches = []
@@ -80,7 +80,7 @@ def test_native_individual_and_multiple_properties(tmp_path, year, monkeypatch):
 
 
 @pytest.mark.skipif(os.environ.get('SINCAL_TEST_NATIVE_DWGPROPS') != '1', reason='Explicit native CAD test opt-in required')
-@pytest.mark.parametrize('year', [2025, 2027])
+@pytest.mark.parametrize('year', [2025, 2026, 2027])
 def test_native_batch_read_benchmark(tmp_path, year):
     from sincal.cad.dwgprops import CadBatch
     engine = next((e['id'] for e in autocad_engines() if e['year'] == year), None)

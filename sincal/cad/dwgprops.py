@@ -28,9 +28,12 @@ def autocad_engines():
 def connector_path(year):
     from sincal.runtime import RUTA_INSTALACION
     root = Path(RUTA_INSTALACION)
-    if getattr(sys, 'frozen', False):
-        return root / 'native' / 'dwgprops' / str(year) / 'Sincal.DwgProps.dll'
-    return root / 'src' / 'Sincal.DwgProps' / 'bin' / str(year) / 'Sincal.DwgProps.dll'
+    base = root / 'native' / 'dwgprops' if getattr(sys, 'frozen', False) else root / 'src' / 'Sincal.DwgProps' / 'bin'
+    connector = base / str(year) / 'Sincal.DwgProps.dll'
+    # Autodesk supports the 2025 managed SDK in AutoCAD 2026 (both use R25).
+    if year == 2026 and not connector.is_file():
+        return base / '2025' / 'Sincal.DwgProps.dll'
+    return connector
 
 
 def fingerprint(path):

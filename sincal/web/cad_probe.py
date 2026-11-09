@@ -1,5 +1,6 @@
 """Read-only CAD probe, isolated so a blocked COM call cannot freeze the UI."""
 import json
+from sincal.cad.engine import application_prog_ids
 from .cad_readiness import read_when_ready
 
 
@@ -43,7 +44,7 @@ def probe():
         if len(processes) > 1:
             return {"status": "ambiguous", "message": "Hay varias instancias CAD abiertas. Deja una sola para conectar con seguridad."}
         family = 'ZWCAD' if str(processes[0].Name).lower() == 'zwcad.exe' else 'AutoCAD'
-        ids = [family + '.Application'] + [f'{family}.Application.{version}' for version in range(15, 36)]
+        ids = application_prog_ids(family)
         for prog_id in ids:
             try:
                 app = win32com.client.GetActiveObject(prog_id)
