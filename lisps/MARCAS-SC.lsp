@@ -732,7 +732,9 @@
   ;; Core Console has no ActiveDocument. Do not leave partially installed
   ;; reactors behind when this file is loaded by a non-interactive worker.
   (setq doc (vl-catch-all-apply 'SCM:Doc nil))
-  (if (and (not (vl-catch-all-error-p doc)) (= (type doc) 'VLA-OBJECT))
+  ;; The generator enables watchers after its linked table and marks exist.
+  (if (and (not (and (boundp 'SCM:defer-auto) SCM:defer-auto))
+           (not (vl-catch-all-error-p doc)) (= (type doc) 'VLA-OBJECT))
     (SCM:EnableAuto)))
 (SCM:EnableIfInteractive)
 (princ)

@@ -15,6 +15,12 @@ def test_cleanup_never_zooms_or_changes_viewports():
 
 def test_side_database_saves_check_viewports():
     source=(ROOT/'src/Sincal.DwgProps/Commands.cs').read_text(encoding='utf-8')
-    assert source.count('database.SaveAs(request.saved, true, database.OriginalFileVersion, database.SecurityParameters)') == 2
-    assert 'ViewportIntegrity.Verify(verified, viewports)' in source
-    assert 'ViewportIntegrity.Verify(verify, viewports)' in source
+    saves = list(re.finditer(r'\bdatabase\.SaveAs\(([^;]+)\);', source))
+    assert saves
+    for index, save in enumerate(saves):
+        assert re.sub(r'\s+', '', save.group(1)) == (
+            'request.saved,true,database.OriginalFileVersion,database.SecurityParameters')
+        end = saves[index + 1].start() if index + 1 < len(saves) else len(source)
+        verification = re.sub(r'\s+', '', source[save.end():end])
+        assert '.ReadDwgFile(request.saved,' in verification
+        assert re.search(r'ViewportIntegrity\.Verify\(\w+,viewports\)', verification)

@@ -7,6 +7,7 @@
 (defun SCL:Catalog ()
   '(
     ("ACTUALIZAR-MARCAS" "Repara los vinculos de las marcas con las filas de su tabla." "lisps/MARCAS-SC.lsp")
+    ("ACTUALIZAR-VINETA" "Reactiva los Fields DWGPROPS de la revision actual en la vineta seleccionada de ZWCAD. No guarda el dibujo." "lisps/ACTUALIZAR-VINETA.lsp")
     ("BTORIENT" "Rota el bloque seleccionado para alinearlo mediante dos puntos." "lisps/BTORIENT.lsp")
     ("BV" "Bloquea todos los viewports de la presentacion actual." "lisps/BV.lsp")
     ("C-FIN" "Extrae coordenadas finales de un bloque a propiedades del dibujo y guarda el DWG." "lisps/SINCAL_PROPS.lsp")
