@@ -67,6 +67,7 @@
     ("VRAP" "Crea un viewport a la escala anotativa de Model; pasa al layout y pide solo su ubicacion." "lisps/VRAP.lsp")
     ("W08" "Establece factor de ancho 0.8 en TODOS los estilos de texto." "lisps/W08.lsp")
     ("ZE" "Hace zoom a la extension completa del dibujo en el espacio actual." "lisps/ZE.lsp")
+    ("ZET" "Hace Zoom Extents en todos los dibujos abiertos de la misma sesion CAD y vuelve al inicial, sin guardar ni cerrar archivos." "lisps/ZE.lsp")
     ("ZV" "Encuadra el tercio inferior derecho de la hoja del layout actual." "lisps/ZV.lsp")
   ))
 

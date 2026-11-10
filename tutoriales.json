@@ -372,8 +372,15 @@
       "titulo": "Zoom Extents",
       "descripcion": "Encuadra todos los objetos visibles mediante Zoom Extents.",
       "pasos": ["Escribe ZE."],
-      "notas": ["Para carpetas completas usa Encuadrar vista."],
+      "notas": ["Para todos los dibujos abiertos de la misma sesión CAD, escribe ZET. ZE sigue actuando inmediatamente en el actual.", "ZET respeta el espacio activo de cada dibujo, vuelve al inicial y no guarda ni cierra archivos. Informa los errores y la ruta del registro.", "Para carpetas completas usa Encuadrar vista."],
       "tags": ["zoom", "extents"]
+    },
+    "ZET": {
+      "titulo": "Zoom Extents en todos los abiertos",
+      "descripcion": "Encuadra los dibujos abiertos en la misma sesión AutoCAD/ZWCAD.",
+      "pasos": ["Termina los comandos activos en CAD.", "Escribe ZET y espera el resumen en la línea de comandos."],
+      "notas": ["Conserva el espacio activo de cada dibujo y vuelve al dibujo inicial. No guarda ni cierra archivos.", "También incluye dibujos nuevos sin guardar. No recorre otras instancias de CAD.", "Si la instancia COM no coincide con la que inició ZET, no actúa; el registro indica el motivo."],
+      "tags": ["zoom", "extents", "todos", "abiertos"]
     },
     "ZV": {
       "titulo": "Zoom al tercio inferior derecho del layout",
