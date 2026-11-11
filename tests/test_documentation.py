@@ -16,7 +16,7 @@ class DocumentationTests(unittest.TestCase):
             "DUP / DUPLICAR", "EXTRIMOUT", "MC", "MPEND", "OF2", "P0", "PLOTYA", "PND", "PNDMAKE",
             "PURGEALL", "VG", "RMLAY", "SEL-SC", "SETUP-A1", "SINCAL-ESCALAS", "ST0",
             "VRAP", "VPTOGGLE", "LAYORIGIN", "W08", "ZE", "ZV", "CUSTOM-PROPS", "COPY-PROPS",
-            "PASTE-PROPS", "REPARAR-PROPS", "C-INICIO / C-FIN", "C0 … C9",
+            "PASTE-PROPS", "REPARAR-PROPS", "REV-EDIT", "C-INICIO / C-FIN", "C0 … C9",
             "MARCA-SC", "MARCA-DE", "MARCA-UP", "MARCA-CONFIG", "REASIGNAR-MARCA", "ACTUALIZAR-MARCAS", "REVISAR-MARCAS",
         }
         self.assertEqual(documented, expected)

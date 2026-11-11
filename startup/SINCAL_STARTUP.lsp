@@ -5,6 +5,14 @@
 ;;; =========================================================================
 (vl-load-com)
 
+;; El pinzamiento necesita la DLL del editor tambien con loaders anteriores.
+(if (not (member "SRG:LOAD" (atoms-family 1)))
+  (progn
+    (setq sincal-revision-editor-file
+      (findfile (strcat (getenv "APPDATA") "/Estandar SINCAL/lisps/REV-EDIT.lsp")))
+    (if sincal-revision-editor-file
+      (vl-catch-all-apply 'load (list sincal-revision-editor-file)))))
+
 ;; Compatibility with installed versions whose old acaddoc list omits PNDMAKE.
 ;; This startup is itself an updateable resource and is already in that list.
 (if (not (member "C:PNDMAKE" (atoms-family 1)))

@@ -438,6 +438,13 @@
       "notas": ["Sin registro no significa necesariamente que un campo antiguo esté roto: significa que aún no tiene la identidad gestionada por SINCAL.", "No modifica ni guarda el dibujo. No recorre bloques anidados o referencias externas."],
       "tags": ["armaduras", "revisar", "diagnóstico", "campos"]
     },
+    "REV-EDIT": {
+      "titulo": "Editar revisiones desde la viñeta",
+      "descripcion": "Abre la cuadrícula de revisiones desde un pinzamiento de la viñeta o mediante REV-EDIT, sin entrar al bloque.",
+      "pasos": ["Instala el complemento de revisiones correspondiente a tu versión de AutoCAD o ZWCAD y prepara la integración CAD.", "Selecciona la viñeta y pulsa su pinzamiento de edición, o ejecuta REV-EDIT y selecciona la viñeta.", "Edita las celdas. Las celdas vinculadas modifican su propiedad DWGPROPS y conservan el Field.", "Si corresponde, marca los otros dibujos abiertos donde aplicar la tabla completa, incluido su historial.", "Pulsa Aplicar, revisa el resultado por dibujo y guarda los DWG cuando corresponda."],
+      "notas": ["Requiere el complemento binario: actualizar solo los LISPs no instala el editor ni el pinzamiento.", "Los destinos se limitan a los dibujos abiertos en esa misma sesión CAD. Los incompatibles no se modifican.", "Se conserva el formato de destino. Los Fields siguen vinculados y las propiedades DWG afectan a todos los textos que las referencian.", "Las inserciones que compartan una definición de viñeta ven los mismos cambios. No guarda ni cierra dibujos automáticamente."],
+      "tags": ["revisiones", "viñeta", "pinzamiento", "dwgprops", "tabla"]
+    },
     "CUSTOM-PROPS": {
       "titulo": "Editar propiedades de viñeta",
       "descripcion": "Recorre las propiedades SINCAL del dibujo, conserva el valor con Enter, actualiza campos y guarda.",

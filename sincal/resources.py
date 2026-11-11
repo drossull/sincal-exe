@@ -517,6 +517,34 @@ def _cad_state_path() -> str:
     return ruta_cad_usuario(".sincal_resources.json")
 
 
+def materialize_revision_grip() -> tuple[str, ...]:
+    """Installed binaries travel with releases, never the remote resource feed."""
+    source_dir = ruta_recurso_instalado("native", "revision-grip")
+    if not os.path.isdir(source_dir):
+        source_dir = ruta_recurso_instalado("src", "Sincal.RevisionGrip", "bin", "distribution")
+    if not os.path.isdir(source_dir):
+        return ()
+    copied = []
+    for name in sorted(os.listdir(source_dir)):
+        if not re.fullmatch(r"Sincal\.RevisionGrip\.(?:AutoCAD\.R\d+\.\d+|ZWCAD\.20\d{2})\.dll", name):
+            continue
+        source = os.path.join(source_dir, name)
+        if not os.path.isfile(source):
+            continue
+        with open(source, "rb") as stream:
+            data = stream.read()
+        target = ruta_cad_usuario(name)
+        try:
+            with open(target, "rb") as stream:
+                if stream.read() == data:
+                    continue
+        except FileNotFoundError:
+            pass
+        _atomic_write(target, data)
+        copied.append(name)
+    return tuple(copied)
+
+
 def materialize_cad_resources() -> tuple[str, ...]:
     pending = _cad_activation_pending_path()
     _atomic_write(pending, b"CAD activation pending\n")
@@ -567,6 +595,7 @@ def materialize_cad_resources() -> tuple[str, ...]:
     payload = json.dumps({"resources": active}, indent=2, ensure_ascii=False).encode("utf-8")
     _atomic_write(_cad_state_path(), payload)
     write_cad_loaders(active)
+    copied.extend(materialize_revision_grip())
     os.remove(pending)
     return tuple(copied)
 

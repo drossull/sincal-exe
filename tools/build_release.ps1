@@ -305,6 +305,11 @@ function Assert-AppPayloadContents([string]$Path) {
                 if ("native/dwgprops/$year/Sincal.DwgProps.dll" -notin $entries) { throw "Falta el conector DWGPROPS $year." }
             }
         }
+        foreach ($platform in @('AutoCAD', 'ZWCAD')) {
+            if (-not ($entries -match "^native/revision-grip/Sincal\.RevisionGrip\.$platform\..+\.dll$")) {
+                throw "Falta el editor de revisiones para $platform."
+            }
+        }
         if ($missing.Count -gt 0) {
             throw "El paquete de aplicación no contiene recursos esenciales: $($missing -join ', ')"
         }
@@ -363,6 +368,12 @@ function New-ReleasePayloads(
             Copy-Item (Join-Path $ProjectRoot "src\Sincal.DwgProps\bin\$year\Sincal.DwgProps.dll") $target
         }
     }
+    $revisionBinaries = @(Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'src\Sincal.RevisionGrip\bin\distribution') -Filter 'Sincal.RevisionGrip.*.dll' -File)
+    if (-not ($revisionBinaries.Name -match '\.AutoCAD\.')) { throw 'Falta el editor de revisiones para AutoCAD.' }
+    if (-not ($revisionBinaries.Name -match '\.ZWCAD\.')) { throw 'Falta el editor de revisiones para ZWCAD.' }
+    $revisionStage = Join-Path $appStage 'native\revision-grip'
+    New-Item -ItemType Directory -Path $revisionStage -Force | Out-Null
+    foreach ($binary in $revisionBinaries) { Copy-Item -LiteralPath $binary.FullName -Destination $revisionStage }
     $fontStage = Join-Path $appStage 'assets\fonts'
     New-Item -ItemType Directory -Force -Path $fontStage | Out-Null
     Get-ChildItem (Join-Path $ProjectRoot 'assets\fonts') -File | Where-Object {
@@ -511,6 +522,9 @@ foreach ($year in @(2025, 2027)) {
 }
 if (-not (Test-ComponentReceipt $pluginComponent)) { Invoke-AutoCAD2025PluginBuild -ProjectRoot $projectRoot }
 if ($DesktopWeb) { Invoke-DwgPropsBuild -ProjectRoot $projectRoot }
+Write-Step 'Compilando editor de revisiones AutoCAD/ZWCAD'
+& (Join-Path $projectRoot 'tools\build_revision_grip.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'Fallo la compilacion del editor de revisiones.' }
 if ($DesktopWeb) {
     Write-Step 'Compilando integración del Explorador'
     $cmake = Get-Command cmake -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
@@ -591,6 +605,9 @@ if (-not $SkipSigning) {
 
     Write-Step "Firmando plugin AutoCAD 2025"
     Sign-File -Path $pluginDll -Certificate $certificate
+    Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src\Sincal.RevisionGrip\bin\distribution') -Filter 'Sincal.RevisionGrip.*.dll' -File | ForEach-Object {
+        Sign-File -Path $_.FullName -Certificate $certificate
+    }
     if ($DesktopWeb) {
         Sign-File -Path (Join-Path $projectRoot 'shell_build\Release\SincalShell.dll') -Certificate $certificate
         foreach ($year in @(2025, 2027)) {

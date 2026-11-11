@@ -1,7 +1,12 @@
 using System.Collections;
+#if ZWCAD
+using System.Web.Script.Serialization;
+using ZwSoft.ZwCAD.DatabaseServices;
+#else
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Autodesk.AutoCAD.DatabaseServices;
+#endif
+using System.Text.RegularExpressions;
 
 namespace Sincal.DwgProps;
 
@@ -13,6 +18,25 @@ public static class RevisionEditor
     public sealed record Sheet(string id, string block, string[] locations, Cell[][] cells);
     public sealed record Snapshot(Sheet[] tables, string integrity);
     private sealed record Group(string id, string block, string[] locations, List<Table> variants);
+
+    private static string Serialize<T>(T value)
+    {
+#if ZWCAD
+        return new JavaScriptSerializer { MaxJsonLength=int.MaxValue }.Serialize(value);
+#else
+        return JsonSerializer.Serialize(value);
+#endif
+    }
+
+    private static bool IsVignette(string name) => name.StartsWith("VIÑETA",StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith("VINETA",StringComparison.OrdinalIgnoreCase);
+
+    private static void SuppressTable(Table table,bool suppress)
+    {
+#if !ZWCAD
+        table.SuppressRegenerateTable(suppress);
+#endif
+    }
 
     private static string? Code(Table t, int r, int c, Transaction tr)
     {
@@ -33,7 +57,7 @@ public static class RevisionEditor
             && string.Equals(Property(Code(t,0,0,tr)),"Revision",StringComparison.OrdinalIgnoreCase))
         .OrderBy(t=>t.Handle.Value).ToList();
 
-    private static List<Group> Find(Database db,Transaction tr)
+    private static List<Group> Find(Database db,Transaction tr,ObjectId? definitionId=null)
     {
         var roots=new Dictionary<ObjectId,List<string>>();
         void Visit(ObjectId recordId,string location,HashSet<ObjectId> ancestors)
@@ -46,16 +70,26 @@ public static class RevisionEditor
                 var block=(BlockTableRecord)tr.GetObject(definition,OpenMode.ForRead);
                 if(block.IsFromExternalReference || block.Name.StartsWith("*T",StringComparison.Ordinal)) continue;
                 var place=location+" / "+block.Name+" ["+reference.Handle+"]";
-                if(block.Name.StartsWith("VIÑETA",StringComparison.OrdinalIgnoreCase)) {
+                if(IsVignette(block.Name)) {
                     if(!roots.ContainsKey(definition)) roots[definition]=new();
                     roots[definition].Add(place);
                 } else Visit(reference.BlockTableRecord,place,new HashSet<ObjectId>(ancestors));
             }
         }
-        foreach(DictionaryEntry entry in (DBDictionary)tr.GetObject(db.LayoutDictionaryId,OpenMode.ForRead))
+        if(definitionId.HasValue)
         {
-            var layout=(Layout)tr.GetObject((ObjectId)entry.Value!,OpenMode.ForRead);
-            Visit(layout.BlockTableRecordId,layout.LayoutName,new HashSet<ObjectId>());
+            if(definitionId.Value.IsNull || tr.GetObject(definitionId.Value,OpenMode.ForRead) is not BlockTableRecord selected
+                || selected.IsFromExternalReference || !IsVignette(selected.Name))
+                throw new InvalidOperationException("Selecciona una definición de viñeta válida del dibujo.");
+            roots.Add(selected.ObjectId,new List<string>{selected.Name});
+        }
+        else
+        {
+            foreach(DictionaryEntry entry in (DBDictionary)tr.GetObject(db.LayoutDictionaryId,OpenMode.ForRead))
+            {
+                var layout=(Layout)tr.GetObject((ObjectId)entry.Value!,OpenMode.ForRead);
+                Visit(layout.BlockTableRecordId,layout.LayoutName,new HashSet<ObjectId>());
+            }
         }
         var result=new List<Group>();
         foreach(var root in roots)
@@ -97,30 +131,38 @@ public static class RevisionEditor
         }).ToArray()).ToArray();
     }
 
-    public static Snapshot Read(Database db)
+    public static Snapshot Read(Database db,ObjectId? definitionId=null)
     {
-        using var tr=db.TransactionManager.StartOpenCloseTransaction();
-        var groups=Find(db,tr);var sheets=new List<Sheet>();
+        using var tr=db.TransactionManager.StartTransaction();
+        var groups=Find(db,tr,definitionId);var sheets=new List<Sheet>();
         foreach(var group in groups)
         {
             var rows=Cells(group.variants[0],db,tr);
             foreach(var variant in group.variants.Skip(1))
-                if(JsonSerializer.Serialize(Cells(variant,db,tr))!=JsonSerializer.Serialize(rows))
+                if(Serialize(Cells(variant,db,tr))!=Serialize(rows))
                     throw new InvalidOperationException("Las variantes de "+group.block+" no coinciden; no se mezclarán sus tablas.");
             sheets.Add(new Sheet(group.id,group.block,group.locations,rows));
         }
-        var integrity=JsonSerializer.Serialize(groups.Select(g=>new {g.id,g.block,g.locations,tables=g.variants.Select(t=>new {
+        var integrity=Serialize(groups.Select(g=>new {g.id,g.block,g.locations,tables=g.variants.Select(t=>new {
             handle=t.Handle.ToString(),t.Visible,x=t.Position.X,y=t.Position.Y,z=t.Position.Z,style=t.TableStyle.Handle.ToString(),
             rows=Enumerable.Range(0,t.Rows.Count).Select(r=>t.Rows[r].Height).ToArray(),
             columns=Enumerable.Range(0,t.Columns.Count).Select(c=>t.Columns[c].Width).ToArray(),
             cells=Enumerable.Range(0,t.Rows.Count).Select(r=>Enumerable.Range(0,t.Columns.Count).Select(c=> {
                 var cell=t.Cells[r,c];var id=cell.Contents[0].FieldId;
                 return new { style=cell.TextStyleId?.Handle.ToString(),cell.TextHeight,alignment=cell.Alignment?.ToString(),
-                    field=id.IsNull?null:id.Handle.ToString(),code=Code(t,r,c,tr),
+#if ZWCAD
+                    // ZWCAD rebuilds table FIELD objects on commit; preserve their cell and semantics.
+                    field=id.IsNull?null:"FIELD",
+#else
+                    field=id.IsNull?null:id.Handle.ToString(),
+#endif
+                    code=Code(t,r,c,tr),evaluator=id.IsNull?null:((Field)tr.GetObject(id,OpenMode.ForRead)).EvaluatorId,
                     evaluation=id.IsNull?-1:(int)((Field)tr.GetObject(id,OpenMode.ForRead)).EvaluationOption };
             }).ToArray()).ToArray()
         }).ToArray()}).ToArray());
-        return new Snapshot(sheets.ToArray(),integrity);
+        var result=new Snapshot(sheets.ToArray(),integrity);
+        tr.Commit();
+        return result;
     }
 
     public static Dictionary<string,string> DesiredProperties(Snapshot old,Change[] changes)
@@ -145,11 +187,22 @@ public static class RevisionEditor
         return props;
     }
 
-    public static void Apply(Database db,Snapshot old,Change[] changes)
+    public static void Apply(Database db,Snapshot old,Change[] changes,ObjectId? definitionId=null)
     {
         var values=DesiredProperties(old,changes);
         using var tr=db.TransactionManager.StartTransaction();
-        var groups=Find(db,tr);
+        var groups=Find(db,tr,definitionId);
+        foreach(var group in groups) foreach(var table in group.variants)
+        for(int c=0;c<table.Columns.Count;c++)
+        {
+            var id=table.Cells[0,c].Contents[0].FieldId;
+            if(id.IsNull) continue;
+            var field=(Field)tr.GetObject(id,OpenMode.ForRead);
+            if(Property(field.GetFieldCode()) is not null
+                && !string.Equals(field.EvaluatorId,"AcVar",StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(field.EvaluatorId,"_text",StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("El FIELD de la tabla no tiene un evaluador de propiedades válido.");
+        }
         var props=new DatabaseSummaryInfoBuilder(db.SummaryInfo);
         foreach(var pair in values) props.CustomPropertyTable[pair.Key]=pair.Value;
         db.SummaryInfo=props.ToDatabaseSummaryInfo();
@@ -161,28 +214,38 @@ public static class RevisionEditor
             var related=old.tables.Single(s=>s.id==group.id).cells[0].Any(c=>c.property is not null && values.ContainsKey(c.property));
             if(edits.Length==0 && !related) continue;
             table.UpgradeOpen();
-            // Batch updates: regenerating each cell separately can clear shared
-            // FIELD objects in the source definition of a dynamic block.
-            table.SuppressRegenerateTable(true);
-            foreach(var change in edits)
-                if(Code(table,change.row,change.column,tr) is null) table.Cells[change.row,change.column].TextString=change.value;
-            for(int c=0;c<table.Columns.Count;c++)
+            // AutoCAD needs one batch to retain shared FIELD objects in dynamic definitions.
+            // ZWCAD rebuilds those objects natively and does not implement this managed API.
+            SuppressTable(table,true);
+            try
             {
-                var id=table.Cells[0,c].Contents[0].FieldId;
-                if(id.IsNull) continue;
-                var field=(Field)tr.GetObject(id,OpenMode.ForWrite);var property=Property(field.GetFieldCode());
-                if(property is null || !values.ContainsKey(property)) continue;
-                field.Evaluate((int)FieldEvaluationContext.Preview,db);
-                if(field.EvaluationStatus.Status!=FieldEvaluationStatus.Success) throw new InvalidOperationException("No se pudo evaluar el FIELD "+property);
+                foreach(var change in edits)
+                    if(Code(table,change.row,change.column,tr) is null) table.Cells[change.row,change.column].TextString=change.value;
+                for(int c=0;c<table.Columns.Count;c++)
+                {
+                    var id=table.Cells[0,c].Contents[0].FieldId;
+                    if(id.IsNull) continue;
+                    var field=(Field)tr.GetObject(id,OpenMode.ForWrite);var property=Property(field.GetFieldCode());
+                    if(property is null || !values.ContainsKey(property)) continue;
+#if ZWCAD
+                    // Evaluating the text wrapper alone leaves its child CustomDP result cached.
+                    foreach(var childId in field.GetChildrenIds())
+                        ((Field)tr.GetObject(childId,OpenMode.ForWrite)).Evaluate((int)FieldEvaluationContext.Demand,db);
+                    field.Evaluate((int)FieldEvaluationContext.Demand,db);
+#else
+                    field.Evaluate((int)FieldEvaluationContext.Preview,db);
+#endif
+                    if(field.EvaluationStatus.Status!=FieldEvaluationStatus.Success) throw new InvalidOperationException("No se pudo evaluar el FIELD "+property);
+                }
             }
-            table.SuppressRegenerateTable(false);
+            finally { SuppressTable(table,false); }
         }
         tr.Commit();
     }
 
-    public static void Verify(Database db,Snapshot old,Change[] changes)
+    public static void Verify(Database db,Snapshot old,Change[] changes,ObjectId? definitionId=null)
     {
-        var properties=DesiredProperties(old,changes);var current=Read(db);
+        var properties=DesiredProperties(old,changes);var current=Read(db,definitionId);
         if(current.integrity!=old.integrity) throw new InvalidOperationException("Cambió el formato, tamaño, identidad o propiedades de los Fields. El original no se reemplazará.");
         foreach(var sheet in old.tables)
         {
@@ -197,8 +260,8 @@ public static class RevisionEditor
             }
         }
         // Check the persisted FIELD result too, not only its source DWG property.
-        using var tr=db.TransactionManager.StartOpenCloseTransaction();
-        foreach(var group in Find(db,tr)) foreach(var table in group.variants)
+        using var tr=db.TransactionManager.StartTransaction();
+        foreach(var group in Find(db,tr,definitionId)) foreach(var table in group.variants)
         for(int c=0;c<table.Columns.Count;c++)
         {
             var code=Code(table,0,c,tr);var key=Property(code);
@@ -208,5 +271,6 @@ public static class RevisionEditor
             if(field.GetFieldCode(FieldCodeFlags.EvaluatedText)!=expected || table.Cells[0,c].TextString!=expected)
                 throw new InvalidOperationException("El resultado visible del FIELD "+key+" no coincide con DWGPROPS.");
         }
+        tr.Commit();
     }
 }
