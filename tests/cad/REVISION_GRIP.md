@@ -20,6 +20,12 @@ de la DLL ya está cargada, hay que cerrar y volver a abrir CAD para sustituirla
 Las DLL viajan con la aplicación instalada. Actualizar únicamente los recursos
 LISP no distribuye este complemento nativo.
 
+La pestaña **Propiedades personalizadas** también se abre con `PROPS-EDIT`,
+sin seleccionar una viñeta. Marca los nombres que quieras aplicar, edita sus
+valores y selecciona los DWG de destino. Crear propiedades faltantes y dejar
+valores vacíos es explícito; no se eliminan ni renombran propiedades. Cada
+botón Aplicar opera sólo sobre su pestaña activa y no guarda los dibujos.
+
 ## Comportamiento
 
 - La fuente es la viñeta elegida. Su tabla, estilos, dimensiones y Fields se
@@ -40,6 +46,9 @@ LISP no distribuye este complemento nativo.
 `tests/cad/RevisionGripSmoke.cs` solo se incluye con
 `-p:RevisionGripTests=true`. Compilar a una carpeta temporal y colocar esa DLL
 de pruebas en una ruta de confianza ya existente; no cambiar `SECURELOAD`.
+Asigna un nombre de ensamblado exclusivo mediante `-p:AssemblyName=...`
+(por ejemplo, `Sincal.RevisionGrip.TEST.Properties.AutoCAD`) para que la DLL
+de producción cargada por el startup no oculte los comandos de prueba.
 
 ```powershell
 python tools/cad/test_revision_grip_native.py --progid AutoCAD.Application.25.1 --dll RUTA_DLL_PRUEBAS
@@ -61,3 +70,16 @@ Para la revisión manual: seleccionar la viñeta, pulsar el pinzamiento, cambiar
 una propiedad y una fila histórica, marcar otro DWG y dejar un tercero sin
 marcar. Verificar los resultados en cada destino. Cancelar debe
 conservar todos los documentos.
+
+Para comprobar sólo el nuevo flujo de propiedades, usa el mismo runner con
+`--suite properties`. Crea cinco dibujos temporales sin viñeta, con Fields en
+MTEXT y atributos; verifica selección, mayúsculas de claves, faltantes, vacíos,
+propiedades ajenas, sólo lectura, rechazo de datos obsoletos y rollback. Abre
+`PROPS-EDIT` y cancela su segunda pestaña. No repite las pruebas de revisiones.
+
+La interfaz también se comprueba sin abrir CAD ni mostrar ventanas:
+
+```powershell
+dotnet run --project tests/cad/RevisionDialogStandalone.csproj -f net10.0-windows
+dotnet run --project tests/cad/RevisionDialogStandalone.csproj -f net48
+```

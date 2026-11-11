@@ -445,6 +445,13 @@
       "notas": ["Requiere el complemento binario: actualizar solo los LISPs no instala el editor ni el pinzamiento.", "Los destinos se limitan a los dibujos abiertos en esa misma sesión CAD. Los incompatibles no se modifican.", "Se conserva el formato de destino. Los Fields siguen vinculados y las propiedades DWG afectan a todos los textos que las referencian.", "Las inserciones que compartan una definición de viñeta ven los mismos cambios. No guarda ni cierra dibujos automáticamente."],
       "tags": ["revisiones", "viñeta", "pinzamiento", "dwgprops", "tabla"]
     },
+    "PROPS-EDIT": {
+      "titulo": "Propiedades personalizadas en dibujos abiertos",
+      "descripcion": "Abre la pestaña Propiedades personalizadas del editor nativo; también está disponible desde REV-EDIT.",
+      "pasos": ["Abre el dibujo cuyos valores quieres usar como base y ejecuta PROPS-EDIT. No hace falta seleccionar una viñeta.", "Marca las propiedades que quieras unificar y edita sus valores. Las demás propiedades se conservan; un valor vacío marcado deja el contenido vacío.", "Selecciona los dibujos abiertos donde aplicar esos valores. También pueden recibirlos dibujos sin tabla de revisiones.", "Pulsa Aplicar propiedades, revisa el resultado por dibujo y guarda cuando corresponda."],
+      "notas": ["Se crean o actualizan sólo las propiedades marcadas y se refrescan sus campos vinculados. No se copia el historial de revisiones ni se guardan los dibujos automáticamente.", "Requiere el complemento nativo actualizado para AutoCAD o ZWCAD. Actualizar sólo los LISPs no incorpora esta pestaña.", "Comprueba la selección antes de aplicar datos particulares como Nombre_Plano. No se eliminan ni renombran propiedades."],
+      "tags": ["propiedades", "dwgprops", "planos", "estándar"]
+    },
     "CUSTOM-PROPS": {
       "titulo": "Editar propiedades de viñeta",
       "descripcion": "Recorre las propiedades SINCAL del dibujo, conserva el valor con Enter, actualiza campos y guarda.",

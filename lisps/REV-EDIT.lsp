@@ -1,4 +1,4 @@
-;;; REV-EDIT -- editor nativo de revisiones y pinzamiento de la vineta.
+;;; REV-EDIT / PROPS-EDIT -- editor nativo de revisiones y propiedades.
 ;;; La DLL se instala con SINCAL; actualizar solo LISPs no instala el editor.
 (vl-load-com)
 
@@ -29,6 +29,13 @@
 
 (defun c:REV-EDIT ()
   (if (SRG:Load T) (vl-cmdf "SINCAL_REV_EDIT"))
+  (princ))
+
+(defun c:PROPS-EDIT ()
+  (if (SRG:Load T)
+    (if (getcname "SINCAL_PROPS_EDIT")
+      (vl-cmdf "SINCAL_PROPS_EDIT")
+      (princ "\nPROPS-EDIT: actualiza el complemento de SINCAL, prepara la integracion CAD y reinicia CAD para cargar la pestana de propiedades.")))
   (princ))
 
 ;; La carga registra el pinzamiento una vez por proceso, sin recorrer dibujos.

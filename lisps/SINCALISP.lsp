@@ -50,6 +50,7 @@
     ("REASIGNAR-MARCA" "Vincula nuevamente una marca a la fila elegida de una tabla." "lisps/MARCAS-SC.lsp")
     ("REPARAR-PROPS" "Elimina propiedades personalizadas duplicadas, conserva valores y guarda el DWG." "lisps/SINCAL_PROPS.lsp")
     ("REV-EDIT" "Abre el editor de revisiones de la vineta; conserva Fields y permite aplicar a DWG abiertos seleccionados, sin guardar." "lisps/REV-EDIT.lsp")
+    ("PROPS-EDIT" "Edita las Custom Properties marcadas en los DWG abiertos seleccionados, sin guardar." "lisps/REV-EDIT.lsp")
     ("REVISAR-MARCAS" "Revisa las marcas y comunica problemas de vinculacion, sin repararlas." "lisps/MARCAS-SC.lsp")
     ("RMLAY" "Renombra la presentacion actual." "lisps/RMLAY.lsp")
     ("ROMAND" "Aplica RomanD TrueType anotativo (romand__.ttf, 2.5 / 0.8) a TEXT/MTEXT conservando contenido, anclaje y campos vinculados. Enter: solo estilo." "lisps/ROMAND.lsp")

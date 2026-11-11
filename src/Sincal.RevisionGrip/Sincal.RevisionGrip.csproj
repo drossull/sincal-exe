@@ -31,5 +31,6 @@
   <ItemGroup Condition="'$(RevisionGripTests)' == 'true'">
     <Compile Include="../../tests/cad/RevisionGripSmoke.cs" Link="RevisionGripSmoke.cs" />
     <Compile Include="../../tests/cad/RevisionGripDialogSmoke.cs" Link="RevisionGripDialogSmoke.cs" />
+    <Compile Include="../../tests/cad/CustomPropertyGripSmoke.cs" Link="CustomPropertyGripSmoke.cs" />
   </ItemGroup>
 </Project>

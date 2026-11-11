@@ -69,56 +69,82 @@ public sealed class RevisionGripPlugin : IExtensionApplication
         internal TargetChoice Choice = null!;
         internal RevisionEditor.Snapshot? Snapshot;
         internal ObjectId? Definition;
+        internal TargetChoice PropertyChoice = null!;
+        internal Dictionary<string, string>? Properties;
     }
 
     [CommandMethod("SINCAL_REV_EDIT", CommandFlags.Session)]
-    public static void Edit()
+    public static void Edit() => Open(false);
+
+    [CommandMethod("SINCAL_PROPS_EDIT", CommandFlags.Session)]
+    public static void EditProperties() => Open(true);
+
+    private static void Open(bool propertiesFirst)
     {
         var current = CadApplication.DocumentManager.MdiActiveDocument;
         if (current == null) return;
         try
         {
-            ObjectId selected;
-            if (Pending.TryGetValue(current, out selected)) Pending.Remove(current);
-            else
+            ObjectId? definition = null;
+            RevisionEditor.Snapshot? sourceSnapshot = null;
+            if (!propertiesFirst)
             {
-                var options = new PromptEntityOptions("\nSelecciona la viñeta cuyo cuadro quieres editar: ");
-                options.SetRejectMessage("\nSelecciona una inserción de viñeta.");
-                options.AddAllowedClass(typeof(BlockReference), true);
-                var selection = current.Editor.GetEntity(options);
-                if (selection.Status != PromptStatus.OK) return;
-                selected = selection.ObjectId;
+                ObjectId selected;
+                if (Pending.TryGetValue(current, out selected)) Pending.Remove(current);
+                else
+                {
+                    var options = new PromptEntityOptions("\nSelecciona la viñeta cuyo cuadro quieres editar: ");
+                    options.SetRejectMessage("\nSelecciona una inserción de viñeta.");
+                    options.AddAllowedClass(typeof(BlockReference), true);
+                    var selection = current.Editor.GetEntity(options);
+                    if (selection.Status != PromptStatus.OK) return;
+                    selected = selection.ObjectId;
+                }
+                using (current.LockDocument())
+                using (var transaction = current.Database.TransactionManager.StartTransaction())
+                {
+                    var reference = (BlockReference)transaction.GetObject(selected, OpenMode.ForRead);
+                    definition = Definition(reference);
+                    if (!IsVignette((BlockTableRecord)transaction.GetObject(definition.Value, OpenMode.ForRead)))
+                        throw new InvalidOperationException("Selecciona un bloque VIÑETA o VINETA del dibujo, no una referencia externa.");
+                    sourceSnapshot = RevisionEditor.Read(current.Database, definition);
+                    transaction.Commit();
+                }
+                if (sourceSnapshot.tables.Length != 1)
+                    throw new InvalidOperationException("La viñeta debe contener un único cuadro de revisiones compatible.");
             }
-            ObjectId definition;
-            RevisionEditor.Snapshot sourceSnapshot;
-            using (current.LockDocument())
-            using (var transaction = current.Database.TransactionManager.StartTransaction())
-            {
-                var reference = (BlockReference)transaction.GetObject(selected, OpenMode.ForRead);
-                definition = Definition(reference);
-                if (!IsVignette((BlockTableRecord)transaction.GetObject(definition, OpenMode.ForRead)))
-                    throw new InvalidOperationException("Selecciona un bloque VIÑETA o VINETA del dibujo, no una referencia externa.");
-                sourceSnapshot = RevisionEditor.Read(current.Database, definition);
-                transaction.Commit();
-            }
-            if (sourceSnapshot.tables.Length != 1)
-                throw new InvalidOperationException("La viñeta debe contener un único cuadro de revisiones compatible.");
-            var source = sourceSnapshot.tables[0];
-            var values = source.cells.Select(row => row.Select(cell => cell.text).ToArray()).ToArray();
+            var source = sourceSnapshot?.tables[0];
+            var values = source?.cells.Select(row => row.Select(cell => cell.text).ToArray()).ToArray();
+            Dictionary<string, string> properties;
+            using (current.LockDocument()) properties = CustomPropertyTransfer.Read(current.Database);
             var destinations = new List<Destination>();
             foreach (Document document in CadApplication.DocumentManager)
             {
                 var target = new Destination { Document = document,
                     Choice = new TargetChoice { Name = document.Name, Selected = document == current },
-                    Definition = document == current ? definition : (ObjectId?)null };
+                    PropertyChoice = new TargetChoice { Name = document.Name, Selected = document == current },
+                    Definition = document == current ? definition : null };
                 try
                 {
                     if (document.IsReadOnly) throw new InvalidOperationException("Dibujo de solo lectura.");
+                    using (document.LockDocument()) target.Properties = CustomPropertyTransfer.Read(document.Database);
+                    target.PropertyChoice.Available = true;
+                    target.PropertyChoice.Detail = document == current ? "Dibujo actual · valores de origen" : "Propiedades del dibujo";
+                }
+                catch (System.Exception error)
+                {
+                    target.PropertyChoice.Selected = false;
+                    target.PropertyChoice.Detail = error.Message;
+                }
+                try
+                {
+                    if (source == null) throw new InvalidOperationException("Selecciona una viñeta con REV-EDIT para editar revisiones.");
+                    if (document.IsReadOnly) throw new InvalidOperationException("Dibujo de solo lectura.");
                     using (document.LockDocument()) target.Snapshot = document == current
                         ? sourceSnapshot : RevisionEditor.Read(document.Database);
-                    RevisionTransfer.Plan(source, values, target.Snapshot);
+                    RevisionTransfer.Plan(source, values!, target.Snapshot!);
                     target.Choice.Available = true;
-                    target.Choice.Detail = document == current ? "Viñeta seleccionada" : string.Join(", ", target.Snapshot.tables.Select(t => t.block).Distinct());
+                    target.Choice.Detail = document == current ? "Viñeta seleccionada" : string.Join(", ", target.Snapshot!.tables.Select(t => t.block).Distinct());
                 }
                 catch (System.Exception error)
                 {
@@ -128,13 +154,36 @@ public sealed class RevisionGripPlugin : IExtensionApplication
                 }
                 destinations.Add(target);
             }
-            using (var dialog = new RevisionDialog(source, destinations.Select(d => d.Choice).ToList()))
+            using (var dialog = new RevisionDialog(source, destinations.Select(d => d.Choice).ToList(),
+                properties, destinations.Select(d => d.PropertyChoice).ToList(), propertiesFirst))
             {
                 if (CadApplication.ShowModalDialog(dialog) != DialogResult.OK) return;
+                if (dialog.ApplyProperties)
+                {
+                    var propertyPlans = destinations.Where(d => d.PropertyChoice.Selected).Select(d => new
+                    {
+                        Target = d, Changes = CustomPropertyTransfer.Plan(d.Properties!, dialog.PropertyValues)
+                    }).ToArray();
+                    var propertyResults = new List<string>();
+                    foreach (var plan in propertyPlans)
+                    {
+                        var target = plan.Target;
+                        try
+                        {
+                            if (!CadApplication.DocumentManager.Cast<Document>().Contains(target.Document))
+                                throw new InvalidOperationException("El dibujo se cerró.");
+                            var notice = CustomPropertyTransfer.Apply(target.Document, target.Properties!, plan.Changes);
+                            propertyResults.Add($"{System.IO.Path.GetFileName(target.Document.Name)}: {(notice ?? (plan.Changes.Count == 0 ? "sin cambios" : "propiedades actualizadas"))}");
+                        }
+                        catch (System.Exception error) { propertyResults.Add($"{System.IO.Path.GetFileName(target.PropertyChoice.Name)}: no aplicado · {error.Message}"); }
+                    }
+                    CadApplication.ShowAlertDialog(string.Join("\n", propertyResults) + "\n\nLos dibujos no se guardaron automáticamente.");
+                    return;
+                }
                 var selectedTargets = destinations.Where(d => d.Choice.Selected).ToArray();
                 // Validate every destination before applying the first drawing.
                 var plans = selectedTargets.Select(d => new { Target = d,
-                    Changes = RevisionTransfer.Plan(source, dialog.Values, d.Snapshot!) }).ToArray();
+                    Changes = RevisionTransfer.Plan(source!, dialog.Values, d.Snapshot!) }).ToArray();
                 var results = new List<string>();
                 foreach (var plan in plans)
                 {
@@ -153,8 +202,9 @@ public sealed class RevisionGripPlugin : IExtensionApplication
         }
         catch (System.Exception error)
         {
-            current.Editor.WriteMessage("\nREV-EDIT: " + error.Message);
-            CadApplication.ShowAlertDialog("REV-EDIT: " + error.Message);
+            string command = propertiesFirst ? "PROPS-EDIT" : "REV-EDIT";
+            current.Editor.WriteMessage("\n" + command + ": " + error.Message);
+            CadApplication.ShowAlertDialog(command + ": " + error.Message);
         }
     }
 }

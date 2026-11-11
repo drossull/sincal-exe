@@ -1,5 +1,28 @@
 # Editor de revisiones
 
+## Propiedades personalizadas en CAD
+
+La ventana nativa de `REV-EDIT` tiene las pestañas **Revisiones** y
+**Propiedades personalizadas**. `PROPS-EDIT` abre directamente la segunda,
+sin seleccionar una viñeta. Requiere el complemento nativo que incorpora
+esta pestaña; la release 3.0.42 sólo contiene la pestaña de revisiones.
+
+En Propiedades se muestran los valores del dibujo actual y los nombres del
+estándar SINCAL. Marca las propiedades que quieras unificar, edita sus valores
+y elige los DWG abiertos que deben recibirlos. Las propiedades comienzan
+desmarcadas; un valor vacío marcado vacía su contenido y una propiedad ausente
+se crea. Se conservan las propiedades no marcadas, sus nombres y las propiedades
+generales del dibujo. No se eliminan ni renombran propiedades.
+
+**Aplicar propiedades** sólo aplica esa pestaña: no copia el historial de
+revisiones. Los destinos no necesitan una viñeta o tabla compatible. Los campos
+vinculados reflejan los nuevos DWGPROPS conservando sus expresiones. El resultado
+se informa por dibujo; los cambios quedan sin guardar. Cancelar no aplica nada.
+ZWCAD puede rechazar el REGEN encolado de un dibujo inactivo; si aparece ese
+aviso, activa ese DWG y ejecuta `REGEN`. Sus propiedades y Fields ya se actualizaron.
+No se garantiza que un único `U` revierta conjuntamente las propiedades y los
+resultados visibles de los campos.
+
 ## Selección y datos comunes
 
 - La lista tiene una casilla por DWG, buscador y selección de archivos visibles.
