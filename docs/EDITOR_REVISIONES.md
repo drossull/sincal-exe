@@ -4,8 +4,9 @@
 
 La ventana nativa de `REV-EDIT` tiene las pestañas **Revisiones** y
 **Propiedades personalizadas**. `PROPS-EDIT` abre directamente la segunda,
-sin seleccionar una viñeta. Requiere el complemento nativo que incorpora
-esta pestaña; la release 3.0.42 sólo contiene la pestaña de revisiones.
+sin seleccionar una viñeta. Esta pestaña se distribuye desde SINCAL 3.0.43.
+Instala la versión nueva, prepara la integración CAD y reinicia CAD para
+cargar el complemento actualizado; actualizar sólo los LISPs no basta.
 
 En Propiedades se muestran los valores del dibujo actual y los nombres del
 estándar SINCAL. Marca las propiedades que quieras unificar, edita sus valores

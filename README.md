@@ -1,6 +1,6 @@
 # SINCAL Suite — Ingeniería y estándares CAD
 
-**SINCAL Suite** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 3.0. Esta guía corresponde a la release `v3.0.42`, con interfaz de escritorio web y Pasarela BIM como módulo opcional.
+**SINCAL Suite** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 3.0. Esta guía corresponde a la release `v3.0.43`, con interfaz de escritorio web y Pasarela BIM como módulo opcional.
 
 La disponibilidad de los instaladores se confirma en las
 [publicaciones oficiales](https://github.com/drossull/sincal-updates/releases).
@@ -85,7 +85,7 @@ El servidor se limita a loopback: no es apto para publicarlo en Internet.
 ### Validación y compilación
 
 El arranque de escritorio usa `desktop_main.py` y
-`packaging/windows/SINCAL_Web.spec`. La release `v3.0.42` se construye con
+`packaging/windows/SINCAL_Web.spec`. La release `v3.0.43` se construye con
 `tools/build_release.ps1`; la interfaz web es la opción predeterminada.
 `-DesktopWeb` se conserva como parámetro compatible. El pipeline rechaza el
 arranque Tk y verifica el contenido real del EXE antes de firmarlo.
@@ -100,7 +100,7 @@ sus pendientes históricos no sustituyen el resultado de verificación de cada r
 ## Instalación web y distribución
 
 SINCAL Suite se distribuye mediante un instalador web firmado. El archivo
-`Setup_SINCAL_v3.0.42.exe` descarga desde su release pública los paquetes exactos
+`Setup_SINCAL_v3.0.43.exe` descarga desde su release pública los paquetes exactos
 de la aplicación y del plugin AutoCAD, comprueba sus SHA-256 y después los instala.
 El componente **Pasarela BIM** aparece **desmarcado por defecto**: su paquete
 independiente sólo se descarga si se selecciona. También puede instalarse más adelante.
@@ -111,7 +111,7 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
 
 ## Primer inicio
 
-1. Descarga y ejecuta el instalador de `v3.0.42` desde su publicación oficial, con SINCAL y CAD cerrados.
+1. Descarga y ejecuta el instalador de `v3.0.43` desde su publicación oficial, con SINCAL y CAD cerrados.
 2. Abre SINCAL; la aplicación comprobará automáticamente si existe una actualización menor de recursos.
 3. Abre **Diagnóstico**, verifica el motor CAD sugerido y cámbialo si necesitas otra versión.
 4. Pulsa **Preparar integración CAD**.
@@ -121,12 +121,18 @@ Para instalar se necesita conexión a Internet y acceso HTTPS a `github.com` y `
    **Instalar Pasarela BIM**. Se descargará el módulo correspondiente a esta
    versión de SINCAL; al terminar podrás usar **Abrir editor**.
 
-La versión 3.0.42 incluye el editor de revisiones para AutoCAD 2026/2027 y
-ZWCAD 2026. Después de preparar la integración y reiniciar CAD, selecciona la
-viñeta y pulsa **Editar revisiones**, o ejecuta `REV-EDIT`. Permite editar el
-historial y los DWGPROPS conservando los Fields, y aplicar la tabla completa
-a los dibujos abiertos que marques. No guarda automáticamente. Un solo `U`
-no garantiza revertir conjuntamente la tabla y las propiedades.
+La versión 3.0.43 incluye las pestañas **Revisiones** y **Propiedades
+personalizadas** para AutoCAD 2026/2027 (.NET 10) y ZWCAD 2026. Después de
+preparar la integración y reiniciar CAD, selecciona la viñeta y pulsa
+**Editar revisiones**, o ejecuta `REV-EDIT`. Para abrir directamente las
+propiedades, sin seleccionar una viñeta, ejecuta `PROPS-EDIT`.
+
+En Propiedades, marca los nombres que quieres unificar, edita sus valores y
+selecciona los dibujos abiertos de destino. Se crean las propiedades faltantes,
+se conservan las no marcadas y se actualizan los Fields. Un valor vacío marcado
+deja el contenido vacío. Aplicar opera sólo sobre la pestaña activa y no guarda
+los dibujos. En ZWCAD, un destino inactivo puede necesitar `REGEN`; el editor
+lo indica. Un solo `U` no garantiza revertir conjuntamente tabla y propiedades.
 
 La copia base de los recursos esenciales queda junto a la aplicación. Las revisiones descargadas, estados, diagnósticos y registros se almacenan en `%LOCALAPPDATA%\SINCAL`: son datos internos de SINCAL que no necesitan acompañar el perfil móvil del usuario. La integración CAD activa se materializa en `%APPDATA%\Estandar SINCAL`: AutoCAD/ZWCAD deben poder encontrar allí LISPs, startup y scripts desde el perfil del usuario. No son dos copias equivalentes: **Local** es almacén y estado de la aplicación; **Roaming** es la copia operativa expuesta al CAD.
 
@@ -486,7 +492,7 @@ reutiliza aplicación, conectores CAD, integración del Explorador y Pasarela BI
 cuando coinciden sus fuentes, herramientas y hashes de salida. Los archivos
 faltantes o alterados invalidan su comprobante. Las firmas se verifican antes
 de reutilizarlas. Genera los instaladores, el manifiesto y `SHA256SUMS.txt`.
-Los artefactos de `v3.0.42` quedan en `installer_output/v3.0.42/`.
+Los artefactos de `v3.0.43` quedan en `installer_output/v3.0.43/`.
 Reserva una versión nueva y usa un checkout de compilación aislado y estable:
 conservar ese directorio permite reutilizar su caché. Volver a compilar la misma versión sustituye sus
 artefactos locales. Para una compilación local no publicable puede usarse
@@ -513,12 +519,12 @@ ejecuta `python -m pytest tests/test_prospecciones_ocr.py -q` después de prepar
 
 En la release pública deben adjuntarse juntos:
 
-- `Setup_SINCAL_v3.0.42.exe`
-- `SINCAL_App_v3.0.42.zip`
-- `SINCAL_AutoCAD_v3.0.42.zip`
+- `Setup_SINCAL_v3.0.43.exe`
+- `SINCAL_App_v3.0.43.zip`
+- `SINCAL_AutoCAD_v3.0.43.zip`
 - `SINCAL_Pasarela_v0.3.3.zip`
 - `Setup_SINCAL_Pasarela_v0.3.3.exe`
-- `release-manifest_v3.0.42.json`
+- `release-manifest_v3.0.43.json`
 - `SHA256SUMS.txt`
 
 No renombres ni vuelvas a firmar los paquetes después de calcular sus hashes:
