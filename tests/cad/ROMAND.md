@@ -1,8 +1,13 @@
 # ROMAND
 
 `ROMAND` acepta una preselección de TEXT/MTEXT o pide seleccionarlos. Enter sin
-selección configura únicamente el estilo. Usa RomanD, `romand.shx`, anotativo,
+selección configura únicamente el estilo. Usa RomanD TrueType, `romand__.ttf`, anotativo,
 altura de papel 2,5, factor de ancho 0,8, sin inclinación ni efectos.
+Requiere esa fuente instalada. Si falta, avisa sin sustituirla por una SHX.
+La asignación final se hace al registro STYLE con la familia RomanD, porque
+`-STYLE` rechaza ese archivo reservado para el editor MTEXT. Se almacena el
+nombre registrado `romand__.ttf`; ZWCAD no resuelve su familia al usar la ruta
+absoluta. La prueba nativa comprueba también el nombre de familia con GetFont.
 
 Conserva contenido, punto de inserción/alineación, giro y justificación. En MTEXT
 retira las sustituciones internas de fuente, altura, ancho e inclinación, pero
@@ -29,7 +34,7 @@ Ejecutar `tools/cad/test_romand_native.py` con `--engine` apuntando a
 `--drawing archivo.dwg` prueba una copia temporal del archivo; nunca guarda el
 original. El proceso de prueba se cierra al terminar. No usa la sesión abierta.
 
-Pruebas nativas: creación y reparación del estilo, idempotencia, conservación
+Pruebas nativas: creación TrueType y conversión del estilo SHX anterior, idempotencia, conservación
 de otros estilos y textos no seleccionados, TEXT justificado, MTEXT con formato
 interno, altura a escala 1:100 y formato de MTEXT con campos. Se cambia una
 línea vinculada de longitud 100 a 175 y se verifica que el campo se actualice,

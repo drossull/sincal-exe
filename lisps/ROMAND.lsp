@@ -1,5 +1,5 @@
 ;;; ROMAND - configura RomanD y lo aplica a TEXT/MTEXT seleccionados.
-;;; romand.shx, anotativo, papel 2.5, ancho 0.8, sin efectos.
+;;; romand__.ttf (TrueType), anotativo, papel 2.5, ancho 0.8, sin efectos.
 ;;; Conserva contenido, campos, anclaje, giro y justificacion de los textos.
 ;;; Enter sin seleccion configura solo el estilo. No requiere el master.
 
@@ -19,7 +19,7 @@
   (and (setq data (tblobjname "STYLE" "RomanD"))
     (setq data (entget data '("*")))
     (= (strcase (strcat (vl-filename-base (cdr (assoc 3 data)))
-                        (vl-filename-extension (cdr (assoc 3 data))))) "ROMAND.SHX")
+                        (vl-filename-extension (cdr (assoc 3 data))))) "ROMAND__.TTF")
     (= (cdr (assoc 4 data)) "")
     (equal (cdr (assoc 40 data)) 2.5 1e-9)
     (equal (cdr (assoc 41 data)) 0.8 1e-9)
@@ -36,9 +36,26 @@
 
 ;; El filtro de aplicaciones de entget en ZWCAD distingue ciertos nombres
 ;; heredados de APPID. Leer toda la XDATA y comparar sin distinguir mayusculas.
-(defun SRD:Configure ()
+(defun SRD:FontPath (/ path root)
+  (setq path (findfile "romand__.ttf"))
+  ;; Las fuentes de Windows no siempre estan en las rutas de soporte CAD.
+  (foreach root (list
+      (if (getenv "WINDIR") (strcat (getenv "WINDIR") "/Fonts"))
+      (if (getenv "LOCALAPPDATA") (strcat (getenv "LOCALAPPDATA") "/Microsoft/Windows/Fonts")))
+    (if (and root (not path)) (setq path (findfile (strcat root "/romand__.ttf")))))
+  path)
+
+(defun SRD:Configure (/ data)
+  ;; -STYLE rechaza la TTF RomanD reservada para MTEXT. Configurar primero
+  ;; la anotacion y asignar despues el archivo TrueType al registro STYLE.
   (command "_.-STYLE" "RomanD" "romand.shx"
     "_Annotative" "_Yes" "_No" 2.5 0.8 0.0 "_No" "_No" "_No")
+  (setq data (entget (tblobjname "STYLE" "RomanD")))
+  (regapp "ACAD")
+  ;; Nombre registrado, no ruta absoluta: ZWCAD no resuelve la familia RomanD
+  ;; con la ruta completa. 34 = familia Swiss/paso variable, regular ANSI.
+  (entmod (append (SRD:Put 3 "romand__.ttf" data)
+    '((-3 ("ACAD" (1000 . "RomanD") (1071 . 34))))))
   (SRD:Valid))
 
 ;; Quita solo fuente, altura, ancho e inclinacion internos de MTEXT.
@@ -164,8 +181,8 @@
       (princ (strcat "\nROMAND: " msg " Se revirtieron los cambios.")))
     (princ))
   (cond
-    ((not (findfile "romand.shx"))
-     (princ "\nROMAND: no se encuentra romand.shx. No se modifico el dibujo."))
+    ((not (SRD:FontPath))
+     (princ "\nROMAND: no se encuentra romand__.ttf (TrueType). No se modifico el dibujo."))
     (T
      (vl-load-com)
      ;; Capturar posiciones y campos antes de cambiar el estilo existente.
@@ -190,7 +207,7 @@
              (command "_.REGENALL")
              (command "_.UNDO" "_End") (setq begun nil)
              (setvar "CMDECHO" echo)
-             (princ "\nRomanD actual: romand.shx, anotativo, papel 2.5, ancho 0.8, angulo 0.")
+             (princ "\nRomanD actual: romand__.ttf (TrueType), anotativo, papel 2.5, ancho 0.8, angulo 0.")
              (if selection
                (princ (strcat "\nTextos configurados: " (itoa (- (sslength selection) skipped))
                               ". Contenido, anclaje y giro conservados.")))

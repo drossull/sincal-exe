@@ -17,15 +17,21 @@
 (setq SRDT:echo (getvar "CMDECHO"))
 (SRD:Run nil)
 (SRDT:Assert (SRD:Valid) "create all screenshot settings")
+(setq SRDT:styleobj (vl-catch-all-apply 'vlax-ename->vla-object (list (tblobjname "STYLE" "RomanD"))))
+(if (not (vl-catch-all-error-p SRDT:styleobj))
+  (progn
+    (vla-GetFont SRDT:styleobj 'SRDT:face 'SRDT:bold 'SRDT:italic 'SRDT:charset 'SRDT:pitch)
+    (SRDT:Log (strcat "FONT " (vl-princ-to-string (list SRDT:face SRDT:bold SRDT:italic SRDT:pitch (vla-get-FontFile SRDT:styleobj)))))
+    (SRDT:Assert (= (strcase SRDT:face) "ROMAND") "TrueType typeface is RomanD")))
 (SRDT:Assert (= (strcase (getvar "TEXTSTYLE")) "ROMAND") "current style")
 (setq SRDT:handle (tblobjname "STYLE" "RomanD"))
 (SRD:Run nil)
 (SRDT:Assert (and (SRD:Valid) (eq SRDT:handle (tblobjname "STYLE" "RomanD"))) "idempotent, same style")
-;; Seed wrong values, including layout orientation and all three effects.
+;; Legacy SHX style with wrong layout orientation and all three effects.
 (command-s "_.-STYLE" "RomanD" "romand.shx" "_Annotative" "_Yes" "_Yes" 7.0 1.2 12.0 "_Yes" "_Yes" "_Yes")
 (SRDT:Assert (not (SRD:Valid)) "reject wrong configuration")
 (SRD:Run nil)
-(SRDT:Assert (SRD:Valid) "repair existing annotative style")
+(SRDT:Assert (SRD:Valid) "convert legacy SHX to TrueType and repair annotation")
 (entmod (SRD:Put 3 "txt.shx" (entget (tblobjname "STYLE" "RomanD"))))
 (SRD:Run nil)
 (SRDT:Assert (SRD:Valid) "repair different font")
