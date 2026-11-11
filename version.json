@@ -1,5 +1,5 @@
 {
-  "version": "v3.0.41",
+  "version": "v3.0.42",
   "product_version": "3.0",
   "archivos": [
     "main.py",
@@ -46,6 +46,7 @@
     "lisps/RPUENTE.lsp",
     "lisps/TXT-JOIN.lsp",
     "lisps/MARCAS-SC.lsp",
+    "lisps/REV-EDIT.lsp",
     "lisps/VRAP.lsp",
     "lisps/VPTOGGLE.lsp",
     "lisps/LAYORIGIN.lsp",

@@ -40,8 +40,8 @@ function Save-ComponentReceipt($Component) {
     if ($LASTEXITCODE -ne 0) { throw "No se pudo registrar $($Component.Name)." }
 }
 
-function Get-CadSdkInputs([int]$Year) {
-    $folder = Join-Path $env:ProgramFiles "Autodesk\AutoCAD $Year"
+function Get-CadSdkInputs([int]$Year, [string]$AutoCAD2025SdkDir = '') {
+    $folder = if ($Year -eq 2025 -and $AutoCAD2025SdkDir) { $AutoCAD2025SdkDir } else { Join-Path $env:ProgramFiles "Autodesk\AutoCAD $Year" }
     return @('acdbmgd.dll', 'accoremgd.dll', 'acmgd.dll', 'AcWindows.dll', 'AdWindows.dll') |
         ForEach-Object { Join-Path $folder $_ }
 }

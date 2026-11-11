@@ -3,6 +3,7 @@ param(
     [string]$CertificateSubject = 'Gonzalo Mardones',
     [string]$CertificateThumbprint = '',
     [string]$InnoSetupPath = '',
+    [string]$AutoCAD2025SdkDir = (Join-Path $env:ProgramFiles 'Autodesk\AutoCAD 2025'),
     [switch]$SkipSigning,
     [switch]$DesktopWeb = $true,
     [switch]$SkipPasarelaModule,
@@ -129,7 +130,7 @@ function Invoke-AutoCAD2025PluginBuild([string]$ProjectRoot) {
         throw "No existe el manifiesto del bundle: $bundleManifest"
     }
 
-    & dotnet build $project -c Release -t:Rebuild
+    & dotnet build $project -c Release -t:Rebuild "-p:AutoCAD2025Dir=$AutoCAD2025SdkDir"
     if ($LASTEXITCODE -ne 0) {
         throw 'Falló la compilación del plugin AutoCAD 2025.'
     }
@@ -148,7 +149,7 @@ function Invoke-DwgPropsBuild([string]$ProjectRoot) {
     $project = Join-Path $ProjectRoot 'src\Sincal.DwgProps\Sincal.DwgProps.csproj'
     foreach ($year in @(2025, 2027)) {
         if (Test-ComponentReceipt $dwgComponents[$year]) { continue }
-        $cadDirectory = Join-Path $env:ProgramFiles "Autodesk\AutoCAD $year"
+        $cadDirectory = if ($year -eq 2025) { $AutoCAD2025SdkDir } else { Join-Path $env:ProgramFiles "Autodesk\AutoCAD $year" }
         if (-not (Test-Path -LiteralPath (Join-Path $cadDirectory 'acdbmgd.dll'))) {
             throw "Falta el SDK instalado de AutoCAD $year para el conector DWGPROPS."
         }
@@ -512,12 +513,12 @@ if ($CleanBuild) { Remove-ArtifactIfExists (Join-Path $projectRoot 'build') }
 $nativeContext = (& dotnet --info | Out-String)
 if ($LASTEXITCODE -ne 0) { throw 'No se pudo identificar la herramienta .NET.' }
 $pluginComponent = New-ComponentReceipt -Name 'autocad-2025' `
-    -Inputs (@((Join-Path $projectRoot 'src\Sincal.AutoCAD2025')) + @(Get-CadSdkInputs 2025)) `
+    -Inputs (@((Join-Path $projectRoot 'src\Sincal.AutoCAD2025')) + @(Get-CadSdkInputs 2025 -AutoCAD2025SdkDir $AutoCAD2025SdkDir)) `
     -Outputs @($pluginDll) -Context $nativeContext
 $dwgComponents = @{}
 foreach ($year in @(2025, 2027)) {
     $dwgComponents[$year] = New-ComponentReceipt -Name "dwgprops-$year" `
-        -Inputs (@((Join-Path $projectRoot 'src\Sincal.DwgProps')) + @(Get-CadSdkInputs $year)) `
+        -Inputs (@((Join-Path $projectRoot 'src\Sincal.DwgProps')) + @(Get-CadSdkInputs $year -AutoCAD2025SdkDir $AutoCAD2025SdkDir)) `
         -Outputs @((Join-Path $projectRoot "src\Sincal.DwgProps\bin\$year\Sincal.DwgProps.dll")) -Context $nativeContext
 }
 if (-not (Test-ComponentReceipt $pluginComponent)) { Invoke-AutoCAD2025PluginBuild -ProjectRoot $projectRoot }
