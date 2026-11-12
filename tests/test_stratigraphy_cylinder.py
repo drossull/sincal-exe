@@ -124,6 +124,11 @@ def test_lisp_uses_exact_ellipses_and_shared_hatch_cleanup_and_guards():
     assert '(foreach boundary boundaries (vla-Delete boundary)' in source
     assert '(vla-AppendOuterLoop hatch objects)' in source
     assert 'vla-CopyObjects' in source and 'RomanD' in source
+    assert "(member (type setpropertyvalue) '(SUBR USUBR EXRXSUBR))" in source
+    assert "(if has-property (setq result (vl-catch-all-apply 'setpropertyvalue" in source
+    assert '(if (or (not has-property) (vl-catch-all-error-p result))' in source
+    assert '(vl-cmdf "_.ANNOUPDATE" ent "")' in source
+    assert '(regapp "AcadAnnotative")' in source
     assert source.count('      (se:scale)') == 2
     assert '(getvar "CANNOSCALEVALUE") 5 ' in source
     assert '(* k 2.5)' in source and 'vla-EndUndoMark' in source

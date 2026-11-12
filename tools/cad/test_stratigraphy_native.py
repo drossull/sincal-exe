@@ -221,7 +221,8 @@ def draw_cylinders(app, doc, hole, folder, request):
         read_completion(cylinder_request)
         added = next(g for g in doc.Groups if g.Name not in known)
         verify_cylinder(list(added), scene, ratio)
-        cylinders.append((added.Name, scene, ratio))
+        verify_annotation_contexts(doc, list(added), folder/f'contexts-{denominator}.txt', name)
+        cylinders.append((added.Name, scene, ratio, name))
         print('CYLINDER_NATIVE_GEOMETRY_AND_HATCH_AREA_OK', name, flush=True)
     # Also cover the unchanged rectangular hatch branch, without all legacy tests.
     doc.SetVariable('CANNOSCALE', '1:100 (m)')
@@ -238,10 +239,46 @@ def draw_cylinders(app, doc, hole, folder, request):
     doc.SaveAs(str(dwg))
     doc.Close(False)
     doc = wait_for(lambda: app.Documents.Open(str(dwg)))
-    for group_name, scene, ratio in cylinders:
+    for group_name, scene, ratio, name in cylinders:
         verify_cylinder(list(doc.Groups.Item(group_name)), scene, ratio)
+        verify_annotation_contexts(doc, list(doc.Groups.Item(group_name)),
+                                   folder/f'contexts-reopened-{ratio}.txt', name)
     print('CYLINDER_PERSISTENCE_AFTER_REOPEN_OK', dwg, flush=True)
     return doc
+
+
+def verify_annotation_contexts(doc, native, path, scale_name):
+    """Check actual persisted context/scale records, not only XDATA or height."""
+    handles = [obj.Handle for obj in native if obj.ObjectName == 'AcDbMText']
+    assert handles
+    source = '''(progn
+      (defun qa:dump-context (e n / data pair)
+        (if (and e (< n 7)) (progn
+          (setq data (entget e '("*")))
+          (write-line (vl-prin1-to-string data) qa:f)
+          (foreach pair data
+            (if (member (car pair) '(350 360 340))
+              (qa:dump-context (cdr pair) (1+ n)))))))
+      (setq qa:f (open TARGET "w"))
+      (write-line (strcat "PROPERTY_FUNCTION=" (vl-prin1-to-string (type setpropertyvalue))) qa:f)
+      (foreach qa:handle 'HANDLES
+        (write-line (strcat "TEXT=" qa:handle) qa:f)
+        (qa:dump-context (handent qa:handle) 0))
+      (write-line "CONTEXTS_COMPLETE" qa:f)
+      (close qa:f) (princ))
+    '''.replace('TARGET', json.dumps(path.as_posix())).replace(
+        'HANDLES', '('+' '.join(json.dumps(handle) for handle in handles)+')')
+    doc.SendCommand(source+'\n')
+    wait_for(lambda: path.exists() and path.read_text(errors='replace').endswith('CONTEXTS_COMPLETE\n'))
+    wait_for(lambda: doc.GetVariable('CMDACTIVE') == 0)
+    records = path.read_text(errors='replace').split('TEXT=')
+    assert len(records)-1 == len(handles)
+    for record in records[1:]:
+        assert '"AcadAnnotative"' in record and '(1070 . 1) (1070 . 1)' in record
+        assert '"ACDB_ANNOTATIONSCALES"' in record, record
+        assert '"AcDbAnnotScaleObjectContextData"' in record, record
+        assert f'(300 . "{scale_name}")' in record, record
+    print('NATIVE_ANNOTATION_CONTEXTS_OK', scale_name, records[0].strip(), flush=True)
 
 
 def verify_cylinder(native, scene, ratio):
