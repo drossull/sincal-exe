@@ -33,11 +33,21 @@ def annotation_scale_value(value):
     return value
 
 
-def stratigraphy_scene(hole, include_table=False, annotation_scale=10.0):
+def output_mode_value(value):
+    if type(value) is not str or value not in ('full', 'isometric-cylinder'):
+        raise ValueError('Selecciona el formato completo o solo cilindro isométrico.')
+    return value
+
+
+def stratigraphy_scene(hole, include_table=False, annotation_scale=10.0, *, output_mode='full'):
+    output_mode = output_mode_value(output_mode)
     annotation_scale = annotation_scale_value(annotation_scale)
     errors = hole.errors()
     if errors:
         raise ValueError('\n'.join(errors))
+    if output_mode == 'isometric-cylinder':
+        from sincal.cad.stratigraphy_cylinder import cylinder_scene
+        return cylinder_scene(hole, annotation_scale)
     if hole.drawing_format == 'cdi-spt-v1':
         from sincal.cad.stratigraphy_cdi import cdi_scene
         return cdi_scene(hole, include_table, annotation_scale)
@@ -191,18 +201,28 @@ def append_tables(hole, cursor, line, text):
     return cursor
 
 
-def build_stratigraphy_lisp(hole, master_path, include_table=False, annotation_scale=10.0, scale_name=None):
+def build_stratigraphy_lisp(hole, master_path, include_table=False, annotation_scale=10.0, scale_name=None, *, output_mode='full'):
+    output_mode = output_mode_value(output_mode)
     if not hole.ready_to_insert:
         raise ValueError('Coteja las tablas, profundidades, discrepancias y hatch antes de insertar.')
     annotation_scale = annotation_scale_value(annotation_scale)
-    scene = stratigraphy_scene(hole, include_table, annotation_scale)
+    scene = stratigraphy_scene(hole, include_table, annotation_scale, output_mode=output_mode)
     commands = []
     def pt(point):
         return f'(se:p {point[0]:.10g} {point[1]:.10g})'
+    def curve(item, color):
+        if item['kind'] == 'line':
+            return f'(se:add (vla-AddLine ms {pt(item["points"][0])} {pt(item["points"][1])}) {color})'
+        if item['kind'] == 'ellipse':
+            values = ' '.join(format(item[k], '.17g') for k in ('rx', 'ry', 'start', 'end'))
+            return f'(se:ellipse {pt(item["point"])} {values} {color})'
+        raise ValueError('Contorno de estratigrafía no compatible.')
     for item in scene['items']:
         kind = item['kind']
         if kind == 'line':
             commands.append(f'(se:add (vla-AddLine ms {pt(item["points"][0])} {pt(item["points"][1])}) {item["color"]})')
+        elif kind == 'ellipse':
+            commands.append(curve(item, item['color']))
         elif kind == 'circle':
             commands.append(f'(se:add (vla-AddCircle ms {pt(item["point"])} (* k {item["radius"]})) {item["color"]})')
         elif kind == 'triangle':
@@ -215,14 +235,18 @@ def build_stratigraphy_lisp(hole, master_path, include_table=False, annotation_s
             template = HATCHES.get(item['material'])
             if not template:
                 raise ValueError('Falta el hatch del master para '+item['material'])
-            x1,y1,x2,y2 = item['bounds']
-            commands.append(f'(se:hatch {pt([x1,y1])} {pt([x2,y2])} {lisp_string(template["pattern"])})')
+            if item.get('boundary'):
+                boundary = ' '.join(curve(part, 8) for part in item['boundary'])
+                commands.append(f'(se:hatch nil nil {lisp_string(template["pattern"])} (list {boundary}))')
+            else:
+                x1,y1,x2,y2 = item['bounds']
+                commands.append(f'(se:hatch {pt([x1,y1])} {pt([x2,y2])} {lisp_string(template["pattern"])} nil)')
     body = '\n      '.join(commands)
     patterns = ' '.join(lisp_string(HATCHES[name]['pattern']) for name in
                         dict.fromkeys(item['material'] for item in scene['items'] if item['kind'] == 'hatch'))
     master = lisp_string(str(master_path).replace('\\','/'))
     return '''(vl-load-com)
-(defun c:SINCAL-ESTRATIGRAFIA (/ *error* se:p se:add se:text se:hatch se:dbx se:source se:finish se:scale doc ms db base k created grp arr oldecho undo obj result scale-name scale-value)
+(defun c:SINCAL-ESTRATIGRAFIA (/ *error* se:p se:add se:text se:ellipse se:hatch se:dbx se:source se:finish se:scale doc ms db base k created grp arr oldecho undo obj result scale-name scale-value)
   (defun se:scale ()
     (if (or (not (equal (getvar "CANNOSCALEVALUE") EXPECTED_SCALE 1e-10))
             (and EXPECTED_NAME (/= (getvar "CANNOSCALE") EXPECTED_NAME)))
@@ -246,6 +270,13 @@ def build_stratigraphy_lisp(hole, master_path, include_table=False, annotation_s
   (defun se:add (obj color)
     (setq created (cons obj created)) (vla-put-Layer obj "0")
     (vla-put-Color obj color) (vla-put-Linetype obj "Continuous") obj)
+  (defun se:ellipse (pt rx ry start end color / entity)
+    (setq entity (se:add (vla-AddEllipse ms pt (vlax-3d-point (list (* k rx) 0.0 0.0)) (/ ry rx)) color))
+    ;; Scene Y points down; reverse ellipse parameters, not the WCS normal.
+    (if (< (abs (- end start)) (- (* 2.0 pi) 1e-10))
+      (progn
+        (vla-put-StartParameter entity (- (* 2.0 pi) (max start end)))
+        (vla-put-EndParameter entity (- (* 2.0 pi) (min start end))))) entity)
   (defun se:dbx (/ prog candidate found)
     (foreach prog (list (strcat "ObjectDBX.AxDbDocument." (substr (getvar "ACADVER") 1 2)) "ObjectDBX.AxDbDocument" "ZWCAD.ZcDbDocument")
       (if (not found)
@@ -267,7 +298,7 @@ def build_stratigraphy_lisp(hole, master_path, include_table=False, annotation_s
       (if (and (= (vla-get-ObjectName item) "AcDbHatch") (= (vla-get-PatternName item) pattern))
         (if source (progn (setq result (strcat "Hatch duplicado en master: " pattern)) (exit)) (setq source item))))
     (if (not source) (progn (setq result (strcat "Falta hatch en master: " pattern)) (exit))) source)
-  (defun se:hatch (a b pattern / source objects copied sample data tail en ax ay bx by z coords boundary hatch native prefix)
+  (defun se:hatch (a b pattern boundaries / source objects copied sample data tail en ax ay bx by z coords boundary hatch native prefix)
     ;; Clone the master's pattern definitions; no dependency on local PAT files.
     (setq source (se:source pattern))
     (setq objects (vlax-make-safearray vlax-vbObject '(0 . 0)))
@@ -277,16 +308,19 @@ def build_stratigraphy_lisp(hole, master_path, include_table=False, annotation_s
     (vla-put-PatternScale sample (* k 14.0 (vla-get-PatternScale source)))
     (setq data (entget (vlax-vla-object->ename sample)) tail (member (assoc 75 data) data))
     (setq tail (vl-remove-if-not '(lambda (p) (member (car p) '(75 76 52 41 77 78 53 43 44 45 46 79 49))) tail))
-    (setq a (vlax-safearray->list (vlax-variant-value a)) b (vlax-safearray->list (vlax-variant-value b))
-          ax (car a) ay (cadr a) bx (car b) by (cadr b) z (caddr a))
     ;; Let CAD construct and own a valid external loop. A hand-made HATCH loop
     ;; may display but have no computable area / persistence on some releases.
-    (setq coords (vlax-make-safearray vlax-vbDouble '(0 . 7)))
-    (vlax-safearray-fill coords (list ax ay bx ay bx by ax by))
-    (setq boundary (se:add (vla-AddLightWeightPolyline ms coords) 8))
-    (vla-put-Closed boundary :vlax-true) (vla-put-Elevation boundary z)
-    (setq objects (vlax-make-safearray vlax-vbObject '(0 . 0)))
-    (vlax-safearray-put-element objects 0 boundary)
+    (if (not boundaries)
+      (progn
+        (setq a (vlax-safearray->list (vlax-variant-value a)) b (vlax-safearray->list (vlax-variant-value b))
+              ax (car a) ay (cadr a) bx (car b) by (cadr b) z (caddr a))
+        (setq coords (vlax-make-safearray vlax-vbDouble '(0 . 7)))
+        (vlax-safearray-fill coords (list ax ay bx ay bx by ax by))
+        (setq boundary (se:add (vla-AddLightWeightPolyline ms coords) 8))
+        (vla-put-Closed boundary :vlax-true) (vla-put-Elevation boundary z)
+        (setq boundaries (list boundary))))
+    (setq objects (vlax-make-safearray vlax-vbObject (cons 0 (1- (length boundaries)))))
+    (vlax-safearray-fill objects boundaries)
     (setq hatch (vla-AddHatch ms 1 "SOLID" :vlax-false))
     (setq created (cons hatch created))
     (vla-AppendOuterLoop hatch objects)
@@ -300,7 +334,7 @@ def build_stratigraphy_lisp(hole, master_path, include_table=False, annotation_s
     (if (not (entmod (append prefix tail '((98 . 0))))) (progn (princ "No se pudo aplicar el patron master") (exit)))
     (vla-put-Layer hatch "0") (vla-put-Color hatch 8)
     (vla-Evaluate hatch)
-    (vla-Delete boundary) (setq created (vl-remove boundary created))
+    (foreach boundary boundaries (vla-Delete boundary) (setq created (vl-remove boundary created)))
     (vla-Delete sample) (setq created (vl-remove sample created)))
   (setq doc (vla-get-ActiveDocument (vlax-get-acad-object)) ms (vla-get-ModelSpace doc))
   (cond

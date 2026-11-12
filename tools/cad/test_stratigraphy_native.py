@@ -5,6 +5,7 @@ user drawings. Tests the exact completion expression used by the web worker.
 """
 import ctypes
 import json
+import math
 import os
 from pathlib import Path
 import sys
@@ -36,13 +37,15 @@ def wait_for(callback, seconds=90):
 
 def main():
     existing = {int(p.ProcessId) for p in win32com.client.GetObject('winmgmts:').ExecQuery("SELECT ProcessId FROM Win32_Process WHERE Name='acad.exe'")}
+    (ROOT/'tmp').mkdir(exist_ok=True)
     folder = Path(tempfile.mkdtemp(prefix='stratigraphy-cad-', dir=ROOT/'tmp'))
-    app = win32com.client.DispatchEx('AutoCAD.Application.25')
+    app = win32com.client.DispatchEx(os.environ.get('SINCAL_TEST_CAD_PROGID', 'AutoCAD.Application.25'))
     process_id = ctypes.c_ulong()
     ctypes.windll.user32.GetWindowThreadProcessId(wait_for(lambda: app.HWND), ctypes.byref(process_id))
     assert process_id.value not in existing, 'Refuse to use an existing CAD instance'
     print('OWN_PID', process_id.value, 'OUTPUT', folder, flush=True)
     doc = None
+    trusted_paths = None
     try:
         wait_for(lambda: app.GetAcadState().IsQuiescent)
         app.Visible = False
@@ -51,6 +54,8 @@ def main():
         doc.SetVariable('INSUNITS', 6)
         doc.SetVariable('CANNOSCALE', '1:100 (m)')
         doc.SetVariable('LOGFILEMODE', 1)
+        trusted_paths = doc.GetVariable('TRUSTEDPATHS')
+        doc.SetVariable('TRUSTEDPATHS', str(folder)+';'+trusted_paths)
         hole = Borehole('test','QA', [Interval(str(i),str(i+1),'1','.6','60',m,1,m) for i,m in enumerate(HATCHES)],
             [Spt(1,'.5','.95','.45','.2','5','10','12','22',1)], reviewed=True,
             vs_bands=[VsBand('0','1.49','185','185',19,'Arreglo 3-2',117),
@@ -69,6 +74,9 @@ def main():
         request = dict(command=f'(progn (load "{path.as_posix()}") (c:SINCAL-ESTRATIGRAFIA))\n',
                        marker=str(folder/'done.txt'),token='qa-success',completion='stratigraphy-v1')
         print('LOG', doc.GetVariable('LOGFILENAME'), flush=True)
+        if os.environ.get('SINCAL_TEST_CYLINDER_ONLY'):
+            doc = draw_cylinders(app, doc, hole, folder, request)
+            return
         # Only point coordinates follow the complete expression. The completion
         # message stays inside the command, not in getpoint's input stream.
         doc.SendCommand(command_with_completion(request)+'0,0\n')
@@ -169,9 +177,15 @@ def main():
         assert Path(cancelled['marker']).read_text().splitlines()[1] == 'cancelled'
         assert doc.ModelSpace.Count == before
         print('CANCEL_WITHOUT_GEOMETRY_OK', flush=True)
+        doc = draw_cylinders(app, doc, hole, folder, request)
         doc.SaveAs(str(folder/'qa.dxf'), 65)
         print('DXF', folder/'qa.dxf', flush=True)
     finally:
+        if trusted_paths is not None:
+            try:
+                app.ActiveDocument.SetVariable('TRUSTEDPATHS', trusted_paths)
+            except Exception:
+                pass
         if doc is not None:
             try:
                 doc.Close(False)
@@ -184,6 +198,81 @@ def main():
             app.Quit()
         except Exception:
             pass
+
+
+def draw_cylinders(app, doc, hole, folder, request):
+    """Native curve/area/persistence check confined to a proven private process."""
+    cylinders = []
+    for denominator in (200, 50):
+        name = f'1:{denominator} (m)'
+        doc.SetVariable('CANNOSCALE', name)
+        ratio = doc.GetVariable('CANNOSCALEVALUE')
+        scene = stratigraphy_scene(hole, True, ratio, output_mode='isometric-cylinder')
+        cylinder_path = folder/f'cylinder-{denominator}.lsp'
+        cylinder_path.write_text(build_stratigraphy_lisp(hole,
+            ROOT/'masters/FORMATOS ANOTATIVOS ACAD_2025.dwg', True, ratio, name,
+            output_mode='isometric-cylinder'), encoding='utf-8')
+        known = {g.Name for g in doc.Groups}
+        cylinder_request = dict(request,
+            command=f'(progn (load "{cylinder_path.as_posix()}") (c:SINCAL-ESTRATIGRAFIA))\n',
+            marker=str(folder/f'cylinder-{denominator}.txt'),token=f'cylinder-{denominator}')
+        doc.SendCommand(command_with_completion(cylinder_request)+'0,0\n')
+        wait_for(lambda: Path(cylinder_request['marker']).exists())
+        read_completion(cylinder_request)
+        added = next(g for g in doc.Groups if g.Name not in known)
+        verify_cylinder(list(added), scene, ratio)
+        cylinders.append((added.Name, scene, ratio))
+        print('CYLINDER_NATIVE_GEOMETRY_AND_HATCH_AREA_OK', name, flush=True)
+    # Also cover the unchanged rectangular hatch branch, without all legacy tests.
+    doc.SetVariable('CANNOSCALE', '1:100 (m)')
+    before = {g.Name for g in doc.Groups}
+    rectangular = dict(request, marker=str(folder/'rectangle-after-cylinder.txt'),
+                       token='qa-rectangle-after-cylinder')
+    doc.SendCommand(command_with_completion(rectangular)+'0,0\n')
+    wait_for(lambda: Path(rectangular['marker']).exists())
+    read_completion(rectangular)
+    added = next(g for g in doc.Groups if g.Name not in before)
+    assert all(o.Area > 0 for o in added if o.ObjectName == 'AcDbHatch')
+    print('RECTANGULAR_HATCH_BRANCH_OK', flush=True)
+    dwg = folder/'cylinder-persistence.dwg'
+    doc.SaveAs(str(dwg))
+    doc.Close(False)
+    doc = wait_for(lambda: app.Documents.Open(str(dwg)))
+    for group_name, scene, ratio in cylinders:
+        verify_cylinder(list(doc.Groups.Item(group_name)), scene, ratio)
+    print('CYLINDER_PERSISTENCE_AFTER_REOPEN_OK', dwg, flush=True)
+    return doc
+
+
+def verify_cylinder(native, scene, ratio):
+    expected_types = {'line':'AcDbLine', 'ellipse':'AcDbEllipse', 'hatch':'AcDbHatch', 'text':'AcDbMText'}
+    assert len(native) == len(scene['items']), (len(native),len(scene['items']))
+    for obj, item in zip(native, scene['items']):
+        assert obj.ObjectName == expected_types[item['kind']], (obj.ObjectName,item['kind'])
+        assert obj.Color == item['color']
+        if item['kind'] == 'ellipse':
+            assert abs(obj.Center[0]-item['point'][0]/ratio) < 1e-7
+            assert abs(obj.Center[1]+item['point'][1]/ratio) < 1e-7
+            assert abs(obj.MajorRadius-item['rx']/ratio) < 1e-7
+            assert abs(obj.MinorRadius-item['ry']/ratio) < 1e-7
+            if item['end']-item['start'] < 2*math.pi-1e-10:
+                assert abs(obj.StartParameter-math.pi) < 1e-7
+                assert abs(obj.EndParameter-2*math.pi) < 1e-7
+        elif item['kind'] == 'line':
+            for actual, point in zip((obj.StartPoint,obj.EndPoint),item['points']):
+                assert abs(actual[0]-point[0]/ratio) < 1e-7
+                assert abs(actual[1]+point[1]/ratio) < 1e-7
+        elif item['kind'] == 'hatch':
+            assert obj.PatternName == HATCHES[item['material']]['pattern']
+            loop = item['boundary']
+            if len(loop) == 1:
+                area = math.pi*loop[0]['rx']*loop[0]['ry']
+            else:
+                area = 2*loop[0]['rx']*(loop[2]['point'][1]-loop[0]['point'][1])
+            assert obj.Area > 0 and abs(obj.Area-area/ratio**2) < 1e-6, (obj.Area,area/ratio**2)
+        elif item['kind'] == 'text':
+            assert obj.StyleName == 'RomanD' and abs(obj.Height*ratio-2.5) < 1e-8
+            assert not any(s in obj.TextString.upper() for s in ('NSPT','RECUPERA','VS =','EMPRESA'))
 
 
 if __name__ == '__main__':

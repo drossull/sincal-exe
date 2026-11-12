@@ -521,15 +521,16 @@ class Services:
         return {'report': report.to_dict(), **self.describe_stratigraphy(report)}
 
     @staticmethod
-    def describe_stratigraphy(report, include_table=False, annotation_scale=10.0):
-        from sincal.cad.stratigraphy import stratigraphy_scene
+    def describe_stratigraphy(report, include_table=False, annotation_scale=10.0, *, output_mode='full'):
+        from sincal.cad.stratigraphy import stratigraphy_scene, output_mode_value
         from sincal.stratigraphy_hatches import HATCHES
         from sincal.stratigraphy_patterns import PATTERNS
         from sincal.stratigraphy import DRAWING_FORMATS
+        output_mode = output_mode_value(output_mode)
         hatches = {key: dict(value, lines=PATTERNS[value['pattern']]) for key, value in HATCHES.items()}
         return {'hatches': hatches, 'checks': [dict(key=h.key, errors=h.errors(), warnings=h.audit(),
                 format=dict(id=h.drawing_format, **DRAWING_FORMATS.get(h.drawing_format, {'label':'No reconocido', 'description':'No se puede insertar.'})),
-                scene=stratigraphy_scene(h, include_table, annotation_scale) if not h.errors() else None) for h in report.boreholes]}
+                scene=stratigraphy_scene(h, include_table, annotation_scale, output_mode=output_mode) if not h.errors() else None) for h in report.boreholes]}
 
     def stratigraphy_insert(self, job, payload):
         from sincal.stratigraphy import StratigraphyReport
@@ -547,7 +548,7 @@ class Services:
         if not isinstance(scale.get('name'), str) or not scale['name']:
             raise ValueError('Comprueba la escala anotativa activa de CAD antes de insertar.')
         path = self.lisp(job, build_stratigraphy_lisp(hole, master, payload.get('table') is True,
-                                                   scale.get('value'), scale['name']))
+                                                   scale.get('value'), scale['name'], output_mode=payload.get('output_mode', 'full')))
         return self.cad(job, payload.get('expected'), f'(progn (load "{path}") (c:SINCAL-ESTRATIGRAFIA))\n', True, completion='stratigraphy-v1')
 
     @staticmethod

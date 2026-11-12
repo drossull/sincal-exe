@@ -60,10 +60,11 @@ async function loadProjectJson(file){
   if(['sincal-stratigraphy-1','sincal-stratigraphy-2'].includes(saved.schema)){
     const reports=saved.schema==='sincal-stratigraphy-1'?[saved.report]:saved.reports;
     if(!Array.isArray(reports)||!reports.length||reports.length>10)throw Error('Reconocimiento no compatible (máximo 10 informes).');
-    let checked;for(const report of reports){const value=await api('stratigraphy/preview',{report,table:false});checked??=value;}
+    const outputMode=saved.output_mode??'full';
+    let checked;for(const report of reports){const value=await api('stratigraphy/preview',{report,table:false,output_mode:outputMode});checked??=value;}
     if(project!==previous)throw Error('El proyecto cambió durante la carga.');
     project??={data:{},identification:{ot:'',revision:'',structure_name:''}};
-    project.stratigraphy={report:reports[0],library:reports.slice(1),...checked};dirty=true;
+    project.stratigraphy={report:reports[0],library:reports.slice(1),output_mode:outputMode,...checked};dirty=true;
     notify('Reconocimiento incorporado. Disponible en Prospecciones → Estratigrafía.');
   }else{
     const candidate={data:saved,identification:{...identity()},sourceName:file.name,rebarAssistant:{elements:{}}};

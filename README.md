@@ -1,6 +1,6 @@
 # SINCAL Suite — Ingeniería y estándares CAD
 
-**SINCAL Suite** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 3.0. Esta guía corresponde a la release `v3.0.43`, con interfaz de escritorio web y Pasarela BIM como módulo opcional.
+**SINCAL Suite** es una aplicación para Windows que centraliza estándares de dibujo para AutoCAD/ZWCAD, automatiza el procesamiento de planos y entrega herramientas de apoyo para ingeniería estructural y ubicación geográfica. La versión de producto es 3.0. Esta guía corresponde a la release `v3.0.44`, con interfaz de escritorio web y Pasarela BIM como módulo opcional.
 
 La disponibilidad de los instaladores se confirma en las
 [publicaciones oficiales](https://github.com/drossull/sincal-updates/releases).
@@ -52,6 +52,11 @@ y se utiliza dentro de la misma ventana de SINCAL.
   extraídos sin alterar sus plantillas a `sincal/cad/crossbeam.py`.
 - **Prospecciones:** extracción PDF/TXT y OCR local, tablas, avisos, imagen/texto
   de evidencia, confianza por celda, cotejo explícito, vista del perfil e inserción CAD.
+- **Estratigrafía:** conserva el formato completo y permite elegir «Solo cilindro
+  isométrico», con hatch vectorial del master, límites de estratos a profundidad
+  real y textos RomanD anotativos de 2,5 mm. La opción se guarda en la sesión y
+  en el reconocimiento exportado; las siglas USCS se muestran sólo cuando están
+  declaradas de forma inequívoca en el informe.
 - **Sesiones:** instantáneas privadas por perfil Windows, búsqueda, tarjetas,
   paginación, carga, importación no destructiva de sesiones anteriores, exportación,
   recuperación periódica y oferta de reabrir el último guardado.
@@ -85,7 +90,7 @@ El servidor se limita a loopback: no es apto para publicarlo en Internet.
 ### Validación y compilación
 
 El arranque de escritorio usa `desktop_main.py` y
-`packaging/windows/SINCAL_Web.spec`. La release `v3.0.43` se construye con
+`packaging/windows/SINCAL_Web.spec`. La release `v3.0.44` se construye con
 `tools/build_release.ps1`; la interfaz web es la opción predeterminada.
 `-DesktopWeb` se conserva como parámetro compatible. El pipeline rechaza el
 arranque Tk y verifica el contenido real del EXE antes de firmarlo.

@@ -9,6 +9,8 @@ export async function renderStratigraphy(ctx){
   const output=section('estratigrafia-revision','Sondajes, vista previa y evidencia');
   let selected=project.stratigraphy?.report?.boreholes?.[0]?.key, includeTable=false, revision=0;
   let annotationScale={name:'1:100 (m) · referencia de vista previa',value:10};
+  const outputModes={full:'Formato actual','isometric-cylinder':'Solo cilindro isométrico'};
+  const outputMode=()=>project.stratigraphy?.output_mode||'full';
   function cadScale(expected){
     if(expected.status!=='ready')throw Error(expected.message);
     if(expected.active?.insunits!==6)throw Error('La estratigrafía requiere un dibujo en metros (INSUNITS=6).');
@@ -24,7 +26,8 @@ export async function renderStratigraphy(ctx){
   async function refresh(){
     const ticket=++revision,state=project.stratigraphy;
     if(!state?.report)return;
-    const result=await api('stratigraphy/preview',{report:state.report,table:includeTable,annotation_scale:annotationScale.value});
+    const mode=outputMode();
+    const result=await api('stratigraphy/preview',{report:state.report,table:includeTable&&mode==='full',annotation_scale:annotationScale.value,output_mode:mode});
     if(ticket!==revision||project.stratigraphy!==state||!current())return;
     Object.assign(state,result);draw();return true;
   }
@@ -36,7 +39,7 @@ export async function renderStratigraphy(ctx){
     if(reports.length>1){
       const fileLabel=node('label','Informe'),fileSelect=node('select');fileSelect.setAttribute('aria-label','Informe de estratigrafía');fileLabel.append(fileSelect);output.append(fileLabel);
       reports.forEach((r,i)=>{const option=node('option',`${r.source} · ${r.boreholes.map(h=>h.name).join(', ')}`);option.value=i;fileSelect.append(option);});
-      fileSelect.addEventListener('change',async()=>{const index=Number(fileSelect.value);project.stratigraphy={report:reports[index],library:reports.filter((_,i)=>i!==index)};selected=reports[index].boreholes[0]?.key;changed();try{await refresh();}catch(e){notify(e.message);}});
+      fileSelect.addEventListener('change',async()=>{const index=Number(fileSelect.value);project.stratigraphy={report:reports[index],library:reports.filter((_,i)=>i!==index),output_mode:outputMode()};selected=reports[index].boreholes[0]?.key;changed();try{await refresh();}catch(e){notify(e.message);}});
     }
     output.append(node('p',report.source));
     for(const notice of report.notices||[])output.append(node('p',notice,'muted'));
@@ -59,7 +62,11 @@ export async function renderStratigraphy(ctx){
       for(const warning of warnings.filter(w=>w.includes('no se extrapola')))output.append(node('p',warning,'badge'));
     }else for(const warning of warnings)output.append(node('p',warning,'badge'));
     for(const error of checks?.errors||[])output.append(node('p',error,'badge'));
-    const toggle=node('label','Incluir tablas de valores debajo del gráfico'),inc=node('input');inc.type='checkbox';inc.checked=includeTable;toggle.prepend(inc);output.append(toggle);
+    const modeLabel=node('label','Salida'),modeSelect=node('select');modeSelect.setAttribute('aria-label','Salida de estratigrafía');modeLabel.append(modeSelect);output.append(modeLabel);
+    for(const [value,title]of Object.entries(outputModes)){const option=node('option',title);option.value=value;modeSelect.append(option);}
+    modeSelect.value=outputMode();
+    modeSelect.addEventListener('change',async()=>{state.output_mode=modeSelect.value;changed();try{await refresh();}catch(e){notify(e.message);}});
+    const toggle=node('label','Incluir tablas de valores debajo del gráfico'),inc=node('input');inc.type='checkbox';inc.disabled=outputMode()!=='full';inc.checked=includeTable&&!inc.disabled;toggle.prepend(inc);output.append(toggle);
     inc.addEventListener('change',async()=>{includeTable=inc.checked;try{await refresh();}catch(e){notify(e.message);}});
     output.append(node('p',`Escala de vista previa: ${annotationScale.name}. Profundidades reales en metros; textos de 2,5 mm en papel.`,'badge'));
     output.append(button('Tomar escala anotativa de CAD',async()=>{
@@ -103,11 +110,13 @@ export async function renderStratigraphy(ctx){
     const review=node('label','He cotejado el formato identificado, las cifras, profundidades, avisos de discrepancia y hatch con el informe original.'),check=node('input');check.type='checkbox';check.checked=hole.reviewed&&(format?.id==='visan-summary-v1'||hole.reviewed_format===format?.id);review.prepend(check);output.append(review);
     const insert=button('Insertar este sondaje en AutoCAD / ZWCAD',async()=>{
       if(!check.checked||checks?.errors?.length)throw Error('Revisa el formato y el sondaje antes de insertar.');
+      const mode=outputMode(),table=includeTable&&mode==='full';
       const expected=await api('cad/status');annotationScale=cadScale(expected);
+      if(project.stratigraphy!==state||selected!==hole.key||outputMode()!==mode)return;
       if(!await refresh())return;
-      if(!current()||project.stratigraphy!==state||selected!==hole.key||!hole.reviewed)return;
-      if(!confirm(`¿Insertar ${hole.name} exclusivamente en ${expected.active.name}?\nFormato: ${format?.label}\nEscala anotativa: ${annotationScale.name}. Profundidades reales (1 m = 1 unidad); texto de 2,5 mm en papel.\nSe actualizó la vista previa con esta escala. Se crearán entidades vectoriales agrupadas, sin guardar ni modificar otros dibujos. Selecciona el punto de inserción en CAD.`))return;
-      const result=await job('cad-stratigraphy',{report,key:hole.key,table:includeTable,expected});notify(result.message);
+      if(!current()||project.stratigraphy!==state||selected!==hole.key||!hole.reviewed||outputMode()!==mode||table!==(includeTable&&mode==='full'))return;
+      if(!confirm(`¿Insertar ${hole.name} exclusivamente en ${expected.active.name}?\nFormato: ${format?.label}\nSalida: ${outputModes[mode]}\nEscala anotativa: ${annotationScale.name}. Profundidades reales (1 m = 1 unidad); texto de 2,5 mm en papel.\nSe actualizó la vista previa con esta escala. Se crearán entidades vectoriales agrupadas, sin guardar ni modificar otros dibujos. Selecciona el punto de inserción en CAD.`))return;
+      const result=await job('cad-stratigraphy',{report,key:hole.key,table,expected,output_mode:mode});notify(result.message);
     },true);
     const setEnabled=()=>{insert.disabled=!check.checked||!format?.id||!checks?.scene||Boolean(checks?.errors?.length);};
     check.addEventListener('change',()=>{hole.reviewed=check.checked;hole.reviewed_format=check.checked?format?.id:'';changed();setEnabled();});setEnabled();output.append(insert);
@@ -120,27 +129,49 @@ export async function renderStratigraphy(ctx){
     for(const r of result.reports)if(!reports.some(old=>old.sha256&&old.sha256===r.sha256))reports.push(r);
     if(reports.length>10)throw Error('La sesión admite 10 informes; no se reemplazó el reconocimiento actual.');
     if(new Blob([JSON.stringify(reports)]).size>45*1024*1024)throw Error('La evidencia supera 45 MB; divide los informes en sesiones separadas. Se conserva el reconocimiento anterior.');
-    project.stratigraphy={report:reports[0],library:reports.slice(1)};selected=reports[0].boreholes[0]?.key;changed();if(current())await refresh();
+    project.stratigraphy={report:reports[0],library:reports.slice(1),output_mode:outputMode()};selected=reports[0].boreholes[0]?.key;changed();if(current())await refresh();
   },true));
   input.append(button('Guardar reconocimiento',()=>{
     if(!project.stratigraphy?.report)throw Error('Carga un informe primero.');
-    const blob=new Blob([JSON.stringify({schema:'sincal-stratigraphy-2',reports:[project.stratigraphy.report,...(project.stratigraphy.library||[])]},null,2)],{type:'application/json'});
+    const blob=new Blob([JSON.stringify({schema:'sincal-stratigraphy-2',reports:[project.stratigraphy.report,...(project.stratigraphy.library||[])],output_mode:outputMode()},null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob),a=node('a');a.href=url;a.download='estratigrafia-sincal.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }));
   input.append(node('p','Los informes y reconocimientos guardados se incorporan desde Proyecto.'));
   if(project.stratigraphy?.report)await refresh();else draw();
 }
 
+// SVG and CAD share exact elliptical boundaries, including reverse arcs.
+function ellipsePath(item,move=true){
+  const {point:[cx,cy],rx,ry,start,end}=item,span=end-start;
+  const point=t=>[cx+rx*Math.cos(t),cy+ry*Math.sin(t)].join(',');
+  let path=move?`M${point(start)}`:'';
+  const parts=Math.max(1,Math.ceil(Math.abs(span)/Math.PI));
+  for(let i=1;i<=parts;i++)path+=`A${rx},${ry} 0 0 ${span>=0?1:0} ${point(start+span*i/parts)}`;
+  return path;
+}
+function boundaryPath(segments){
+  return segments.map((part,i)=>part.kind==='ellipse'?ellipsePath(part,i===0):`${i?'':`M${part.points[0].join(',')}`}L${part.points[1].join(',')}`).join('')+'Z';
+}
+let sceneSerial=0;
 export function renderScene(scene,hatches){
   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
+  const clipPrefix=`stratigraphy-hatch-${++sceneSerial}-`;let clipIndex=0,defs;
   svg.setAttribute('viewBox',scene.viewbox.join(' '));svg.setAttribute('class','stratigraphy-preview');svg.setAttribute('role','img');svg.setAttribute('aria-label',scene.accessible_label||'Estratigrafía, recuperación porcentual, ensayos NSPT y tramos Vs disponibles');
   const colors={1:'#ff5959',3:'#68f778',5:'#579bff',7:'#ffffff',8:'#808080'};
   function shape(name,attrs,parent=svg){const el=document.createElementNS(ns,name);for(const [k,v]of Object.entries(attrs))el.setAttribute(k,v);parent.append(el);return el;}
   for(const item of scene.items){const stroke=colors[item.color]||'#fff';
     if(item.kind==='line')shape('line',{x1:item.points[0][0],y1:item.points[0][1],x2:item.points[1][0],y2:item.points[1][1],stroke,'stroke-width':.22});
+    else if(item.kind==='ellipse')shape('path',{d:ellipsePath(item),stroke,fill:'none','stroke-width':.22});
     else if(item.kind==='circle')shape('circle',{cx:item.point[0],cy:item.point[1],r:item.radius,stroke,fill:'none','stroke-width':.24});
     else if(item.kind==='triangle')shape('polygon',{points:item.points.map(p=>p.join(',')).join(' '),fill:stroke});
-    else if(item.kind==='hatch')shape('path',{d:patternPath(item.bounds,hatches[item.material].lines),fill:'none',stroke:'#b5b5b5','stroke-width':.14,'stroke-linecap':'round'});
+    else if(item.kind==='hatch'){
+      const attrs={d:patternPath(item.bounds,hatches[item.material].lines),fill:'none',stroke:'#b5b5b5','stroke-width':.14,'stroke-linecap':'round'};
+      if(item.boundary?.length){
+        defs??=shape('defs',{});const id=clipPrefix+clipIndex++,clip=shape('clipPath',{id,clipPathUnits:'userSpaceOnUse'},defs);
+        shape('path',{d:boundaryPath(item.boundary)},clip);attrs['clip-path']=`url(#${id})`;attrs.stroke=stroke;
+      }
+      shape('path',attrs);
+    }
     else if(item.kind==='text'){
       const text=shape('text',{x:item.point[0],y:item.point[1],fill:stroke,'text-anchor':{left:'start',right:'end',center:'middle'}[item.anchor],'dominant-baseline':'middle','font-size':2.5});
       const lines=item.text.split('\n');lines.forEach((line,i)=>{

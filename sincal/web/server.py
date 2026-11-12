@@ -97,6 +97,8 @@ class Store:
             VsReport.from_dict(payload['prospecciones']['report'])
         if isinstance(payload.get('stratigraphy'), dict) and payload['stratigraphy'].get('report'):
             from sincal.stratigraphy import StratigraphyReport
+            from sincal.cad.stratigraphy import output_mode_value
+            output_mode_value(payload['stratigraphy'].get('output_mode', 'full'))
             StratigraphyReport.from_dict(payload['stratigraphy']['report'])
             library = payload['stratigraphy'].get('library', [])
             if not isinstance(library, list) or len(library) > 9:
@@ -345,7 +347,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/api/stratigraphy/preview':
                 from sincal.stratigraphy import StratigraphyReport
                 report = StratigraphyReport.from_dict(payload.get('report'))
-                return self.send(200, self.server.services.describe_stratigraphy(report, payload.get('table') is True, payload.get('annotation_scale', 10.0)))
+                return self.send(200, self.server.services.describe_stratigraphy(report, payload.get('table') is True, payload.get('annotation_scale', 10.0), output_mode=payload.get('output_mode', 'full')))
             if self.path == '/api/preferences':
                 return self.send(200, self.server.store.preferences(payload))
             if self.path == '/api/files/choose':
