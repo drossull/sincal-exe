@@ -268,7 +268,7 @@ def verify_annotation_contexts(doc, native, path, scale_name):
       (close qa:f) (princ))
     '''.replace('TARGET', json.dumps(path.as_posix())).replace(
         'HANDLES', '('+' '.join(json.dumps(handle) for handle in handles)+')')
-    doc.SendCommand(source+'\n')
+    doc.SendCommand(source.strip()+'\n')
     wait_for(lambda: path.exists() and path.read_text(errors='replace').endswith('CONTEXTS_COMPLETE\n'))
     wait_for(lambda: doc.GetVariable('CMDACTIVE') == 0)
     records = path.read_text(errors='replace').split('TEXT=')
